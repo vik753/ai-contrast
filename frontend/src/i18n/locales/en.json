@@ -1,0 +1,40 @@
+{
+  "app": {
+    "title": "AI Contrast"
+  },
+  "language": {
+    "label": "Interface language",
+    "names": {
+      "en": "English",
+      "uk": "Українська",
+      "ru": "Русский"
+    }
+  },
+  "home": {
+    "tagline": "Compare contracts clause by clause with AI.",
+    "description": "Add two or more contracts. AI Contrast matches their clauses, shows what is the same and what is different, and rates each difference from the client's point of view.",
+    "ratings": {
+      "title": "How differences are rated",
+      "green": {
+        "label": "Favorable",
+        "description": "The terms work in the client's favor."
+      },
+      "yellow": {
+        "label": "Pay attention",
+        "description": "The terms need a careful look."
+      },
+      "red": {
+        "label": "Unfavorable",
+        "description": "The terms are unfavorable or risky for the client."
+      },
+      "evidence": "Every rating comes with an explanation and a quote from the contract."
+    },
+    "byok": "Start free with the built-in AI model, or connect your own AI provider key. Contract text goes only to the AI provider that processes it.",
+    "status": "Early version: contract comparison is coming soon."
+  },
+  "footer": {
+    "privacy": "We store nothing on our server: no contracts, no keys, no results.",
+    "source": "Source code",
+    "license": "Free software under the AGPL-3.0 license."
+  }
+}

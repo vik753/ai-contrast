@@ -1,0 +1,340 @@
+/*
+ * AI Contrast — app shell styles.
+ * System font stack only (no web fonts). Light and dark themes follow
+ * `prefers-color-scheme`. No inline styles anywhere: the CSP has no
+ * 'unsafe-inline' in style-src.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+    "Liberation Sans", sans-serif;
+
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --text: #1b1f24;
+  --text-muted: #4a5360;
+  --border: #d9dee5;
+  --accent: #1f4e8c;
+  --accent-contrast: #ffffff;
+  --focus: #1a5fd0;
+
+  --green: #1e7a3c;
+  --yellow: #8a5a00;
+  --red: #b3261e;
+  --green-bg: #e8f5ec;
+  --yellow-bg: #fdf3dc;
+  --red-bg: #fbe9e7;
+
+  --radius: 10px;
+  --space: 1rem;
+  --max-width: 52rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151a;
+    --surface: #1a1f26;
+    --text: #e8ebef;
+    --text-muted: #a9b2be;
+    --border: #2e3540;
+    --accent: #8fb8f2;
+    --accent-contrast: #0e1726;
+    --focus: #9cc3ff;
+
+    --green: #6fd08f;
+    --yellow: #f0c45a;
+    --red: #ff8a80;
+    --green-bg: #15281c;
+    --yellow-bg: #2c2412;
+    --red-bg: #2f1a19;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+h1,
+h2,
+p,
+ul {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: var(--space);
+}
+
+/* Header */
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 0.75rem;
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--accent);
+}
+
+.lang-switcher {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.125rem;
+  background: var(--bg);
+}
+
+.lang-switcher__button {
+  min-width: 2.75rem;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.lang-switcher__button:hover {
+  background: var(--border);
+}
+
+/*
+ * Active language: not by color alone. An underline marks it in every mode,
+ * including forced colors where backgrounds are replaced.
+ */
+.lang-switcher__button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+
+@media (forced-colors: active) {
+  .lang-switcher {
+    border-color: CanvasText;
+  }
+
+  .lang-switcher__button {
+    border: 2px solid transparent;
+  }
+
+  .lang-switcher__button[aria-pressed="true"] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .rating-icon__badge {
+    fill: CanvasText;
+  }
+
+  .rating-icon__mark {
+    stroke: Canvas;
+  }
+
+  .ratings__item {
+    border: 1px solid CanvasText;
+    border-left-width: 4px;
+  }
+}
+
+/* Main */
+
+.site-main {
+  flex: 1;
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
+  padding-block: 2.5rem 3rem;
+}
+
+.intro {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.intro__title {
+  font-size: clamp(1.6rem, 1.2rem + 2vw, 2.4rem);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.intro__lead {
+  font-size: 1.125rem;
+  color: var(--text-muted);
+  max-width: 44rem;
+}
+
+.card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.card__title {
+  font-size: 1.125rem;
+  line-height: 1.3;
+}
+
+.card__note {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.ratings {
+  display: grid;
+  gap: 0.625rem;
+  padding: 0;
+  list-style: none;
+}
+
+.ratings__item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.875rem;
+  border-radius: calc(var(--radius) - 2px);
+  border-left: 4px solid currentColor;
+}
+
+.ratings__item--green {
+  color: var(--green);
+  background: var(--green-bg);
+}
+
+.ratings__item--yellow {
+  color: var(--yellow);
+  background: var(--yellow-bg);
+}
+
+.ratings__item--red {
+  color: var(--red);
+  background: var(--red-bg);
+}
+
+.ratings__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.ratings__label {
+  font-weight: 700;
+}
+
+.ratings__description {
+  color: var(--text);
+}
+
+.rating-icon {
+  flex: none;
+  margin-top: 0.2rem;
+}
+
+.rating-icon__badge {
+  fill: currentColor;
+}
+
+.rating-icon__mark {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.note,
+.status {
+  color: var(--text-muted);
+}
+
+.status {
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+/* Footer */
+
+.site-footer {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.site-footer__inner {
+  display: grid;
+  gap: 0.375rem;
+  padding-block: 1.25rem;
+}
+
+.site-footer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.site-footer__link {
+  color: var(--accent);
+  font-weight: 600;
+  text-underline-offset: 0.2em;
+}
+
+.site-footer__link:hover {
+  text-decoration-thickness: 2px;
+}
