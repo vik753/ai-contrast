@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -59,3 +61,80 @@ def all_log_text(caplog: pytest.LogCaptureFixture) -> str:
         if record.exc_text:
             parts.append(record.exc_text)
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Raw ASGI driving (no test client between the app and the "server").
+# ---------------------------------------------------------------------------
+
+Message = dict[str, Any]
+
+
+def http_scope(
+    method: str = "GET",
+    path: str = "/",
+    *,
+    headers: list[tuple[bytes, bytes]] | None = None,
+    query_string: bytes = b"",
+) -> dict[str, Any]:
+    """A minimal ASGI 3 HTTP scope, as uvicorn would build it."""
+    return {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "method": method,
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode("utf-8", "surrogateescape"),
+        "query_string": query_string,
+        "root_path": "",
+        "headers": headers or [(b"host", b"testserver")],
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    }
+
+
+async def call_asgi(app: Any, scope: dict[str, Any], body: bytes = b"") -> list[Message]:
+    """Run one request through ``app`` and return every message it sent.
+
+    Any exception raised by the app propagates to the caller, exactly as it
+    would reach uvicorn.
+    """
+    sent: list[Message] = []
+    request_messages = [{"type": "http.request", "body": body, "more_body": False}]
+
+    async def receive() -> Message:
+        if request_messages:
+            return request_messages.pop(0)
+        await asyncio.Event().wait()  # never returns: client stays connected
+        raise AssertionError("unreachable")
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    await app(scope, receive, send)
+    return sent
+
+
+def run_asgi(app: Any, scope: dict[str, Any], body: bytes = b"") -> list[Message]:
+    return asyncio.run(call_asgi(app, scope, body))
+
+
+def response_status(messages: list[Message]) -> int | None:
+    for message in messages:
+        if message["type"] == "http.response.start":
+            return int(message["status"])
+    return None
+
+
+def response_body(messages: list[Message]) -> bytes:
+    return b"".join(m.get("body", b"") for m in messages if m["type"] == "http.response.body")
+
+
+def access_lines(caplog: pytest.LogCaptureFixture, method: str, path: str) -> list[str]:
+    """ai_contrast log messages that look like the access line of one request:
+    ``<method> <path> <status> ...``."""
+    prefix = f"{method} {path} "
+    return [
+        r.getMessage() for r in ai_contrast_records(caplog) if r.getMessage().startswith(prefix)
+    ]

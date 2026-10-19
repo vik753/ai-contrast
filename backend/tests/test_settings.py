@@ -51,6 +51,7 @@ def test_settings_env_environment_production_parsed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example")
 
     assert Settings().environment == "production"
 
@@ -94,6 +95,7 @@ def test_docs_env_production_openapi_returns_404(
     make_client: Callable[..., TestClient], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example")
 
     response = make_client().get("/openapi.json")
 

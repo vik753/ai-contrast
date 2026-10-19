@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.settings import Settings
-from tests.helpers import LOG_NAMESPACE, SETTINGS_ENV_VARS
+from tests.helpers import ALLOWED_ORIGIN, LOG_NAMESPACE, SETTINGS_ENV_VARS
 
 TEST_CLIENT_LOGGERS = ("httpx", "httpcore")
 
@@ -47,9 +47,16 @@ def log_capture(caplog: pytest.LogCaptureFixture) -> Iterator[pytest.LogCaptureF
 
 @pytest.fixture
 def make_app() -> Callable[..., FastAPI]:
-    """Build a fresh app. Keyword arguments are passed to ``Settings``."""
+    """Build a fresh app. Keyword arguments are passed to ``Settings``.
+
+    Production requires ``allowed_origins`` to be set explicitly (S1-T1b AC6).
+    When a test asks for production without origins, a valid https origin
+    is supplied so that the test exercises its own behavior only.
+    """
 
     def _make_app(**settings_overrides: Any) -> FastAPI:
+        if settings_overrides.get("environment") == "production":
+            settings_overrides.setdefault("allowed_origins", [ALLOWED_ORIGIN])
         return create_app(Settings(**settings_overrides))
 
     return _make_app
