@@ -73,7 +73,7 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   3. **Start command guard:** a test asserts the Dockerfile `CMD` contains `--log-config log_config.json`, `--no-access-log`, `--no-proxy-headers` and `--no-server-header`.
 - Threats: T1, T3.
 
-### S1-T2 Frontend skeleton
+### S1-T2 Frontend skeleton — merged in PR #2
 
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-frontend`.
 - Goal: a React + TypeScript app shell with i18n and safe defaults.
@@ -105,7 +105,7 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   - Test runner: Vitest with jsdom and Testing Library; setup file `src/test/setup.ts`.
 - Working directory: git worktree `/home/claude/wt/s1-frontend` on branch `feat/s1-frontend`.
 
-### S1-T2b Frontend hardening from review (PR #2)
+### S1-T2b Frontend hardening from review — merged in PR #2
 
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-frontend` (same PR #2).
 - AC (from `code-reviewer` and `security-reviewer`):
@@ -123,6 +123,15 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   12. **Hard-coded strings check** compares whole strings (exact text node match or explicitly allowed interpolations), not substrings.
   13. **Copy (ADR 0007):** `home.byok` describes both paths in all three languages — start free with the built-in model, or connect your own provider key; contract text goes only to the AI provider that processes it.
 - Threats: T1, T8, T9.
+
+### S1-T2c Lint follow-ups (next frontend PR)
+
+- Owner: `frontend-dev`. Tests first: `test-engineer`.
+- AC:
+  1. The HTML-sink rule applies to all JS/TS extensions (`js, mjs, cjs, jsx, ts, mts, cts, tsx`); a fixture test with an `.mts` path.
+  2. Extra selectors: `srcdoc` assignment; object properties `innerHTML`/`outerHTML`/`srcdoc`/`srcDoc` (covers `Object.assign`); member access to `insertAdjacentHTML`/`createContextualFragment`/`setHTMLUnsafe`/`parseHTMLUnsafe` (covers `.call`); `setAttribute("srcdoc" | "on*", ...)`; `new window.DOMParser()`; `document.write` without depending on `object.name`.
+  3. `changeLanguage()` no longer sets `<html lang>` itself (the listener does).
+- Threats: T1.
 
 ### S1-T3 Local run with Docker Compose
 

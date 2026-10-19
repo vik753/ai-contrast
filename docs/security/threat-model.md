@@ -47,7 +47,7 @@ Browser controls:
 2. Opt-in "Remember on this device": `localStorage`, with a warning.
 3. "Forget key" button.
 4. Strict CSP (see T9). No third-party scripts, analytics or CDNs.
-5. React escaping only. `dangerouslySetInnerHTML` is forbidden by a lint rule.
+5. React escaping only. Raw HTML sinks are banned by lint (`no-restricted-syntax` with T1 messages): `dangerouslySetInnerHTML`, `__html`, `innerHTML`/`outerHTML` writes, `insertAdjacentHTML`, `createContextualFragment`, `setHTMLUnsafe`, `parseHTMLUnsafe`, `document.write`, `DOMParser`, `srcDoc`. Inline `eslint-disable` has no effect (`noInlineConfig`). Runtime backstop: Trusted Types (`require-trusted-types-for 'script'; trusted-types 'none'`). Untrusted text is never passed through i18n `<Trans>` and never used as a translation key.
 6. UI tip: create a separate provider key for AI Contrast with a spending limit.
 
 Out of our control: malicious browser extensions and compromised client devices. The privacy policy says so.
@@ -143,6 +143,7 @@ Controls:
 6. GitHub Actions pinned by full commit SHA; minimal `permissions:`.
 7. GitHub secret scanning and push protection enabled.
 8. Tesseract language data and fonts are committed or built into the bundle, not loaded from a CDN.
+9. `frontend/.npmrc` sets `ignore-scripts=true` (do not remove it without security review); npm is pinned with `packageManager`. The Vite dev server is never exposed beyond localhost.
 
 ## T9. Security headers
 
@@ -157,7 +158,15 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 Cross-Origin-Opener-Policy: same-origin
 ```
 
-Google Picker needs Google domains in `script-src`, `frame-src` and `connect-src` (stage 3).
+Deployed policy (stage 1) adds: `frame-src 'none'`, `font-src 'self'`, `manifest-src 'self'`, `require-trusted-types-for 'script'; trusted-types 'none'`, `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`. The exact policy lives in `frontend/public/_headers` and is pinned by `headers.test.ts`.
+
+Stage 3 plan (OCR and Google Picker):
+
+- `new Worker(url)` and `importScripts()` are Trusted Types sinks. Tesseract.js and PDF.js create workers, so add a reviewed `default` policy (`trusted-types default`) whose `createScriptURL` accepts only same-origin `/assets/` URLs; no `createHTML`/`createScript`. Workers need their own default policy from a small worker entry of ours, or a path-specific header rule.
+- Self-host Tesseract `workerPath`, `corePath`, `langPath` and PDF.js `workerSrc`, `cMapUrl`, `standardFontDataUrl`, `wasmUrl`. PDF.js `isEvalSupported: false`. Prefer `workerBlobURL: false`, then remove `blob:` from `worker-src`.
+- Google Picker needs Google hosts in `script-src`, `frame-src` and `connect-src`, and COOP `same-origin-allow-popups` for the Google Identity Services popup — a documented exception to the header tests.
+- Turnstile (ADR 0007) needs `https://challenges.cloudflare.com` in `script-src` and `frame-src` — also a documented exception.
+- An automated Playwright CSP smoke test (no `securitypolicyviolation`) runs in CI at the e2e stage.
 
 Backend: `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, CORS allowlist.
 
