@@ -149,9 +149,46 @@ ul {
   background: var(--border);
 }
 
+/*
+ * Active language: not by color alone. An underline marks it in every mode,
+ * including forced colors where backgrounds are replaced.
+ */
 .lang-switcher__button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-contrast);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+
+@media (forced-colors: active) {
+  .lang-switcher {
+    border-color: CanvasText;
+  }
+
+  .lang-switcher__button {
+    border: 2px solid transparent;
+  }
+
+  .lang-switcher__button[aria-pressed="true"] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .rating-icon__badge {
+    fill: CanvasText;
+  }
+
+  .rating-icon__mark {
+    stroke: Canvas;
+  }
+
+  .ratings__item {
+    border: 1px solid CanvasText;
+    border-left-width: 4px;
+  }
 }
 
 /* Main */

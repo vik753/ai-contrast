@@ -55,25 +55,67 @@ function setDocumentLanguage(lang: Language): void {
   document.documentElement.lang = lang;
 }
 
-export async function setupI18n(): Promise<i18n> {
-  const lang = readStoredLanguage();
+/**
+ * Marker on the i18next singleton. This module can be loaded more than once
+ * (tests reset the module registry) while i18next stays the same object, so a
+ * module-level flag is not enough to keep the listener unique.
+ */
+const HTML_LANG_LISTENER = Symbol.for("ai-contrast.i18n.html-lang-listener");
+
+/**
+ * `<html lang>` follows every language change, including direct
+ * `i18next.changeLanguage()` calls. Registered once per i18next instance.
+ */
+function syncHtmlLangOnChange(instance: i18n): void {
+  if (Reflect.get(instance, HTML_LANG_LISTENER) === true) {
+    return;
+  }
+  instance.on("languageChanged", () => {
+    const resolved = instance.resolvedLanguage;
+    setDocumentLanguage(isLanguage(resolved) ? resolved : DEFAULT_LANGUAGE);
+  });
+  Reflect.set(instance, HTML_LANG_LISTENER, true);
+}
+
+async function initOrSwitch(lang: Language): Promise<void> {
+  syncHtmlLangOnChange(i18next);
   if (i18next.isInitialized) {
     await i18next.changeLanguage(lang);
-  } else {
-    await i18next.init({
-      resources,
-      lng: lang,
-      fallbackLng: DEFAULT_LANGUAGE,
-      supportedLngs: [...SUPPORTED_LANGUAGES],
-      load: "currentOnly",
-      defaultNS: "translation",
-      // React escapes all rendered text; i18next must not escape it twice.
-      interpolation: { escapeValue: false },
-      // Resources are bundled, so nothing loads asynchronously.
-      react: { useSuspense: false },
-    });
+    return;
   }
+  await i18next.init({
+    resources,
+    lng: lang,
+    fallbackLng: DEFAULT_LANGUAGE,
+    supportedLngs: [...SUPPORTED_LANGUAGES],
+    load: "currentOnly",
+    defaultNS: "translation",
+    // React escapes all rendered text; i18next must not escape it twice.
+    interpolation: { escapeValue: false },
+    // Resources are bundled, so nothing loads asynchronously.
+    react: { useSuspense: false },
+  });
+}
+
+/** Initializes i18n with the stored language (English if none or invalid). */
+export async function setupI18n(): Promise<i18n> {
+  const lang = readStoredLanguage();
+  await initOrSwitch(lang);
   setDocumentLanguage(lang);
+  return i18next;
+}
+
+/**
+ * Last-resort setup used when `setupI18n()` failed: English, no storage.
+ * Never rejects; `<html lang>` is always set to English.
+ */
+export async function setupFallbackI18n(): Promise<i18n> {
+  try {
+    await initOrSwitch(DEFAULT_LANGUAGE);
+  } catch {
+    // Nothing else to try: the app still renders; i18next falls back to keys.
+  }
+  setDocumentLanguage(DEFAULT_LANGUAGE);
   return i18next;
 }
 
