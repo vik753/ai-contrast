@@ -35,7 +35,12 @@ RUN python -m compileall -q app
 # ---- runtime: no uv, no build tools, non-root ----
 FROM python:3.13-slim AS runtime
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+# Fail closed: the image runs as production unless told otherwise. Production
+# refuses ALLOW_PRIVATE_PROVIDER_URLS=true and requires ALLOWED_ORIGINS (https
+# origins) to be set, so the container does not start without it.
+# Local development (Docker Compose) sets ENVIRONMENT=development explicitly.
+ENV ENVIRONMENT=production \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:${PATH}"
 
