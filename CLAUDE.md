@@ -44,11 +44,13 @@ People and roles:
 | AI layer | `AIProvider` port; adapters on the official `anthropic` and `openai` SDKs. **No LiteLLM.** |
 | Validation | Pydantic v2 |
 | Rate limiting | slowapi (in memory) |
+| Free default model | Cloudflare Workers AI `@cf/openai/gpt-oss-120b` via the `openai` adapter, our token, Turnstile, daily quotas (ADR 0007) |
+| Demo mode | Built-in synthetic contracts with precomputed results (ADR 0007) |
 | Hosting | Cloudflare Pages (frontend, `_headers`), Render (backend, Docker, 512 MB RAM) |
 
 ## Hard security rules — never break
 
-1. **No secrets in the repository. Ever.** The v1 server needs no secrets.
+1. **No secrets in the repository. Ever.** The server holds only its own operational secrets for the free default model and Turnstile (ADR 0007), in hosting environment variables, typed `SecretStr`. It never stores client secrets.
 2. **Client API key:** only in the `X-Provider-Key` request header. Never in a URL, query string, log, error message or server-side storage. Type `pydantic.SecretStr`. Create SDK clients per request; no global clients holding a key.
 3. **Logging:** never log request headers, request or response bodies, contract text, prompts or model output. Log only method, path, status, duration, sizes, counts and error codes.
 4. **Outbound HTTP to user-supplied hosts** goes only through the SSRF guard: HTTPS and port 443 only, hostnames only, resolve DNS once and block private/loopback/link-local/multicast/reserved/ULA addresses, connect to the checked IP, no redirects, timeouts and size limits. Provider presets are an allowlist.

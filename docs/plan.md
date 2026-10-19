@@ -14,7 +14,11 @@ This file is the working copy for the team.
    - topics suggested by AI from the uploaded contracts;
    - the client's own topics.
 4. The client chooses their side (for example: insured party, buyer, supplier).
-5. The client chooses the AI provider and model and enters their own API key. Known providers have preset base URLs. A custom base URL is an advanced setting.
+5. AI provider (ADR 0007):
+   - **Default:** "AI Contrast Free" — Cloudflare Workers AI `gpt-oss-120b` with our key; works without a client key; small daily quota; Turnstile check.
+   - **Own key:** the client chooses a provider and model and enters their own API key. Known providers have preset base URLs. A custom base URL is an advanced setting.
+   - **Free-key hint:** "Get a free Gemini key" link with a warning about Google's free-tier data use.
+   - **Demo:** sample contracts with precomputed results, no key and no AI call.
 6. Comparison by clause and by meaning, not by number or title.
 7. Result: a table with ratings — green (favorable), yellow (attention), red (unfavorable). Each cell has an explanation and a contract quote. Color is always paired with an icon and a text label.
 8. The server stores nothing: no contracts, keys or results.
@@ -47,11 +51,11 @@ This file is the working copy for the team.
 | 3 | Text extraction | pdfplumber, python-docx, TXT; zip bomb and XXE defenses; subprocess parsing with limits; Google Docs by link and via Picker; `.pages` hint; Tesseract.js OCR with confidence; language detection. |
 | 4 | Browser hash and cache | Web Crypto, IndexedDB, `CacheStore` port, "already analyzed" dialog, 90-day retention, history toggle, "Clear all". |
 | 5 | Clause splitting | By numbering and headings, no AI. |
-| 6 | Model connection | `AIProvider` port, `anthropic` and `openai` adapters, presets, custom URL with SSRF guard, key handling and log canary, key storage options, test request, "OCR via AI" button. |
+| 6 | Model connection | `AIProvider` port, `anthropic` and `openai` adapters, presets, custom URL with SSRF guard, key handling and log canary, key storage options, test request, "OCR via AI" button. Free default provider (Cloudflare Workers AI) with Turnstile and daily quotas; free-key hint for Gemini (ADR 0007). |
 | 7 | Topic catalog | Templates as JSON in the repo (3 languages), AI-suggested topics, own topics (browser storage, export/import), synonym expansion, client side selection. |
 | 8 | Clause tagging | Cheap model tags, strong model checks low confidence, "Other" bucket. |
 | 9 | Analysis | Prompt with instruction/data separation, strict JSON, Pydantic, quote verification, SSE progress, cross-language comparison, missing-topic findings. |
-| 10 | Result table | Colors with icons and labels, explanations, quotes, "Other", plain-text rendering, export to PDF and JSON. |
+| 10 | Result table | Colors with icons and labels, explanations, quotes, "Other", plain-text rendering, export to PDF and JSON. Demo mode with sample contracts and precomputed results (ADR 0007). |
 | 11 | Token economy and quality | Prompt caching, per-topic cache, model routing, cost estimate, eval on a golden set. |
 | 12 | Security audit | Threat model review, OWASP ZAP, manual pentest (OWASP Top 10, OWASP Top 10 for LLM), header check, real contracts in 3 languages. |
 | 13 | Deploy | Cloudflare Pages, Render, GitHub Actions deploy, header check on the production domain. |
@@ -67,4 +71,5 @@ This file is the working copy for the team.
 ## Open questions
 
 - Domain and trademark check for "AI Contrast".
-- Provider presets for v1. Proposal: Anthropic, OpenAI, Google Gemini, Mistral, OpenRouter.
+- Provider presets for v1. Proposal: AI Contrast Free (Cloudflare), Anthropic, OpenAI, Google Gemini, Mistral, OpenRouter.
+- Workers Paid ($5/month) to raise the free quota — customer decision, later.

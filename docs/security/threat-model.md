@@ -5,7 +5,7 @@ Owner: `security-reviewer`. Updated at every stage. Fully reviewed at stage 12 (
 ## Principles
 
 1. **The server stores nothing.** No database, no files on disk, no server-side cache.
-2. **The server holds no client secrets.** The API key lives on the server only for the duration of one request.
+2. **The server holds no client secrets.** The client API key lives on the server only for the duration of one request. The server holds only its own operational secrets for the free default model and Turnstile (ADR 0007), in hosting environment variables.
 3. **Everything external is untrusted:** files, links, provider URLs, contract text, model output.
 4. **Minimal dependencies,** each pinned with a hash.
 5. **Least privilege** for every component, workflow and agent.
@@ -19,6 +19,7 @@ Owner: `security-reviewer`. Updated at every stage. Fully reviewed at stage 12 (
 | Contract text | Browser. Server: memory. The client's AI provider. | Personal and commercial data exposure. |
 | Analysis results | Browser IndexedDB | Contain contract quotes. |
 | Google access token | Browser only | Access to the selected file. |
+| Our free-tier credentials (`CF_ACCOUNT_ID`, `CF_AI_TOKEN`, Turnstile secret) | Render secret env vars only | Free quota theft; abuse of our Cloudflare account in our name. |
 | Our backend | Render | Resource abuse; attacks on others through us. |
 | Repository and CI | GitHub | Code or dependency tampering. |
 
@@ -153,6 +154,21 @@ Cross-Origin-Opener-Policy: same-origin
 Google Picker needs Google domains in `script-src`, `frame-src` and `connect-src` (stage 3).
 
 Backend: `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, CORS allowlist.
+
+## T10. Free default model (ADR 0007)
+
+Threats: theft of our Cloudflare token; bots burning the shared free quota; using free mode as a free AI proxy; billing surprises.
+
+Controls:
+
+1. `CF_AI_TOKEN` is scoped to Workers AI only. It lives only in Render secret env vars. It is never sent to the browser, never logged, never part of an error. It is typed `SecretStr` and covered by the log canary test.
+2. The Cloudflare account stays on the Workers Free plan: above 10,000 Neurons per day requests fail instead of being billed.
+3. Free mode requires a valid Cloudflare Turnstile token, verified server-side, one use per analysis.
+4. Per-IP daily limit and an in-memory global daily Neuron budget below the free allocation.
+5. Stricter size limits in free mode (initial: 2 documents, 30 pages in total).
+6. Free mode runs only our analysis pipeline with a fixed model; no raw prompts, no client-chosen model.
+7. Quota exhausted → `429` with code `free_quota_exhausted`; the UI offers the client's own key.
+8. The UI states which provider processes the text in free mode and its data policy.
 
 ## Checklist for every change
 

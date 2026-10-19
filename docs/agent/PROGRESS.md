@@ -30,7 +30,9 @@ How to resume after a break: read this file, then continue with the first unchec
 - License AGPL-3.0-only, public repository (ADR 0005).
 - Agent team and review workflow (ADR 0006).
 - Carte blanche for the tech lead. Report to the customer after each stage. Ask only on disputed questions and blockers.
+- Free default model: demo mode + Cloudflare Workers AI `gpt-oss-120b` with our key and quotas + free Gemini key hint (ADR 0007).
 
 ## Log
 
 - 2026-10-19 — Stage 0 done: `CLAUDE.md`, `README.md`, `SECURITY.md`, `LICENSE`, threat model, plan, ADR 0001–0006, eight agents in `.claude/agents/`. Secret scanning and push protection are on. Waiting for the customer: private vulnerability reporting, Dependabot alerts and security updates (S0-T5b).
+- 2026-10-19 — ADR 0007 accepted (free default model). Obsidian sync pending: the customer's computer was offline.
