@@ -48,6 +48,22 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   - Tests may add their own routes to an app from `create_app()` (for example a route that raises) and use `TestClient(app, raise_server_exceptions=False)`.
 - Working directory: git worktree `/home/claude/wt/s1-backend` on branch `feat/s1-backend`.
 
+### S1-T1b Backend hardening from review (PR #1)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-backend` (same PR #1).
+- AC (from `code-reviewer` and `security-reviewer`):
+  1. **Log redaction filter** `app.logging_filters.ExcInfoScrubber` attached to the `stderr` handler in `backend/log_config.json`: for every record it removes `exc_info`, `exc_text` and `stack_info` and appends only the exception type names (recursively for exception groups). Test: `logging.config.dictConfig` with `log_config.json`, then a record whose `exc_info` carries a canary formats without the canary.
+  2. **Exception groups:** `ErrorCatcherMiddleware` handles `BaseExceptionGroup` whose leaves are `Exception`s like any other `Exception` (500, generic body, no re-raise). Test with a raw ASGI call and a canary.
+  3. **FastAPI telemetry off:** `FastAPI(..., telemetry={"tracing": False, "metrics": False, "logs": False, "operation_spans": False, "auto_configure": False})`. Test asserts the setting.
+  4. **Validation errors:** a `RequestValidationError` handler returns `422` with `{"error": "invalid_request", "fields": [<loc as list of strings>]}` — no `input`, `ctx`, `msg` or `url`. Canary test with a test route that has a constrained `X-Provider-Key` header and a constrained JSON body.
+  5. **Settings errors hide input:** `hide_input_in_errors=True`; test that `str(ValidationError)` does not contain a marker value.
+  6. **Origins:** each `ALLOWED_ORIGINS` entry must be `scheme://host[:port]` with no path, query, fragment, userinfo or wildcard; `null` rejected. In production: `https` only, and `ALLOWED_ORIGINS` must be set explicitly (no localhost default).
+  7. **Fail closed:** the Docker runtime stage sets `ENV ENVIRONMENT=production`.
+  8. **Access log accuracy:** if the app fails after the response started, the line shows the sent status plus ` aborted=1`; if no response started (cancel or disconnect), the status is `-`. Test with a `StreamingResponse` whose generator raises after the first chunk (canary in the message): no exception reaches the client, the canary is not logged, exactly one `unhandled_exception` line.
+  9. Control characters in logged method and path are replaced with U+FFFD instead of `?`.
+  10. `app/main.py` docstring shows the full run command with `--log-config log_config.json`.
+- Threats: T1, T2, T3, T6, T8.
+
 ### S1-T2 Frontend skeleton
 
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-frontend`.
@@ -97,6 +113,9 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   2. `.github/workflows/codeql.yml`: languages `python` and `javascript-typescript`, on push, pull request and weekly.
   3. All actions pinned by full SHA from the table above, with a version comment. Top-level `permissions: contents: read`; CodeQL job adds `security-events: write` only.
   4. `.github/dependabot.yml`: ecosystems `uv` (`/backend`), `npm` (`/frontend`), `github-actions` (`/`), `docker` (`/backend`); weekly; `cooldown` with `default-days: 7`.
+  6. Docker base images pinned by digest (`python:3.13-slim@sha256:...` — the same digest in builder and runtime; `ghcr.io/astral-sh/uv:<version>@sha256:...`). CI job `docker` builds the backend image on every pull request and smoke-tests `/api/health` in a container.
+  7. pip-audit in CI uses the PyPI and OSV sources. CI fails if `uv.lock` contains `opentelemetry-sdk` or `opentelemetry-exporter-*`.
+  8. Note: `package-lock.json` was generated with npm 11 because npm 10 crashed on this tree; `npm ci` works with npm 10. Use npm 11 in CI if a regeneration is needed.
   5. CI is green on the pull request.
 - Threats: T8.
 

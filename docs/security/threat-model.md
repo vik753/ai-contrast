@@ -35,6 +35,11 @@ Server controls:
 4. The error handler returns only an error code and a short safe message. SDK exception text never leaves the server and is never logged verbatim.
 5. The key lives only inside one request. No global variables, caches or shared SDK clients with a key.
 6. **Log canary test:** a request with the key `sk-CANARY-<random>` must not leave the canary in logs, responses or errors. Runs in CI on every change.
+7. A redaction filter on the root log handler removes exception messages, tracebacks and stack info from every logger, including `uvicorn.error`. Tested through `log_config.json`.
+8. A custom `422` handler: validation errors never return `input`, `ctx` or `msg`.
+9. FastAPI native telemetry is disabled explicitly. No OpenTelemetry SDK or exporter without security review.
+10. SDK debug-logging variables (`ANTHROPIC_LOG`, `OPENAI_LOG`) are never set in production.
+11. Settings use `hide_input_in_errors=True`, so startup errors never print values (including our own secrets).
 
 Browser controls:
 
@@ -62,7 +67,7 @@ Controls:
    - redirects are not followed;
    - the backend appends the endpoint path; the client sets only the base URL;
    - timeouts and a response size limit.
-3. Local models (Ollama and others) only in local development: `ALLOW_PRIVATE_PROVIDER_URLS=true`. Off in production.
+3. Local models (Ollama and others) only in local development: `ALLOW_PRIVATE_PROVIDER_URLS=true`. Off in production. The Docker image defaults to `ENVIRONMENT=production`, so this refusal fails closed.
 4. Tests cover at least: `127.0.0.1`, `127.1`, `0.0.0.0`, `[::1]`, `2130706433`, `0x7f000001`, `169.254.169.254`, `10.0.0.1`, `192.168.0.1`, `[fd00::1]`, and hostnames that resolve to loopback.
 
 ## T3. Contract data leak
@@ -89,7 +94,7 @@ Controls:
 3. DOCX: before parsing, check total uncompressed size, entry count and compression ratio.
 4. XML parsing without external entities (`defusedxml` or `resolve_entities=False`).
 5. Parsing runs in a subprocess with time and memory limits.
-6. Docker: non-root user, read-only root filesystem, in-memory temp directory.
+6. Docker: non-root user, read-only root filesystem, in-memory temp directory. Compose uses `read_only`, `tmpfs` for `/tmp`, `cap_drop: [ALL]` and `no-new-privileges`. Render cannot enforce a read-only root filesystem (residual risk).
 
 ## T5. Prompt injection
 
@@ -114,7 +119,8 @@ Controls:
 1. Per-IP rate limit in memory (slowapi).
 2. Concurrent analysis limit (initial: 2) because of 512 MB RAM.
 3. Request body size limit at the server.
-4. CORS allows only our frontend origin. CORS protects against other websites in a browser, not against scripts.
+4. CORS allows only our frontend origin. CORS protects against other websites in a browser, not against scripts. `ALLOWED_ORIGINS` holds exact `https://host[:port]` origins; `null`, paths and wildcards are rejected; production requires it to be set explicitly.
+7. Per-IP limits behind Render's proxy: never trust the leftmost `X-Forwarded-For`; derive the client IP from the hop added by Render's proxy, and document it.
 5. No raw prompt endpoint. The server runs only our analysis pipeline, so it is useless as a generic AI proxy.
 6. If needed later: Cloudflare Turnstile.
 
@@ -130,7 +136,7 @@ Example: on 2026-03-24, malicious LiteLLM 1.82.7 and 1.82.8 were published to Py
 Controls:
 
 1. Minimal dependencies. No LiteLLM. Official `anthropic` and `openai` SDKs only.
-2. Lock files with hashes: `uv.lock`, `package-lock.json`. Install only with `uv sync --locked` and `npm ci`.
+2. Lock files with hashes: `uv.lock`, `package-lock.json`. Install only with `uv sync --locked` and `npm ci`. Docker base images are pinned by digest and updated by Dependabot. CI runs pip-audit with the OSV source.
 3. A new dependency needs approval of the tech lead and `security-reviewer`.
 4. Updates through Dependabot pull requests with a cooldown of several days.
 5. CI: pip-audit, npm audit, CodeQL (Python and TypeScript).
