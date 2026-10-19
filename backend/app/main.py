@@ -8,14 +8,14 @@ Run (from ``backend/``, as in the ``Dockerfile``)::
 
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from fastapi.telemetry import TelemetryConfig
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api import health
+from app.api.validation_errors import validation_error_handler
 from app.middleware import AccessLogMiddleware, ErrorCatcherMiddleware, SecurityHeadersMiddleware
 from app.settings import Settings
 
@@ -31,22 +31,6 @@ TELEMETRY_DISABLED: TelemetryConfig = {
     "operation_spans": False,
     "auto_configure": False,
 }
-
-
-async def validation_error_handler(_request: Request, exc: Exception) -> JSONResponse:
-    """422 with field locations only.
-
-    FastAPI's default body echoes ``input``, ``ctx`` and ``msg``, which can hold the
-    provider key or contract text. Locations are names chosen by our code (and list
-    indexes); malformed JSON gives ``["body", "<offset>"]``.
-    """
-    errors = exc.errors() if isinstance(exc, RequestValidationError) else []
-    fields: list[list[str]] = []
-    for error in errors:
-        loc = [str(part) for part in error.get("loc", ())]
-        if loc not in fields:
-            fields.append(loc)
-    return JSONResponse({"error": "invalid_request", "fields": fields}, status_code=422)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
