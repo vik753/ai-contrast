@@ -9,7 +9,8 @@ Check a task only when it is merged to `main` with green CI.
 - [x] S0-T2 Threat model and plan: `docs/security/threat-model.md`, `docs/plan.md`.
 - [x] S0-T3 ADR 0001–0006.
 - [x] S0-T4 Agents: `.claude/agents/*.md`.
-- [x] S0-T5 Repository security settings: secret scanning, push protection, private vulnerability reporting, Dependabot alerts.
+- [x] S0-T5a Secret scanning and push protection: enabled (verified through the API).
+- [ ] S0-T5b **Customer action** (the session proxy cannot change repository settings): enable private vulnerability reporting, Dependabot alerts and Dependabot security updates in Settings → Security.
 
 ## Stage 1 — Scaffold
 
@@ -85,5 +86,5 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
 - AC:
   1. Both reviewers approve every Stage 1 pull request.
   2. `CLAUDE.md` "Commands" section and `README.md` "Run locally" section are filled with exact commands.
-  3. Branch protection on `main`: pull request required, status checks `backend`, `frontend`, `CodeQL` required.
+  3. Branch protection on `main`: pull request required, status checks `backend`, `frontend`, `CodeQL` required. **Customer action** — the tech lead sends exact steps.
   4. `PROGRESS.md` updated; Stage 1 report sent to the customer.

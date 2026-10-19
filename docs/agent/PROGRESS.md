@@ -33,4 +33,4 @@ How to resume after a break: read this file, then continue with the first unchec
 
 ## Log
 
-- 2026-10-19 — Stage 0 done: `CLAUDE.md`, `README.md`, `SECURITY.md`, `LICENSE`, threat model, plan, ADR 0001–0006, eight agents in `.claude/agents/`, repository security settings.
+- 2026-10-19 — Stage 0 done: `CLAUDE.md`, `README.md`, `SECURITY.md`, `LICENSE`, threat model, plan, ADR 0001–0006, eight agents in `.claude/agents/`. Secret scanning and push protection are on. Waiting for the customer: private vulnerability reporting, Dependabot alerts and security updates (S0-T5b).
