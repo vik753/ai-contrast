@@ -183,3 +183,46 @@ describe("other security headers (AC8, T9)", () => {
     expect(singleHeader("Cross-Origin-Opener-Policy")).toBe("same-origin");
   });
 });
+
+/** Order-insensitive comparison of a directive's source list. */
+function sorted(sources: string[]): string[] {
+  return [...sources].sort();
+}
+
+describe("exact CSP directives (S1-T2b AC4)", () => {
+  it("test_csp_script_src_is_exactly_self_and_wasm_unsafe_eval", () => {
+    expect(sorted(directive("script-src"))).toEqual(sorted(["'self'", "'wasm-unsafe-eval'"]));
+  });
+
+  it("test_csp_worker_src_is_exactly_self_and_blob", () => {
+    expect(sorted(directive("worker-src"))).toEqual(sorted(["'self'", "blob:"]));
+  });
+
+  it("test_csp_frame_src_is_none", () => {
+    expect(directive("frame-src")).toEqual(["'none'"]);
+  });
+
+  it("test_csp_has_upgrade_insecure_requests_without_sources", () => {
+    expect(directive("upgrade-insecure-requests")).toEqual([]);
+  });
+});
+
+describe("extra security headers (S1-T2b AC4)", () => {
+  it("test_cross_origin_resource_policy_is_same_origin", () => {
+    expect(singleHeader("Cross-Origin-Resource-Policy")).toBe("same-origin");
+  });
+
+  it("test_x_frame_options_is_deny", () => {
+    expect(singleHeader("X-Frame-Options")).toBe("DENY");
+  });
+});
+
+describe("Trusted Types (S1-T2b AC5)", () => {
+  it("test_csp_requires_trusted_types_for_script", () => {
+    expect(directive("require-trusted-types-for")).toEqual(["'script'"]);
+  });
+
+  it("test_csp_trusted_types_is_none", () => {
+    expect(directive("trusted-types")).toEqual(["'none'"]);
+  });
+});

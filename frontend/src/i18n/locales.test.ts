@@ -76,3 +76,30 @@ describe("locale values (AC7)", () => {
     expect(LOCALES.uk["home.tagline"]).not.toBe(LOCALES.ru["home.tagline"]);
   });
 });
+
+/**
+ * S1-T2b AC13 (ADR 0007) — `home.byok` describes both paths (free built-in
+ * model or own key). The exact wording is approved by the customer, so the
+ * tests check only presence, parity and that the old key-only copy is gone.
+ */
+const OLD_BYOK: Record<LocaleName, string> = {
+  en: "You use your own AI provider API key. Contract text goes only to the provider you choose.",
+  uk: "Ви використовуєте власний API-ключ постачальника ШІ. Текст договору надходить лише до обраного вами постачальника.",
+  ru: "Вы используете собственный API-ключ провайдера ИИ. Текст договора передаётся только выбранному вами провайдеру.",
+};
+
+describe("home.byok copy (S1-T2b AC13)", () => {
+  it.each(NAMES)("test_%s_has_non_empty_home_byok", (name) => {
+    const value = LOCALES[name]["home.byok"];
+    expect(typeof value).toBe("string");
+    expect(String(value).trim()).not.toBe("");
+  });
+
+  it.each(NAMES)("test_%s_home_byok_replaces_old_key_only_copy", (name) => {
+    expect(LOCALES[name]["home.byok"]).not.toBe(OLD_BYOK[name]);
+  });
+
+  it.each(["uk", "ru"] as const)("test_%s_home_byok_is_translated", (name) => {
+    expect(LOCALES[name]["home.byok"]).not.toBe(LOCALES.en["home.byok"]);
+  });
+});

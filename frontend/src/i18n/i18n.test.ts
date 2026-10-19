@@ -180,3 +180,33 @@ describe("changeLanguage (AC3)", () => {
 function resetHtmlLangOnly(): void {
   document.documentElement.removeAttribute("lang");
 }
+
+describe("<html lang> follows every language change (S1-T2b AC7)", () => {
+  it.each(["uk", "ru"] as const)(
+    "test_direct_instance_change_language_to_%s_updates_html_lang",
+    async (lang) => {
+      const { setupI18n } = await freshModule();
+      const instance = await setupI18n();
+      await instance.changeLanguage(lang);
+      expect(document.documentElement.lang).toBe(lang);
+    },
+  );
+
+  it("test_direct_i18next_default_change_language_updates_html_lang", async () => {
+    const { setupI18n } = await freshModule();
+    await setupI18n();
+    // Same module registry as the fresh `./index`, so the same i18next singleton.
+    const { default: i18next } = await import("i18next");
+    await i18next.changeLanguage("uk");
+    expect(document.documentElement.lang).toBe("uk");
+  });
+
+  it("test_direct_change_back_to_en_updates_html_lang", async () => {
+    localStorage.setItem("aic.lang", "ru");
+    const { setupI18n } = await freshModule();
+    const instance = await setupI18n();
+    expect(document.documentElement.lang).toBe("ru");
+    await instance.changeLanguage("en");
+    expect(document.documentElement.lang).toBe("en");
+  });
+});

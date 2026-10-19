@@ -323,13 +323,33 @@ describe("AC7 — no hard-coded UI strings", () => {
     return found;
   }
 
+  /**
+   * S1-T2b AC12: whole-string comparison. A UI string passes only if it is
+   * exactly one locale value or one of the explicitly allowed literals.
+   * A fragment of a locale value (or a value glued to hard-coded text) fails.
+   */
+  const ALLOWED_LITERALS: ReadonlySet<string> = new Set<string>(LANG_BUTTONS);
+
   function untranslated(locale: FlatLocale): string[] {
-    const values = allStrings(locale);
-    const allowed = new Set<string>(LANG_BUTTONS);
+    const values = new Set(allStrings(locale).map((v) => v.trim()));
     return collectUiStrings(document.body).filter(
-      (s) => !allowed.has(s) && !values.some((v) => v.includes(s)),
+      (s) => !ALLOWED_LITERALS.has(s) && !values.has(s),
     );
   }
+
+  it("test_untranslated_rejects_fragment_of_locale_value", () => {
+    // Guards the checker itself: a substring of a real value must not pass.
+    const tagline = text(EN, "home.tagline");
+    const fragment = tagline.slice(0, Math.max(1, Math.floor(tagline.length / 2))).trim();
+    const host = document.createElement("p");
+    host.textContent = fragment;
+    document.body.append(host);
+    try {
+      expect(untranslated(EN)).toEqual([fragment]);
+    } finally {
+      host.remove();
+    }
+  });
 
   it("test_all_ui_strings_come_from_en_locale", async () => {
     await renderApp();
