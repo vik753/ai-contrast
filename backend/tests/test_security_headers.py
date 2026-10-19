@@ -20,9 +20,7 @@ EXPECTED_HEADERS = {
 
 def _assert_security_headers(response: httpx.Response) -> None:
     for name, value in EXPECTED_HEADERS.items():
-        assert response.headers.get(name) == value, (
-            f"{name}: {response.headers.get(name)!r}"
-        )
+        assert response.headers.get(name) == value, f"{name}: {response.headers.get(name)!r}"
 
 
 @pytest.mark.parametrize("environment", ["development", "production"])

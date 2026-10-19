@@ -65,9 +65,7 @@ def test_unhandled_exception_does_not_propagate_to_server(
     # If the exception escapes the app, the ASGI server (uvicorn) logs the
     # full traceback including the exception message. The app must handle
     # it completely and return the 500 response itself.
-    client = _boom_client(
-        make_app, make_client, new_marker("boom"), raise_server_exceptions=True
-    )
+    client = _boom_client(make_app, make_client, new_marker("boom"), raise_server_exceptions=True)
 
     response = client.get(BOOM_PATH)
 
@@ -98,9 +96,7 @@ def test_unhandled_exception_log_contains_path(
     client.get(BOOM_PATH)
 
     error_lines = [
-        r.getMessage()
-        for r in log_capture.records
-        if BoomError.__name__ in r.getMessage()
+        r.getMessage() for r in log_capture.records if BoomError.__name__ in r.getMessage()
     ]
     assert any(BOOM_PATH in line for line in error_lines), error_lines
 
@@ -142,9 +138,7 @@ def test_unhandled_exception_log_omits_request_headers(
     client = _boom_client(make_app, make_client, new_marker("boom"))
     log_capture.clear()
 
-    client.get(
-        BOOM_PATH, headers={"X-Custom": header_value, "User-Agent": header_value}
-    )
+    client.get(BOOM_PATH, headers={"X-Custom": header_value, "User-Agent": header_value})
 
     assert header_value not in all_log_text(log_capture)
 

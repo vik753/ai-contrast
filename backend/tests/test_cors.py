@@ -40,9 +40,7 @@ def _tokens(header_value: str | None) -> set[str]:
 def test_cors_allowed_origin_get_returns_matching_allow_origin(
     make_client: Callable[..., TestClient],
 ) -> None:
-    response = _client(make_client).get(
-        "/api/health", headers={"Origin": ALLOWED_ORIGIN}
-    )
+    response = _client(make_client).get("/api/health", headers={"Origin": ALLOWED_ORIGIN})
 
     assert response.headers.get("access-control-allow-origin") == ALLOWED_ORIGIN
 
@@ -50,9 +48,7 @@ def test_cors_allowed_origin_get_returns_matching_allow_origin(
 def test_cors_second_allowed_origin_get_returns_matching_allow_origin(
     make_client: Callable[..., TestClient],
 ) -> None:
-    response = _client(make_client).get(
-        "/api/health", headers={"Origin": SECOND_ALLOWED_ORIGIN}
-    )
+    response = _client(make_client).get("/api/health", headers={"Origin": SECOND_ALLOWED_ORIGIN})
 
     assert response.headers.get("access-control-allow-origin") == SECOND_ALLOWED_ORIGIN
 
@@ -117,9 +113,7 @@ def test_cors_preflight_allowed_origin_allows_get_and_post(
 ) -> None:
     response = _preflight(_client(make_client), method="GET")
 
-    assert {"get", "post"} <= _tokens(
-        response.headers.get("access-control-allow-methods")
-    )
+    assert {"get", "post"} <= _tokens(response.headers.get("access-control-allow-methods"))
 
 
 def test_cors_preflight_allowed_methods_exclude_others(
@@ -168,9 +162,7 @@ def test_cors_preflight_content_type_and_provider_key_headers_allowed(
 def test_cors_preflight_unknown_request_header_not_allowed(
     make_client: Callable[..., TestClient],
 ) -> None:
-    response = _preflight(
-        _client(make_client), method="POST", request_headers="X-Something-Else"
-    )
+    response = _preflight(_client(make_client), method="POST", request_headers="X-Something-Else")
 
     allowed = _tokens(response.headers.get("access-control-allow-headers"))
     assert "x-something-else" not in allowed
@@ -188,12 +180,8 @@ def test_cors_preflight_other_origin_returns_no_allow_origin(
 def test_cors_allowed_origins_from_env_applied_to_app(
     make_client: Callable[..., TestClient], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(
-        "ALLOWED_ORIGINS", f" {ALLOWED_ORIGIN} , {SECOND_ALLOWED_ORIGIN}"
-    )
+    monkeypatch.setenv("ALLOWED_ORIGINS", f" {ALLOWED_ORIGIN} , {SECOND_ALLOWED_ORIGIN}")
 
-    response = make_client().get(
-        "/api/health", headers={"Origin": SECOND_ALLOWED_ORIGIN}
-    )
+    response = make_client().get("/api/health", headers={"Origin": SECOND_ALLOWED_ORIGIN})
 
     assert response.headers.get("access-control-allow-origin") == SECOND_ALLOWED_ORIGIN

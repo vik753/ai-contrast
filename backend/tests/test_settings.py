@@ -84,9 +84,7 @@ def test_settings_direct_allowed_origins_list_accepted() -> None:
 
 
 @pytest.mark.parametrize("path", ["/docs", "/openapi.json", "/redoc"])
-def test_docs_in_production_return_404(
-    make_client: Callable[..., TestClient], path: str
-) -> None:
+def test_docs_in_production_return_404(make_client: Callable[..., TestClient], path: str) -> None:
     response = make_client(environment="production").get(path)
 
     assert response.status_code == 404
