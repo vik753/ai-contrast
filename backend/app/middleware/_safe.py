@@ -6,11 +6,13 @@ from starlette.types import Scope
 
 MAX_LOGGED_PATH_LENGTH = 256
 MAX_LOGGED_METHOD_LENGTH = 16
+REPLACEMENT_CHAR = "\ufffd"
 
 
 def _printable(value: str, limit: int) -> str:
-    """Replace control and other non-printable characters (log injection) and truncate."""
-    cleaned = "".join(char if char.isprintable() else "?" for char in value[:limit])
+    """Replace control and other non-printable characters (log injection) with
+    U+FFFD and truncate."""
+    cleaned = "".join(char if char.isprintable() else REPLACEMENT_CHAR for char in value[:limit])
     if len(value) > limit:
         cleaned += "..."
     return cleaned

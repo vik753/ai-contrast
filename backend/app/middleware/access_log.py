@@ -1,7 +1,13 @@
 """Access log: one line per request (threat model T1, T3).
 
-The line holds only the method, the path (without the query string), the status
-and the duration in milliseconds. Never headers, never bodies.
+Format: ``<METHOD> <path> <status> duration_ms=<int>[ aborted=1][ disconnected=1]``.
+
+- The path never includes the query string. Never headers, never bodies.
+- ``status`` is the status sent to the client, or ``-`` when no response started
+  (cancellation, client disconnect).
+- ``aborted=1``: the response started but did not finish (the app failed or was
+  cancelled mid-response).
+- ``disconnected=1``: the client disconnected before the response finished.
 """
 
 from __future__ import annotations
@@ -15,8 +21,7 @@ from app.middleware._safe import log_method, log_path
 
 logger = logging.getLogger("ai_contrast.access")
 
-# Status logged when the app fails before it starts a response.
-NO_RESPONSE_STATUS = 500
+NO_STATUS = "-"
 
 
 class AccessLogMiddleware:
@@ -28,23 +33,40 @@ class AccessLogMiddleware:
             await self.app(scope, receive, send)
             return
 
-        status = NO_RESPONSE_STATUS
+        status: int | None = None
+        response_complete = False
+        disconnected = False
         start = time.perf_counter()
 
-        async def send_with_status(message: Message) -> None:
-            nonlocal status
+        async def receive_tracking() -> Message:
+            nonlocal disconnected
+            message = await receive()
+            if message["type"] == "http.disconnect" and not response_complete:
+                disconnected = True
+            return message
+
+        async def send_tracking(message: Message) -> None:
+            nonlocal status, response_complete
             if message["type"] == "http.response.start":
                 status = int(message["status"])
+            elif message["type"] == "http.response.body" and not message.get("more_body"):
+                response_complete = True
             await send(message)
 
         try:
-            await self.app(scope, receive, send_with_status)
+            await self.app(scope, receive_tracking, send_tracking)
         finally:
             duration_ms = round((time.perf_counter() - start) * 1000)
+            flags = ""
+            if status is not None and not response_complete:
+                flags += " aborted=1"
+            if disconnected:
+                flags += " disconnected=1"
             logger.info(
-                "%s %s %d duration_ms=%d",
+                "%s %s %s duration_ms=%d%s",
                 log_method(scope),
                 log_path(scope),
-                status,
+                NO_STATUS if status is None else str(status),
                 duration_ms,
+                flags,
             )
