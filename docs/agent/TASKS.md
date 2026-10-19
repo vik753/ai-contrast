@@ -64,6 +64,15 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   10. `app/main.py` docstring shows the full run command with `--log-config log_config.json`.
 - Threats: T1, T2, T3, T6, T8.
 
+### S1-T1c Backend polish from re-review (PR #1)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-backend`.
+- AC:
+  1. **422 without client-chosen keys:** each location keeps its source (`body`, `header`, `query`, `path`) and only names declared by our code (route parameters and model field names) or list indexes; any other part (unknown extra field, dict key) becomes `"*"`; for `extra_forbidden` the last part is dropped. At most 20 entries (deduplicated), then one `"..."` entry. Each part at most 64 characters. Canary tests: canary as an unknown key and as a dict key; 5,000 invalid items give a small body. The docstring matches the real behavior (malformed JSON location).
+  2. **Scrubber robustness:** works on a copy of the record (Python 3.12+ filter may return a new `LogRecord`); `getMessage()` errors fall back to `record.msg` plus ` log_format_error=1` with `args=None`; the message is right-stripped before ` exc_type=...` is appended; `logging.raiseExceptions = False` is set when `app.logging_filters` is imported. Tests: mismatched format args with and without `exc_info` neither raise at the call site nor print arguments to stderr.
+  3. **Start command guard:** a test asserts the Dockerfile `CMD` contains `--log-config log_config.json`, `--no-access-log`, `--no-proxy-headers` and `--no-server-header`.
+- Threats: T1, T3.
+
 ### S1-T2 Frontend skeleton
 
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-frontend`.

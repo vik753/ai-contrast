@@ -35,8 +35,8 @@ Server controls:
 4. The error handler returns only an error code and a short safe message. SDK exception text never leaves the server and is never logged verbatim.
 5. The key lives only inside one request. No global variables, caches or shared SDK clients with a key.
 6. **Log canary test:** a request with the key `sk-CANARY-<random>` must not leave the canary in logs, responses or errors. Runs in CI on every change.
-7. A redaction filter on the root log handler removes exception messages, tracebacks and stack info from every logger, including `uvicorn.error`. Tested through `log_config.json`.
-8. A custom `422` handler: validation errors never return `input`, `ctx` or `msg`.
+7. A redaction filter on the root log handler removes exception messages, tracebacks and stack info from every logger, including `uvicorn.error`. Tested through `log_config.json`. The filter is installed only through `uvicorn --log-config log_config.json`: every way of starting the backend (Dockerfile, Compose, Render) keeps that flag; do not override the Docker command on Render. Limits: message text is not scrubbed, so application code never logs exception objects or messages; no logger may use `propagate=False` with its own handler; `logging.raiseExceptions = False`, so formatting errors never print arguments.
+8. A custom `422` handler: validation errors never return `input`, `ctx` or `msg`, and never echo client-chosen keys (unknown fields, dict keys). The field list is capped.
 9. FastAPI native telemetry is disabled explicitly. No OpenTelemetry SDK or exporter without security review.
 10. SDK debug-logging variables (`ANTHROPIC_LOG`, `OPENAI_LOG`) are never set in production.
 11. Settings use `hide_input_in_errors=True`, so startup errors never print values (including our own secrets).
