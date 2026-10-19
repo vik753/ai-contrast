@@ -59,7 +59,10 @@ function singleHeader(name: string): string {
 function parseCsp(value: string): Map<string, string[]> {
   const directives = new Map<string, string[]>();
   for (const part of value.split(";")) {
-    const tokens = part.trim().split(/\s+/).filter((t) => t !== "");
+    const tokens = part
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t !== "");
     const [name, ...sources] = tokens;
     if (name === undefined) {
       continue;
@@ -158,9 +161,7 @@ describe("other security headers (AC8, T9)", () => {
   });
 
   it("test_hsts_includes_subdomains", () => {
-    expect(singleHeader("Strict-Transport-Security").toLowerCase()).toContain(
-      "includesubdomains",
-    );
+    expect(singleHeader("Strict-Transport-Security").toLowerCase()).toContain("includesubdomains");
   });
 
   it("test_x_content_type_options_is_nosniff", () => {

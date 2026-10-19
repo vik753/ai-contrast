@@ -42,7 +42,5 @@ export function text(locale: FlatLocale, key: string): string {
 
 /** All non-empty string values of a flattened locale. */
 export function allStrings(locale: FlatLocale): string[] {
-  return Object.values(locale).filter(
-    (v): v is string => typeof v === "string" && v.trim() !== "",
-  );
+  return Object.values(locale).filter((v): v is string => typeof v === "string" && v.trim() !== "");
 }

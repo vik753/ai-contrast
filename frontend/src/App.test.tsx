@@ -67,9 +67,7 @@ function expectUiIn(locale: FlatLocale): void {
   expect(within(screen.getByRole("banner")).getByText(text(locale, "app.title"))).toBeTruthy();
   expect(within(screen.getByRole("main")).getByText(text(locale, "home.tagline"))).toBeTruthy();
   expect(languageGroup(locale)).toBeTruthy();
-  expect(
-    within(footer()).getByRole("link", { name: text(locale, "footer.source") }),
-  ).toBeTruthy();
+  expect(within(footer()).getByRole("link", { name: text(locale, "footer.source") })).toBeTruthy();
   expect(within(footer()).getByText(text(locale, "footer.privacy"))).toBeTruthy();
 }
 
@@ -191,16 +189,13 @@ describe("AC3 — language switching", () => {
   it.each([
     ["uk", UK, "UK"],
     ["ru", RU, "RU"],
-  ] as const)(
-    "test_stored_language_%s_is_used_on_setup",
-    async (stored, locale, button) => {
-      localStorage.setItem("aic.lang", stored);
-      setBrowserLanguage("en-US");
-      await renderApp();
-      expectUiIn(locale);
-      expect(langButton(button, locale).getAttribute("aria-pressed")).toBe("true");
-    },
-  );
+  ] as const)("test_stored_language_%s_is_used_on_setup", async (stored, locale, button) => {
+    localStorage.setItem("aic.lang", stored);
+    setBrowserLanguage("en-US");
+    await renderApp();
+    expectUiIn(locale);
+    expect(langButton(button, locale).getAttribute("aria-pressed")).toBe("true");
+  });
 
   it.each(["de", "xx", "<img src=x onerror=alert(1)>"])(
     "test_invalid_stored_value_%j_falls_back_to_english",

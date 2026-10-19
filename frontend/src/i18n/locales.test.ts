@@ -67,9 +67,7 @@ describe("locale values (AC7)", () => {
   it.each(["uk", "ru"] as const)(
     "test_%s_translates_user_visible_keys_differently_from_en",
     (name) => {
-      const untranslated = TRANSLATED_KEYS.filter(
-        (key) => LOCALES[name][key] === LOCALES.en[key],
-      );
+      const untranslated = TRANSLATED_KEYS.filter((key) => LOCALES[name][key] === LOCALES.en[key]);
       expect(untranslated).toEqual([]);
     },
   );

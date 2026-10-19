@@ -61,16 +61,13 @@ describe("setupI18n — default language (AC2)", () => {
 });
 
 describe("setupI18n — stored language (AC3)", () => {
-  it.each(["en", "uk", "ru"] as const)(
-    "test_setup_with_stored_%s_selects_it",
-    async (lang) => {
-      localStorage.setItem("aic.lang", lang);
-      setBrowserLanguage("de-DE");
-      const { setupI18n } = await freshModule();
-      const instance = await setupI18n();
-      expect(instance.language).toBe(lang);
-    },
-  );
+  it.each(["en", "uk", "ru"] as const)("test_setup_with_stored_%s_selects_it", async (lang) => {
+    localStorage.setItem("aic.lang", lang);
+    setBrowserLanguage("de-DE");
+    const { setupI18n } = await freshModule();
+    const instance = await setupI18n();
+    expect(instance.language).toBe(lang);
+  });
 
   it.each(["de", "", "english", "EN-us", "<script>alert(1)</script>", "null"])(
     "test_setup_with_invalid_stored_value_%j_falls_back_to_english",
@@ -107,15 +104,12 @@ describe("<html lang> (AC4)", () => {
     expect(document.documentElement.lang).toBe("en");
   });
 
-  it.each(["uk", "ru"] as const)(
-    "test_setup_with_stored_%s_sets_html_lang",
-    async (lang) => {
-      localStorage.setItem("aic.lang", lang);
-      const { setupI18n } = await freshModule();
-      await setupI18n();
-      expect(document.documentElement.lang).toBe(lang);
-    },
-  );
+  it.each(["uk", "ru"] as const)("test_setup_with_stored_%s_sets_html_lang", async (lang) => {
+    localStorage.setItem("aic.lang", lang);
+    const { setupI18n } = await freshModule();
+    await setupI18n();
+    expect(document.documentElement.lang).toBe(lang);
+  });
 
   it.each(["uk", "ru", "en"] as const)(
     "test_change_language_to_%s_sets_html_lang",
