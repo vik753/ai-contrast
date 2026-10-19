@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 DOCKERFILE = Path(__file__).resolve().parent.parent / "Dockerfile"
 
 
@@ -59,3 +61,41 @@ def test_dockerfile_final_stage_does_not_enable_sdk_debug_logging() -> None:
 
     assert "ANTHROPIC_LOG" not in env
     assert "OPENAI_LOG" not in env
+
+
+# --------------------------------------------------------------------------
+# S1-T1c AC3: start command guard.
+# --------------------------------------------------------------------------
+
+
+def _cmd_tokens() -> list[str]:
+    cmds = [line for line in _final_stage() if line.upper().startswith("CMD ")]
+    assert len(cmds) == 1, cmds
+    # Exec form; the shell string inside holds the uvicorn command line.
+    return cmds[0][4:].replace('"', " ").replace("[", " ").replace("]", " ").split()
+
+
+def test_dockerfile_cmd_runs_uvicorn_app() -> None:
+    tokens = _cmd_tokens()
+
+    assert "uvicorn" in tokens
+    assert "app.main:app" in tokens
+
+
+def test_dockerfile_cmd_uses_log_config_file() -> None:
+    tokens = _cmd_tokens()
+
+    assert "--log-config" in tokens
+    assert tokens[tokens.index("--log-config") + 1] == "log_config.json"
+
+
+@pytest.mark.parametrize("flag", ["--no-access-log", "--no-proxy-headers", "--no-server-header"])
+def test_dockerfile_cmd_has_safety_flag(flag: str) -> None:
+    assert flag in _cmd_tokens()
+
+
+def test_dockerfile_cmd_does_not_enable_proxy_headers_or_access_log() -> None:
+    tokens = _cmd_tokens()
+
+    assert "--proxy-headers" not in tokens
+    assert "--access-log" not in tokens
