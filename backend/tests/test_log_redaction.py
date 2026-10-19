@@ -195,7 +195,7 @@ def test_log_redaction_record_without_exception_message_kept(
     assert "Started server process" in configured_stream.getvalue()
 
 
-def test_exc_info_scrubber_clears_exc_info_exc_text_and_stack_info() -> None:
+def test_exc_info_scrubber_copy_has_no_exc_info_exc_text_or_stack_info() -> None:
     # Local import: keeps the other tests in this module collectable while
     # the filter module does not exist yet.
     from app.logging_filters import ExcInfoScrubber  # noqa: PLC0415
@@ -213,13 +213,13 @@ def test_exc_info_scrubber_clears_exc_info_exc_text_and_stack_info() -> None:
     )
     record.exc_text = f"Traceback ... {canary}"
 
-    keep = ExcInfoScrubber().filter(record)
+    scrubbed = ExcInfoScrubber().filter(record)
 
-    # Read the attributes through getattr: mypy narrows them after the
-    # first ``is None`` assertion and would flag the rest as unreachable.
-    assert keep  # the record itself is still emitted
-    assert getattr(record, "exc_info") is None  # noqa: B009
-    assert getattr(record, "exc_text") is None  # noqa: B009
-    assert getattr(record, "stack_info") is None  # noqa: B009
-    assert canary not in record.getMessage()
-    assert CanaryLeakError.__name__ in record.getMessage()
+    # The filter returns a scrubbed copy (S1-T1c AC2); the original record
+    # is left unchanged and is checked in test_log_scrubber_robustness.py.
+    assert isinstance(scrubbed, logging.LogRecord), "filter must return the scrubbed copy"
+    assert scrubbed.exc_info is None
+    assert scrubbed.exc_text is None
+    assert scrubbed.stack_info is None
+    assert canary not in scrubbed.getMessage()
+    assert CanaryLeakError.__name__ in scrubbed.getMessage()
