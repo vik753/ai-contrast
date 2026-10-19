@@ -1,0 +1,70 @@
+# AI Contrast — plan
+
+The customer's master copy of the plan (in Russian, with theory notes) lives in his Obsidian vault.
+This file is the working copy for the team.
+
+## Requirements
+
+1. Upload two or more contracts.
+2. Formats: PDF with text, scanned PDF, DOCX, Google Docs, plain text.
+   - Apple Pages: the UI asks the client to export to PDF and shows how.
+   - Google Docs: import by link, or upload of an exported DOCX or PDF.
+3. Comparison topics, three modes that can be combined and edited before the analysis:
+   - ready template: car insurance (KASKO), compulsory motor liability (OSAGO), lease, property insurance;
+   - topics suggested by AI from the uploaded contracts;
+   - the client's own topics.
+4. The client chooses their side (for example: insured party, buyer, supplier).
+5. The client chooses the AI provider and model and enters their own API key. Known providers have preset base URLs. A custom base URL is an advanced setting.
+6. Comparison by clause and by meaning, not by number or title.
+7. Result: a table with ratings — green (favorable), yellow (attention), red (unfavorable). Each cell has an explanation and a contract quote. Color is always paired with an icon and a text label.
+8. The server stores nothing: no contracts, keys or results.
+9. Re-upload of the same contracts is detected. The client chooses: cached result or new analysis. The cache lives in the browser.
+10. Minimal token usage without quality loss. The client sees an estimated cost before the analysis starts.
+11. Contract languages: English, Ukrainian, Russian. Contracts in different languages can be compared with each other in v1.
+12. UI languages: English (default), Ukrainian, Russian.
+13. Security from the first stage: `docs/security/threat-model.md`.
+
+## Analysis pipeline
+
+1. **Upload.** The browser hashes each file and checks its cache. The browser OCRs scans with Tesseract.js. Other files go to the backend.
+2. **Extract.** The backend extracts text in memory and detects the language.
+3. **Cache check.** The browser hashes the normalized text. On a hit the client chooses: cached result or new analysis.
+4. **Split.** The backend splits text into clauses by numbering and headings. No AI.
+5. **Topics.** Template, AI suggestion or own topics. A cheap model expands each topic with synonyms.
+6. **Cost estimate.** Estimated tokens and cost. The client confirms.
+7. **Tag.** A cheap model tags each clause with topics (several tags allowed). A strong model checks low-confidence cases. Untagged clauses go to "Other".
+8. **Analyze.** A strong model receives the clauses of all contracts for one topic, the client's side and the UI language. Findings in the UI language, quotes in the original language. Strict JSON.
+9. **Verify.** Schema validation and quote verification against the source text.
+10. **Result.** Streamed by topic over SSE. The browser renders the table and stores the result in IndexedDB if history is on.
+
+## Stages
+
+| # | Stage | Result |
+| --- | --- | --- |
+| 0 | Project rules | Threat model, agent team, rules, ADRs, repository security settings. |
+| 1 | Scaffold | Monorepo, Docker Compose, FastAPI, React, i18n (en/uk/ru), baseline security headers, CI (lint, tests, pip-audit, npm audit, CodeQL), Dependabot. One command to run. |
+| 2 | File upload | Multi-file form; type by magic bytes; size and count limits; in-memory handling. |
+| 3 | Text extraction | pdfplumber, python-docx, TXT; zip bomb and XXE defenses; subprocess parsing with limits; Google Docs by link and via Picker; `.pages` hint; Tesseract.js OCR with confidence; language detection. |
+| 4 | Browser hash and cache | Web Crypto, IndexedDB, `CacheStore` port, "already analyzed" dialog, 90-day retention, history toggle, "Clear all". |
+| 5 | Clause splitting | By numbering and headings, no AI. |
+| 6 | Model connection | `AIProvider` port, `anthropic` and `openai` adapters, presets, custom URL with SSRF guard, key handling and log canary, key storage options, test request, "OCR via AI" button. |
+| 7 | Topic catalog | Templates as JSON in the repo (3 languages), AI-suggested topics, own topics (browser storage, export/import), synonym expansion, client side selection. |
+| 8 | Clause tagging | Cheap model tags, strong model checks low confidence, "Other" bucket. |
+| 9 | Analysis | Prompt with instruction/data separation, strict JSON, Pydantic, quote verification, SSE progress, cross-language comparison, missing-topic findings. |
+| 10 | Result table | Colors with icons and labels, explanations, quotes, "Other", plain-text rendering, export to PDF and JSON. |
+| 11 | Token economy and quality | Prompt caching, per-topic cache, model routing, cost estimate, eval on a golden set. |
+| 12 | Security audit | Threat model review, OWASP ZAP, manual pentest (OWASP Top 10, OWASP Top 10 for LLM), header check, real contracts in 3 languages. |
+| 13 | Deploy | Cloudflare Pages, Render, GitHub Actions deploy, header check on the production domain. |
+
+## Hosting (checked 2026-10-19)
+
+| Part | Service | Free tier |
+| --- | --- | --- |
+| Frontend | Cloudflare Pages | Free, no card, custom headers via `_headers`. |
+| Backend | Render | 750 h/month, ~512 MB RAM, sleeps after 15 min, ~1 min cold start, 5 GB bandwidth/month. |
+| Backend fallback | Google Cloud Run | 180,000 vCPU-seconds and 2M requests/month; needs a card. |
+
+## Open questions
+
+- Domain and trademark check for "AI Contrast".
+- Provider presets for v1. Proposal: Anthropic, OpenAI, Google Gemini, Mistral, OpenRouter.
