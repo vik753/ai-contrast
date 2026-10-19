@@ -5,13 +5,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from typing import Annotated
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Header, Request
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from starlette.types import Message
 
+from app.api.validation_errors import declared_names, sanitize_location
 from app.exc_names import exception_type_names
 from app.logging_filters import ExcInfoScrubber
 from app.middleware._safe import MAX_LOGGED_PATH_LENGTH, log_path
@@ -78,9 +81,61 @@ def test_exc_info_scrubber_keeps_args_formatting_and_appends_type() -> None:
             "x", logging.ERROR, __file__, 1, "failed %s", ("op",), (type(exc), exc, None)
         )
 
-    ExcInfoScrubber().filter(record)
+    scrubbed = ExcInfoScrubber().filter(record)
 
-    assert record.getMessage() == "failed op exc_type=RuntimeError"
+    assert scrubbed.getMessage() == "failed op exc_type=RuntimeError"
+
+
+def test_exc_info_scrubber_unprintable_msg_falls_back() -> None:
+    class _BadStr:
+        def __str__(self) -> str:
+            raise ValueError(new_canary())
+
+    record = logging.LogRecord("x", logging.ERROR, __file__, 1, _BadStr(), None, None)
+
+    scrubbed = ExcInfoScrubber().filter(record)
+
+    assert scrubbed.getMessage() == "<unprintable log message> log_format_error=1"
+
+
+# --------------------------------------------------------------------------
+# 422 locations: helpers (S1-T1c AC1)
+# --------------------------------------------------------------------------
+
+
+def test_sanitize_location_bool_part_is_not_an_index() -> None:
+    assert sanitize_location(["body", True], "int_parsing", set()) == ["body", "*"]
+
+
+def test_sanitize_location_unknown_first_part_replaced() -> None:
+    assert sanitize_location(["secret", "x"], "missing", {"x"}) == ["*", "x"]
+
+
+class _Leaf(BaseModel):
+    leaf_value: int = Field(alias="leafAlias")
+
+
+class _Root(BaseModel):
+    leaves: dict[str, list[_Leaf]]
+
+
+async def _dep(x_extra: Annotated[str, Header()]) -> str:
+    return x_extra
+
+
+def test_declared_names_include_nested_aliases_and_dependencies(
+    make_app: Callable[..., FastAPI],
+) -> None:
+    async def _endpoint(body: _Root, extra: Annotated[str, Depends(_dep)]) -> None:
+        return None
+
+    app = make_app()
+    app.add_api_route("/api/test/names", _endpoint, methods=["POST"])
+    route = next(r for r in app.routes if isinstance(r, APIRoute) and r.path == "/api/test/names")
+
+    names = declared_names(route)
+
+    assert {"body", "leaves", "leaf_value", "leafAlias", "x-extra"} <= names
 
 
 # --------------------------------------------------------------------------
