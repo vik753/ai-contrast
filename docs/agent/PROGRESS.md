@@ -36,3 +36,5 @@ How to resume after a break: read this file, then continue with the first unchec
 
 - 2026-10-19 — Stage 0 done: `CLAUDE.md`, `README.md`, `SECURITY.md`, `LICENSE`, threat model, plan, ADR 0001–0006, eight agents in `.claude/agents/`. Secret scanning and push protection are on. Waiting for the customer: private vulnerability reporting, Dependabot alerts and security updates (S0-T5b).
 - 2026-10-19 — ADR 0007 accepted (free default model). Obsidian sync pending: the customer's computer was offline.
+- 2026-10-19 — Frontend lock file generated with npm 11.6.2: npm 10.9 (bundled with Node 22) crashed with `Cannot read properties of null (reading 'edgesOut')` on `npm install` (chain vitest → msw → vitest@*). `npm ci` works with npm 10.
+- Lesson: never run two agents that call `npm ci` or `uv sync` in the same worktree at the same time.

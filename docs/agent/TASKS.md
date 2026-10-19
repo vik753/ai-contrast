@@ -96,6 +96,25 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   - Test runner: Vitest with jsdom and Testing Library; setup file `src/test/setup.ts`.
 - Working directory: git worktree `/home/claude/wt/s1-frontend` on branch `feat/s1-frontend`.
 
+### S1-T2b Frontend hardening from review (PR #2)
+
+- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-frontend` (same PR #2).
+- AC (from `code-reviewer` and `security-reviewer`):
+  1. **Raw HTML sinks banned by lint** (`no-restricted-syntax`, each entry with a message citing T1): JSX attribute `dangerouslySetInnerHTML`; object property `dangerouslySetInnerHTML` (identifier or string key); member access `.dangerouslySetInnerHTML`; property `__html`; assignment to `innerHTML` / `outerHTML`; calls to `insertAdjacentHTML`, `createContextualFragment`, `setHTMLUnsafe`, `parseHTMLUnsafe`; `document.write` / `document.writeln`; `new DOMParser()`; JSX attribute `srcDoc` / `srcdoc`. One lint test case per sink, plus a clean component with no errors.
+  2. **No inline disabling:** `linterOptions.noInlineConfig: true`. Test: a `// eslint-disable-next-line no-restricted-syntax` comment does not hide the error.
+  3. **No install scripts:** `.npmrc` has `ignore-scripts=true`; `npm ci`, `npm run build` and `npm test` still pass from a clean `node_modules`.
+  4. **Exact CSP assertions:** `script-src` is exactly `'self' 'wasm-unsafe-eval'`; `worker-src` is exactly `'self' blob:`; `frame-src 'none'`; `upgrade-insecure-requests`; headers `Cross-Origin-Resource-Policy: same-origin` and `X-Frame-Options: DENY` present.
+  5. **Trusted Types:** CSP adds `require-trusted-types-for 'script'; trusted-types 'none'`. The tech lead verifies the built app in Chromium with the headers applied (no `securitypolicyviolation`).
+  6. **Proxy (AC9 of S1-T2) tested:** `vite.config.ts` `server.proxy["/api"].target` is `http://localhost:8000` by default and follows `VITE_API_PROXY_TARGET`.
+  7. **`<html lang>` follows every change:** a `languageChanged` listener registered once in `setupI18n()`; a direct `i18next.changeLanguage("uk")` call also updates `<html lang>`.
+  8. **Resilient start:** if `setupI18n()` rejects, the app still renders in English.
+  9. **Types:** `tsconfig.test.json` includes `src/**/*.d.ts`; `tsconfig.app.json` excludes `src/__lint_fixture__.tsx`.
+  10. **npm version:** `package.json` has `"packageManager": "npm@11.6.2"`; no `engines.npm`. `PROGRESS.md` records the npm 10 crash.
+  11. **Forced colors:** the active language button has a non-color marker (for example an underline or border) and a `forced-colors: active` style.
+  12. **Hard-coded strings check** compares whole strings (exact text node match or explicitly allowed interpolations), not substrings.
+  13. **Copy (ADR 0007):** `home.byok` describes both paths in all three languages — start free with the built-in model, or connect your own provider key; contract text goes only to the AI provider that processes it.
+- Threats: T1, T8, T9.
+
 ### S1-T3 Local run with Docker Compose
 
 - Owner: `backend-dev`. Branch: `feat/s1-compose` (after T1 and T2 are merged).
