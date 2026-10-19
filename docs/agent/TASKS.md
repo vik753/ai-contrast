@@ -40,6 +40,13 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   8. `ruff check`, `ruff format --check`, `mypy --strict` (on `app/`), `pytest` pass.
   9. `backend/Dockerfile`: multi-stage build with uv, `python:3.13-slim` base, non-root user, `uv sync --locked --no-dev`, listens on `$PORT` (default 8000), `--no-access-log`, `--proxy-headers` off unless documented.
 - Threats: T1, T3, T6, T8.
+- Public interface (contract between `test-engineer` and `backend-dev`):
+  - `app/__init__.py` exports `__version__: str`.
+  - `app/settings.py`: `class Settings(pydantic_settings.BaseSettings)` with fields `environment: Literal["development", "production"] = "development"`, `allowed_origins: list[str] = ["http://localhost:5173"]` (env `ALLOWED_ORIGINS`, comma-separated, whitespace trimmed), `allow_private_provider_urls: bool = False`. Tests may build `Settings(...)` directly or through environment variables.
+  - `app/main.py`: `def create_app(settings: Settings | None = None) -> FastAPI` and a module-level `app = create_app()` for `uvicorn app.main:app`.
+  - Loggers live under the `ai_contrast` namespace (for example `ai_contrast.access`, `ai_contrast.errors`). Tests capture all loggers with `caplog` at `DEBUG`.
+  - Tests may add their own routes to an app from `create_app()` (for example a route that raises) and use `TestClient(app, raise_server_exceptions=False)`.
+- Working directory: git worktree `/home/claude/wt/s1-backend` on branch `feat/s1-backend`.
 
 ### S1-T2 Frontend skeleton
 
@@ -59,6 +66,19 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   9. Vite dev server proxies `/api` to `VITE_API_PROXY_TARGET` (default `http://localhost:8000`).
   10. `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` pass. `package-lock.json` committed.
 - Threats: T1 (XSS), T8, T9.
+- Public interface (contract between `test-engineer` and `frontend-dev`):
+  - `src/App.tsx`: default export `App` (renders header, main and footer; expects i18n to be set up).
+  - `src/i18n/index.ts` exports:
+    - `SUPPORTED_LANGUAGES = ["en", "uk", "ru"] as const` and `type Language`;
+    - `LANGUAGE_STORAGE_KEY = "aic.lang"`;
+    - `setupI18n(): Promise<i18n>` — reads the stored language (falls back to `en` on missing, invalid or throwing storage), initializes i18next, sets `<html lang>`;
+    - `changeLanguage(lang: Language): Promise<void>` — switches language, sets `<html lang>`, stores the choice (ignores storage errors).
+  - Locale files `src/i18n/locales/{en,uk,ru}.json` contain at least these keys: `app.title`, `home.tagline`, `language.label`, `footer.source`, `footer.privacy`. `app.title` is `"AI Contrast"` in all languages.
+  - Language switcher: a group labelled by `language.label` with three buttons whose accessible names are `EN`, `UK`, `RU`; the active one has `aria-pressed="true"`.
+  - Footer link: accessible name = `footer.source` text; `href="https://github.com/vik753/ai-contrast"`; `rel` contains `noopener` and `noreferrer`.
+  - ESLint flat config at `frontend/eslint.config.js`; tests may lint a code string with the ESLint Node API and a virtual file path `src/__lint_fixture__.tsx`.
+  - Test runner: Vitest with jsdom and Testing Library; setup file `src/test/setup.ts`.
+- Working directory: git worktree `/home/claude/wt/s1-frontend` on branch `feat/s1-frontend`.
 
 ### S1-T3 Local run with Docker Compose
 
