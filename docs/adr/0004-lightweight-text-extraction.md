@@ -13,7 +13,7 @@ PyMuPDF is fast but licensed under AGPL with a commercial option; we keep depend
 - PDF with a text layer: `pdfplumber` (MIT).
 - DOCX: `python-docx` (MIT), after archive checks (zip bomb) and with safe XML parsing.
 - Plain text: built-in decoding with charset detection limited to UTF-8, UTF-16 and CP1251.
-- Scans: OCR in the browser with Tesseract.js; optional "OCR via AI" with the client's provider.
+- Scans: OCR in the browser with Tesseract.js. ("OCR via AI" was removed by ADR 0008: page images cannot be pseudonymized.)
 - Parsing runs in a subprocess with time and memory limits.
 
 ## Consequences

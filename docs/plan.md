@@ -27,6 +27,7 @@ This file is the working copy for the team.
 11. Contract languages: English, Ukrainian, Russian. Contracts in different languages can be compared with each other in v1.
 12. UI languages: English (default), Ukrainian, Russian.
 13. Security from the first stage: `docs/security/threat-model.md`.
+14. **Pseudonymization (ADR 0008).** No identifier reaches an AI provider: names of companies, legal entities and people, tax and registry codes, bank accounts, addresses, contacts, personal documents, document numbers, vehicle data. Documents are labelled A, B, C. The requisites and signatures section is removed. A preview with all replacements is mandatory before any AI call. The browser restores names in the results locally.
 
 ## Analysis pipeline
 
@@ -34,6 +35,7 @@ This file is the working copy for the team.
 2. **Extract.** The backend extracts text in memory and detects the language.
 3. **Cache check.** The browser hashes the normalized text. On a hit the client chooses: cached result or new analysis.
 4. **Split.** The backend splits text into clauses by numbering and headings. No AI.
+4a. **Pseudonymize (ADR 0008).** The backend drops the requisites and signatures section and detects identifiers. The browser shows a mandatory preview; the client confirms or edits the masks. The mapping stays in the browser. The backend runs a safety pass before any AI call.
 5. **Topics.** Template, AI suggestion or own topics. A cheap model expands each topic with synonyms.
 6. **Cost estimate.** Estimated tokens and cost. The client confirms.
 7. **Tag.** A cheap model tags each clause with topics (several tags allowed). A strong model checks low-confidence cases. Untagged clauses go to "Other".
@@ -51,7 +53,8 @@ This file is the working copy for the team.
 | 3 | Text extraction | pdfplumber, python-docx, TXT; zip bomb and XXE defenses; subprocess parsing with limits; Google Docs by link and via Picker; `.pages` hint; Tesseract.js OCR with confidence; language detection. |
 | 4 | Browser hash and cache | Web Crypto, IndexedDB, `CacheStore` port, "already analyzed" dialog, 90-day retention, history toggle, "Clear all". |
 | 5 | Clause splitting | By numbering and headings, no AI. |
-| 6 | Model connection | `AIProvider` port, `anthropic` and `openai` adapters, presets, custom URL with SSRF guard, key handling and log canary, key storage options, test request, "OCR via AI" button. Free default provider (Cloudflare Workers AI) with Turnstile and daily quotas; free-key hint for Gemini (ADR 0007). |
+| 5b | Pseudonymization | Requisites section removal, identifier detection (preamble definitions, case forms, legal forms, code formats), mandatory preview with manual masks, browser-side mapping, server safety pass, `PseudonymizedDocument` type gate for the AI layer, AI payload canary tests, redaction recall in the eval (ADR 0008). |
+| 6 | Model connection | `AIProvider` port, `anthropic` and `openai` adapters, presets, custom URL with SSRF guard, key handling and log canary, key storage options, test request. Free default provider (Cloudflare Workers AI) with Turnstile and daily quotas; free-key hint for Gemini (ADR 0007). |
 | 7 | Topic catalog | Templates as JSON in the repo (3 languages), AI-suggested topics, own topics (browser storage, export/import), synonym expansion, client side selection. |
 | 8 | Clause tagging | Cheap model tags, strong model checks low confidence, "Other" bucket. |
 | 9 | Analysis | Prompt with instruction/data separation, strict JSON, Pydantic, quote verification, SSE progress, cross-language comparison, missing-topic findings. |

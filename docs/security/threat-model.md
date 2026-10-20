@@ -139,7 +139,7 @@ Controls:
 1. Minimal dependencies. No LiteLLM. Official `anthropic` and `openai` SDKs only.
 2. Lock files with hashes: `uv.lock`, `package-lock.json`. Install only with `uv sync --locked` and `npm ci`. Docker base images are pinned by digest and updated by Dependabot. CI runs pip-audit with the OSV source. Docker base images, including `frontend/Dockerfile.dev`, are pinned by digest. There is no `# syntax=` directive, or it is pinned by digest. `COPY --from=` and `RUN --mount=...from=` use only stage aliases or digest-pinned images. Dependabot takes digest and patch updates only; Python, Node and uv minor and major upgrades are planned changes.
 3. A new dependency needs approval of the tech lead and `security-reviewer`.
-4. Updates through Dependabot pull requests with a cooldown of several days.
+4. Updates through Dependabot pull requests with a cooldown of 7 days. Ignore rules use only `update-types` (never `versions:`), so they never suppress security updates. npm majors and Python/Node/uv minor and major versions are planned upgrades, reviewed every stage (`npm outdated`, `uv tree --outdated`). Dependabot alerts and security updates are enabled in repository settings.
 5. CI: pip-audit, npm audit, CodeQL (Python and TypeScript). CodeQL languages: `python`, `javascript-typescript`, `actions`; query suite `security-extended`.
 6. GitHub Actions pinned by full commit SHA; minimal `permissions:`. Workflow triggers are limited to `push`, `pull_request`, `schedule`, `workflow_dispatch`. No `pull_request_target`, no `workflow_run`. Every `actions/checkout` has `persist-credentials: false`. No `${{ }}` inside `run:`, comment lines included; pass values through `env:`. Job-level permissions are only `read`/`none`, except `security-events: write` for CodeQL. These rules are enforced by `backend/tests/test_repo_policy.py`.
 7. GitHub secret scanning and push protection enabled.
@@ -186,6 +186,24 @@ Controls:
 7. Quota exhausted → `429` with code `free_quota_exhausted`; the UI offers the client's own key.
 8. The UI states which provider processes the text in free mode and its data policy.
 
+## T11. Identity leakage to AI providers (ADR 0008)
+
+Threat: names of companies, legal entities and people, codes, accounts, addresses, contacts and document numbers from contracts reach an AI provider (including our free default provider) and are logged, retained or used for training there.
+
+Controls:
+
+1. All identifiers are replaced by typed placeholders (`[ORG_n]`, `[PERSON_n]`, `[TAX_ID_n]`, `[ACCOUNT_n]`, `[ADDRESS_n]`, `[PHONE_n]`, `[EMAIL_n]`, `[URL_n]`, `[PERSONAL_DOC_n]`, `[DOC_NO_n]`, `[VEHICLE_n]`) before any AI call. The requisites and signatures section is removed.
+2. Mandatory preview: no AI call without the client's confirmation of the masked text.
+3. The placeholder mapping stays in the browser. It is never sent to the backend's AI endpoints or to an AI provider, and never logged.
+4. Server safety pass: the backend runs the detector again on incoming pseudonymized text before any AI call.
+5. Type gate: the AI layer accepts only `PseudonymizedDocument`; raw text fails `mypy --strict`.
+6. Documents are labelled A, B, C. File names, PDF metadata and Google document titles never reach an AI provider.
+7. No page images go to an AI provider ("OCR via AI" removed).
+8. **AI payload canary tests:** planted identifiers in test contracts never appear in any request recorded by a fake `AIProvider`.
+9. The eval measures redaction recall on a golden set with planted identifiers in English, Ukrainian and Russian, including case forms; target 100 % on the golden set.
+
+Residual risk: automatic detection is never complete; the preview is the final control. Our backend still sees the original text in memory during extraction and detection (nothing is stored).
+
 ## Checklist for every change
 
 - [ ] Log canary test is green: no key or contract text in logs, responses or errors.
@@ -193,6 +211,7 @@ Controls:
 - [ ] Every new outbound request goes through the SSRF guard or uses an allowlisted preset.
 - [ ] Every new dependency is approved and pinned in a lock file.
 - [ ] Model output and contract text are rendered as plain text only.
+- [ ] Every new AI call goes through the `PseudonymizedDocument` type gate (T11).
 - [ ] CI green: tests, linters, pip-audit, npm audit, CodeQL.
 
 ## Pre-launch audit (stage 12)

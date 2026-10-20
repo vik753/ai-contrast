@@ -7,11 +7,12 @@ How to resume after a break: read this file, then continue with the first unchec
 | # | Stage | Status |
 | --- | --- | --- |
 | 0 | Project rules | done |
-| 1 | Scaffold | done (pending PR #3 merge) |
+| 1 | Scaffold | done |
 | 2 | File upload | planned |
 | 3 | Text extraction | planned |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
+| 5b | Pseudonymization | planned |
 | 6 | Model connection | planned |
 | 7 | Topic catalog | planned |
 | 8 | Clause tagging | planned |
@@ -31,6 +32,7 @@ How to resume after a break: read this file, then continue with the first unchec
 - Agent team and review workflow (ADR 0006).
 - Carte blanche for the tech lead. Report to the customer after each stage. Ask only on disputed questions and blockers.
 - Free default model: demo mode + Cloudflare Workers AI `gpt-oss-120b` with our key and quotas + free Gemini key hint (ADR 0007).
+- Pseudonymization before any AI call: all identifiers masked, documents labelled A/B/C, mandatory preview, names restored only in the browser, "OCR via AI" removed (ADR 0008).
 
 ## Log
 
@@ -43,3 +45,5 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-20 — PR #4 (S1-T3, S1-T4, S1-T4b: CI, Docker Compose, CodeQL, Dependabot, repository policy tests) merged after two approvals. 370 backend tests. Frontend: 266 tests on the lint branch (PR #3, not merged yet), 214 on `main`.
 - 2026-10-20 — Stage 1 docs: `CLAUDE.md` Commands, README "Run locally", threat model updates for T3 and T4, T8 (supply chain).
 - Lesson: scheduled wake-ups are queued while the session is at its usage limit and arrive only when the session resumes.
+- 2026-10-20 — PR #3 (lint follow-ups) and PR #10 (Dependabot tuning) merged. Dependabot PRs #5–#8 answered with `@dependabot ignore` (planned upgrades). Stage 1 done.
+- 2026-10-20 — ADR 0008 accepted (pseudonymization). New stage 5b.

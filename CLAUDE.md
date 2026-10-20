@@ -46,6 +46,7 @@ People and roles:
 | Rate limiting | slowapi (in memory) |
 | Free default model | Cloudflare Workers AI `@cf/openai/gpt-oss-120b` via the `openai` adapter, our token, Turnstile, daily quotas (ADR 0007) |
 | Demo mode | Built-in synthetic contracts with precomputed results (ADR 0007) |
+| Pseudonymization | Identifiers replaced by typed placeholders before any AI call; mandatory preview; mapping only in the browser (ADR 0008) |
 | Hosting | Cloudflare Pages (frontend, `_headers`), Render (backend, Docker, 512 MB RAM) |
 
 ## Hard security rules — never break
@@ -61,6 +62,7 @@ People and roles:
 9. **Dependencies:** minimal. A new dependency needs approval of the tech lead and `security-reviewer`. Pinned in `uv.lock` / `package-lock.json`. Install only with `uv sync --locked` / `npm ci`.
 10. **GitHub Actions:** pin every action by full commit SHA. Minimal `permissions:` per workflow.
 11. **License AGPL-3.0-only:** the UI shows a "Source code" link to this repository (AGPL section 13).
+12. **Pseudonymization (ADR 0008):** no identifier reaches an AI provider. The AI layer accepts only `PseudonymizedDocument`, which only the pseudonymization module can create. File names, document metadata and the placeholder mapping never reach an AI provider. No page images are sent to an AI provider.
 
 ## Workflow for one task
 
