@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-#
 # AI Contrast backend image.
 # Build:  docker build -t ai-contrast-backend backend/
 # Run:    docker run --rm -p 127.0.0.1:8000:8000 \
