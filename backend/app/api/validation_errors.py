@@ -27,7 +27,8 @@ Special body cases:
 - malformed JSON gives ``["body", "<offset>"]``: Pydantic reports the character
   offset of the parse error as an integer, which is kept like a list index;
 - a body with a non-JSON ``Content-Type`` (for example ``text/plain`` or a form) is
-  not parsed for a model parameter, so the error is ``missing`` at ``["body"]``.
+  not parsed as JSON for a model parameter, so the location is ``["body"]``: the error
+  type is ``model_attributes_type`` for a non-empty body and ``missing`` for an empty one.
 """
 
 from __future__ import annotations
@@ -83,8 +84,9 @@ def declared_names(route: APIRoute) -> set[str]:
     ``body_params``, ``dependencies``). It is an internal, undocumented FastAPI API and
     may change in any FastAPI release. Guarding tests that fail if it changes:
     ``tests/test_validation_locations.py`` (path, query and nested body names stay
-    visible) and ``tests/test_hardening.py::
-    test_declared_names_include_nested_aliases_and_dependencies``.
+    visible) and this test:
+
+    ``tests/test_hardening.py::test_declared_names_include_nested_aliases_and_dependencies``
     """
     names: set[str] = set()
     seen: set[int] = set()
