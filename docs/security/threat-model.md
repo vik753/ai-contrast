@@ -109,15 +109,15 @@ Controls:
 
 **Controls (summary; details in ADR 0009):**
 
-1. **Read what the person reads:** own DOCX walker (insertions, content controls, text boxes, fields, footnotes, endnotes); unread parts produce a "Not read" warning and no green for that document.
-2. **Clean input:** default-ignorable, Cf, Co, Cs, Cn removed by a checked-in table; script allowlist; NFC for text, NFKC + confusable skeleton only for matching; PDF and DOCX text dropped only when provably invisible, borderline text kept and flagged; removed text shown in the preview and reported as 🔴 "contains hidden text".
-3. **Detect and flag:** versioned pattern file; heuristic hits 🟡, high-confidence classes (special or role tokens including gpt-oss harmony tokens, our tags, hidden instruction text, instruction plus rating words) 🔴; model reports accepted only from single-document calls.
-4. **Map-reduce prompts:** one document per call for tagging and rating; comparison by code from structured results; random per-block nonce in both tags; all special tokens and tag look-alikes neutralized; sandwich rules; fixed transform order with an offset map.
-5. **Code-checked output:** strict schema; every finding needs a verbatim quote; quotes expanded to full sentence or clause; green needs a minimum-length quote outside suspicious spans, an exception and cross-reference check, and matching numbers with units; no green for a document with a Layer 2 hit, removed hidden text or unread parts; missing topics computed by code; keyword tags cannot be removed by the model; "Other" clauses scanned and rated.
-6. **Limits:** no tools, network, memory, keys or mapping for the model; hard token cap including repairs and reasoning; linear-time patterns inside the limited parsing subprocess; caps on clauses, tags and entities.
-7. **Adversarial eval gate:** attack success measured against clean twins over N ≥ 3 runs; held-out set; adaptive red-team at stage 12; eval keys only in a protected GitHub environment.
+1. **Read what the person reads:** DOCX parts resolved through package relationships, package anomalies rejected as 🔴 "suspicious package", zero text is an error; own DOCX walker (insertions, content controls, text boxes, fields, footnotes, endnotes, headers, footers); a "Not read" warning only for material unread content, and then no green for that document; damaged PDFs (cross-reference reconstruction) are material "Not read"; references to documents that were not provided are shown and cap the referring clauses at 🟡.
+2. **Clean input:** symbol-font checkboxes mapped first; default-ignorable, Cf, Co, Cs, Cn removed by a checked-in table; other scripts kept and flagged; cleaning is idempotent; NFC for text, NFKC + confusable skeleton only for matching; PDF and DOCX text dropped only when provably invisible, borderline and overlapping text kept and flagged; removed text shown in the preview and reported as 🔴 "contains hidden text".
+3. **Detect and flag:** versioned pattern file, also run on suggested and custom topics; heuristic hits 🟡 and block green for that clause; high-confidence classes (special or role tokens including gpt-oss harmony tokens, our tags, hidden instruction text, instruction plus rating words) 🔴 and remove all greens of the document; model reports accepted only from single-document calls.
+4. **Map-reduce prompts:** one document per call for tagging and rating; schema-first topics with typed attributes, proposed for custom topics without any document text and confirmed by the client (`ConfirmedTopic`); comparison by code from attribute values; `text` attributes shown side by side for the client; no model call receives text of two documents, directly or through summaries (policy and wire tests); random per-block nonce in both tags; all special tokens and tag look-alikes neutralized; sandwich rules; fixed transform order with an offset map.
+5. **Code-checked output:** strict schema; repair never sends previous model output back; every finding needs a verbatim quote; quotes expanded to full sentence or clause; green needs a minimum-length quote outside suspicious spans, a deterministic exception rule the model cannot lift, a bounded cross-reference check (depth 1, at most 5 clauses), and matching numbers with units; missing topics computed by code; keyword tags cannot be removed by the model; "Other" clauses scanned and rated.
+6. **Limits:** no tools, network, memory, keys or mapping for the model; hard token cap including repairs and reasoning; linear-time patterns inside the limited parsing subprocess; caps on clauses, tags and entities. **Every cap fails closed:** the document is rejected or the topic is "not analyzed" with a reason; nothing is truncated silently.
+7. **Adversarial eval gate:** attack success measured against clean twins over N ≥ 3 runs; held-out set; adaptive red-team at stage 12; for AI-layer changes the tech lead records the eval result on the PR head in the PR; eval secrets per T8.
 
-**Residual risk:** a wrong yellow or red finding on any document — including a false red on a competing contract — or a missed difference remains possible. A green always needs a verbatim, expanded, exception-checked quote, but a verified quote can still mislead because the attacker writes the text. PDF clipping, optional content, soft masks, ToUnicode mismatches and text drawn as images are not handled in v1.
+**Residual risk:** a wrong yellow or red finding on any document — including a false red on a competing contract — or a missed difference remains possible. A green always needs a verbatim, expanded, exception-checked quote, but a verified quote can still mislead because the attacker writes the text. PDF clipping, optional content, soft masks, ToUnicode mismatches, text drawn as images, text covered by a shape or image painted later, and text in the same colour as a coloured box under it are not handled in v1.
 
 ## T6. Server abuse
 
@@ -153,6 +153,7 @@ Controls:
 7. GitHub secret scanning and push protection enabled.
 8. Tesseract language data and fonts are committed or built into the bundle, not loaded from a CDN.
 9. `frontend/.npmrc` sets `ignore-scripts=true` (do not remove it without security review); npm is pinned with `packageManager`. The Vite dev server is never exposed beyond localhost. The Compose frontend dev container runs as `node` (uid 1000) with a read-only root filesystem, no capabilities, `no-new-privileges` and `npm ci --ignore-scripts`. Residual risk: the `./frontend` bind mount is read-write, so on a Linux host where the developer is uid 1000, dev-server code can change the source tree. Planned mitigation: Compose Watch `sync`.
+10. **Eval secrets (ADR 0009 Layer 6):** the eval never runs on `pull_request`. The GitHub `eval` environment has required reviewers and a deployment branch policy limited to `main` (`workflow_dispatch` runs the workflow file of the dispatched branch). PR-head evals run locally with a separate eval key with a low spending limit, never the production free-model token.
 
 ## T9. Security headers
 
@@ -202,11 +203,11 @@ Controls:
 
 1. All identifier classes in ADR 0008 are replaced by document-scoped typed placeholders (`[A.ORG_1]`) before any AI call; placeholder look-alikes in the source are neutralized; defined terms equal to masked names are masked.
 2. Detection runs on de-hyphenated text and a confusable skeleton, inside the limited parsing subprocess, with linear-time patterns and caps; PDF running headers and footers are detected and masked or dropped.
-3. The requisites section is dropped only when it is last, its heading matches and its content is mostly identifiers; otherwise it is masked. Dropped parts are visible in the preview and listed as "not analyzed".
-4. Mandatory preview; high-precision classes cannot be unmasked by the client.
+3. The requisites section is processed line by line: only lines made entirely of identifiers, labels, role words and signature lines are dropped; any line with a condition is kept, masked, analyzed and flagged 🟡. Dropped lines are visible in the preview and counted as "not analyzed".
+4. Mandatory preview; high-precision classes cannot be unmasked by the client. Checksummed codes are high-precision only with a context keyword (or inside the requisites section) and never match a number followed by a currency, `%` or a unit; a masked token next to an amount flags its clause 🟡. Detection caps fail closed (`too_many_identifiers`).
 5. The mapping stays in the browser; it is never sent to AI endpoints or providers and never logged; "Clear all" and retention cover it; exports use placeholders by default.
-6. **Fail-closed safety pass:** the server repeats input cleaning and high-precision rules on the untrusted DTO and returns `unmasked_identifier` with offsets; it never changes confirmed text silently.
-7. **Type gate:** a frozen dataclass with a runtime sentinel, created only by `safety_pass()`; never a request model; the `AIProvider` port takes no `str`; topics and side text become `PseudonymizedText`; an AST policy test enforces this.
+6. **Fail-closed safety pass:** a detector version mismatch is rejected (`detector_version_mismatch`); idempotent input cleaning is only a check (`input_not_clean` if it would change anything, offsets never mapped); high-precision hits return `unmasked_identifier` with offsets, the browser pre-masks them and asks for a new confirmation; the server never changes confirmed text silently.
+7. **Type gate:** a frozen dataclass with a runtime sentinel, created only by `safety_pass()`; never a request model; the `AIProvider` port takes no `str`; topics and side text become `PseudonymizedText` or `ConfirmedTopic`; repair never re-sends model output; an AST policy test enforces this, including `__new__` and `object.__setattr__` on gate types.
 8. File names, PDF Info and XMP, DOCX `docProps`, embedded files and Google titles are never parsed into text, never logged, never sent.
 9. Cache key = SHA-256 of the final masked text plus prompt and model versions.
 10. **AI payload canaries on the wire** under the real `anthropic` and `openai` adapters (httpx `MockTransport`): URL, headers and the whole body, for every AI call type; plus negative checks for logs, SSE, errors, `422` and the browser's outgoing analysis request.
@@ -223,6 +224,7 @@ Controls:
 - [ ] Model output and contract text are rendered as plain text only.
 - [ ] Every string that reaches a prompt is a gate type (`PseudonymizedDocument` / `PseudonymizedText`), an enum or a constant (T11).
 - [ ] Every new AI call contains one document only, and its output is validated by code (T5).
+- [ ] Every cap fails closed: no truncation, no partial masking, no partly rated topic (T5, T11).
 - [ ] CI green: tests, linters, pip-audit, npm audit, CodeQL.
 
 ## Pre-launch audit (stage 12)

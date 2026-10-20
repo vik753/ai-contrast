@@ -40,7 +40,7 @@ People and roles:
 | OCR | Tesseract.js + PDF.js in the browser, language data self-hosted (`eng`, `ukr`, `rus`) |
 | Browser storage | IndexedDB behind the `CacheStore` port; SHA-256 via Web Crypto API |
 | `backend/` | Python 3.13, FastAPI, stateless; progress and results via SSE |
-| Text extraction | pdfplumber, python-docx |
+| Text extraction | pdfplumber with a render-mode pdfminer device; own DOCX walker over relationship-resolved parts (ADR 0004 revision, ADR 0009) |
 | AI layer | `AIProvider` port; adapters on the official `anthropic` and `openai` SDKs. **No LiteLLM.** |
 | Validation | Pydantic v2 |
 | Rate limiting | slowapi (in memory) |
@@ -63,7 +63,7 @@ People and roles:
 10. **GitHub Actions:** pin every action by full commit SHA. Minimal `permissions:` per workflow.
 11. **License AGPL-3.0-only:** the UI shows a "Source code" link to this repository (AGPL section 13).
 12. **Pseudonymization (ADR 0008):** no identifier reaches an AI provider. The AI layer accepts only `PseudonymizedDocument` / `PseudonymizedText` (frozen dataclasses with a runtime sentinel, created only by the server safety pass, never a request model); the `AIProvider` port takes no `str`. File names, document metadata and the placeholder mapping never reach an AI provider. No page images are sent to an AI provider.
-13. **Prompt injection (ADR 0009):** read what the person reads (own DOCX walker, "Not read" warnings); clean input (default-ignorable and format characters, provably invisible PDF/DOCX text); **one document per AI call**, comparison by code; random per-block nonce; every finding needs a verbatim quote, green also needs exception and number checks; no clause can be hidden by tagging.
+13. **Prompt injection (ADR 0009):** read what the person reads (DOCX parts resolved through relationships, own walker, material "Not read" warnings); clean input (default-ignorable and format characters, provably invisible PDF/DOCX text); **one document per AI call** — no call receives text of two documents, directly or through summaries; schema-first topics, comparison by code; random per-block nonce; every finding needs a verbatim quote, green also needs the deterministic exception rule and number checks; no clause can be hidden by tagging; **every cap fails closed**.
 
 ## Workflow for one task
 
