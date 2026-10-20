@@ -20,3 +20,12 @@ PyMuPDF is fast but licensed under AGPL with a commercial option; we keep depend
 
 - Small image, fits the free tier.
 - Complex layouts (multi-column, tables) may extract worse than with ML-based tools. The eval set will measure this.
+
+## Revision (2026-10-20, ADR 0008 and ADR 0009)
+
+- DOCX text is read by our own walker over `document.xml`, footnotes and endnotes (defusedxml, element allowlist), not by python-docx `paragraph.text`, which skips tracked insertions, content controls, text boxes, smart tags, custom XML and fields. python-docx may still be used to open the package.
+- Hidden DOCX text is detected with effective formatting (docDefaults → styles → direct formatting).
+- PDF text is extracted with a custom pdfminer device that records the text render mode; only provably invisible text is dropped.
+- Parts we do not read (headers and footers, `altChunk`, OLE objects, form fields, PDF annotations and form values, image-heavy pages) are reported as "Not read" per document.
+- Document metadata (DOCX `docProps`, PDF Info and XMP) and embedded files are never parsed into text.
+- All cleaning and detection run inside the parsing subprocess with time and memory limits.

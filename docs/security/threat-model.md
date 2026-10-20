@@ -99,18 +99,25 @@ Controls:
 
 ## T5. Prompt injection (ADR 0009)
 
-**Threat.** A contract (possibly written by the other party) contains instructions for the model, open or hidden: white or tiny PDF text, hidden DOCX runs, zero-width or Unicode tag characters, fake delimiters or chat role markers, other languages, base64. Goal: change ratings, hide clauses, break the output.
+**Threats.**
+- The other party writes the whole contract and addresses the AI openly or hidden (white, tiny or clipped PDF text, hidden DOCX runs, zero-width, tag or variation-selector characters, fake delimiters and role tokens, other languages, encodings, legal wording aimed at automated review).
+- **Cross-document influence:** one contract steers how another is rated, or frames it as "containing AI instructions".
+- **Visible but not extracted:** harsh terms in footnotes, text boxes, content controls, tracked insertions, form fields, light-grey fine print or a section titled like "Signatures" — the person signs them, the model never sees them.
+- **Tagging and topic attacks:** a clause routed to "Other" is never rated; over-tagging; steering AI-suggested topics.
+- **Evidence gaming:** a planted favorable sentence with a buried exception, quote truncation, number-unit mismatch, self-praise.
+- **Cost and denial:** clause explosion, reasoning-heavy text, repair loops, catastrophic regex backtracking.
 
-**Controls (defense in depth):**
+**Controls (summary; details in ADR 0009):**
 
-1. **Clean input:** NFKC normalization; zero-width, Unicode tag, bidi and other format characters removed; PDF: only visible text (render mode, crop box, font size, near-background colour); DOCX: hidden runs, comments, deleted revisions and field codes dropped. Removed content is counted in the preview.
-2. **Detect and flag:** heuristic scan (EN/UK/RU) for text addressed to an AI and for role markers; a hit marks the clause as suspicious and the contract gets a 🔴 "contains instructions for AI systems" finding. The model also reports suspected instructions in the `injection_suspected` schema field.
-3. **Prompt structure:** instructions only in the system message; documents in the user message inside blocks with a random per-request boundary; look-alike tags and boundaries in document text are escaped; key rules repeated after the documents; optional datamarking if the eval allows; tagging per document, analysis per topic.
-4. **Code-checked output:** strict JSON schema with limits; quote verification; **a green rating requires a verified quote** (otherwise yellow "not confirmed"); numbers in a summary must appear in its quote; every clause is shown (topic or "Other"); `max_tokens` and per-analysis token budget.
-5. **No capabilities:** no tools, no browsing, no memory, no keys, no placeholder mapping; plain-text rendering, CSP with Trusted Types.
-6. **Adversarial eval gate:** attack success rate 0 on the adversarial golden set (three languages, hidden text, spoofing, encodings); a regression blocks the merge.
+1. **Read what the person reads:** own DOCX walker (insertions, content controls, text boxes, fields, footnotes, endnotes); unread parts produce a "Not read" warning and no green for that document.
+2. **Clean input:** default-ignorable, Cf, Co, Cs, Cn removed by a checked-in table; script allowlist; NFC for text, NFKC + confusable skeleton only for matching; PDF and DOCX text dropped only when provably invisible, borderline text kept and flagged; removed text shown in the preview and reported as 🔴 "contains hidden text".
+3. **Detect and flag:** versioned pattern file; heuristic hits 🟡, high-confidence classes (special or role tokens including gpt-oss harmony tokens, our tags, hidden instruction text, instruction plus rating words) 🔴; model reports accepted only from single-document calls.
+4. **Map-reduce prompts:** one document per call for tagging and rating; comparison by code from structured results; random per-block nonce in both tags; all special tokens and tag look-alikes neutralized; sandwich rules; fixed transform order with an offset map.
+5. **Code-checked output:** strict schema; every finding needs a verbatim quote; quotes expanded to full sentence or clause; green needs a minimum-length quote outside suspicious spans, an exception and cross-reference check, and matching numbers with units; no green for a document with a Layer 2 hit, removed hidden text or unread parts; missing topics computed by code; keyword tags cannot be removed by the model; "Other" clauses scanned and rated.
+6. **Limits:** no tools, network, memory, keys or mapping for the model; hard token cap including repairs and reasoning; linear-time patterns inside the limited parsing subprocess; caps on clauses, tags and entities.
+7. **Adversarial eval gate:** attack success measured against clean twins over N ≥ 3 runs; held-out set; adaptive red-team at stage 12; eval keys only in a protected GitHub environment.
 
-Residual risk: no current model is fully immune. The design limits the worst case to a wrong yellow or red finding or a missed difference — never an unverified green, a hidden clause or code execution.
+**Residual risk:** a wrong yellow or red finding on any document — including a false red on a competing contract — or a missed difference remains possible. A green always needs a verbatim, expanded, exception-checked quote, but a verified quote can still mislead because the attacker writes the text. PDF clipping, optional content, soft masks, ToUnicode mismatches and text drawn as images are not handled in v1.
 
 ## T6. Server abuse
 
@@ -189,21 +196,23 @@ Controls:
 
 ## T11. Identity leakage to AI providers (ADR 0008)
 
-Threat: names of companies, legal entities and people, codes, accounts, addresses, contacts and document numbers from contracts reach an AI provider (including our free default provider) and are logged, retained or used for training there.
+**Threat.** Identifiers from contracts (names of companies and people, codes, accounts, addresses, contacts, document numbers, vehicle and health data) reach an AI provider — including our free default provider — and are logged, retained or used for training. Side channels: file names, document metadata, PDF running headers and footers, custom topics and side text, wire-level SDK fields, cache, exports, logs, SSE and errors.
 
-Controls:
+**Controls:**
 
-1. All identifiers are replaced by typed placeholders (`[ORG_n]`, `[PERSON_n]`, `[TAX_ID_n]`, `[ACCOUNT_n]`, `[ADDRESS_n]`, `[PHONE_n]`, `[EMAIL_n]`, `[URL_n]`, `[PERSONAL_DOC_n]`, `[DOC_NO_n]`, `[VEHICLE_n]`) before any AI call. The requisites and signatures section is removed.
-2. Mandatory preview: no AI call without the client's confirmation of the masked text.
-3. The placeholder mapping stays in the browser. It is never sent to the backend's AI endpoints or to an AI provider, and never logged.
-4. Server safety pass: the backend runs the detector again on incoming pseudonymized text before any AI call.
-5. Type gate: the AI layer accepts only `PseudonymizedDocument`; raw text fails `mypy --strict`.
-6. Documents are labelled A, B, C. File names, PDF metadata and Google document titles never reach an AI provider.
-7. No page images go to an AI provider ("OCR via AI" removed).
-8. **AI payload canary tests:** planted identifiers in test contracts never appear in any request recorded by a fake `AIProvider`.
-9. The eval measures redaction recall on a golden set with planted identifiers in English, Ukrainian and Russian, including case forms; target 100 % on the golden set.
+1. All identifier classes in ADR 0008 are replaced by document-scoped typed placeholders (`[A.ORG_1]`) before any AI call; placeholder look-alikes in the source are neutralized; defined terms equal to masked names are masked.
+2. Detection runs on de-hyphenated text and a confusable skeleton, inside the limited parsing subprocess, with linear-time patterns and caps; PDF running headers and footers are detected and masked or dropped.
+3. The requisites section is dropped only when it is last, its heading matches and its content is mostly identifiers; otherwise it is masked. Dropped parts are visible in the preview and listed as "not analyzed".
+4. Mandatory preview; high-precision classes cannot be unmasked by the client.
+5. The mapping stays in the browser; it is never sent to AI endpoints or providers and never logged; "Clear all" and retention cover it; exports use placeholders by default.
+6. **Fail-closed safety pass:** the server repeats input cleaning and high-precision rules on the untrusted DTO and returns `unmasked_identifier` with offsets; it never changes confirmed text silently.
+7. **Type gate:** a frozen dataclass with a runtime sentinel, created only by `safety_pass()`; never a request model; the `AIProvider` port takes no `str`; topics and side text become `PseudonymizedText`; an AST policy test enforces this.
+8. File names, PDF Info and XMP, DOCX `docProps`, embedded files and Google titles are never parsed into text, never logged, never sent.
+9. Cache key = SHA-256 of the final masked text plus prompt and model versions.
+10. **AI payload canaries on the wire** under the real `anthropic` and `openai` adapters (httpx `MockTransport`): URL, headers and the whole body, for every AI call type; plus negative checks for logs, SSE, errors, `422` and the browser's outgoing analysis request.
+11. The eval measures recall and precision per class and per language.
 
-Residual risk: automatic detection is never complete; the preview is the final control. Our backend still sees the original text in memory during extraction and detection (nothing is stored).
+**Residual risk:** the result is pseudonymized, not anonymous. Public standard terms, product wording, tariffs or procurement data can re-identify a counterparty. Automatic detection is never complete; the preview is the final control. Our backend sees the original text in memory during extraction and detection (nothing is stored).
 
 ## Checklist for every change
 
@@ -212,7 +221,8 @@ Residual risk: automatic detection is never complete; the preview is the final c
 - [ ] Every new outbound request goes through the SSRF guard or uses an allowlisted preset.
 - [ ] Every new dependency is approved and pinned in a lock file.
 - [ ] Model output and contract text are rendered as plain text only.
-- [ ] Every new AI call goes through the `PseudonymizedDocument` type gate (T11).
+- [ ] Every string that reaches a prompt is a gate type (`PseudonymizedDocument` / `PseudonymizedText`), an enum or a constant (T11).
+- [ ] Every new AI call contains one document only, and its output is validated by code (T5).
 - [ ] CI green: tests, linters, pip-audit, npm audit, CodeQL.
 
 ## Pre-launch audit (stage 12)

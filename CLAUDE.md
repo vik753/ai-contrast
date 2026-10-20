@@ -62,8 +62,8 @@ People and roles:
 9. **Dependencies:** minimal. A new dependency needs approval of the tech lead and `security-reviewer`. Pinned in `uv.lock` / `package-lock.json`. Install only with `uv sync --locked` / `npm ci`.
 10. **GitHub Actions:** pin every action by full commit SHA. Minimal `permissions:` per workflow.
 11. **License AGPL-3.0-only:** the UI shows a "Source code" link to this repository (AGPL section 13).
-12. **Pseudonymization (ADR 0008):** no identifier reaches an AI provider. The AI layer accepts only `PseudonymizedDocument`, which only the pseudonymization module can create. File names, document metadata and the placeholder mapping never reach an AI provider. No page images are sent to an AI provider.
-13. **Prompt injection (ADR 0009):** clean input before any AI call (format characters, hidden PDF/DOCX text); random per-request document boundaries; a green rating needs a verified quote; every clause stays visible; output validated by code.
+12. **Pseudonymization (ADR 0008):** no identifier reaches an AI provider. The AI layer accepts only `PseudonymizedDocument` / `PseudonymizedText` (frozen dataclasses with a runtime sentinel, created only by the server safety pass, never a request model); the `AIProvider` port takes no `str`. File names, document metadata and the placeholder mapping never reach an AI provider. No page images are sent to an AI provider.
+13. **Prompt injection (ADR 0009):** read what the person reads (own DOCX walker, "Not read" warnings); clean input (default-ignorable and format characters, provably invisible PDF/DOCX text); **one document per AI call**, comparison by code; random per-block nonce; every finding needs a verbatim quote, green also needs exception and number checks; no clause can be hidden by tagging.
 
 ## Workflow for one task
 
