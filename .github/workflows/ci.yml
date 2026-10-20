@@ -10,9 +10,10 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels its older run; runs on main always finish.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -36,44 +37,53 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --locked
 
+      # `uv run --locked` fails instead of silently re-locking if uv.lock is stale.
       - name: Lint
-        run: uv run ruff check .
+        run: uv run --locked ruff check .
 
       - name: Check formatting
-        run: uv run ruff format --check .
+        run: uv run --locked ruff format --check .
 
       - name: Type check
-        run: uv run mypy app
+        run: uv run --locked mypy app
 
       - name: Test
         # Job logs may be unreadable to some reviewers; failing test ids are also
-        # reported as annotations. The step keeps pytest's exit status.
+        # reported as annotations (the short summary comes from `-ra` in addopts).
+        # If no test id is found (for example a crash), one annotation gives the exit
+        # status. The step keeps pytest's exit status.
         run: |
           set +e
           set -o pipefail
-          uv run pytest -q -rfE 2>&1 | tee "$RUNNER_TEMP/pytest.txt"
+          uv run --locked pytest -q 2>&1 | tee "$RUNNER_TEMP/pytest.txt"
           status=$?
           if [ "$status" -ne 0 ]; then
-            grep -E '^(FAILED|ERROR) ' "$RUNNER_TEMP/pytest.txt" | while IFS= read -r line; do
+            reported=0
+            while IFS= read -r line; do
               test_id="${line%% - *}"
               test_id="${test_id//%/%25}"
               echo "::error title=pytest::${test_id}"
-            done
+              reported=1
+            done < <(grep -E '^(FAILED|ERROR) ' "$RUNNER_TEMP/pytest.txt")
+            if [ "$reported" -eq 0 ]; then
+              echo "::error title=pytest::pytest exited with status ${status}"
+            fi
           fi
           exit "$status"
 
       - name: Audit dependencies (PyPI advisory database)
-        run: uv run pip-audit --strict --vulnerability-service pypi
+        run: uv run --locked pip-audit --strict --vulnerability-service pypi
 
       - name: Audit dependencies (OSV database)
-        run: uv run pip-audit --strict --vulnerability-service osv
+        run: uv run --locked pip-audit --strict --vulnerability-service osv
 
-      - name: Reject OpenTelemetry SDK and exporters in uv.lock
-        # FastAPI depends on opentelemetry-api only (a no-op API). An SDK or exporter
-        # could send request data out of the process; it needs a security review first.
+      - name: Reject telemetry SDKs and exporters in uv.lock
+        # FastAPI depends on opentelemetry-api only (a no-op API). A telemetry SDK,
+        # exporter or distro could send request data out of the process; adding one
+        # needs a security review first.
         run: |
-          if grep -nE '^name = "opentelemetry-(sdk|exporter-[a-z0-9-]+)"' uv.lock; then
-            echo "::error file=backend/uv.lock::opentelemetry-sdk or an opentelemetry exporter is in uv.lock"
+          if grep -nE '^name = "(opentelemetry-(sdk|distro|exporter-[a-z0-9-]+)|logfire|sentry-sdk)"' uv.lock; then
+            echo "::error file=backend/uv.lock::a telemetry SDK, exporter or distro is in uv.lock"
             exit 1
           fi
 
@@ -131,12 +141,16 @@ jobs:
         run: docker build --pull -t ai-contrast-backend:ci backend
 
       - name: Image runs as a non-root user
+        # Config.User is "user", "uid", "user:group" or "uid:gid"; check the user part.
         run: |
           user="$(docker image inspect --format '{{.Config.User}}' ai-contrast-backend:ci)"
-          echo "image user: $user"
-          test -n "$user"
-          test "$user" != "root"
-          test "$user" != "0"
+          echo "image user: '${user}'"
+          case "${user%%:*}" in
+            "" | 0 | root)
+              echo "::error::backend image runs as root (User='${user}')"
+              exit 1
+              ;;
+          esac
 
       - name: Start container (production mode, hardened)
         # Production mode requires an explicit https origin; any https origin works here.
@@ -153,7 +167,7 @@ jobs:
       - name: Smoke test /api/health
         run: |
           for _ in $(seq 1 30); do
-            if curl -fsS -o /dev/null http://127.0.0.1:8000/api/health; then
+            if curl -fs -o /dev/null http://127.0.0.1:8000/api/health; then
               break
             fi
             sleep 1
@@ -190,13 +204,22 @@ jobs:
           persist-credentials: false
 
       - name: Validate Compose file
-        run: docker compose config --quiet && docker compose config
+        run: docker compose config --quiet
 
       - name: Start stack and wait until healthy
         run: docker compose up -d --build --wait --wait-timeout 600
 
       - name: Backend health
         run: curl -fsS http://127.0.0.1:8000/api/health
+
+      - name: Frontend runs as a non-root user
+        run: |
+          uid="$(docker compose exec -T frontend id -u)"
+          echo "frontend uid: ${uid}"
+          if [ "$uid" = "0" ]; then
+            echo "::error::frontend container runs as root"
+            exit 1
+          fi
 
       - name: Frontend proxy reaches the backend
         run: |

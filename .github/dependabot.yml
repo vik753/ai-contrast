@@ -27,15 +27,34 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
 
+  # Base images in backend/Dockerfile and frontend/Dockerfile.dev. Only digest and
+  # patch updates: a new Python, Node or uv minor/major version is a planned change
+  # (it must match CI, uv.lock and setup-uv), not an automatic one.
   - package-ecosystem: docker
-    directory: /backend
+    directories:
+      - /backend
+      - /frontend
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: python
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      - dependency-name: ghcr.io/astral-sh/uv
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
 
-  # The node image in docker-compose.yml (local development stack).
+  # Images referenced directly in docker-compose.yml (none today: both services build
+  # from Dockerfiles). Kept so that a future `image:` gets updates too.
   - package-ecosystem: docker-compose
     directory: /
     schedule:
@@ -43,3 +62,8 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
