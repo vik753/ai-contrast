@@ -47,3 +47,4 @@ How to resume after a break: read this file, then continue with the first unchec
 - Lesson: scheduled wake-ups are queued while the session is at its usage limit and arrive only when the session resumes.
 - 2026-10-20 — PR #3 (lint follow-ups) and PR #10 (Dependabot tuning) merged. Dependabot PRs #5–#8 answered with `@dependabot ignore` (planned upgrades). Stage 1 done.
 - 2026-10-20 — ADR 0008 accepted (pseudonymization). New stage 5b.
+- 2026-10-20 — ADR 0009 accepted (prompt injection defense in depth), on the customer's request.

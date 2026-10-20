@@ -53,13 +53,13 @@ This file is the working copy for the team.
 | 3 | Text extraction | pdfplumber, python-docx, TXT; zip bomb and XXE defenses; subprocess parsing with limits; Google Docs by link and via Picker; `.pages` hint; Tesseract.js OCR with confidence; language detection. |
 | 4 | Browser hash and cache | Web Crypto, IndexedDB, `CacheStore` port, "already analyzed" dialog, 90-day retention, history toggle, "Clear all". |
 | 5 | Clause splitting | By numbering and headings, no AI. |
-| 5b | Pseudonymization | Requisites section removal, identifier detection (preamble definitions, case forms, legal forms, code formats), mandatory preview with manual masks, browser-side mapping, server safety pass, `PseudonymizedDocument` type gate for the AI layer, AI payload canary tests, redaction recall in the eval (ADR 0008). |
+| 5b | Pseudonymization | Input cleaning against hidden prompt injection (ADR 0009: Unicode format characters, invisible PDF text, hidden DOCX content), requisites section removal, identifier detection (preamble definitions, case forms, legal forms, code formats), mandatory preview with manual masks, browser-side mapping, server safety pass, `PseudonymizedDocument` type gate for the AI layer, AI payload canary tests, redaction recall in the eval (ADR 0008). |
 | 6 | Model connection | `AIProvider` port, `anthropic` and `openai` adapters, presets, custom URL with SSRF guard, key handling and log canary, key storage options, test request. Free default provider (Cloudflare Workers AI) with Turnstile and daily quotas; free-key hint for Gemini (ADR 0007). |
 | 7 | Topic catalog | Templates as JSON in the repo (3 languages), AI-suggested topics, own topics (browser storage, export/import), synonym expansion, client side selection. |
 | 8 | Clause tagging | Cheap model tags, strong model checks low confidence, "Other" bucket. |
-| 9 | Analysis | Prompt with instruction/data separation, strict JSON, Pydantic, quote verification, SSE progress, cross-language comparison, missing-topic findings. |
+| 9 | Analysis | Prompt with instruction/data separation, strict JSON, Pydantic, quote verification, SSE progress, cross-language comparison, missing-topic findings. Prompt injection controls (ADR 0009): random boundaries, sandwich rules, `injection_suspected` field, evidence rule for green, number check. |
 | 10 | Result table | Colors with icons and labels, explanations, quotes, "Other", plain-text rendering, export to PDF and JSON. Demo mode with sample contracts and precomputed results (ADR 0007). |
-| 11 | Token economy and quality | Prompt caching, per-topic cache, model routing, cost estimate, eval on a golden set. |
+| 11 | Token economy and quality | Prompt caching, per-topic cache, model routing, cost estimate, eval on a golden set. Adversarial prompt-injection set with attack success rate 0 as a merge gate (ADR 0009). |
 | 12 | Security audit | Threat model review, OWASP ZAP, manual pentest (OWASP Top 10, OWASP Top 10 for LLM), header check, real contracts in 3 languages. |
 | 13 | Deploy | Cloudflare Pages, Render, GitHub Actions deploy, header check on the production domain. |
 
