@@ -8,7 +8,13 @@
 # No secrets and no .env file are needed. Ports are published on 127.0.0.1 only:
 # the dev servers are never reachable from other machines.
 #
-# The node image is pinned by multi-arch index digest; Dependabot (docker-compose) updates it.
+# Notes:
+# - The backend runs from its image: after backend changes, rebuild with
+#   `docker compose up --build` (there is no backend hot reload).
+# - The frontend has hot reload through the bind mount. On WSL2 with the code on the
+#   Windows file system, file events do not reach the container: enable polling
+#   (Vite `server.watch.usePolling: true`) or keep the code in the Linux file system.
+# - Images and the frontend dev Dockerfile are pinned by digest; Dependabot updates them.
 
 name: ai-contrast
 
@@ -22,6 +28,8 @@ services:
       ALLOWED_ORIGINS: http://localhost:5173
     ports:
       - "127.0.0.1:8000:8000"
+    # Same memory as the hosting plan (Render, 512 MB).
+    mem_limit: 512m
     read_only: true
     tmpfs:
       - /tmp:noexec,nosuid,nodev,size=64m
@@ -42,7 +50,10 @@ services:
       start_period: 10s
 
   frontend:
-    image: node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    user: node
     working_dir: /app
     # Lifecycle scripts of dependencies never run (supply-chain defense, T8).
     command:
@@ -54,10 +65,18 @@ services:
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
+      # Read-write on purpose: the nested node_modules volume needs a mount point
+      # inside /app. On a fresh clone ./frontend/node_modules does not exist, and
+      # Docker cannot create it inside a read-only bind mount, so `:ro` fails to start.
+      # The `node` user (uid 1000) still cannot write files owned by another host uid.
       - ./frontend:/app
-      # Anonymous volume: node_modules for Linux inside the container, never the
-      # host's node_modules (and nothing written back to the host).
-      - /app/node_modules
+      # Named volumes: Linux node_modules and the npm cache stay in Docker, owned by
+      # `node` (ownership comes from Dockerfile.dev), and never touch the host.
+      - frontend-node-modules:/app/node_modules
+      - npm-cache:/home/node/.npm
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=256m
     cap_drop:
       - ALL
     security_opt:
@@ -76,3 +95,7 @@ services:
       retries: 12
       # `npm ci` runs first; give it time on a cold cache.
       start_period: 300s
+
+volumes:
+  frontend-node-modules:
+  npm-cache:
