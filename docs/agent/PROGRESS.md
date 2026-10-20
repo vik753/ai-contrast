@@ -7,7 +7,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | # | Stage | Status |
 | --- | --- | --- |
 | 0 | Project rules | done |
-| 1 | Scaffold | next |
+| 1 | Scaffold | done (pending PR #3 merge) |
 | 2 | File upload | planned |
 | 3 | Text extraction | planned |
 | 4 | Browser hash and cache | planned |
@@ -40,4 +40,6 @@ How to resume after a break: read this file, then continue with the first unchec
 - Lesson: never run two agents that call `npm ci` or `uv sync` in the same worktree at the same time.
 - 2026-10-19 — PR #2 (frontend S1-T2, S1-T2b) merged after two approvals.
 - 2026-10-20 — PR #1 (backend S1-T1, S1-T1b, S1-T1c) merged after two approvals. 263 backend tests.
+- 2026-10-20 — PR #4 (S1-T3, S1-T4, S1-T4b: CI, Docker Compose, CodeQL, Dependabot, repository policy tests) merged after two approvals. 370 backend tests. Frontend: 266 tests on the lint branch (PR #3, not merged yet), 214 on `main`.
+- 2026-10-20 — Stage 1 docs: `CLAUDE.md` Commands, README "Run locally", threat model updates for T3 and T4, T8 (supply chain).
 - Lesson: scheduled wake-ups are queued while the session is at its usage limit and arrive only when the session resumes.
