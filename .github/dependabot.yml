@@ -1,0 +1,73 @@
+# Dependency updates. A cooldown of 7 days lets the community spot a malicious or
+# broken release before we take it (threat model T8). Security updates are not
+# delayed by the cooldown.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+
+  # Base images in backend/Dockerfile and frontend/Dockerfile.dev. Only digest and
+  # patch updates: a new Python, Node or uv minor/major version is a planned change
+  # (it must match CI, uv.lock and setup-uv), not an automatic one.
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: python
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      # A uv patch or digest PR changes the uv image tag in backend/Dockerfile only.
+      # Also update `version:` of astral-sh/setup-uv in .github/workflows/ci.yml in
+      # the same PR: the policy test (setup-uv version == Dockerfile uv tag) fails
+      # until then. That failure is intended.
+      - dependency-name: ghcr.io/astral-sh/uv
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+
+  # Images referenced directly in docker-compose.yml (none today: both services build
+  # from Dockerfiles). Kept so that a future `image:` gets updates too.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor

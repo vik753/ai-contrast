@@ -19,8 +19,16 @@ Rules for each location:
 Locations are deduplicated in order. At most 20 are returned; if there are more, a
 plain ``"..."`` string is appended as the 21st entry.
 
-Malformed JSON gives ``["body", "<offset>"]``: Pydantic reports the character
-offset of the parse error as an integer, which is kept like a list index.
+Request bodies should be Pydantic models: only their field names and aliases count as
+declared names. Keys inside a plain ``dict`` body are client-chosen and become ``"*"``.
+
+Special body cases:
+
+- malformed JSON gives ``["body", "<offset>"]``: Pydantic reports the character
+  offset of the parse error as an integer, which is kept like a list index;
+- a body with a non-JSON ``Content-Type`` (for example ``text/plain`` or a form) is
+  not parsed as JSON for a model parameter, so the location is ``["body"]``: the error
+  type is ``model_attributes_type`` for a non-empty body and ``missing`` for an empty one.
 """
 
 from __future__ import annotations
@@ -69,7 +77,17 @@ def _collect_from_annotation(annotation: object, names: set[str], seen: set[int]
 
 
 def declared_names(route: APIRoute) -> set[str]:
-    """Names declared by our code for one route: parameters and body model fields."""
+    """Names declared by our code for one route: parameters and body model fields.
+
+    This reads ``route.dependant`` (FastAPI's ``fastapi.dependencies.models.Dependant``:
+    ``path_params``, ``query_params``, ``header_params``, ``cookie_params``,
+    ``body_params``, ``dependencies``). It is an internal, undocumented FastAPI API and
+    may change in any FastAPI release. Guarding tests that fail if it changes:
+    ``tests/test_validation_locations.py`` (path, query and nested body names stay
+    visible) and this test:
+
+    ``tests/test_hardening.py::test_declared_names_include_nested_aliases_and_dependencies``
+    """
     names: set[str] = set()
     seen: set[int] = set()
     pending = [route.dependant]

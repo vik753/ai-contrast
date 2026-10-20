@@ -1,0 +1,111 @@
+# Local development stack: backend (FastAPI) and frontend (Vite dev server).
+#
+#   docker compose up --build
+#
+# Backend:  http://localhost:8000/api/health
+# Frontend: http://localhost:5173  (proxies /api to the backend)
+#
+# No secrets and no .env file are needed. Ports are published on 127.0.0.1 only:
+# the dev servers are never reachable from other machines.
+#
+# Notes:
+# - The backend runs from its image: after backend changes, rebuild with
+#   `docker compose up --build` (there is no backend hot reload).
+# - The frontend has hot reload through the bind mount. On WSL2 with the code on the
+#   Windows file system, file events do not reach the container: enable polling
+#   (Vite `server.watch.usePolling: true`) or keep the code in the Linux file system.
+# - Images and the frontend dev Dockerfile are pinned by digest; Dependabot updates them.
+
+name: ai-contrast
+
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      # The image defaults to production (fail closed); local runs opt in to development.
+      ENVIRONMENT: development
+      ALLOWED_ORIGINS: http://localhost:5173
+    ports:
+      - "127.0.0.1:8000:8000"
+    # Same memory as the hosting plan (Render, 512 MB).
+    mem_limit: 512m
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # The runtime image has no curl; use Python's standard library.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    user: node
+    working_dir: /app
+    # Lifecycle scripts of dependencies never run (supply-chain defense, T8).
+    command:
+      - sh
+      - -c
+      - npm ci --ignore-scripts && exec npm run dev -- --host 0.0.0.0 --strictPort
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      # The source bind mount is read-write: the nested node_modules volume needs a
+      # mount point inside /app, and Docker cannot create it inside a `:ro` bind
+      # mount, so the container would not start on a fresh clone.
+      #
+      # This is NOT a write protection. The container runs as `node` (uid 1000). On a
+      # Linux host where your own uid is 1000 (the usual first user), the container
+      # CAN write and delete files in ./frontend. After running the stack, review
+      # `git diff` before you commit. Planned mitigation: Compose Watch (`develop.watch`
+      # with `sync`) instead of a bind mount.
+      - ./frontend:/app
+      # Named volumes hold the Linux node_modules and the npm cache, owned by `node`
+      # (ownership comes from Dockerfile.dev). Their contents stay in Docker, but on a
+      # Linux host Docker creates the mount point ./frontend/node_modules on the host
+      # as an empty directory owned by root. That breaks a later `npm ci` on the host.
+      # Fix: run `mkdir -p frontend/node_modules` before the first `docker compose up`
+      # (the directory is then yours), or remove it later with
+      # `sudo rm -rf frontend/node_modules`.
+      - frontend-node-modules:/app/node_modules
+      - npm-cache:/home/node/.npm
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      # `npm ci` runs first; give it time on a cold cache.
+      start_period: 300s
+
+volumes:
+  frontend-node-modules:
+  npm-cache:

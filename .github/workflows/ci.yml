@@ -1,0 +1,236 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# Least privilege: jobs only read the repository.
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run; runs on main always finish.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.11.32"
+
+      - name: Install locked dependencies
+        run: uv sync --locked
+
+      # `uv run --locked` fails instead of silently re-locking if uv.lock is stale.
+      - name: Lint
+        run: uv run --locked ruff check .
+
+      - name: Check formatting
+        run: uv run --locked ruff format --check .
+
+      - name: Type check
+        run: uv run --locked mypy app
+
+      - name: Test
+        # Job logs may be unreadable to some reviewers; failing test ids are also
+        # reported as annotations (the short summary comes from `-ra` in addopts).
+        # If no test id is found (for example a crash), one annotation gives the exit
+        # status. The step keeps pytest's exit status.
+        run: |
+          set +e
+          set -o pipefail
+          uv run --locked pytest -q 2>&1 | tee "$RUNNER_TEMP/pytest.txt"
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            reported=0
+            while IFS= read -r line; do
+              test_id="${line%% - *}"
+              test_id="${test_id//%/%25}"
+              echo "::error title=pytest::${test_id}"
+              reported=1
+            done < <(grep -E '^(FAILED|ERROR) ' "$RUNNER_TEMP/pytest.txt")
+            if [ "$reported" -eq 0 ]; then
+              echo "::error title=pytest::pytest exited with status ${status}"
+            fi
+          fi
+          exit "$status"
+
+      - name: Audit dependencies (PyPI advisory database)
+        run: uv run --locked pip-audit --strict --vulnerability-service pypi
+
+      - name: Audit dependencies (OSV database)
+        run: uv run --locked pip-audit --strict --vulnerability-service osv
+
+      - name: Reject telemetry SDKs and exporters in uv.lock
+        # FastAPI depends on opentelemetry-api only (a no-op API). A telemetry SDK,
+        # exporter or distro could send request data out of the process; adding one
+        # needs a security review first.
+        run: |
+          if grep -nE '^name = "(opentelemetry-(sdk|distro|exporter-[a-z0-9-]+)|logfire|sentry-sdk)"' uv.lock; then
+            echo "::error file=backend/uv.lock::a telemetry SDK, exporter or distro is in uv.lock"
+            exit 1
+          fi
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies (no lifecycle scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        # The github-actions reporter adds one ::error annotation per failing test;
+        # the default reporter keeps the normal log. Exit status is unchanged.
+        run: npm run test -- --reporter=default --reporter=github-actions
+
+      - name: Build
+        run: npm run build
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  docker:
+    name: docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build backend image
+        run: docker build --pull -t ai-contrast-backend:ci backend
+
+      - name: Image runs as a non-root user
+        # Config.User is "user", "uid", "user:group" or "uid:gid"; check the user part.
+        run: |
+          user="$(docker image inspect --format '{{.Config.User}}' ai-contrast-backend:ci)"
+          echo "image user: '${user}'"
+          case "${user%%:*}" in
+            "" | 0 | root)
+              echo "::error::backend image runs as root (User='${user}')"
+              exit 1
+              ;;
+          esac
+
+      - name: Start container (production mode, hardened)
+        # Production mode requires an explicit https origin; any https origin works here.
+        run: |
+          docker run -d --name backend-smoke \
+            -p 127.0.0.1:8000:8000 \
+            -e ALLOWED_ORIGINS=https://example.invalid \
+            --read-only \
+            --tmpfs /tmp:noexec,nosuid,nodev,size=64m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            ai-contrast-backend:ci
+
+      - name: Smoke test /api/health
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fs -o /dev/null http://127.0.0.1:8000/api/health; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS -D headers.txt -o body.json http://127.0.0.1:8000/api/health
+          cat headers.txt body.json
+          echo
+          grep -q '"status":"ok"' body.json
+          grep -qi '^cache-control: no-store' headers.txt
+          grep -qi '^x-content-type-options: nosniff' headers.txt
+          if grep -qi '^server:' headers.txt; then
+            echo "::error::server header must not be sent"
+            exit 1
+          fi
+          # Production: OpenAPI docs are disabled.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/openapi.json)" = "404"
+
+      - name: Container logs
+        if: always()
+        run: docker logs backend-smoke || true
+
+      - name: Remove container
+        if: always()
+        run: docker rm -f backend-smoke || true
+
+  compose:
+    name: compose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate Compose file
+        run: docker compose config --quiet
+
+      - name: Start stack and wait until healthy
+        run: docker compose up -d --build --wait --wait-timeout 600
+
+      - name: Backend health
+        run: curl -fsS http://127.0.0.1:8000/api/health
+
+      - name: Frontend runs as a non-root user
+        run: |
+          uid="$(docker compose exec -T frontend id -u)"
+          echo "frontend uid: ${uid}"
+          if [ "$uid" = "0" ]; then
+            echo "::error::frontend container runs as root"
+            exit 1
+          fi
+
+      - name: Frontend proxy reaches the backend
+        run: |
+          body="$(curl -fsS http://127.0.0.1:5173/api/health)"
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+
+      - name: Compose logs
+        if: always()
+        run: docker compose logs --no-color || true
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

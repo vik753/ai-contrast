@@ -1,0 +1,2 @@
+# Dockerfile.dev copies nothing from the build context; send none.
+*
