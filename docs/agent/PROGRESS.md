@@ -38,3 +38,6 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-19 — ADR 0007 accepted (free default model). Obsidian sync pending: the customer's computer was offline.
 - 2026-10-19 — Frontend lock file generated with npm 11.6.2: npm 10.9 (bundled with Node 22) crashed with `Cannot read properties of null (reading 'edgesOut')` on `npm install` (chain vitest → msw → vitest@*). `npm ci` works with npm 10.
 - Lesson: never run two agents that call `npm ci` or `uv sync` in the same worktree at the same time.
+- 2026-10-19 — PR #2 (frontend S1-T2, S1-T2b) merged after two approvals.
+- 2026-10-20 — PR #1 (backend S1-T1, S1-T1b, S1-T1c) merged after two approvals. 263 backend tests.
+- Lesson: scheduled wake-ups are queued while the session is at its usage limit and arrive only when the session resumes.

@@ -23,7 +23,7 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
 | `astral-sh/setup-uv` | v10.3.0 | `1c37ad07a6a961277cf70c0d37d6f313000f5884` |
 | `github/codeql-action` (`init`, `analyze`) | v4.39.0 | `6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee` |
 
-### S1-T1 Backend skeleton
+### S1-T1 Backend skeleton — merged in PR #1
 
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-backend`.
 - Goal: a stateless FastAPI app with safe defaults.
@@ -48,7 +48,7 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   - Tests may add their own routes to an app from `create_app()` (for example a route that raises) and use `TestClient(app, raise_server_exceptions=False)`.
 - Working directory: git worktree `/home/claude/wt/s1-backend` on branch `feat/s1-backend`.
 
-### S1-T1b Backend hardening from review (PR #1)
+### S1-T1b Backend hardening from review — merged in PR #1
 
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-backend` (same PR #1).
 - AC (from `code-reviewer` and `security-reviewer`):
@@ -64,7 +64,7 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   10. `app/main.py` docstring shows the full run command with `--log-config log_config.json`.
 - Threats: T1, T2, T3, T6, T8.
 
-### S1-T1c Backend polish from re-review (PR #1)
+### S1-T1c Backend polish from re-review — merged in PR #1
 
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-backend`.
 - AC:
@@ -132,6 +132,16 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   2. Extra selectors: `srcdoc` assignment; object properties `innerHTML`/`outerHTML`/`srcdoc`/`srcDoc` (covers `Object.assign`); member access to `insertAdjacentHTML`/`createContextualFragment`/`setHTMLUnsafe`/`parseHTMLUnsafe` (covers `.call`); `setAttribute("srcdoc" | "on*", ...)`; `new window.DOMParser()`; `document.write` without depending on `object.name`.
   3. `changeLanguage()` no longer sets `<html lang>` itself (the listener does).
 - Threats: T1.
+
+### S1-T3 + S1-T4 delivery note
+
+- Both tasks go into one branch `feat/s1-infra` and one pull request. Owner: `backend-dev`. Tests first: `test-engineer` (policy tests in `backend/tests/test_repo_policy.py`, plain text/regex checks — no new dependency).
+- Extra AC for both:
+  - Compose: backend `ENVIRONMENT=development`, `ALLOWED_ORIGINS=http://localhost:5173`; `read_only: true`, `tmpfs: /tmp` (noexec, size cap), `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]` on the backend; ports published only on `127.0.0.1` (the Vite dev server is never exposed beyond localhost); frontend runs `npm ci` (with `ignore-scripts`) and `npm run dev`; `VITE_API_PROXY_TARGET=http://backend:8000`.
+  - CI also validates Compose (`docker compose config`) and runs a Compose smoke test: frontend proxy reaches `/api/health`.
+  - Policy tests: every `uses:` in `.github/workflows/*.yml` is pinned by a 40-hex SHA with a version comment; every workflow has top-level `permissions:` with `contents: read`; no `pull_request_target`; Dockerfile `FROM` lines pinned by `@sha256:` digest (same Python digest in builder and runtime); Dependabot covers `uv`, `npm`, `github-actions`, `docker` with `cooldown`; Compose hardening options above.
+  - Digests: the session proxy blocks Docker Hub and ghcr.io. Resolve them in the first CI run (a step that prints `docker buildx imagetools inspect --format '{{json .Manifest.Digest}}'` for both images), then pin them in the same PR.
+  - Code-review NITs: comment in `app/api/validation_errors.py` naming the FastAPI internal `Dependant` API and the tests that guard it; docstring adds "request bodies should be Pydantic models" and the non-JSON Content-Type case (`["body"]`).
 
 ### S1-T3 Local run with Docker Compose
 
