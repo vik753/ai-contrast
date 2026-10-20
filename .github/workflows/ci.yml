@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# Least privilege: jobs only read the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.11.32"
+
+      - name: Install locked dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy app
+
+      - name: Test
+        run: uv run pytest -q
+
+      - name: Audit dependencies (PyPI advisory database)
+        run: uv run pip-audit --strict --vulnerability-service pypi
+
+      - name: Audit dependencies (OSV database)
+        run: uv run pip-audit --strict --vulnerability-service osv
+
+      - name: Reject OpenTelemetry SDK and exporters in uv.lock
+        # FastAPI depends on opentelemetry-api only (a no-op API). An SDK or exporter
+        # could send request data out of the process; it needs a security review first.
+        run: |
+          if grep -nE '^name = "opentelemetry-(sdk|exporter-[a-z0-9-]+)"' uv.lock; then
+            echo "::error file=backend/uv.lock::opentelemetry-sdk or an opentelemetry exporter is in uv.lock"
+            exit 1
+          fi
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies (no lifecycle scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  docker:
+    name: docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # TEMPORARY (S1-T4): print base image digests so they can be pinned.
+      # Remove this step after the digests are pinned in the Dockerfile and Compose file.
+      - name: Print base image digests (temporary)
+        run: |
+          for image in python:3.13-slim ghcr.io/astral-sh/uv:0.11.32 node:22-slim; do
+            printf '%s ' "$image"
+            docker buildx imagetools inspect "$image" --format '{{json .Manifest.Digest}}'
+          done
+
+      - name: Build backend image
+        run: docker build --pull -t ai-contrast-backend:ci backend
+
+      - name: Image runs as a non-root user
+        run: |
+          user="$(docker image inspect --format '{{.Config.User}}' ai-contrast-backend:ci)"
+          echo "image user: $user"
+          test -n "$user"
+          test "$user" != "root"
+          test "$user" != "0"
+
+      - name: Start container (production mode, hardened)
+        # Production mode requires an explicit https origin; any https origin works here.
+        run: |
+          docker run -d --name backend-smoke \
+            -p 127.0.0.1:8000:8000 \
+            -e ALLOWED_ORIGINS=https://example.invalid \
+            --read-only \
+            --tmpfs /tmp:noexec,nosuid,nodev,size=64m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            ai-contrast-backend:ci
+
+      - name: Smoke test /api/health
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8000/api/health; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS -D headers.txt -o body.json http://127.0.0.1:8000/api/health
+          cat headers.txt body.json
+          echo
+          grep -q '"status":"ok"' body.json
+          grep -qi '^cache-control: no-store' headers.txt
+          grep -qi '^x-content-type-options: nosniff' headers.txt
+          if grep -qi '^server:' headers.txt; then
+            echo "::error::server header must not be sent"
+            exit 1
+          fi
+          # Production: OpenAPI docs are disabled.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/openapi.json)" = "404"
+
+      - name: Container logs
+        if: always()
+        run: docker logs backend-smoke || true
+
+      - name: Remove container
+        if: always()
+        run: docker rm -f backend-smoke || true
+
+  compose:
+    name: compose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate Compose file
+        run: docker compose config --quiet && docker compose config
+
+      - name: Start stack and wait until healthy
+        run: docker compose up -d --build --wait --wait-timeout 600
+
+      - name: Backend health
+        run: curl -fsS http://127.0.0.1:8000/api/health
+
+      - name: Frontend proxy reaches the backend
+        run: |
+          body="$(curl -fsS http://127.0.0.1:5173/api/health)"
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+
+      - name: Compose logs
+        if: always()
+        run: docker compose logs --no-color || true
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
