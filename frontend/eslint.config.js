@@ -20,6 +20,49 @@ const HTML_METHODS =
 /** Attribute names that take HTML or script: `srcdoc` and event handlers (`on*`). */
 const HTML_ATTRS = "/^(srcdoc|on[a-z]+)$/i";
 const WRITE = "/^(write|writeln)$/";
+const DOCUMENT = "/^(document|contentDocument)$/";
+
+/**
+ * Selectors for a statically known name at `node.key`: an identifier
+ * (`a.b`, `{ b: 1 }`), a string literal (`a["b"]`) or a template literal
+ * without expressions (`` a[`b`] ``).
+ * @param {string} node
+ * @param {string} key
+ * @param {string} pattern
+ * @returns {string[]}
+ */
+function staticName(node, key, pattern) {
+  return [
+    `${node}[computed=false][${key}.name=${pattern}]`,
+    `${node}[${key}.type='Literal'][${key}.value=${pattern}]`,
+    `${node}[${key}.type='TemplateLiteral'][${key}.expressions.length=0][${key}.quasis.0.value.raw=${pattern}]`,
+  ];
+}
+
+/**
+ * Same as `staticName` for a call argument (no `computed` flag).
+ * @param {string} node
+ * @param {string} arg
+ * @param {string} pattern
+ * @returns {string[]}
+ */
+function staticArg(node, arg, pattern) {
+  return [
+    `${node}[${arg}.type='Literal'][${arg}.value=${pattern}]`,
+    `${node}[${arg}.type='TemplateLiteral'][${arg}.expressions.length=0][${arg}.quasis.0.value.raw=${pattern}]`,
+  ];
+}
+
+/**
+ * Object literal keys only (`ObjectExpression > Property`): destructuring
+ * reads such as `const { innerHTML } = el` are not sinks.
+ * @param {string} pattern
+ */
+const objectKey = (pattern) => staticName("ObjectExpression > Property", "key", pattern);
+/** @param {string} pattern */
+const memberName = (pattern) => staticName("MemberExpression", "property", pattern);
+/** @param {string[]} selectors */
+const anyOf = (selectors) => selectors.join(", ");
 
 const htmlSinkBans = [
   {
@@ -27,50 +70,58 @@ const htmlSinkBans = [
     message: `${T1} dangerouslySetInnerHTML. ${PLAIN_TEXT}`,
   },
   {
-    selector:
-      "Property[key.name='dangerouslySetInnerHTML'], Property[key.value='dangerouslySetInnerHTML']",
+    selector: anyOf(objectKey("'dangerouslySetInnerHTML'")),
     message: `${T1} a dangerouslySetInnerHTML prop object (spread props). ${PLAIN_TEXT}`,
   },
   {
-    selector:
-      "MemberExpression[property.name='dangerouslySetInnerHTML'], MemberExpression[property.value='dangerouslySetInnerHTML']",
+    selector: anyOf(memberName("'dangerouslySetInnerHTML'")),
     message: `${T1} access to dangerouslySetInnerHTML. ${PLAIN_TEXT}`,
   },
   {
     // Inside a JSX dangerouslySetInnerHTML attribute the attribute itself is
     // already reported; report one error per sink.
-    selector:
-      ":matches(Property[key.name='__html'], Property[key.value='__html'], MemberExpression[property.name='__html']):not(JSXAttribute[name.name='dangerouslySetInnerHTML'] *)",
+    selector: `:matches(${anyOf([...objectKey("'__html'"), ...memberName("'__html'")])}):not(JSXAttribute[name.name='dangerouslySetInnerHTML'] *)`,
     message: `${T1} an __html object (raw HTML for React). ${PLAIN_TEXT}`,
   },
   {
-    selector: `AssignmentExpression > MemberExpression.left[property.name=${HTML_PROPS}], AssignmentExpression > MemberExpression.left[property.value=${HTML_PROPS}]`,
+    selector: anyOf(
+      staticName("AssignmentExpression > MemberExpression.left", "property", HTML_PROPS),
+    ),
     message: `${T1} assignment to innerHTML, outerHTML or srcdoc. ${PLAIN_TEXT}`,
   },
   {
     // Object literals with these keys reach the DOM through Object.assign,
     // spread props or createElement("iframe", { srcDoc }).
-    selector: `Property[key.name=${HTML_PROPS}], Property[key.value=${HTML_PROPS}]`,
+    selector: anyOf(objectKey(HTML_PROPS)),
     message: `${T1} an object property innerHTML, outerHTML, srcdoc or srcDoc (Object.assign, props). ${PLAIN_TEXT}`,
   },
   {
-    selector: `MemberExpression[property.name=${HTML_METHODS}], MemberExpression[property.value=${HTML_METHODS}]`,
+    selector: anyOf(memberName(HTML_METHODS)),
     message: `${T1} insertAdjacentHTML, createContextualFragment, setHTMLUnsafe and parseHTMLUnsafe parse HTML. ${PLAIN_TEXT}`,
   },
   {
-    selector: `CallExpression[callee.property.name='setAttribute'][arguments.0.value=${HTML_ATTRS}]:not([arguments.0.value=/^open$/i]), CallExpression[callee.property.name='setAttributeNS'][arguments.1.value=${HTML_ATTRS}]:not([arguments.1.value=/^open$/i])`,
+    selector: anyOf([
+      ...staticArg(
+        "CallExpression[callee.property.name='setAttribute']",
+        "arguments.0",
+        HTML_ATTRS,
+      ),
+      ...staticArg(
+        "CallExpression[callee.property.name='setAttributeNS']",
+        "arguments.1",
+        HTML_ATTRS,
+      ),
+    ]),
     message: `${T1} setAttribute with srcdoc or an on* event handler. ${PLAIN_TEXT}`,
   },
   {
-    // document.write, document["write"], window.document.write, globalThis.document.writeln.
-    selector: [
-      `MemberExpression[property.name=${WRITE}][object.name='document']`,
-      `MemberExpression[property.value=${WRITE}][object.name='document']`,
-      `MemberExpression[property.name=${WRITE}][object.property.name='document']`,
-      `MemberExpression[property.value=${WRITE}][object.property.name='document']`,
-      `MemberExpression[property.name=${WRITE}][object.property.value='document']`,
-      `MemberExpression[property.value=${WRITE}][object.property.value='document']`,
-    ].join(", "),
+    // document.write, document["write"], window.document.write,
+    // iframe.contentDocument.writeln.
+    selector: anyOf([
+      ...memberName(WRITE).map((m) => `${m}[object.name='document']`),
+      ...memberName(WRITE).map((m) => `${m}[object.property.name=${DOCUMENT}]`),
+      ...memberName(WRITE).map((m) => `${m}[object.property.value=${DOCUMENT}]`),
+    ]),
     message: `${T1} document.write and document.writeln. ${PLAIN_TEXT}`,
   },
   {
@@ -114,11 +165,25 @@ export default defineConfig(
     },
   },
   {
-    // Plain JavaScript files are not part of any TypeScript project:
-    // lint them without type information. The HTML-sink ban still applies.
+    // JavaScript files outside any TypeScript project: lint them without type
+    // information. The HTML-sink and eval bans still apply.
+    // `eslint.config.js` and `vite.config.*` belong to tsconfig.node.json and
+    // keep type-aware linting.
     files: [JS_SOURCES],
+    ignores: ["eslint.config.js", "vite.config.*"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
+      // Browser globals (inline, no extra package), so core no-eval and
+      // no-implied-eval also catch window.eval("...") and setTimeout("...").
+      globals: {
+        window: "readonly",
+        self: "readonly",
+        globalThis: "readonly",
+        document: "readonly",
+        setTimeout: "readonly",
+        setInterval: "readonly",
+        execScript: "readonly",
+      },
       parserOptions: {
         projectService: false,
         ecmaFeatures: { jsx: true },
