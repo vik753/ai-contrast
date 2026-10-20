@@ -124,7 +124,7 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   13. **Copy (ADR 0007):** `home.byok` describes both paths in all three languages — start free with the built-in model, or connect your own provider key; contract text goes only to the AI provider that processes it.
 - Threats: T1, T8, T9.
 
-### S1-T2c Lint follow-ups (next frontend PR)
+### S1-T2c Lint follow-ups (next frontend PR) — PR #3
 
 - Owner: `frontend-dev`. Tests first: `test-engineer`.
 - AC:
@@ -132,6 +132,11 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   2. Extra selectors: `srcdoc` assignment; object properties `innerHTML`/`outerHTML`/`srcdoc`/`srcDoc` (covers `Object.assign`); member access to `insertAdjacentHTML`/`createContextualFragment`/`setHTMLUnsafe`/`parseHTMLUnsafe` (covers `.call`); `setAttribute("srcdoc" | "on*", ...)`; `new window.DOMParser()`; `document.write` without depending on `object.name`.
   3. `changeLanguage()` no longer sets `<html lang>` itself (the listener does).
 - Threats: T1.
+
+### S2-T0 Lint follow-up (from PR #3 security re-review)
+
+- TS files: string eval through global-object members (`window.eval`, `self.eval`, `self.setInterval("…")`) is reported. Shared browser-globals map for all sources; core `no-implied-eval` on for TS too; ban `x.eval` member access with a T1 message; tests in a `.ts` fixture.
+- Optional (code review NIT): `changeLanguage()` before setup uses `setupFallbackI18n()`.
 
 ### S1-T3 + S1-T4 delivery note
 
@@ -142,6 +147,29 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
   - Policy tests: every `uses:` in `.github/workflows/*.yml` is pinned by a 40-hex SHA with a version comment; every workflow has top-level `permissions:` with `contents: read`; no `pull_request_target`; Dockerfile `FROM` lines pinned by `@sha256:` digest (same Python digest in builder and runtime); Dependabot covers `uv`, `npm`, `github-actions`, `docker` with `cooldown`; Compose hardening options above.
   - Digests: the session proxy blocks Docker Hub and ghcr.io. Resolve them in the first CI run (a step that prints `docker buildx imagetools inspect --format '{{json .Manifest.Digest}}'` for both images), then pin them in the same PR.
   - Code-review NITs: comment in `app/api/validation_errors.py` naming the FastAPI internal `Dependant` API and the tests that guard it; docstring adds "request bodies should be Pydantic models" and the non-JSON Content-Type case (`["body"]`).
+
+### S1-T4b Infra hardening from review (PR #4)
+
+- Owner: `backend-dev`. Tests first: `test-engineer` (policy tests). Branch: `feat/s1-infra` (same PR #4).
+- Implementation AC:
+  1. Remove the `# syntax=` BuildKit frontend directive from `backend/Dockerfile` (unpinned image pulled at build time).
+  2. CI non-root check parses the uid part of `Config.User` (`0`, `0:0`, `root`, `root:root` all fail).
+  3. Dependabot: `ignore` semver-major and semver-minor updates for the `python`, `node` and `ghcr.io/astral-sh/uv` images (digest and patch updates only); add `docker` for `/frontend` if a frontend dev Dockerfile is added.
+  4. Compose frontend runs as the non-root `node` user with `read_only: true`, `tmpfs: /tmp`, named volumes for `node_modules` and the npm cache; a small `frontend/Dockerfile.dev` (digest-pinned node base) prepares directories owned by `node`. Backend gets `mem_limit: 512m`. Compose comment: rebuild after backend changes; WSL2 needs polling for hot reload.
+  5. CI polish: drop `-rfE` (keep `-ra` from addopts); pytest annotation fallback `pytest exited with status N`; one `docker compose config --quiet`; `cancel-in-progress` only for pull requests; quiet `curl -fs` inside wait loops; `uv run --locked` after `uv sync --locked`; CodeQL languages add `actions`; OpenTelemetry deny regex also blocks `opentelemetry-distro`, `logfire`, `sentry-sdk`.
+  6. Docstring in `app/api/validation_errors.py`: non-JSON body gives `["body"]` with `model_attributes_type` (non-empty) or `missing` (empty); the guarding test id on one line.
+- Policy test AC (`backend/tests/test_repo_policy.py`):
+  1. Command checks match only inside `run:` blocks; no `continue-on-error` and no `|| true` in the `backend` and `frontend` jobs.
+  2. No `${{` at all inside `run:` blocks.
+  3. Triggers only `push`, `pull_request`, `schedule` (also `workflow_dispatch` allowed); no `pull_request_target`, no `workflow_run`.
+  4. Job-level permissions only `read`/`none`, except `security-events: write` in `codeql.yml`; every `actions/checkout` step has `persist-credentials: false`.
+  5. Dockerfiles: no `# syntax=` line unless digest-pinned; every `--from=` value is a stage alias or digest-pinned; every `FROM` digest-pinned (backend and frontend dev Dockerfiles).
+  6. Compose: inline `# ...` comments stripped before port parsing; every service: no `privileged`, no `network_mode: host`, no `pid: host`, no `cap_add`, no `docker.sock` mount; every `image:` digest-pinned; frontend runs as a non-root user with `read_only: true`.
+  7. Dependabot covers `docker-compose` at `/`; ignore rules exist for python, node and uv.
+  8. setup-uv `version:` equals the uv tag in `backend/Dockerfile`.
+  9. The OpenTelemetry guard in CI greps `uv.lock` with a deny regex and exits non-zero on a match.
+  10. `.env*` files (except `.env.example`) are not tracked by git (`git ls-files`; skip if git is unavailable).
+- Threats: T4.6, T8.
 
 ### S1-T3 Local run with Docker Compose
 
