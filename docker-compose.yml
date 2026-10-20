@@ -65,13 +65,23 @@ services:
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
-      # Read-write on purpose: the nested node_modules volume needs a mount point
-      # inside /app. On a fresh clone ./frontend/node_modules does not exist, and
-      # Docker cannot create it inside a read-only bind mount, so `:ro` fails to start.
-      # The `node` user (uid 1000) still cannot write files owned by another host uid.
+      # The source bind mount is read-write: the nested node_modules volume needs a
+      # mount point inside /app, and Docker cannot create it inside a `:ro` bind
+      # mount, so the container would not start on a fresh clone.
+      #
+      # This is NOT a write protection. The container runs as `node` (uid 1000). On a
+      # Linux host where your own uid is 1000 (the usual first user), the container
+      # CAN write and delete files in ./frontend. After running the stack, review
+      # `git diff` before you commit. Planned mitigation: Compose Watch (`develop.watch`
+      # with `sync`) instead of a bind mount.
       - ./frontend:/app
-      # Named volumes: Linux node_modules and the npm cache stay in Docker, owned by
-      # `node` (ownership comes from Dockerfile.dev), and never touch the host.
+      # Named volumes hold the Linux node_modules and the npm cache, owned by `node`
+      # (ownership comes from Dockerfile.dev). Their contents stay in Docker, but on a
+      # Linux host Docker creates the mount point ./frontend/node_modules on the host
+      # as an empty directory owned by root. That breaks a later `npm ci` on the host.
+      # Fix: run `mkdir -p frontend/node_modules` before the first `docker compose up`
+      # (the directory is then yours), or remove it later with
+      # `sudo rm -rf frontend/node_modules`.
       - frontend-node-modules:/app/node_modules
       - npm-cache:/home/node/.npm
     read_only: true
