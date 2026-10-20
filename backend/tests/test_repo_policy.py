@@ -649,10 +649,18 @@ def test_dependabot_ecosystem_weekly(ecosystem: str) -> None:
         assert re.search(r"interval:\s*['\"]?weekly['\"]?", block), block
 
 
-def _ignore_entries() -> dict[str, str]:
-    """dependency-name -> text of its ignore entry, across all update blocks."""
+def _ignore_entries(ecosystem: str | None = None, directory: str | None = None) -> dict[str, str]:
+    """dependency-name -> text of its ignore entry.
+
+    Without arguments all update blocks are searched; otherwise only blocks of
+    the given ecosystem (and directory).
+    """
     entries: dict[str, str] = {}
-    for _, block in _dependabot_updates():
+    for name, block in _dependabot_updates():
+        if ecosystem is not None and name != ecosystem:
+            continue
+        if directory is not None and directory not in _directories(block):
+            continue
         lines = block.splitlines()
         for i, line in enumerate(lines):
             match = re.match(r"^(\s*)-\s+dependency-name:\s*['\"]?([^\s'\"]+)", line)
@@ -676,6 +684,34 @@ def test_dependabot_ignores_major_and_minor_updates_for_base_image(image: str) -
 
     assert "version-update:semver-major" in entries[image]
     assert "version-update:semver-minor" in entries[image]
+
+
+# --- S1-T6: names Dependabot really uses, and npm majors -------------------
+
+
+def test_dependabot_docker_ignores_major_and_minor_for_uv_dependabot_name() -> None:
+    # Dependabot names the ghcr.io image "astral-sh/uv" (see PR #8), so a rule
+    # for "ghcr.io/astral-sh/uv" alone does not match.
+    entries = _ignore_entries("docker")
+    assert "astral-sh/uv" in entries, f"docker ignore rules: {sorted(entries)}"
+
+    assert "version-update:semver-major" in entries["astral-sh/uv"]
+    assert "version-update:semver-minor" in entries["astral-sh/uv"]
+
+
+def test_dependabot_npm_frontend_ignores_majors_for_all_dependencies() -> None:
+    entries = _ignore_entries("npm", "/frontend")
+    assert "*" in entries, f"npm /frontend ignore rules: {sorted(entries)}"
+
+    assert "version-update:semver-major" in entries["*"]
+
+
+def test_dependabot_npm_wildcard_rule_keeps_minor_and_patch_updates() -> None:
+    entries = _ignore_entries("npm", "/frontend")
+    assert "*" in entries, f"npm /frontend ignore rules: {sorted(entries)}"
+
+    assert "version-update:semver-minor" not in entries["*"]
+    assert "version-update:semver-patch" not in entries["*"]
 
 
 # ---------------------------------------------------------------------------

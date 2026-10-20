@@ -18,6 +18,13 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    # Minor and patch updates only. Major upgrades are planned tasks, because they
+    # break other pins: TypeScript is held back by typescript-eslint, @types/node
+    # follows the Node 22 runtime, and jsdom 30 needs Node >= 22.22.2.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
@@ -53,6 +60,13 @@ updates:
       # the same PR: the policy test (setup-uv version == Dockerfile uv tag) fails
       # until then. That failure is intended.
       - dependency-name: ghcr.io/astral-sh/uv
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      # Dependabot names this image `astral-sh/uv` (without the registry) in its PR
+      # titles and matches ignore rules by that name, so the rule above alone does not
+      # apply (see PR #8). Keep both names.
+      - dependency-name: astral-sh/uv
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
