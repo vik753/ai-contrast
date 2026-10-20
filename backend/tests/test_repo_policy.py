@@ -140,11 +140,13 @@ def _jobs(text: str) -> dict[str, list[str]]:
     return _child_keys(jobs)
 
 
-def _run_blocks(text: str) -> list[str]:
+def _run_blocks(text: str, *, keep_shell_comments: bool = False) -> list[str]:
     """The shell content of every ``run:`` key (inline or block scalar).
 
-    YAML comments outside the block are ignored; shell comment lines inside
-    the block are dropped too.
+    YAML comments outside the block are ignored. Shell comment lines inside
+    the block are dropped for command-presence checks; pass
+    ``keep_shell_comments=True`` for expression checks, because GitHub
+    Actions expands ``${{ }}`` before the shell sees the comment.
     """
     lines = text.splitlines()
     blocks: list[str] = []
@@ -161,7 +163,7 @@ def _run_blocks(text: str) -> list[str]:
         for nxt in lines[i + 1 :]:
             if nxt.strip() and _indent(nxt) <= key_indent:
                 break
-            if not nxt.lstrip().startswith("#"):
+            if keep_shell_comments or not nxt.lstrip().startswith("#"):
                 body.append(nxt)
         blocks.append("\n".join(body))
     return blocks
@@ -317,7 +319,7 @@ def test_workflows_no_expressions_inside_run_blocks() -> None:
     problems = [
         f"{path.name}: {line.strip()}"
         for path in files
-        for block in _run_blocks(_read(path))
+        for block in _run_blocks(_read(path), keep_shell_comments=True)
         for line in block.splitlines()
         if "${{" in line
     ]
@@ -716,15 +718,17 @@ def test_dockerfile_every_from_image_pinned_by_digest(path: Path) -> None:
 
 
 @pytest.mark.parametrize("path", DOCKERFILES, ids=_dockerfile_ids())
-def test_dockerfile_copy_from_is_stage_alias_or_pinned_image(path: Path) -> None:
-    text = _read(path)
+def test_dockerfile_from_options_are_stage_alias_or_pinned_image(path: Path) -> None:
+    """``COPY --from=`` and ``RUN --mount=...,from=...`` (bind, cache) sources."""
+    text = "\n".join(line for line in _read(path).splitlines() if not line.lstrip().startswith("#"))
     stages = {alias.lower() for _, alias in _from_lines(path) if alias}
+    values = re.findall(r"(?<![\w-])(?:--)?from=([^\s,]+)", text)
     problems = [
         value
-        for value in re.findall(r"--from=(\S+)", text)
+        for value in (v.strip("'\"") for v in values)
         if value.lower() not in stages and not value.isdigit() and not DIGEST.search(value)
     ]
-    assert not problems, f"--from= must name a stage or a digest-pinned image: {problems}"
+    assert not problems, f"from= must name a stage or a digest-pinned image: {problems}"
 
 
 @pytest.mark.parametrize("path", DOCKERFILES, ids=_dockerfile_ids())
@@ -820,28 +824,25 @@ def test_compose_service_read_only_root_filesystem(service: str) -> None:
     assert _inline_value(service, "read_only") == "true"
 
 
-def test_compose_backend_tmpfs_for_tmp_noexec_with_size_cap() -> None:
-    tmpfs = _service_section("backend", "tmpfs")
+@pytest.mark.parametrize("service", ["backend", "frontend"])
+def test_compose_service_tmpfs_for_tmp_noexec_with_size_cap(service: str) -> None:
+    tmpfs = _service_section(service, "tmpfs")
     tmp_entries = [line for line in tmpfs.splitlines() if re.search(r"(?:^|[\s\"'-])/tmp\b", line)]
 
     assert tmp_entries, tmpfs
     assert any("noexec" in line and "size=" in line for line in tmp_entries), tmp_entries
 
 
-def test_compose_frontend_tmpfs_for_tmp() -> None:
-    tmpfs = _service_section("frontend", "tmpfs")
-
-    assert re.search(r"(?:^|[\s\"'-])/tmp\b", tmpfs), tmpfs
-
-
-def test_compose_backend_drops_all_capabilities() -> None:
-    cap_drop = _service_section("backend", "cap_drop")
+@pytest.mark.parametrize("service", ["backend", "frontend"])
+def test_compose_service_drops_all_capabilities(service: str) -> None:
+    cap_drop = _service_section(service, "cap_drop")
 
     assert re.search(r"\bALL\b", cap_drop), cap_drop
 
 
-def test_compose_backend_no_new_privileges() -> None:
-    security_opt = _service_section("backend", "security_opt")
+@pytest.mark.parametrize("service", ["backend", "frontend"])
+def test_compose_service_no_new_privileges(service: str) -> None:
+    security_opt = _service_section(service, "security_opt")
 
     assert re.search(r"no-new-privileges:\s*true", security_opt), security_opt
 
