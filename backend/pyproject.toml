@@ -1,0 +1,84 @@
+[project]
+name = "ai-contrast-backend"
+version = "0.1.0"
+description = "AI Contrast backend: stateless API that compares contracts clause by clause."
+requires-python = ">=3.13"
+license = "AGPL-3.0-only"
+dependencies = [
+    "fastapi>=0.143.0",
+    "pydantic-settings>=2.15.0",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.4.0",
+    "pip-audit>=2.10.1",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.uv]
+# The backend is an application, not a library: do not build or install it.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "UP",    # pyupgrade
+    "SIM",   # flake8-simplify
+    "S",     # flake8-bandit (security)
+    "N",     # pep8-naming
+    "C4",    # flake8-comprehensions
+    "RUF",   # ruff-specific rules
+    "PT",    # flake8-pytest-style
+    "BLE",   # flake8-blind-except
+    "T20",   # flake8-print (no print in app code)
+    "G",     # flake8-logging-format
+    "LOG",   # flake8-logging
+    "ANN",   # flake8-annotations
+    "PL",    # pylint
+    "TRY",   # tryceratops
+    "DTZ",   # flake8-datetimez
+    "PTH",   # flake8-use-pathlib
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # assert is the point of a test
+    "PLR2004", # magic values in assertions are fine
+    "ANN401",  # `**overrides: Any` passed through to Settings
+    "PT022",   # yield-style fixtures are fine
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+    "error",
+    # Starlette >= 1.7 prefers `httpx2` for its TestClient. Switching needs approval of a
+    # new dev dependency; until then keep `httpx` (approved in task S1-T1).
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]
