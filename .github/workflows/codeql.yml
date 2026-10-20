@@ -13,9 +13,11 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels its older run; runs on main and scheduled
+# runs always finish.
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze:

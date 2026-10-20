@@ -48,6 +48,10 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
+      # A uv patch or digest PR changes the uv image tag in backend/Dockerfile only.
+      # Also update `version:` of astral-sh/setup-uv in .github/workflows/ci.yml in
+      # the same PR: the policy test (setup-uv version == Dockerfile uv tag) fails
+      # until then. That failure is intended.
       - dependency-name: ghcr.io/astral-sh/uv
         update-types:
           - version-update:semver-major
