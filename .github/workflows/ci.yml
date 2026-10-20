@@ -46,7 +46,21 @@ jobs:
         run: uv run mypy app
 
       - name: Test
-        run: uv run pytest -q
+        # Job logs may be unreadable to some reviewers; failing test ids are also
+        # reported as annotations. The step keeps pytest's exit status.
+        run: |
+          set +e
+          set -o pipefail
+          uv run pytest -q -rfE 2>&1 | tee "$RUNNER_TEMP/pytest.txt"
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            grep -E '^(FAILED|ERROR) ' "$RUNNER_TEMP/pytest.txt" | while IFS= read -r line; do
+              test_id="${line%% - *}"
+              test_id="${test_id//%/%25}"
+              echo "::error title=pytest::${test_id}"
+            done
+          fi
+          exit "$status"
 
       - name: Audit dependencies (PyPI advisory database)
         run: uv run pip-audit --strict --vulnerability-service pypi
@@ -93,7 +107,9 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npm run test
+        # The github-actions reporter adds one ::error annotation per failing test;
+        # the default reporter keeps the normal log. Exit status is unchanged.
+        run: npm run test -- --reporter=default --reporter=github-actions
 
       - name: Build
         run: npm run build
@@ -110,15 +126,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      # TEMPORARY (S1-T4): print base image digests so they can be pinned.
-      # Remove this step after the digests are pinned in the Dockerfile and Compose file.
-      - name: Print base image digests (temporary)
-        run: |
-          for image in python:3.13-slim ghcr.io/astral-sh/uv:0.11.32 node:22-slim; do
-            digest="$(docker buildx imagetools inspect "$image" --format '{{json .Manifest.Digest}}' | tr -d '"')"
-            echo "::notice title=base image digest::${image}@${digest}"
-          done
 
       - name: Build backend image
         run: docker build --pull -t ai-contrast-backend:ci backend
