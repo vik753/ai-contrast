@@ -138,6 +138,17 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
 - TS files: string eval through global-object members (`window.eval`, `self.eval`, `self.setInterval("…")`) is reported. Shared browser-globals map for all sources; core `no-implied-eval` on for TS too; ban `x.eval` member access with a T1 message; tests in a `.ts` fixture.
 - Optional (code review NIT): `changeLanguage()` before setup uses `setupFallbackI18n()`.
 
+### S1-T6 Dependabot tuning after the first Dependabot run
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s1-deps`. Review: `security-reviewer`.
+- Context: the first Dependabot run opened #5 (typescript 6 → 7, breaks typescript-eslint), #6 (@types/node 22 → 26, does not match the Node 22 runtime), #7 (jsdom 29 → 30, needs Node ≥ 22.22.2 with `engine-strict`), #8 (uv 0.11 → 0.13: the `ignore` rule used `ghcr.io/astral-sh/uv`, but Dependabot names the dependency `astral-sh/uv`).
+- AC:
+  1. The uv ignore rule matches the name Dependabot uses (`astral-sh/uv`; keep `ghcr.io/astral-sh/uv` too).
+  2. npm: ignore `version-update:semver-major` for all dependencies (`dependency-name: "*"`). Major upgrades are planned changes with their own task.
+  3. Policy tests cover 1 and 2.
+  4. After merge, the tech lead closes #5–#8 with a comment that explains the policy.
+- Threats: T8.
+
 ### S1-T3 + S1-T4 delivery note
 
 - Both tasks go into one branch `feat/s1-infra` and one pull request. Owner: `backend-dev`. Tests first: `test-engineer` (policy tests in `backend/tests/test_repo_policy.py`, plain text/regex checks — no new dependency).
