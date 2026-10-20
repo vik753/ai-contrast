@@ -12,6 +12,15 @@ import tseslint from "typescript-eslint";
 const T1 = "Forbidden by threat model T1 (XSS):";
 const PLAIN_TEXT = "Render untrusted text as plain text (React text nodes or textContent).";
 
+/** Property names whose value is parsed as HTML. */
+const HTML_PROPS = "/^(innerHTML|outerHTML|srcdoc|srcDoc)$/";
+/** Methods that parse a string as HTML. Banned on any access, not only calls (covers `.call`). */
+const HTML_METHODS =
+  "/^(insertAdjacentHTML|createContextualFragment|setHTMLUnsafe|parseHTMLUnsafe)$/";
+/** Attribute names that take HTML or script: `srcdoc` and event handlers (`on*`). */
+const HTML_ATTRS = "/^(srcdoc|on[a-z]+)$/i";
+const WRITE = "/^(write|writeln)$/";
+
 const htmlSinkBans = [
   {
     selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
@@ -35,21 +44,39 @@ const htmlSinkBans = [
     message: `${T1} an __html object (raw HTML for React). ${PLAIN_TEXT}`,
   },
   {
-    selector:
-      "AssignmentExpression > MemberExpression.left[property.name=/^(innerHTML|outerHTML)$/], AssignmentExpression > MemberExpression.left[property.value=/^(innerHTML|outerHTML)$/]",
-    message: `${T1} assignment to innerHTML or outerHTML. ${PLAIN_TEXT}`,
+    selector: `AssignmentExpression > MemberExpression.left[property.name=${HTML_PROPS}], AssignmentExpression > MemberExpression.left[property.value=${HTML_PROPS}]`,
+    message: `${T1} assignment to innerHTML, outerHTML or srcdoc. ${PLAIN_TEXT}`,
   },
   {
-    selector:
-      "CallExpression > MemberExpression.callee[property.name=/^(insertAdjacentHTML|createContextualFragment|setHTMLUnsafe|parseHTMLUnsafe)$/]",
+    // Object literals with these keys reach the DOM through Object.assign,
+    // spread props or createElement("iframe", { srcDoc }).
+    selector: `Property[key.name=${HTML_PROPS}], Property[key.value=${HTML_PROPS}]`,
+    message: `${T1} an object property innerHTML, outerHTML, srcdoc or srcDoc (Object.assign, props). ${PLAIN_TEXT}`,
+  },
+  {
+    selector: `MemberExpression[property.name=${HTML_METHODS}], MemberExpression[property.value=${HTML_METHODS}]`,
     message: `${T1} insertAdjacentHTML, createContextualFragment, setHTMLUnsafe and parseHTMLUnsafe parse HTML. ${PLAIN_TEXT}`,
   },
   {
-    selector: "MemberExpression[object.name='document'][property.name=/^(write|writeln)$/]",
+    selector: `CallExpression[callee.property.name='setAttribute'][arguments.0.value=${HTML_ATTRS}]:not([arguments.0.value=/^open$/i]), CallExpression[callee.property.name='setAttributeNS'][arguments.1.value=${HTML_ATTRS}]:not([arguments.1.value=/^open$/i])`,
+    message: `${T1} setAttribute with srcdoc or an on* event handler. ${PLAIN_TEXT}`,
+  },
+  {
+    // document.write, document["write"], window.document.write, globalThis.document.writeln.
+    selector: [
+      `MemberExpression[property.name=${WRITE}][object.name='document']`,
+      `MemberExpression[property.value=${WRITE}][object.name='document']`,
+      `MemberExpression[property.name=${WRITE}][object.property.name='document']`,
+      `MemberExpression[property.value=${WRITE}][object.property.name='document']`,
+      `MemberExpression[property.name=${WRITE}][object.property.value='document']`,
+      `MemberExpression[property.value=${WRITE}][object.property.value='document']`,
+    ].join(", "),
     message: `${T1} document.write and document.writeln. ${PLAIN_TEXT}`,
   },
   {
-    selector: "NewExpression[callee.name='DOMParser']",
+    // new DOMParser(), new window.DOMParser(), new globalThis["DOMParser"]().
+    selector:
+      "NewExpression[callee.name='DOMParser'], NewExpression[callee.property.name='DOMParser'], NewExpression[callee.property.value='DOMParser']",
     message: `${T1} DOMParser parses HTML. ${PLAIN_TEXT}`,
   },
   {
@@ -57,6 +84,9 @@ const htmlSinkBans = [
     message: `${T1} iframe srcDoc renders raw HTML. ${PLAIN_TEXT}`,
   },
 ];
+
+const ALL_SOURCES = "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}";
+const JS_SOURCES = "**/*.{js,mjs,cjs,jsx}";
 
 export default defineConfig(
   {
@@ -68,10 +98,10 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         projectService: {
-          // Virtual file used by the lint tests in `src/security/` to prove
-          // that the rules below fire. It never exists on disk. It is
+          // Virtual files used by the lint tests in `src/security/` to prove
+          // that the rules below fire. They never exist on disk. They are
           // type-checked with the app compiler options (JSX, DOM, React).
-          allowDefaultProject: ["src/__lint_fixture__.tsx"],
+          allowDefaultProject: ["src/__lint_fixture__.{ts,tsx,mts,cts}"],
           defaultProject: "tsconfig.app.json",
         },
         tsconfigRootDir: import.meta.dirname,
@@ -84,19 +114,38 @@ export default defineConfig(
     },
   },
   {
-    files: ["**/*.{ts,tsx}"],
+    // Plain JavaScript files are not part of any TypeScript project:
+    // lint them without type information. The HTML-sink ban still applies.
+    files: [JS_SOURCES],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        ecmaFeatures: { jsx: true },
+      },
+    },
+  },
+  {
+    files: [ALL_SOURCES],
     ...reactHooks.configs.flat["recommended-latest"],
   },
   {
-    files: ["**/*.{js,ts,tsx}"],
+    files: [ALL_SOURCES],
     rules: {
       "no-restricted-syntax": ["error", ...htmlSinkBans],
       "no-eval": "error",
-      "no-implied-eval": "off",
-      "@typescript-eslint/no-implied-eval": "error",
+      "no-implied-eval": "error",
       "no-new-func": "error",
       "no-script-url": "error",
       eqeqeq: ["error", "always"],
+    },
+  },
+  {
+    // Type-aware variants for TypeScript files.
+    files: ["**/*.{ts,mts,cts,tsx}"],
+    rules: {
+      "no-implied-eval": "off",
+      "@typescript-eslint/no-implied-eval": "error",
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
     },
   },
