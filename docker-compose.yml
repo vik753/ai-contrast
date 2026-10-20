@@ -1,0 +1,78 @@
+# Local development stack: backend (FastAPI) and frontend (Vite dev server).
+#
+#   docker compose up --build
+#
+# Backend:  http://localhost:8000/api/health
+# Frontend: http://localhost:5173  (proxies /api to the backend)
+#
+# No secrets and no .env file are needed. Ports are published on 127.0.0.1 only:
+# the dev servers are never reachable from other machines.
+#
+# TODO(S1-T4): pin the node image by digest (resolved in the first CI run).
+
+name: ai-contrast
+
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      # The image defaults to production (fail closed); local runs opt in to development.
+      ENVIRONMENT: development
+      ALLOWED_ORIGINS: http://localhost:5173
+    ports:
+      - "127.0.0.1:8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # The runtime image has no curl; use Python's standard library.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  frontend:
+    image: node:22-slim
+    working_dir: /app
+    # Lifecycle scripts of dependencies never run (supply-chain defense, T8).
+    command:
+      - sh
+      - -c
+      - npm ci --ignore-scripts && exec npm run dev -- --host 0.0.0.0 --strictPort
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume: node_modules for Linux inside the container, never the
+      # host's node_modules (and nothing written back to the host).
+      - /app/node_modules
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      # `npm ci` runs first; give it time on a cold cache.
+      start_period: 300s
