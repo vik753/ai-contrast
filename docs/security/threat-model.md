@@ -82,6 +82,7 @@ Controls:
 4. API responses carry `Cache-Control: no-store`.
 5. The UI warns that contract text goes to the provider chosen by the client.
 6. Browser: "Save history" toggle, "Clear all" button, 90-day retention.
+7. CI rejects telemetry SDKs, exporters and distros (`opentelemetry-sdk|distro|exporter-*`, `logfire`, `sentry-sdk`) in `uv.lock` until a security review approves one.
 
 ## T4. Malicious files
 
@@ -94,7 +95,7 @@ Controls:
 3. DOCX: before parsing, check total uncompressed size, entry count and compression ratio.
 4. XML parsing without external entities (`defusedxml` or `resolve_entities=False`).
 5. Parsing runs in a subprocess with time and memory limits.
-6. Docker: non-root user, read-only root filesystem, in-memory temp directory. Compose uses `read_only`, `tmpfs` for `/tmp`, `cap_drop: [ALL]` and `no-new-privileges`. Render cannot enforce a read-only root filesystem (residual risk).
+6. Docker: non-root user, read-only root filesystem, in-memory temp directory. Compose uses `read_only`, `tmpfs` for `/tmp`, `cap_drop: [ALL]` and `no-new-privileges`. Render cannot enforce a read-only root filesystem (residual risk). Compose ports bind to 127.0.0.1; Docker Engine 28.0 or later is required for LAN isolation. The local backend has `mem_limit: 512m`, the same as Render.
 
 ## T5. Prompt injection
 
@@ -136,14 +137,14 @@ Example: on 2026-03-24, malicious LiteLLM 1.82.7 and 1.82.8 were published to Py
 Controls:
 
 1. Minimal dependencies. No LiteLLM. Official `anthropic` and `openai` SDKs only.
-2. Lock files with hashes: `uv.lock`, `package-lock.json`. Install only with `uv sync --locked` and `npm ci`. Docker base images are pinned by digest and updated by Dependabot. CI runs pip-audit with the OSV source.
+2. Lock files with hashes: `uv.lock`, `package-lock.json`. Install only with `uv sync --locked` and `npm ci`. Docker base images are pinned by digest and updated by Dependabot. CI runs pip-audit with the OSV source. Docker base images, including `frontend/Dockerfile.dev`, are pinned by digest. There is no `# syntax=` directive, or it is pinned by digest. `COPY --from=` and `RUN --mount=...from=` use only stage aliases or digest-pinned images. Dependabot takes digest and patch updates only; Python, Node and uv minor and major upgrades are planned changes.
 3. A new dependency needs approval of the tech lead and `security-reviewer`.
 4. Updates through Dependabot pull requests with a cooldown of several days.
-5. CI: pip-audit, npm audit, CodeQL (Python and TypeScript).
-6. GitHub Actions pinned by full commit SHA; minimal `permissions:`.
+5. CI: pip-audit, npm audit, CodeQL (Python and TypeScript). CodeQL languages: `python`, `javascript-typescript`, `actions`; query suite `security-extended`.
+6. GitHub Actions pinned by full commit SHA; minimal `permissions:`. Workflow triggers are limited to `push`, `pull_request`, `schedule`, `workflow_dispatch`. No `pull_request_target`, no `workflow_run`. Every `actions/checkout` has `persist-credentials: false`. No `${{ }}` inside `run:`, comment lines included; pass values through `env:`. Job-level permissions are only `read`/`none`, except `security-events: write` for CodeQL. These rules are enforced by `backend/tests/test_repo_policy.py`.
 7. GitHub secret scanning and push protection enabled.
 8. Tesseract language data and fonts are committed or built into the bundle, not loaded from a CDN.
-9. `frontend/.npmrc` sets `ignore-scripts=true` (do not remove it without security review); npm is pinned with `packageManager`. The Vite dev server is never exposed beyond localhost.
+9. `frontend/.npmrc` sets `ignore-scripts=true` (do not remove it without security review); npm is pinned with `packageManager`. The Vite dev server is never exposed beyond localhost. The Compose frontend dev container runs as `node` (uid 1000) with a read-only root filesystem, no capabilities, `no-new-privileges` and `npm ci --ignore-scripts`. Residual risk: the `./frontend` bind mount is read-write, so on a Linux host where the developer is uid 1000, dev-server code can change the source tree. Planned mitigation: Compose Watch `sync`.
 
 ## T9. Security headers
 
