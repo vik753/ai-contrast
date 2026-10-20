@@ -119,9 +119,12 @@ export async function setupFallbackI18n(): Promise<i18n> {
   return i18next;
 }
 
+/**
+ * Switches the language and stores the choice. `<html lang>` is updated by
+ * the `languageChanged` listener (one writer), so call `setupI18n()` first.
+ */
 export async function changeLanguage(lang: Language): Promise<void> {
   const next = isLanguage(lang) ? lang : DEFAULT_LANGUAGE;
   await i18next.changeLanguage(next);
-  setDocumentLanguage(next);
   storeLanguage(next);
 }
