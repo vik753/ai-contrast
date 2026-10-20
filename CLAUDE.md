@@ -91,7 +91,120 @@ Rules:
 
 ## Commands
 
-Filled in at stage 1 (scaffold).
+Run every command from the repository root unless the block starts with `cd`.
+No secrets and no `.env` file are needed.
+
+### Whole stack (Docker Compose)
+
+Needs Docker Engine 28.0 or later, or Docker Desktop.
+
+```bash
+# Linux only, before the first `up`: you own frontend/node_modules, not root.
+mkdir -p frontend/node_modules
+
+# Build and start backend and frontend.
+docker compose up --build
+```
+
+Expected: the backend becomes healthy, then the frontend starts.
+Open http://localhost:5173 for the UI and http://localhost:8000/api/health for the backend health check.
+
+```bash
+# Rebuild only the backend after backend changes (there is no backend hot reload).
+docker compose up --build backend
+
+# Stop the stack.
+docker compose down
+```
+
+Expected: `docker compose down` stops and removes the containers.
+Add `-v` to also delete the `node_modules` and npm cache volumes.
+
+### Backend (local, without Docker)
+
+Needs Python 3.13 and uv.
+
+```bash
+cd backend
+uv sync --locked
+```
+
+Expected: uv creates `backend/.venv` from `uv.lock` and prints no error.
+
+```bash
+cd backend
+ENVIRONMENT=development ALLOWED_ORIGINS=http://localhost:5173 \
+  uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload \
+  --no-access-log --no-server-header --log-config log_config.json
+```
+
+Expected: uvicorn prints `Uvicorn running on http://127.0.0.1:8000`.
+`curl http://127.0.0.1:8000/api/health` returns `{"status":"ok","version":"0.1.0"}`, and the log shows `GET /api/health 200 duration_ms=...`.
+Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
+
+Backend checks (the same as CI):
+
+```bash
+cd backend
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked mypy app
+uv run --locked pytest -q
+uv run --locked pip-audit --strict --vulnerability-service pypi
+uv run --locked pip-audit --strict --vulnerability-service osv
+```
+
+Expected:
+
+- `ruff check .` prints `All checks passed!`.
+- `ruff format --check .` reports that all files are already formatted.
+- `mypy app` prints `Success: no issues found`.
+- `pytest -q` ends with all tests passed.
+- `pip-audit` finds no known vulnerabilities.
+
+To fix formatting, run `uv run --locked ruff format .`.
+
+### Frontend (local, without Docker)
+
+Needs Node 22.13 or later (npm 11.6.2 is set in `packageManager`).
+
+```bash
+cd frontend
+npm ci --ignore-scripts
+```
+
+Expected: npm installs the locked dependencies and runs no lifecycle scripts.
+
+```bash
+cd frontend
+npm run dev
+```
+
+Expected: Vite prints `Local: http://localhost:5173/`.
+It proxies `/api` to http://localhost:8000, so start the backend first.
+
+Frontend checks (the same as CI):
+
+```bash
+cd frontend
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run format:check
+npm audit --audit-level=high
+```
+
+Expected:
+
+- `lint` ends with no warnings and no errors (`--max-warnings=0`).
+- `typecheck` ends with no output.
+- `test` ends with all tests passed.
+- `build` writes `frontend/dist/`.
+- `format:check` reports that all files use Prettier code style.
+- `npm audit` reports no high or critical vulnerabilities.
+
+To fix formatting, run `npm run format`.
 
 ## Definition of Done (every task)
 

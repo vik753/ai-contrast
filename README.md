@@ -9,7 +9,8 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 - 🟡 **Attention** needed
 - 🔴 **Unfavorable** or risky for you
 
-> **Status:** in development. Stage 0 (project rules) is done. See [`docs/plan.md`](docs/plan.md).
+> **Status:** in development. Stage 0 (project rules) and stage 1 (scaffold) are done. See [`docs/plan.md`](docs/plan.md).
+> The scaffold has a health endpoint and an empty frontend. Contract comparison is not built yet.
 
 ## Principles
 
@@ -33,6 +34,53 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 
 React + TypeScript frontend, Python + FastAPI stateless backend, official Anthropic and OpenAI SDKs.
 Details: [`CLAUDE.md`](CLAUDE.md), [`docs/adr/`](docs/adr/).
+
+## Run locally
+
+No secrets and no `.env` file are needed.
+
+### Prerequisites
+
+- With Docker: Docker Engine 28.0 or later, or Docker Desktop. Engine 28.0 is required for LAN isolation of published ports.
+- Without Docker: Python 3.13 with [uv](https://docs.astral.sh/uv/), and Node 22.13 or later.
+
+### Start with Docker Compose
+
+On Linux, create the `node_modules` directory first. Then Docker does not create it as root:
+
+```bash
+mkdir -p frontend/node_modules
+```
+
+Build and start the stack:
+
+```bash
+docker compose up --build
+```
+
+Wait until both services are healthy. The first start is slow because `npm ci` runs in the frontend container.
+
+- Frontend: http://localhost:5173. You see the AI Contrast page.
+- Backend health: http://localhost:8000/api/health. You see `{"status":"ok","version":"0.1.0"}`.
+
+Ports are bound to `127.0.0.1`. Other machines cannot reach them.
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+### Notes
+
+- **Backend changes.** The backend runs from its image and has no hot reload. After you change backend code, run `docker compose up --build backend`.
+- **Linux, `node_modules` owned by root.** If you skipped `mkdir -p frontend/node_modules`, a later `npm ci` on the host can fail. Fix it with `sudo rm -rf frontend/node_modules`.
+- **Linux, write access to `./frontend`.** The frontend container runs as `node` (uid 1000) and the `./frontend` bind mount is read-write. If your user id is also 1000, the container can change files in `./frontend`. Review `git diff` before you commit.
+- **WSL2 hot reload.** If the code is on the Windows file system, file events do not reach the container. Enable polling (Vite `server.watch.usePolling: true`) or keep the code in the Linux file system.
+
+### Run without Docker
+
+Commands for the backend, the frontend and all checks are in the "Commands" section of [`CLAUDE.md`](CLAUDE.md).
 
 ## Security
 
