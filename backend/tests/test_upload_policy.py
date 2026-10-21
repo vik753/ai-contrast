@@ -29,7 +29,8 @@ FORBIDDEN_NAMES = {"UploadFile", "SpooledTemporaryFile"}
 FORBIDDEN_MODULES = {"tempfile"}
 FORBIDDEN_ATTRIBUTES = {"form", "UploadFile", "SpooledTemporaryFile"}
 
-RUNTIME_DEPENDENCIES = {"fastapi", "pydantic-settings", "uvicorn"}
+# defusedxml: approved for S3-T2 (DOCX walker), see docs/agent/TASKS.md "Stage 3 dependencies".
+RUNTIME_DEPENDENCIES = {"defusedxml", "fastapi", "pydantic-settings", "uvicorn"}
 DEV_DEPENDENCIES = {"httpx", "mypy", "pip-audit", "pytest", "ruff"}
 
 

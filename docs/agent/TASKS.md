@@ -238,6 +238,10 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
   9. Language detection; `pages` and `page` null; zero text → `no_text_extracted`; caps of S3-T1.
   10. Fixtures built in tests (`zipfile` + XML strings), synthetic text only. A worst-case DOCX at the caps finishes inside the child limits.
   11. Docs: threat model T4 (DTD rule), ADR 0004 title and `CLAUDE.md` architecture row (no pdfplumber, no python-docx).
+- Review round 0 (tech lead, before code review) added to the AC:
+  - **Toggle properties** (ECMA-376 §17.7.3): `w:vanish` and the other toggle properties XOR across the style hierarchy (table style, paragraph style, character style); direct formatting sets the value. Replaces the plain-override rule.
+  - **Only displayed parts are read.** Headers and footers: the default ones; first-page ones only with `w:titlePg` in that section; even-page ones only with `w:evenAndOddHeaders` in `settings.xml`. Footnotes and endnotes: only those referenced from the read parts; separator and continuation notes excluded. Not displayed parts go to `removed` (reason `not_displayed`).
+  - Server list caps matching the browser: `removed` ≤ 1,000, `warnings` ≤ 1,000 (overflow → `too_much_text`); `removed.count` counts characters.
 - Threats: T4, T5, T11.
 
 ### S3-T3 PDF extraction (outline)
