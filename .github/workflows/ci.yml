@@ -227,6 +227,15 @@ jobs:
           echo "$body"
           echo "$body" | grep -q '"status":"ok"'
 
+      - name: Frontend proxy forwards a raw-bytes upload to /api/extract
+        # One small synthetic text file as the raw request body (ADR 0010).
+        run: |
+          body="$(curl -fsS -X POST -H 'Content-Type: application/octet-stream' \
+            --data-binary 'Synthetic contract text for the CI smoke test.' \
+            http://127.0.0.1:5173/api/extract)"
+          echo "$body"
+          echo "$body" | grep -q '"kind":"text"'
+
       - name: Compose logs
         if: always()
         run: docker compose logs --no-color || true

@@ -40,3 +40,8 @@ Report to the tech lead:
 2. How to run and check it (commands, expected output).
 3. Test results (paste the summary lines).
 4. Open questions or risks.
+
+## Token economy
+
+- Final report: at most 300 words. Follow the token economy rules in `CLAUDE.md`.
+- Read only the sections the task names; do not re-read whole files you already have.

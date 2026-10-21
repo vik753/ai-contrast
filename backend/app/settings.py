@@ -10,10 +10,12 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173"]
+
+MIB = 1024 * 1024
 
 # An origin is exactly `scheme://host[:port]` (lowercase after normalization).
 # Host: a DNS name or IPv4 address, or an IPv6 address in brackets. No userinfo,
@@ -70,6 +72,20 @@ class Settings(BaseSettings):
       (``scheme://host[:port]``). Required in production, ``https`` only.
     - ``ALLOW_PRIVATE_PROVIDER_URLS``: allow private provider hosts (local models).
       Development only.
+
+    Upload limits (positive integers, threat model T4 and T6, ADR 0010):
+
+    - ``MAX_FILE_BYTES``: body size of ``POST /api/extract`` (one file).
+    - ``MAX_JSON_BODY_BYTES``: body size of every other route.
+    - ``MAX_CONCURRENT_EXTRACTIONS``: extractions in progress per server.
+    - ``MAX_ZIP_ENTRIES``: entries in one ZIP (DOCX) archive.
+    - ``MAX_ZIP_UNCOMPRESSED_BYTES``: declared uncompressed size of one archive.
+    - ``MAX_ZIP_RATIO``: uncompressed / compressed size of one archive entry.
+    - ``EXTRACT_BODY_TIMEOUT_SECONDS``: deadline to receive the whole upload body.
+    - ``EXTRACT_MIN_RATE_BYTES_PER_SECOND``: minimum average upload rate, checked
+      after the grace period.
+    - ``EXTRACT_RATE_GRACE_SECONDS``: grace period before the minimum rate applies
+      (a positive, finite number of seconds).
     """
 
     model_config = SettingsConfigDict(
@@ -84,6 +100,16 @@ class Settings(BaseSettings):
         default_factory=lambda: list(DEFAULT_ALLOWED_ORIGINS)
     )
     allow_private_provider_urls: bool = False
+
+    max_file_bytes: PositiveInt = 10 * MIB
+    max_json_body_bytes: PositiveInt = 64 * 1024
+    max_concurrent_extractions: PositiveInt = 2
+    max_zip_entries: PositiveInt = 2000
+    max_zip_uncompressed_bytes: PositiveInt = 100 * MIB
+    max_zip_ratio: PositiveInt = 200
+    extract_body_timeout_seconds: PositiveInt = 60
+    extract_min_rate_bytes_per_second: PositiveInt = 32 * 1024
+    extract_rate_grace_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 5.0
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

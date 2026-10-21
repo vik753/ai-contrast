@@ -38,3 +38,9 @@ Report to the tech lead:
 2. How to run the tests.
 3. Current result (expected to fail before implementation).
 4. Gaps: criteria you could not test and why.
+
+## Token economy
+
+- Final report: at most 300 words. Follow the token economy rules in `CLAUDE.md`.
+- Read only the sections the task names; do not re-read whole files you already have.
+- No throwaway reference implementations or mutation runs unless the tech lead asks for them.
