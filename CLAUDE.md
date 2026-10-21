@@ -40,12 +40,13 @@ People and roles:
 | OCR | Tesseract.js + PDF.js in the browser, language data self-hosted (`eng`, `ukr`, `rus`) |
 | Browser storage | IndexedDB behind the `CacheStore` port; SHA-256 via Web Crypto API |
 | `backend/` | Python 3.13, FastAPI, stateless; progress and results via SSE |
-| Text extraction | pdfplumber, python-docx |
+| Text extraction | pdfplumber with a render-mode pdfminer device; own DOCX walker over relationship-resolved parts (ADR 0004 revision, ADR 0009) |
 | AI layer | `AIProvider` port; adapters on the official `anthropic` and `openai` SDKs. **No LiteLLM.** |
 | Validation | Pydantic v2 |
 | Rate limiting | slowapi (in memory) |
 | Free default model | Cloudflare Workers AI `@cf/openai/gpt-oss-120b` via the `openai` adapter, our token, Turnstile, daily quotas (ADR 0007) |
 | Demo mode | Built-in synthetic contracts with precomputed results (ADR 0007) |
+| Pseudonymization | Identifiers replaced by typed placeholders before any AI call; mandatory preview; mapping only in the browser (ADR 0008) |
 | Hosting | Cloudflare Pages (frontend, `_headers`), Render (backend, Docker, 512 MB RAM) |
 
 ## Hard security rules — never break
@@ -61,6 +62,8 @@ People and roles:
 9. **Dependencies:** minimal. A new dependency needs approval of the tech lead and `security-reviewer`. Pinned in `uv.lock` / `package-lock.json`. Install only with `uv sync --locked` / `npm ci`.
 10. **GitHub Actions:** pin every action by full commit SHA. Minimal `permissions:` per workflow.
 11. **License AGPL-3.0-only:** the UI shows a "Source code" link to this repository (AGPL section 13).
+12. **Pseudonymization (ADR 0008):** no identifier reaches an AI provider. The AI layer accepts only `PseudonymizedDocument` / `PseudonymizedText` / `ConfirmedTopic` (frozen dataclasses with a runtime sentinel, created only by the server safety pass, never a request model); the `AIProvider` port takes no `str`. File names, document metadata and the placeholder mapping never reach an AI provider. No page images are sent to an AI provider.
+13. **Prompt injection (ADR 0009):** read what the person reads (DOCX parts resolved through relationships, own walker, material "Not read" warnings); clean input (default-ignorable and format characters, provably invisible PDF/DOCX text); **one document per AI call** — no call receives text of two documents, directly or through summaries; schema-first topics, comparison by code; random per-block nonce; every finding needs a verbatim quote, green also needs the deterministic exception rule and number checks; no clause can be hidden by tagging; **every cap fails closed**.
 
 ## Workflow for one task
 

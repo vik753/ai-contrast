@@ -137,6 +137,8 @@ Pinned GitHub Actions (resolved 2026-10-19, use full SHA with a version comment)
 
 - TS files: string eval through global-object members (`window.eval`, `self.eval`, `self.setInterval("…")`) is reported. Shared browser-globals map for all sources; core `no-implied-eval` on for TS too; ban `x.eval` member access with a T1 message; tests in a `.ts` fixture.
 - Optional (code review NIT): `changeLanguage()` before setup uses `setupFallbackI18n()`.
+- Policy test (PR #10 security review): no `versions:` in any `dependency-name: "*"` ignore entry in any ecosystem; every wildcard entry has `update-types` without `version-update:semver-patch`.
+- Recurring per stage: run `npm outdated` (frontend) and `uv tree --outdated` (backend) and plan major upgrades (TypeScript 7 with typescript-eslint, jsdom 30 with Node ≥ 22.22.2).
 
 ### S1-T6 Dependabot tuning after the first Dependabot run
 
