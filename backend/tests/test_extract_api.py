@@ -423,7 +423,8 @@ def test_extract_slot_released_after_success(
     [
         pytest.param(b"", 422, id="empty"),
         pytest.param(b"synthetic\x00binary", 422, id="unsupported"),
-        pytest.param(build_zip(docx_entries(), trailing=b"x"), 422, id="archive"),
+        # Under the 100-byte limit: a local header signature and no EOCD.
+        pytest.param(b"PK\x03\x04" + b"x" * 20, 422, id="archive"),
         pytest.param(b"a" * 101, 413, id="too-large"),
     ],
 )
