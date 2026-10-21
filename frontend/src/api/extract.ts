@@ -111,6 +111,14 @@ export const MAX_BLOCKS = 20_000;
 export const MAX_TEXT_CHARS = 1_000_000;
 export const MAX_SAMPLE_CHARS = 200;
 
+/**
+ * List caps. The server must keep the same caps (S3-T2/T3 add them to the
+ * server model); a body above a cap fails closed here as `unknown_error`.
+ */
+export const MAX_PAGES = 100;
+export const MAX_REMOVED = 1_000;
+export const MAX_WARNINGS = 1_000;
+
 const FILE_KINDS: ReadonlySet<string> = new Set<FileKind>(["pdf", "docx", "text"]);
 
 /**
@@ -312,11 +320,19 @@ function parseOcrPages(value: unknown, pages: number | null): number[] | null {
   if (pages === null) {
     return list.length === 0 ? [] : null;
   }
-  return list.every((page) => isPageOf(page, pages)) ? list : null;
+  // Strictly increasing, so no duplicates and at most `pages` entries.
+  let last = 0;
+  for (const page of list) {
+    if (!isPageOf(page, pages) || page <= last) {
+      return null;
+    }
+    last = page;
+  }
+  return list as number[];
 }
 
 function parseRemoved(value: unknown): RemovedText[] | null {
-  if (!Array.isArray(value)) {
+  if (!Array.isArray(value) || value.length > MAX_REMOVED) {
     return null;
   }
   const removed: RemovedText[] = [];
@@ -338,11 +354,16 @@ function parseRemoved(value: unknown): RemovedText[] | null {
   return removed;
 }
 
+/**
+ * Warnings: at most `MAX_WARNINGS`; the pages of one code are strictly
+ * increasing (one warning per code and page; different codes may share a page).
+ */
 function parseWarnings(value: unknown, pages: number | null): ExtractionWarning[] | null {
-  if (!Array.isArray(value)) {
+  if (!Array.isArray(value) || value.length > MAX_WARNINGS) {
     return null;
   }
   const warnings: ExtractionWarning[] = [];
+  const lastPage = new Map<string, number>();
   for (const item of value as unknown[]) {
     if (!isPlainObject(item) || !hasExactKeys(item, WARNING_KEYS)) {
       return null;
@@ -350,6 +371,12 @@ function parseWarnings(value: unknown, pages: number | null): ExtractionWarning[
     const { code, page } = item;
     if (!isCode(code) || (page !== null && !isPageOf(page, pages))) {
       return null;
+    }
+    if (page !== null) {
+      if (page <= (lastPage.get(code) ?? 0)) {
+        return null;
+      }
+      lastPage.set(code, page);
     }
     warnings.push({ code, page });
   }
@@ -373,8 +400,9 @@ function parseSuccess(body: Record<string, unknown>, file: Blob): ExtractResult 
   ) {
     return null;
   }
-  // Only a PDF has pages; DOCX and text have `null`.
-  if (kind === "pdf" ? !isPositiveInt(pages) : pages !== null) {
+  // Only a PDF has pages (1…MAX_PAGES); DOCX and text have `null`. Client and
+  // server must agree on this nullability when S3-T3 (PDF) lands.
+  if (kind === "pdf" ? !isPositiveInt(pages) || pages > MAX_PAGES : pages !== null) {
     return null;
   }
   const pageCount = pages as number | null;

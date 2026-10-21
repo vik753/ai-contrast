@@ -13,7 +13,16 @@
  *   `Preview` shows it as plain text (S3-T4).
  */
 import type { TFunction } from "i18next";
-import { useCallback, useEffect, useId, useReducer, useRef, useState, type DragEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { extractFile } from "../api/extract";
 import { formReducer, initialFormState, type Announcement } from "./announcements";
@@ -174,7 +183,7 @@ function ContractCard({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const label = contractLabel(index);
-  const previewFiles = contract.files.filter(isPreviewFile);
+  const previewFiles = useMemo(() => contract.files.filter(isPreviewFile), [contract.files]);
 
   const onDragOver = (event: DragEvent<HTMLElement>): void => {
     if (!hasFiles(event)) {

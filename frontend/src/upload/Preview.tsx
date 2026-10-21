@@ -4,18 +4,74 @@
  * - Collapsed by default. Nothing of the text is rendered until it opens.
  * - Files in contract order (main text, then annexes), each with its
  *   language, OCR note, warnings, removed text and blocks.
- * - Long text: the first `PREVIEW_BLOCK_LIMIT` blocks, then "Show all".
+ * - Long text: the first `PREVIEW_BLOCK_LIMIT` blocks or `PREVIEW_CHAR_LIMIT`
+ *   characters, whichever comes first, then "Show all" (focus moves to the
+ *   first newly shown block).
  * - All server text (blocks, samples) and file names are plain text inside
  *   `<bdi>`; no HTML sinks, links are not clickable (threat model T1, T5).
  *   Reason and warning codes are never shown: only our messages for known
  *   codes, a generic message otherwise.
  */
-import { useId, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type Ref } from "react";
 import { useTranslation } from "react-i18next";
-import type { BlockPart, Extraction, ExtractionWarning, RemovedText } from "../api/extract";
+import type { Block, BlockPart, Extraction, ExtractionWarning, RemovedText } from "../api/extract";
 
 /** Blocks rendered per file before "Show all". */
 export const PREVIEW_BLOCK_LIMIT = 200;
+
+/** Characters (UTF-16 units) rendered per file before "Show all". */
+export const PREVIEW_CHAR_LIMIT = 50_000;
+
+export interface ShownBlock {
+  readonly block: Block;
+  /** The text to render: the whole block text, or its start when `shortened`. */
+  readonly text: string;
+  readonly shortened: boolean;
+}
+
+export interface DefaultView {
+  readonly shown: readonly ShownBlock[];
+  /** `true` when every block is shown in full. */
+  readonly complete: boolean;
+}
+
+/**
+ * The default (collapsed "Show all") view: blocks in order until
+ * `maxBlocks` blocks or `maxChars` characters, whichever comes first. The
+ * block that crosses the character cap is cut there (never inside a
+ * surrogate pair) and marked as shortened.
+ */
+export function defaultView(
+  blocks: readonly Block[],
+  maxBlocks: number = PREVIEW_BLOCK_LIMIT,
+  maxChars: number = PREVIEW_CHAR_LIMIT,
+): DefaultView {
+  const shown: ShownBlock[] = [];
+  let chars = 0;
+  for (const block of blocks) {
+    if (shown.length >= maxBlocks) {
+      break;
+    }
+    const room = maxChars - chars;
+    if (block.text.length <= room) {
+      shown.push({ block, text: block.text, shortened: false });
+      chars += block.text.length;
+      continue;
+    }
+    let end = room;
+    const last = block.text.charCodeAt(end - 1);
+    if (end > 0 && last >= 0xd800 && last <= 0xdbff) {
+      end -= 1;
+    }
+    if (end > 0) {
+      shown.push({ block, text: block.text.slice(0, end), shortened: true });
+    }
+    break;
+  }
+  const lastShown = shown.at(-1);
+  const complete = shown.length === blocks.length && lastShown?.shortened !== true;
+  return { shown, complete };
+}
 
 export interface PreviewFile {
   readonly id: string;
@@ -155,15 +211,54 @@ function partLabel(t: ReturnType<typeof useTranslation>["t"], part: BlockPart): 
   return t(`upload.preview.part.${part}`);
 }
 
-function FilePreview({ file }: { file: PreviewFile }) {
+function BlockItem({
+  item,
+  focusRef,
+}: {
+  item: ShownBlock;
+  focusRef?: Ref<HTMLLIElement> | undefined;
+}) {
+  const { t } = useTranslation();
+  const { block } = item;
+  return (
+    <li className="preview-block" ref={focusRef} tabIndex={focusRef === undefined ? undefined : -1}>
+      <span className="preview-block__meta">
+        {partLabel(t, block.part)}
+        {block.page !== null && ` · ${t("upload.preview.page", { page: block.page })}`}
+      </span>
+      <bdi className="preview-block__text preview-text">{item.text}</bdi>
+      {item.shortened && (
+        <span className="preview-block__shortened">{t("upload.preview.shortened")}</span>
+      )}
+    </li>
+  );
+}
+
+const FilePreview = memo(function FilePreview({ file }: { file: PreviewFile }) {
   const { t } = useTranslation();
   const locale = useLocale();
   const headingId = useId();
   const [showAll, setShowAll] = useState(false);
   const { extraction } = file;
-  const blocks = showAll ? extraction.blocks : extraction.blocks.slice(0, PREVIEW_BLOCK_LIMIT);
-  const hiddenBlocks = extraction.blocks.length - blocks.length;
-  const warnings = groupWarnings(extraction.warnings);
+  const view = useMemo(() => defaultView(extraction.blocks), [extraction.blocks]);
+  const warnings = useMemo(() => groupWarnings(extraction.warnings), [extraction.warnings]);
+  const shown: readonly ShownBlock[] = useMemo(
+    () =>
+      showAll
+        ? extraction.blocks.map((block) => ({ block, text: block.text, shortened: false }))
+        : view.shown,
+    [showAll, extraction.blocks, view],
+  );
+  // After "Show all", focus moves to the first block that was not shown in full.
+  const focusIndex = showAll
+    ? view.shown.length - (view.shown.at(-1)?.shortened === true ? 1 : 0)
+    : -1;
+  const focusRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (showAll) {
+      focusRef.current?.focus();
+    }
+  }, [showAll]);
 
   return (
     <div className="preview-file" role="group" aria-labelledby={headingId}>
@@ -203,17 +298,15 @@ function FilePreview({ file }: { file: PreviewFile }) {
       {extraction.removed.length > 0 && <RemovedList removed={extraction.removed} />}
 
       <ol className="preview-blocks">
-        {blocks.map((block, index) => (
-          <li key={index} className="preview-block">
-            <span className="preview-block__meta">
-              {partLabel(t, block.part)}
-              {block.page !== null && ` · ${t("upload.preview.page", { page: block.page })}`}
-            </span>
-            <bdi className="preview-block__text preview-text">{block.text}</bdi>
-          </li>
+        {shown.map((item, index) => (
+          <BlockItem
+            key={index}
+            item={item}
+            focusRef={index === focusIndex ? focusRef : undefined}
+          />
         ))}
       </ol>
-      {hiddenBlocks > 0 && (
+      {!showAll && !view.complete && (
         <button
           type="button"
           className="button button--small button--quiet"
@@ -226,7 +319,7 @@ function FilePreview({ file }: { file: PreviewFile }) {
       )}
     </div>
   );
-}
+});
 
 /** The "Preview" disclosure of one contract. Render it only with accepted files. */
 export function Preview({ files }: { files: readonly PreviewFile[] }) {

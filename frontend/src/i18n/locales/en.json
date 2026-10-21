@@ -120,6 +120,7 @@
       "page": "Page {{page}}",
       "showAll_one": "Show all {{count}} block",
       "showAll_other": "Show all {{count}} blocks",
+      "shortened": "Text shortened",
       "removed": {
         "title": "Hidden text removed",
         "count_one": "{{count}} fragment",

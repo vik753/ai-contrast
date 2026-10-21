@@ -122,6 +122,7 @@
       "showAll_few": "Показать все блоки ({{count}})",
       "showAll_many": "Показать все блоки ({{count}})",
       "showAll_other": "Показать все блоки ({{count}})",
+      "shortened": "Текст сокращён",
       "removed": {
         "title": "Удалённый скрытый текст",
         "count_one": "{{count}} фрагмент",

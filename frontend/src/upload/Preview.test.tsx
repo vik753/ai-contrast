@@ -514,7 +514,6 @@ describe("AC5 — untrusted text is plain text inside <bdi>", () => {
     const container = await renderPayloads();
     // The payload can appear more than once (as a block and as a removed sample).
     const elements = within(container).getAllByText(payload);
-    expect(elements.length).toBeGreaterThan(0);
     for (const element of elements) {
       expect(element.closest("bdi")).not.toBeNull();
     }

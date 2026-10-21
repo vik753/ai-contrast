@@ -122,6 +122,7 @@
       "showAll_few": "Показати всі блоки ({{count}})",
       "showAll_many": "Показати всі блоки ({{count}})",
       "showAll_other": "Показати всі блоки ({{count}})",
+      "shortened": "Текст скорочено",
       "removed": {
         "title": "Вилучений прихований текст",
         "count_one": "{{count}} фрагмент",
@@ -132,7 +133,7 @@
           "hidden_formatting": "Приховано форматуванням",
           "same_color": "Колір тексту як у фону",
           "tiny_text": "Надто дрібний, щоб прочитати",
-          "control_characters": "Керівні символи",
+          "control_characters": "Керувальні символи",
           "other": "Інший невидимий текст"
         }
       },

@@ -82,7 +82,8 @@ Controls:
 4. API responses carry `Cache-Control: no-store`.
 5. The UI warns that contract text goes to the provider chosen by the client.
 6. Browser: "Save history" toggle, "Clear all" button, 90-day retention.
-7. CI rejects telemetry SDKs, exporters and distros (`opentelemetry-sdk|distro|exporter-*`, `logfire`, `sentry-sdk`) in `uv.lock` until a security review approves one.
+7. Extracted text is kept in in-memory React state only; never in storage, URLs, logs or announcements; dropped when the file is removed.
+8. CI rejects telemetry SDKs, exporters and distros (`opentelemetry-sdk|distro|exporter-*`, `logfire`, `sentry-sdk`) in `uv.lock` until a security review approves one.
 
 ## T4. Malicious files
 
@@ -139,7 +140,8 @@ Controls:
 
 Browser controls:
 
-1. At most 2 checks are in flight in the whole form. A `busy` answer is retried at most 3 times, and `Retry-After` is limited to 1–10 s. The browser reads the response body up to 4 KiB.
+1. At most 2 checks are in flight in the whole form. A `busy` answer is retried at most 3 times, and `Retry-After` is limited to 1–10 s. The browser reads a `200` body up to 4 MiB + 64 KiB (the extraction result) and any other body up to 4 KiB.
+2. The preview caps blocks and characters per file; client validation repeats every server list cap.
 
 ## T7. Google Docs import
 

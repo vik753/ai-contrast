@@ -95,3 +95,63 @@ describe("character cap counts code points", () => {
     expect(result).toEqual({ ok: false, code: "unknown_error" });
   });
 });
+
+describe("list caps and page order (review findings)", () => {
+  const pdf = (overrides: Record<string, unknown>) =>
+    jsonResponse(200, stage3Body("pdf", 5, overrides));
+  const invalid = { ok: false, code: "unknown_error" };
+
+  it("test_100_pages_are_accepted", async () => {
+    expect((await extractWith(pdf({ pages: 100 }))).ok).toBe(true);
+  });
+
+  it("test_101_pages_are_unknown_error", async () => {
+    expect(await extractWith(pdf({ pages: 101 }))).toEqual(invalid);
+  });
+
+  it.each([[[2, 2]], [[3, 2]]])(
+    "test_ocr_pages_%j_not_increasing_is_unknown_error",
+    async (ocr) => {
+      expect(await extractWith(pdf({ pages: 3, ocr_pages: ocr }))).toEqual(invalid);
+    },
+  );
+
+  it("test_same_code_on_same_page_twice_is_unknown_error", async () => {
+    const warnings = [
+      { code: "borderline_text", page: 2 },
+      { code: "borderline_text", page: 2 },
+    ];
+    expect(await extractWith(pdf({ pages: 3, warnings }))).toEqual(invalid);
+  });
+
+  it("test_same_code_on_decreasing_pages_is_unknown_error", async () => {
+    const warnings = [
+      { code: "borderline_text", page: 3 },
+      { code: "borderline_text", page: 1 },
+    ];
+    expect(await extractWith(pdf({ pages: 3, warnings }))).toEqual(invalid);
+  });
+
+  it("test_different_codes_on_same_page_are_accepted", async () => {
+    const warnings = [
+      { code: "borderline_text", page: 2 },
+      { code: "pdf_edited", page: 2 },
+      { code: "pdf_edited", page: null },
+    ];
+    expect((await extractWith(pdf({ pages: 3, warnings }))).ok).toBe(true);
+  });
+
+  it("test_1000_removed_are_accepted_and_1001_rejected", async () => {
+    const item = { reason: "same_color", count: 1, sample: "x" };
+    const at = Array.from({ length: 1000 }, () => item);
+    expect((await extractWith(pdf({ removed: at }))).ok).toBe(true);
+    expect(await extractWith(pdf({ removed: [...at, item] }))).toEqual(invalid);
+  });
+
+  it("test_1000_warnings_are_accepted_and_1001_rejected", async () => {
+    const item = { code: "not_read_object", page: null };
+    const at = Array.from({ length: 1000 }, () => item);
+    expect((await extractWith(pdf({ warnings: at }))).ok).toBe(true);
+    expect(await extractWith(pdf({ warnings: [...at, item] }))).toEqual(invalid);
+  });
+});
