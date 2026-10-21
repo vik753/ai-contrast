@@ -9,8 +9,8 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 - 🟡 **Attention** needed
 - 🔴 **Unfavorable** or risky for you
 
-> **Status:** in development. Stage 0 (project rules) and stage 1 (scaffold) are done. See [`docs/plan.md`](docs/plan.md).
-> The scaffold has a health endpoint and an empty frontend. Contract comparison is not built yet.
+> **Status:** in development. Stage 0 (project rules), stage 1 (scaffold) and stage 2 (file upload) are done. See [`docs/plan.md`](docs/plan.md).
+> You can add contracts and files, and the server checks them. Contract comparison is not built yet.
 
 ## Principles
 
@@ -24,7 +24,7 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 
 ## How it works
 
-1. Upload contracts: PDF (text or scan), DOCX, plain text, or a Google Docs link.
+1. Upload contracts: PDF (text or scan), DOCX, plain text, or a Google Docs link. One contract may have several files (main text plus annexes). Files are checked by type and size. File names stay in your browser.
 2. Choose topics: a ready template, topics suggested by AI, or your own.
 3. Choose your side: for example, the insured party, the buyer or the supplier.
 4. Choose the AI provider and enter your API key.
