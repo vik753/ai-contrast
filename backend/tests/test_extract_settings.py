@@ -1,4 +1,4 @@
-"""S3-T1 public interface: the six parsing sandbox and text cap settings (T4, T6).
+"""S3-T1 public interface: the parsing sandbox, text cap and send deadline settings (T4, T6).
 
 Environment variables, positive integers, validated. Defaults from S3-T1 in
 docs/agent/TASKS.md (Stage 3).
@@ -15,9 +15,11 @@ DEFAULTS = {
     "extract_worker_memory_mb": 192,
     "extract_worker_cpu_seconds": 20,
     "extract_worker_wall_seconds": 30,
-    "extract_max_result_bytes": 8 * 1024 * 1024,
-    "extract_max_text_chars": 2_000_000,
+    # Review round 1 (PR #20): caps lowered, send deadline added.
+    "extract_max_result_bytes": 4 * 1024 * 1024,
+    "extract_max_text_chars": 1_000_000,
     "extract_max_blocks": 20_000,
+    "extract_send_timeout_seconds": 30,
 }
 FIELDS = sorted(DEFAULTS)
 

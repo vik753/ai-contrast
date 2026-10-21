@@ -94,6 +94,14 @@ def test_dockerfile_cmd_has_safety_flag(flag: str) -> None:
     assert flag in _cmd_tokens()
 
 
+def test_dockerfile_cmd_limits_concurrency_to_32() -> None:
+    # S3-T1 review round 1 (PR #20): a cap on open connections and tasks (T6).
+    tokens = _cmd_tokens()
+
+    assert "--limit-concurrency" in tokens
+    assert tokens[tokens.index("--limit-concurrency") + 1] == "32"
+
+
 def test_dockerfile_cmd_does_not_enable_proxy_headers_or_access_log() -> None:
     tokens = _cmd_tokens()
 

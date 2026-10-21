@@ -23,7 +23,7 @@ UK = "Договір надання послуг (тестові дані).\n\n�
 RU = "Договор оказания услуг (тестовые данные).\n\nОплата в течение 30 дней, счёт выставляется.\n"
 EN = "Service agreement (synthetic test data).\n\nThe Client pays within 30 days.\n"
 
-DEFAULT_MAX_TEXT_CHARS = 2_000_000
+DEFAULT_MAX_TEXT_CHARS = 1_000_000  # review round 1 (PR #20)
 DEFAULT_MAX_BLOCKS = 20_000
 DETECTION_WINDOW = 64 * 1024
 
@@ -221,10 +221,10 @@ def test_text_above_char_cap_rejected() -> None:
 
 
 def test_text_char_cap_counts_characters_not_bytes() -> None:
-    # 1,500,000 Cyrillic characters are 3,000,000 UTF-8 bytes but stay under the cap.
-    result = extract_text_file(("д" * 1_500_000).encode("utf-8"))
+    # 900,000 Cyrillic characters are 1,800,000 UTF-8 bytes but stay under the cap.
+    result = extract_text_file(("д" * 900_000).encode("utf-8"))
 
-    assert sum(len(text) for text in _texts(result)) == 1_500_000
+    assert sum(len(text) for text in _texts(result)) == 900_000
 
 
 def test_text_at_block_cap_accepted() -> None:

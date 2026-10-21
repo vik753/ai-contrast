@@ -60,7 +60,7 @@ DEFAULT_LIMITS: dict[str, int] = {
     "memory_bytes": 192 * MIB,
     "cpu_seconds": 20,
     "wall_seconds": 30,
-    "max_result_bytes": 8 * MIB,
+    "max_result_bytes": 4 * MIB,
 }
 
 
@@ -181,8 +181,16 @@ def test_run_extraction_unknown_hook_fails() -> None:
     assert error.code == "extraction_failed"
 
 
-def test_run_extraction_file_write_attempt_fails() -> None:
+@pytest.fixture
+def clean_write_probe() -> Any:
+    """Remove the ``write_file`` hook's probe file before and after the test."""
     WRITE_PROBE.unlink(missing_ok=True)
+    yield
+    WRITE_PROBE.unlink(missing_ok=True)
+
+
+@pytest.mark.usefixtures("clean_write_probe")
+def test_run_extraction_file_write_attempt_fails() -> None:
     marker = new_canary().encode()
 
     error, _ = _fail(SAMPLE + marker, hook="write_file")
@@ -190,14 +198,12 @@ def test_run_extraction_file_write_attempt_fails() -> None:
     assert error.code == "extraction_failed"
 
 
+@pytest.mark.usefixtures("clean_write_probe")
 def test_run_extraction_file_write_attempt_writes_no_bytes() -> None:
-    WRITE_PROBE.unlink(missing_ok=True)
-
     with pytest.raises(ExtractionError):
         _run(SAMPLE, hook="write_file")
 
     assert not WRITE_PROBE.exists() or WRITE_PROBE.stat().st_size == 0
-    WRITE_PROBE.unlink(missing_ok=True)
 
 
 def test_run_extraction_stderr_flood_is_drained_and_extraction_succeeds() -> None:

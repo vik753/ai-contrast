@@ -89,8 +89,9 @@ def cwd(pid: int) -> str:
 
 async def wait_for_new_live_child(before: set[int], timeout: float = 15.0) -> int | None:
     """The first new descendant that is alive and has set ``RLIMIT_FSIZE`` to 0
-    (the child is past its set-up). If none gets there, the last new live
-    descendant seen, or ``None``."""
+    and ``RLIMIT_AS`` (the last limit it sets) to a finite value: the child is
+    past its set-up. If none gets there, the last new live descendant seen, or
+    ``None``."""
     deadline = time.monotonic() + timeout
     last: int | None = None
     while time.monotonic() < deadline:
@@ -99,9 +100,13 @@ async def wait_for_new_live_child(before: set[int], timeout: float = 15.0) -> in
                 continue
             last = pid
             try:
-                if soft_limits(pid).get("Max file size") == "0":
-                    return pid
+                limits = soft_limits(pid)
             except OSError:
                 continue
+            if limits.get("Max file size") == "0" and limits.get("Max address space") not in (
+                None,
+                "unlimited",
+            ):
+                return pid
         await asyncio.sleep(0.05)
     return last

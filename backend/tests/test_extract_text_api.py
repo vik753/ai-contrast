@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -24,7 +25,7 @@ from fastapi.testclient import TestClient
 from app.extraction.detect import FileKind
 from app.extraction.model import ExtractionError, ExtractionResult
 from app.extraction.text import extract_text_file
-from tests.asgi_stream import AsgiRun, drive_receive, post_scope
+from tests.asgi_stream import AsgiRun, chunks, drive, drive_receive, post_scope
 from tests.helpers import access_lines, all_log_text, new_canary
 from tests.zipbuild import PDF_SAMPLE, minimal_docx
 
@@ -466,3 +467,84 @@ def test_extract_access_log_line_unchanged(
     match = ACCESS_LINE.match(lines[0])
     assert match is not None, lines[0]
     assert match.group("status") == str(status)
+
+
+# --- Review round 1 (PR #20): slot held until the response is sent (T6) ---------------------
+
+
+def _never_reading_client(
+    body: bytes,
+) -> tuple[Callable[[], Any], Callable[[dict[str, Any]], Any], asyncio.Event]:
+    """receive/send of a client that uploads, stays connected and never reads:
+    every ``send`` blocks, as a write to a full socket buffer does."""
+    receive = _body_then_stay_connected(body)
+    send_started = asyncio.Event()
+
+    async def send(message: dict[str, Any]) -> None:
+        send_started.set()
+        await asyncio.Event().wait()
+
+    return receive, send, send_started
+
+
+def _stalled_send_scenario(
+    app: FastAPI, *, wait_seconds: float
+) -> tuple[int | None, bool, bool, float]:
+    """First request: a client that never reads. While its response is pending, a
+    second (normal) request. Returns (second status, first finished, slot free
+    after, seconds from first send to its end)."""
+    body = EN.encode()
+
+    async def scenario() -> tuple[int | None, bool, bool, float]:
+        receive, send, send_started = _never_reading_client(body)
+        scope = post_scope(EXTRACT, content_length=len(body))
+        first = asyncio.create_task(app(scope, receive, send))
+        await asyncio.wait_for(send_started.wait(), 20)
+        started = time.monotonic()
+        second = await drive(app, post_scope(EXTRACT, content_length=len(body)), chunks(body))
+        done, _ = await asyncio.wait({first}, timeout=wait_seconds)
+        elapsed = time.monotonic() - started
+        if first in done and not first.cancelled():
+            first.exception()  # a cut-off may raise; only the outcome matters here
+        else:
+            first.cancel()
+            await asyncio.gather(first, return_exceptions=True)
+        return second.status, first in done, _slot_free(app), elapsed
+
+    return asyncio.run(scenario())
+
+
+def test_extract_slot_held_while_response_not_read(make_app: Callable[..., FastAPI]) -> None:
+    app = make_app(max_concurrent_extractions=1, extract_send_timeout_seconds=2)
+
+    second_status, _, _, _ = _stalled_send_scenario(app, wait_seconds=2 + 15)
+
+    assert second_status == 503
+
+
+def test_extract_client_not_reading_cut_off_after_send_timeout(
+    make_app: Callable[..., FastAPI],
+) -> None:
+    app = make_app(max_concurrent_extractions=1, extract_send_timeout_seconds=2)
+
+    _, finished, _, elapsed = _stalled_send_scenario(app, wait_seconds=2 + 15)
+
+    assert finished, "the response to a client that does not read was never cut off"
+    assert elapsed >= 2 - 0.5, f"cut off too early: {elapsed:.2f} s"
+
+
+def test_extract_slot_free_after_send_timeout(make_app: Callable[..., FastAPI]) -> None:
+    app = make_app(max_concurrent_extractions=1, extract_send_timeout_seconds=2)
+
+    _, _, free_after, _ = _stalled_send_scenario(app, wait_seconds=2 + 15)
+
+    assert free_after is True
+
+
+def test_extract_server_answers_after_send_timeout(
+    make_app: Callable[..., FastAPI], make_client: Callable[..., TestClient]
+) -> None:
+    app = make_app(max_concurrent_extractions=1, extract_send_timeout_seconds=2)
+    _stalled_send_scenario(app, wait_seconds=2 + 15)
+
+    assert _post(make_client(app), EN.encode()).status_code == 200
