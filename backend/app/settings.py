@@ -98,6 +98,8 @@ class Settings(BaseSettings):
     - ``EXTRACT_MAX_RESULT_BYTES``: size of the child's JSON result.
     - ``EXTRACT_MAX_TEXT_CHARS``: characters of extracted text of one file.
     - ``EXTRACT_MAX_BLOCKS``: text blocks of one file.
+    - ``EXTRACT_SEND_TIMEOUT_SECONDS``: deadline to send the response of
+      ``POST /api/extract``; a client that does not read is cut off.
     """
 
     model_config = SettingsConfigDict(
@@ -125,9 +127,10 @@ class Settings(BaseSettings):
     extract_worker_memory_mb: PositiveInt = 192
     extract_worker_cpu_seconds: PositiveInt = 20
     extract_worker_wall_seconds: PositiveInt = 30
-    extract_max_result_bytes: PositiveInt = 8 * MIB
+    extract_max_result_bytes: PositiveInt = 4 * MIB
     extract_max_text_chars: PositiveInt = DEFAULT_MAX_TEXT_CHARS
     extract_max_blocks: PositiveInt = DEFAULT_MAX_BLOCKS
+    extract_send_timeout_seconds: PositiveInt = 30
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

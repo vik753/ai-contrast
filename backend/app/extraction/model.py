@@ -15,7 +15,7 @@ from typing import Annotated, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt
 
 # Defaults of the text caps; the settings use the same values.
-DEFAULT_MAX_TEXT_CHARS: Final = 2_000_000
+DEFAULT_MAX_TEXT_CHARS: Final = 1_000_000
 DEFAULT_MAX_BLOCKS: Final = 20_000
 
 MAX_SAMPLE_CHARS: Final = 200

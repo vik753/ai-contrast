@@ -62,10 +62,7 @@ DISCARD_SECONDS: Final = 5
 # The app root: the directory that holds the `app` package of this server.
 APP_ROOT: Final = str(Path(app.__file__).resolve().parent.parent)
 _BOOTSTRAP: Final = (
-    "import sys\n"
-    "sys.path.insert(0, sys.argv.pop(1))\n"
-    "from app.extraction.worker import main\n"
-    "main()\n"
+    "import sys\nsys.path.append(sys.argv.pop(1))\nfrom app.extraction.worker import main\nmain()\n"
 )
 
 
@@ -202,7 +199,30 @@ async def _run(
             "max_blocks": limits.max_blocks,
         }
     ).encode()
-    process = await asyncio.create_subprocess_exec(
+    try:
+        process = await _start_child(limits, test_hook)
+    except OSError:
+        # No traceback: the outcome code is logged by `run_extraction`.
+        raise ExtractionError(EXTRACTION_FAILED) from None
+    try:
+        async with asyncio.timeout(limits.wall_seconds):
+            output = await _communicate(process, header + b"\n", data, limits.max_result_bytes)
+    except TimeoutError:
+        raise ExtractionError(EXTRACTION_TIMEOUT) from None
+    except _ResultTooLargeError:
+        raise ExtractionError(EXTRACTION_FAILED) from None
+    finally:
+        _kill_group(process)
+        # Always reap (no zombie, also after a timeout or a cancellation) and read the
+        # pipes to their end at the same time, so that neither can wait on the other.
+        await asyncio.gather(process.wait(), _discard_rest(process))
+    if process.returncode != 0:
+        raise ExtractionError(EXTRACTION_FAILED)
+    return _parse_reply(output, kind, data, limits)
+
+
+async def _start_child(limits: SandboxLimits, test_hook: str | None) -> asyncio.subprocess.Process:
+    return await asyncio.create_subprocess_exec(
         sys.executable,
         "-I",
         "-B",
@@ -219,21 +239,6 @@ async def _run(
         start_new_session=True,
         close_fds=True,
     )
-    try:
-        async with asyncio.timeout(limits.wall_seconds):
-            output = await _communicate(process, header + b"\n", data, limits.max_result_bytes)
-    except TimeoutError:
-        raise ExtractionError(EXTRACTION_TIMEOUT) from None
-    except _ResultTooLargeError:
-        raise ExtractionError(EXTRACTION_FAILED) from None
-    finally:
-        _kill_group(process)
-        # Always reap: no zombie, also after a timeout or a cancellation.
-        await process.wait()
-        await _discard_rest(process)
-    if process.returncode != 0:
-        raise ExtractionError(EXTRACTION_FAILED)
-    return _parse_reply(output, kind, data, limits)
 
 
 async def run_extraction(

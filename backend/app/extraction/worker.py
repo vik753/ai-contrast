@@ -44,6 +44,8 @@ def set_limits(memory_bytes: int, cpu_seconds: int) -> None:
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
     resource.setrlimit(resource.RLIMIT_NOFILE, (MAX_OPEN_FILES, MAX_OPEN_FILES))
+    # No new processes: `fork` fails (for a user other than root, ADR 0011).
+    resource.setrlimit(resource.RLIMIT_NPROC, (0, 0))
     # SIGXCPU at the soft limit, SIGKILL one second later at the hard limit.
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
     resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
@@ -56,7 +58,7 @@ def _read_exact(stream: BinaryIO, size: int) -> bytes:
     return data
 
 
-def _positive(header: dict[str, object], key: str) -> int:
+def _non_negative(header: dict[str, object], key: str) -> int:
     value = header.get(key)
     if type(value) is not int or value < 0:
         raise ValueError
@@ -93,6 +95,8 @@ def _run_hook(name: str, data: bytes, out: BinaryIO) -> None:  # noqa: PLR0912 -
             sys.stderr.buffer.write(data)
             written += len(data)
         sys.stderr.buffer.flush()
+    elif name == "fork":
+        _fork_probe()
     elif name == "invalid_json":
         out.write(b"not json")
         out.flush()
@@ -103,6 +107,18 @@ def _run_hook(name: str, data: bytes, out: BinaryIO) -> None:  # noqa: PLR0912 -
         os._exit(0)
     else:
         os._exit(UNKNOWN_HOOK_EXIT)
+
+
+def _fork_probe() -> None:
+    """Test hook: exit with ``_HOOK_EXIT`` if ``fork`` works; else go on normally."""
+    try:
+        pid = os.fork()
+    except OSError:
+        return
+    if pid == 0:
+        os._exit(0)
+    os.waitpid(pid, 0)
+    os._exit(_HOOK_EXIT)
 
 
 def _extract(kind: str, data: bytes, *, max_text_chars: int, max_blocks: int) -> bytes:
@@ -129,9 +145,9 @@ def _main(argv: list[str]) -> None:
     kind = header.get("kind")
     if not isinstance(kind, str):
         raise TypeError
-    data = _read_exact(stdin, _positive(header, "size"))
-    max_text_chars = _positive(header, "max_text_chars")
-    max_blocks = _positive(header, "max_blocks")
+    data = _read_exact(stdin, _non_negative(header, "size"))
+    max_text_chars = _non_negative(header, "max_text_chars")
+    max_blocks = _non_negative(header, "max_blocks")
 
     out = sys.stdout.buffer
     hook = os.environ.get(HOOK_ENV)
