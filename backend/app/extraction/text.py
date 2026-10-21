@@ -9,7 +9,11 @@
 3. The control-character rule of detection runs again on the whole text: any NUL,
    or more than 1 % C0 controls other than TAB, LF, FF and CR →
    ``text_decoding_failed`` (fail closed; detection saw only the first 64 KiB).
-4. Newlines are normalized to ``\\n``. Blocks are split at blank lines (lines with
+4. Newlines (CR LF, CR, NEL U+0085, LS U+2028, PS U+2029) are normalized to
+   ``\\n``. Other control characters (Unicode category Cc, TAB and LF excepted) are
+   removed and reported in ``removed`` (reason ``control_characters``, with a sample
+   of their code points such as ``U+0001``).
+5. Blocks are split at blank lines (lines with
    only whitespace) and trimmed; empty blocks are dropped. More blocks than
    ``max_blocks`` → ``too_much_text``; no block → ``no_text_extracted``.
 
@@ -31,6 +35,7 @@ from app.extraction.model import (
     Block,
     ExtractionError,
     ExtractionResult,
+    Removed,
 )
 
 UTF8_BOM: Final = b"\xef\xbb\xbf"
@@ -42,6 +47,13 @@ MAX_CONTROL_PERCENT: Final = 1
 _CONTROL_CHARS: Final = tuple(
     chr(c) for c in range(0x20) if c not in {0x00, 0x09, 0x0A, 0x0C, 0x0D}
 )
+
+# Cc characters that are kept: TAB and LF. CR, NEL, LS and PS become LF first.
+_LINE_BREAKS: Final = re.compile(r"\r\n|[\r\u0085\u2028\u2029]")
+_REMOVED_CONTROLS: Final = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+CONTROL_CHARACTERS: Final = "control_characters"
+# How many distinct code points the sample lists (each ``U+XXXX`` is 6 characters).
+_SAMPLE_CODE_POINTS: Final = 16
 
 # A blank line: a line break, then lines that hold only whitespace, then a line break.
 _BLANK_LINES: Final = re.compile(r"\n(?:[^\S\n]*\n)+")
@@ -70,6 +82,24 @@ def _check_controls(text: str) -> None:
     controls = sum(text.count(char) for char in _CONTROL_CHARS)
     if controls * 100 > len(text) * MAX_CONTROL_PERCENT:
         raise ExtractionError(TEXT_DECODING_FAILED)
+
+
+def _remove_controls(text: str) -> tuple[str, list[Removed]]:
+    found: set[str] = set()
+    count = 0
+
+    def note(match: re.Match[str]) -> str:
+        nonlocal count
+        count += 1
+        if len(found) < _SAMPLE_CODE_POINTS:
+            found.add(match.group())
+        return ""
+
+    cleaned = _REMOVED_CONTROLS.sub(note, text)
+    if not count:
+        return cleaned, []
+    sample = " ".join(f"U+{ord(char):04X}" for char in sorted(found))
+    return cleaned, [Removed(reason=CONTROL_CHARACTERS, count=count, sample=sample)]
 
 
 def _split_blocks(text: str, max_blocks: int) -> list[Block]:
@@ -101,7 +131,7 @@ def extract_text_file(
     if len(text) > max_chars:
         raise ExtractionError(TOO_MUCH_TEXT)
     _check_controls(text)
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text, removed = _remove_controls(_LINE_BREAKS.sub("\n", text))
     blocks = _split_blocks(text, max_blocks)
     if not blocks:
         raise ExtractionError(NO_TEXT_EXTRACTED)
@@ -112,6 +142,6 @@ def extract_text_file(
         pages=None,
         blocks=blocks,
         ocr_pages=[],
-        removed=[],
+        removed=removed,
         warnings=[],
     )
