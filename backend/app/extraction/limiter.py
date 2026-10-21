@@ -1,14 +1,22 @@
-"""Server-wide limit on extractions in progress (threat model T6, ADR 0010).
+"""Limit on extractions in progress in this process (threat model T6, ADR 0010).
 
 A slot is taken without waiting before the request body is read. If none is free,
 the caller answers ``503 busy`` at once: a queue would hold memory for bodies that
 nobody processes yet. The app keeps one instance in ``app.state.extraction_limiter``.
 
-All callers run on the event loop thread and the methods never ``await``, so no
-lock is needed.
+The count is per process, so the backend runs as a single uvicorn worker (see the
+``Dockerfile``). All callers run on the event loop thread and no method awaits, so
+no lock is needed.
 """
 
 from __future__ import annotations
+
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+
+class ExtractionBusyError(Exception):
+    """No free slot. Carries no data."""
 
 
 class ExtractionLimiter:
@@ -27,6 +35,26 @@ class ExtractionLimiter:
         return True
 
     def release(self) -> None:
-        """Give back a slot taken by ``try_acquire``. Extra calls are ignored."""
-        if self._in_use > 0:
-            self._in_use -= 1
+        """Give back a slot taken by ``try_acquire``.
+
+        Raises ``RuntimeError`` if no slot is held: a double release would let more
+        extractions run than the limit allows.
+        """
+        if self._in_use == 0:
+            msg = "release() without a held slot"
+            raise RuntimeError(msg)
+        self._in_use -= 1
+
+    @contextmanager
+    def slot(self) -> Iterator[None]:
+        """Hold one slot for the ``with`` block; release it exactly once on exit,
+        also on exceptions and cancellation.
+
+        Raises ``ExtractionBusyError`` on enter if no slot is free (never waits).
+        """
+        if not self.try_acquire():
+            raise ExtractionBusyError
+        try:
+            yield
+        finally:
+            self.release()

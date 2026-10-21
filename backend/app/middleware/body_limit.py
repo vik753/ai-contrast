@@ -3,13 +3,13 @@
 Pure ASGI middleware between CORS and the error catcher, so a ``413`` to an
 allowed origin carries the CORS headers.
 
-- ``POST /api/extract`` (exact path): ``max_file_bytes``, error ``file_too_large``.
+- The ``/api/extract`` path (any method): ``max_file_bytes``, error ``file_too_large``.
 - Every other path: ``max_json_body_bytes``, error ``request_too_large``.
 
 Two checks:
 
-1. A ``Content-Length`` above the limit is answered with ``413`` before any body
-   byte is read. The app is not called.
+1. A ``Content-Length`` above the limit (also one with more than 18 digits) is
+   answered with ``413`` before any body byte is read. The app is not called.
 2. ``http.request`` chunks are counted as the app reads them. When the count goes
    above the limit (a body longer than its ``Content-Length``, or a chunked body),
    the middleware sends the ``413`` itself, then tells the app that the client
@@ -17,7 +17,8 @@ Two checks:
    which the error catcher swallows) and any response it still tries to send is
    dropped. No more body is read from the client.
 
-Nothing here logs; the access log records the status.
+Every ``413`` carries ``Connection: close``: the rest of the body is never read, so
+the connection cannot be reused. Nothing here logs; the access log records the status.
 """
 
 from __future__ import annotations
@@ -26,22 +27,16 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-EXTRACT_PATH = "/api/extract"
+from app.http_limits import EXTRACT_PATH, declared_length
+
 FILE_TOO_LARGE = "file_too_large"
 REQUEST_TOO_LARGE = "request_too_large"
 
 _DISCONNECT: Message = {"type": "http.disconnect"}
 
 
-def declared_length(headers: Headers) -> int | None:
-    """The ``Content-Length`` as an integer, or ``None`` if it is absent or invalid."""
-    value = headers.get("content-length")
-    if value is None:
-        return None
-    value = value.strip()
-    if not value.isascii() or not value.isdigit():
-        return None
-    return int(value)
+async def _client_gone() -> Message:
+    return _DISCONNECT
 
 
 class BodySizeLimitMiddleware:
@@ -61,11 +56,16 @@ class BodySizeLimitMiddleware:
             return
 
         limit, code = self._limit(scope)
-        too_large = JSONResponse({"error": code}, status_code=413)
+
+        async def reject() -> None:
+            response = JSONResponse(
+                {"error": code}, status_code=413, headers={"Connection": "close"}
+            )
+            await response(scope, _client_gone, send)
 
         length = declared_length(Headers(scope=scope))
         if length is not None and length > limit:
-            await too_large(scope, receive, send)
+            await reject()
             return
 
         received = 0
@@ -84,7 +84,7 @@ class BodySizeLimitMiddleware:
                 return message
             rejected = True
             if not response_started:
-                await too_large(scope, _client_gone, send)
+                await reject()
             return _DISCONNECT
 
         async def send_from_app(message: Message) -> None:
@@ -97,7 +97,3 @@ class BodySizeLimitMiddleware:
             await send(message)
 
         await self.app(scope, receive_counting, send_from_app)
-
-
-async def _client_gone() -> Message:
-    return _DISCONNECT

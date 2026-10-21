@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     - ``MAX_ZIP_ENTRIES``: entries in one ZIP (DOCX) archive.
     - ``MAX_ZIP_UNCOMPRESSED_BYTES``: declared uncompressed size of one archive.
     - ``MAX_ZIP_RATIO``: uncompressed / compressed size of one archive entry.
+    - ``EXTRACT_BODY_TIMEOUT_SECONDS``: deadline to receive the whole upload body.
+    - ``EXTRACT_MIN_RATE_BYTES_PER_SECOND``: minimum average upload rate, checked
+      after a fixed grace period (``app.api.extract.RATE_GRACE_SECONDS``).
     """
 
     model_config = SettingsConfigDict(
@@ -102,6 +105,8 @@ class Settings(BaseSettings):
     max_zip_entries: PositiveInt = 2000
     max_zip_uncompressed_bytes: PositiveInt = 100 * MIB
     max_zip_ratio: PositiveInt = 200
+    extract_body_timeout_seconds: PositiveInt = 60
+    extract_min_rate_bytes_per_second: PositiveInt = 32 * 1024
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

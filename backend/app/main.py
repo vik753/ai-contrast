@@ -27,6 +27,8 @@ from app.settings import Settings
 
 CORS_ALLOWED_METHODS = ["GET", "POST"]
 CORS_ALLOWED_HEADERS = ["Content-Type", "X-Provider-Key"]
+# Production is cross-origin: the browser may read `Retry-After` only if it is exposed.
+CORS_EXPOSED_HEADERS = ["Retry-After"]
 
 # FastAPI native OpenTelemetry is off: no spans, metrics or logs leave the process,
 # whatever the environment says (`FASTAPI_OTEL_AUTO_CONFIGURE` included).
@@ -73,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=settings.allowed_origins,
         allow_methods=CORS_ALLOWED_METHODS,
         allow_headers=CORS_ALLOWED_HEADERS,
+        expose_headers=CORS_EXPOSED_HEADERS,
         allow_credentials=False,
     )
     app.add_middleware(AccessLogMiddleware)
