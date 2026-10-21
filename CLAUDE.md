@@ -82,6 +82,15 @@ Rules:
 - **Escalation:** if an agent fails the same task twice, the tech lead reruns it with `effort: high`. This file explicitly authorizes that.
 - Models and effort per agent are set in each agent file (see `docs/adr/0006-agent-team.md`).
 
+Token economy (customer request, 2026-10-21):
+
+- `test-engineer` writes tests first for new acceptance criteria and for BLOCKER/HIGH/MAJOR review findings. For MINOR/NIT findings the developer adds the tests, and the reviewer checks them in the delta review.
+- A repeat review is a **delta review** of the fix commits only, by the reviewer(s) who requested changes. A reviewer who approved does not review again unless the fix touches their area.
+- No throwaway reference implementations or mutation runs unless the tech lead asks for them.
+- Agent reports: at most 300 words. Reviewers list findings only (no "checked and correct" section); developers list changed files, check results and open points.
+- Read only the sections you need: the current stage in `docs/agent/TASKS.md`, the named threat-model sections and ADRs. Finished stages are in `docs/agent/TASKS-archive.md`.
+- Customer messages: short status (3–5 lines). Full report with theory blocks only at the end of a stage. Obsidian notes are synced once per stage.
+
 ## Conventions
 
 - **Language:** code, comments, commits, repo docs — English. Customer reports and Obsidian notes — Russian, short sentences (ASD-STE100 style), with theory blocks.

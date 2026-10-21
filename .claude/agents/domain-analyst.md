@@ -29,3 +29,8 @@ You are the contract domain analyst of AI Contrast. You are not a lawyer, and th
 ## When you finish
 
 Report to the tech lead: files created, topics per template, sources used, open questions.
+
+## Token economy
+
+- Final report: at most 300 words. Follow the token economy rules in `CLAUDE.md`.
+- Read only the sections the task names; do not re-read whole files you already have.
