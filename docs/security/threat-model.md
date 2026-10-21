@@ -135,7 +135,7 @@ Controls:
 6. Per-IP limits behind Render's proxy: never trust the leftmost `X-Forwarded-For`; derive the client IP from the hop added by Render's proxy, and document it.
 7. No raw prompt endpoint. The server runs only our analysis pipeline, so it is useless as a generic AI proxy.
 8. If needed later: Cloudflare Turnstile.
-9. The extraction slot covers sending the response: a send deadline (30 s) cuts off a client that does not read; uvicorn `--limit-concurrency 32` caps open connections.
+9. The extraction slot covers sending the response: a send deadline (30 s) cuts off a client that does not read; uvicorn `--limit-concurrency 32` caps open connections. **Release blockers for stage 13:** (a) uvicorn has no header-read timeout, so 33+ sockets that send a partial header make every route answer 503 (slowloris); (b) a cut-off connection is closed, not aborted, and keeps about 4 MiB of kernel send buffer until the client closes it. Check whether Render's proxy buffers headers and responses; if not, add a header-read timeout and abort cut-off connections, and add kernel socket buffers to the ADR 0011 memory budget.
 
 Browser controls:
 
