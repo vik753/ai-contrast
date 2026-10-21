@@ -5,6 +5,7 @@
  * Everything here is synthetic. No real network call is ever made.
  */
 import { vi } from "vitest";
+import type { ExtractResult, Extraction } from "../api/extract";
 import type { FlatLocale } from "./locale-utils";
 
 export const MIB = 1024 * 1024;
@@ -49,8 +50,60 @@ export function jsonResponse(
   });
 }
 
-export function okResponse(kind: "pdf" | "docx" | "text", bytes: number): Response {
-  return jsonResponse(200, { kind, bytes });
+type Kind = "pdf" | "docx" | "text";
+
+/**
+ * Stage 3 `200` body (wire format, snake_case), valid by default:
+ * one body block, no OCR pages, nothing removed, no warnings.
+ * PDF gets `pages: 1` and `page: 1`; DOCX and text get `null`.
+ */
+export function stage3Body(
+  kind: Kind,
+  bytes: number,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const page = kind === "pdf" ? 1 : null;
+  return {
+    kind,
+    bytes,
+    language: "en",
+    pages: page,
+    blocks: [{ text: "Synthetic clause one.", part: "body", page }],
+    ocr_pages: [],
+    removed: [],
+    warnings: [],
+    ...overrides,
+  };
+}
+
+/** The `Extraction` the client must build from `stage3Body` (camelCase). */
+export function toExtraction(body: Record<string, unknown>): Extraction {
+  return {
+    language: body.language,
+    pages: body.pages,
+    blocks: body.blocks,
+    ocrPages: body.ocr_pages,
+    removed: body.removed,
+    warnings: body.warnings,
+  } as Extraction;
+}
+
+/** A valid stage 3 `200` response. */
+export function okResponse(
+  kind: Kind,
+  bytes: number,
+  overrides: Record<string, unknown> = {},
+): Response {
+  return jsonResponse(200, stage3Body(kind, bytes, overrides));
+}
+
+/** The `ExtractResult` that `okResponse(kind, bytes, overrides)` must give. */
+export function okResult(
+  kind: Kind,
+  bytes: number,
+  overrides: Record<string, unknown> = {},
+): ExtractResult {
+  return { ok: true, kind, bytes, extraction: toExtraction(stage3Body(kind, bytes, overrides)) };
 }
 
 export function busyResponse(retryAfter: string | null = "5"): Response {

@@ -17,6 +17,7 @@ import { act, render } from "@testing-library/react";
 import { StrictMode, useEffect, useReducer, type Dispatch, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtractResult } from "../api/extract";
+import { okResult } from "../test/upload-fakes";
 import { resetBrowserEnv } from "../test/browser-env";
 import {
   initialUploadState,
@@ -96,7 +97,7 @@ function idOf(args: unknown[]): string {
   throw new Error("check() was called without a file id");
 }
 
-const ok = (): ExtractResult => ({ ok: true, kind: "pdf", bytes: 1000 });
+const ok = (): ExtractResult => okResult("pdf", 1000);
 const busy = (seconds = 5): ExtractResult => ({
   ok: false,
   code: "busy",

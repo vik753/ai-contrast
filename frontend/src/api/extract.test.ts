@@ -16,6 +16,8 @@ import {
   jsonResponse,
   makeFile,
   okResponse,
+  okResult,
+  stage3Body,
 } from "../test/upload-fakes";
 
 afterEach(() => {
@@ -46,7 +48,7 @@ describe("AC6 — successful response", () => {
     async (kind) => {
       const file = makeFile("a.bin", { content: "0123456789" });
       const result = await extractWith(okResponse(kind, file.size), file);
-      expect(result).toEqual({ ok: true, kind, bytes: file.size });
+      expect(result).toEqual(okResult(kind, file.size));
     },
   );
 
@@ -60,7 +62,7 @@ describe("AC6 — successful response", () => {
     async (kind) => {
       const file = makeFile("a.pdf");
       expectError(
-        await extractWith(jsonResponse(200, { kind, bytes: file.size }), file),
+        await extractWith(jsonResponse(200, stage3Body("pdf", file.size, { kind })), file),
         "unknown_error",
       );
     },
@@ -76,14 +78,16 @@ describe("AC6 — successful response", () => {
     async (bytes) => {
       const file = makeFile("a.pdf", { content: "12345" });
       expectError(
-        await extractWith(jsonResponse(200, { kind: "pdf", bytes }), file),
+        await extractWith(jsonResponse(200, stage3Body("pdf", 5, { bytes })), file),
         "unknown_error",
       );
     },
   );
 
   it("test_200_without_bytes_is_unknown_error", async () => {
-    expectError(await extractWith(jsonResponse(200, { kind: "pdf" })), "unknown_error");
+    const body = stage3Body("pdf", 1);
+    delete body.bytes;
+    expectError(await extractWith(jsonResponse(200, body)), "unknown_error");
   });
 
   it.each([[null], [[]], ["pdf"], [42]])(
@@ -376,7 +380,7 @@ describe("AC5 — request privacy (T3, T11)", () => {
     const blob = new Blob(["hello"]);
     const fake = fetchReturning(() => okResponse("text", blob.size));
     const result = await extractFile(blob, { fetchImpl: fake.asFetch() });
-    expect(result).toEqual({ ok: true, kind: "text", bytes: 5 });
+    expect(result).toEqual(okResult("text", 5));
     expect(fake.calls[0]?.body).toBe(blob);
   });
 
@@ -410,7 +414,7 @@ describe("AC5 — request privacy (T3, T11)", () => {
 });
 
 /**
- * Review round 1 — the response body is read up to 4 KiB; a larger declared
+ * Review round 1 — an error body is read up to 4 KiB; a larger declared
  * or streamed body, or a non-JSON Content-Type, gives `unknown_error`.
  */
 describe("Review round 1 — response size cap and Content-Type", () => {
@@ -449,55 +453,55 @@ describe("Review round 1 — response size cap and Content-Type", () => {
     return { stream, pulled: () => offset, cancelled: () => cancelled };
   }
 
-  /** Valid JSON for a 5-byte file, padded to `size` bytes. */
+  /** Valid stage 3 JSON for a 5-byte PDF, padded to `size` bytes inside the block text. */
   function paddedOkJson(size: number): string {
-    const head = '{"kind":"pdf","bytes":5,"pad":"';
-    const tail = '"}';
-    return head + "a".repeat(Math.max(0, size - head.length - tail.length)) + tail;
+    const marker = "@@PAD@@";
+    const template = JSON.stringify(
+      stage3Body("pdf", 5, { blocks: [{ text: marker, part: "body", page: 1 }] }),
+    );
+    const padding = "a".repeat(Math.max(1, size - template.length + marker.length));
+    return template.replace(marker, padding);
   }
 
   const FILE = () => makeFile("a.pdf", { content: "12345" });
 
   it("test_small_json_body_under_cap_is_accepted", async () => {
-    const body = trackedBody(paddedOkJson(CAP - 100));
+    const text = paddedOkJson(CAP - 100);
+    const body = trackedBody(text);
     const response = new Response(body.stream, {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-    expect(await extractWith(response, FILE())).toEqual({ ok: true, kind: "pdf", bytes: 5 });
+    const expected = JSON.parse(text) as Record<string, unknown>;
+    expect(await extractWith(response, FILE())).toEqual(okResult("pdf", 5, expected));
   });
 
   it("test_content_type_with_charset_is_accepted", async () => {
-    const response = new Response('{"kind":"pdf","bytes":5}', {
+    const response = new Response(JSON.stringify(stage3Body("pdf", 5)), {
       status: 200,
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
-    expect(await extractWith(response, FILE())).toEqual({ ok: true, kind: "pdf", bytes: 5 });
+    expect(await extractWith(response, FILE())).toEqual(okResult("pdf", 5));
   });
 
-  it("test_content_length_above_cap_is_unknown_error_without_reading_body", async () => {
-    const body = trackedBody('{"kind":"pdf","bytes":5}');
+  // Stage 3 (S3-T4): the 4 KiB cap now applies to error bodies only; the
+  // `200` cap (4 MiB + 64 KiB) is tested in `extract.stage3.test.ts`.
+  const ERROR_HEAD = '{"error":"empty_file","pad":"';
+
+  it("test_error_content_length_above_cap_is_unknown_error_without_reading_body", async () => {
+    const body = trackedBody('{"error":"empty_file"}');
     const response = new Response(body.stream, {
-      status: 200,
+      status: 422,
       headers: { "Content-Type": "application/json", "Content-Length": String(CAP + 1) },
     });
     expectError(await extractWith(response, FILE()), "unknown_error");
     expect(body.pulled()).toBe(0);
   });
 
-  it("test_streamed_body_above_cap_is_unknown_error", async () => {
-    const body = trackedBody(paddedOkJson(1024 * 1024));
+  it("test_streamed_error_body_above_cap_stops_reading", async () => {
+    const body = trackedBody(ERROR_HEAD + "a".repeat(1024 * 1024) + '"}');
     const response = new Response(body.stream, {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-    expectError(await extractWith(response, FILE()), "unknown_error");
-  });
-
-  it("test_streamed_body_above_cap_stops_reading", async () => {
-    const body = trackedBody(paddedOkJson(1024 * 1024));
-    const response = new Response(body.stream, {
-      status: 200,
+      status: 422,
       headers: { "Content-Type": "application/json" },
     });
     await extractWith(response, FILE());

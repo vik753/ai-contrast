@@ -15,6 +15,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ExtractResult } from "../api/extract";
+import { okResult } from "../test/upload-fakes";
 import {
   MAX_CONTRACTS,
   MAX_FILES_PER_CONTRACT,
@@ -413,7 +414,7 @@ describe("AC4 — fileChecked", () => {
     (kind) => {
       const f = spec("a.bin", 10);
       let state = addFiles(initialUploadState, 0, f);
-      state = reduce(state, checked(f.id, { ok: true, kind, bytes: 10 }));
+      state = reduce(state, checked(f.id, okResult(kind, 10)));
       expect(file(state, f.id)).toMatchObject({ status: "accepted", kind });
     },
   );
@@ -436,7 +437,7 @@ describe("AC4 — fileChecked", () => {
     const a = spec("a.pdf");
     let state = addFiles(initialUploadState, 0, a);
     state = reduce(state, { type: "fileRemoved", contractId: contractId(state, 0), fileId: a.id });
-    const next = reduce(state, checked(a.id, { ok: true, kind: "pdf", bytes: 1000 }));
+    const next = reduce(state, checked(a.id, okResult("pdf", 1000)));
     expect(contracts(next).flatMap((c) => c.files)).toEqual([]);
   });
 
@@ -444,14 +445,14 @@ describe("AC4 — fileChecked", () => {
     const a = spec("a.pdf");
     const b = spec("b.pdf");
     let state = addFiles(initialUploadState, 0, a, b);
-    state = reduce(state, checked(a.id, { ok: true, kind: "pdf", bytes: 1000 }));
+    state = reduce(state, checked(a.id, okResult("pdf", 1000)));
     expect(file(state, b.id).status).toBe("queued");
   });
 
   it("test_file_checked_does_not_override_client_rejection", () => {
     const a = spec("a.doc");
     let state = addFiles(initialUploadState, 0, a);
-    state = reduce(state, checked(a.id, { ok: true, kind: "docx", bytes: 1000 }));
+    state = reduce(state, checked(a.id, okResult("docx", 1000)));
     expect(file(state, a.id)).toMatchObject({
       status: "rejected",
       code: "legacy_office_unsupported",
@@ -461,7 +462,7 @@ describe("AC4 — fileChecked", () => {
 
 describe("AC9 — readiness()", () => {
   function accept(state: State, f: { id: string; size: number }): State {
-    return reduce(state, checked(f.id, { ok: true, kind: "pdf", bytes: f.size }));
+    return reduce(state, checked(f.id, okResult("pdf", f.size)));
   }
 
   it("test_initial_state_is_not_ready_contract_without_file", () => {
@@ -583,7 +584,7 @@ describe("purity", () => {
     const actions: unknown[] = [
       { type: "contractAdded" },
       { type: "filesAdded", contractId: contractId(frozen, 1), files: [spec("b.pdf")] },
-      checked(a.id, { ok: true, kind: "pdf", bytes: 1000 }),
+      checked(a.id, okResult("pdf", 1000)),
       { type: "fileRemoved", contractId: contractId(frozen, 0), fileId: a.id },
     ];
     for (const action of actions) {
