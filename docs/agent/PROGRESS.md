@@ -8,7 +8,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | --- | --- | --- |
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
-| 2 | File upload | planned |
+| 2 | File upload | in progress |
 | 3 | Text extraction | planned |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
@@ -48,3 +48,7 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-20 — PR #3 (lint follow-ups) and PR #10 (Dependabot tuning) merged. Dependabot PRs #5–#8 answered with `@dependabot ignore` (planned upgrades). Stage 1 done.
 - 2026-10-20 — ADR 0008 accepted (pseudonymization). New stage 5b.
 - 2026-10-20 — ADR 0009 accepted (prompt injection defense in depth), on the customer's request.
+- 2026-10-21 — PR #13: certifi 2026.10.19 (PYSEC-2026-4320, dev-only dependency); pip-audit in CI blocked every PR until the fix.
+- 2026-10-21 — PR #11 merged: ADR 0008 and 0009 after two security design reviews. PR #12: uv 0.11.33 (setup-uv `version` updated by hand, as the policy test requires).
+- 2026-10-21 — Customer enabled private vulnerability reporting, Dependabot alerts and security updates, and created the `main` ruleset (enforcement and check names still to fix).
+- 2026-10-21 — Stage 2 started: ADR 0010 (raw-bytes upload, one file per request), tasks S2-T1, S2-T2, S2-T3.
