@@ -49,7 +49,7 @@ This file is the working copy for the team.
 | --- | --- | --- |
 | 0 | Project rules | Threat model, agent team, rules, ADRs, repository security settings. |
 | 1 | Scaffold | Monorepo, Docker Compose, FastAPI, React, i18n (en/uk/ru), baseline security headers, CI (lint, tests, pip-audit, npm audit, CodeQL), Dependabot. One command to run. |
-| 2 | File upload | Multi-file form; several files per contract (main text plus annexes); type by magic bytes; size and count limits; in-memory handling. |
+| 2 | File upload | Multi-file form; several files per contract (main text plus annexes); one file per request as raw bytes, no file name sent (ADR 0010); type by magic bytes; size and count limits; in-memory handling. |
 | 3 | Text extraction | pdfplumber, python-docx, TXT; zip bomb and XXE defenses; subprocess parsing with limits; Google Docs by link and via Picker; `.pages` hint; Tesseract.js OCR with confidence; language detection. Read what the person reads (ADR 0009 Layer 0): DOCX parts resolved through relationships, own DOCX walker (headers and footers included), PDF render-mode device, damaged-PDF detection, material "Not read" warnings, references to documents not provided, provably-invisible text removal shown in the preview. |
 | 4 | Browser hash and cache | Web Crypto, IndexedDB, `CacheStore` port, "already analyzed" dialog, 90-day retention, history toggle, "Clear all". |
 | 5 | Clause splitting | By numbering and headings, no AI. |
