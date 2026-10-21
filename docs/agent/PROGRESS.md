@@ -9,7 +9,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
 | 2 | File upload | done |
-| 3 | Text extraction | planned |
+| 3 | Text extraction | in progress |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
 | 5b | Pseudonymization | planned |
