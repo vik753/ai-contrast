@@ -32,15 +32,18 @@ Design: ADR 0010 (one file per request, raw bytes, no multipart). Threats: T3, T
 | ZIP entries | 2,000 | server |
 | Declared uncompressed ZIP size | 100 MiB (the real size is enforced while decompressing, stage 3) | server |
 | Compression ratio of one ZIP entry | 200 | server |
+| Body read deadline / minimum average rate | 60 s / 32 KiB/s after a 5 s grace period | server (`/api/extract`) |
 
 ### API contract: `POST /api/extract` (stage 2; stage 3 adds the extracted text to the `200` response)
 
-Request: the body is the raw bytes of one file. Headers: `Content-Type: application/octet-stream` (media type compared without parameters, case-insensitive) and `Content-Length`. No file name anywhere.
+Request: the body is the raw bytes of one file. Headers: `Content-Type: application/octet-stream` (media type compared without parameters, case-insensitive) and `Content-Length`. No `Transfer-Encoding`. No file name anywhere.
 
 | Status | Body | When |
 | --- | --- | --- |
 | 200 | `{"kind": "pdf" \| "docx" \| "text", "bytes": <int>}` | The file is accepted. `bytes` is the number of body bytes received. |
-| 411 | `{"error": "length_required"}` | No `Content-Length` header (for example `Transfer-Encoding: chunked`). |
+| 400 | `{"error": "length_mismatch"}` | The number of body bytes received differs from `Content-Length`. |
+| 408 | `{"error": "upload_timeout"}` | The body is not complete within the deadline, or its average rate falls below the minimum after the grace period. |
+| 411 | `{"error": "length_required"}` | No `Content-Length` header, a non-numeric one, or any `Transfer-Encoding` header (also together with `Content-Length`). |
 | 413 | `{"error": "file_too_large"}` | `Content-Length` is above the limit (rejected before the body is read), or the body grows above the limit. |
 | 415 | `{"error": "unsupported_media_type"}` | Any other `Content-Type`, or none. |
 | 422 | `{"error": "empty_file"}` | Zero bytes. |
@@ -52,19 +55,21 @@ Request: the body is the raw bytes of one file. Headers: `Content-Type: applicat
 
 Every other route: a body above 64 KiB gets `413` with `{"error": "request_too_large"}`.
 
+Every response sent before the whole body is read (400, 408, 411, 413, 415, 503) carries `Connection: close`. A `Content-Length` with more than 18 digits counts as too large (413), never as an error. CORS exposes `Retry-After` (`Access-Control-Expose-Headers`), because production is cross-origin.
+
 ### Detection rules (`detect_kind`)
 
 1. `%PDF-` at offset 0 → `pdf`.
 2. OLE2 signature `D0 CF 11 E0 A1 B1 1A E1` at offset 0 → `legacy_office_unsupported`.
 3. `PK\x03\x04` at offset 0 → ZIP checks, in this order. Any failure → `archive_rejected`.
-   1. Find the end-of-central-directory (EOCD) record by scanning back over at most the last 65,557 bytes. Its comment must end exactly at the end of the file. One disk only. ZIP64 (a ZIP64 locator, or `0xFFFF` / `0xFFFFFFFF` in EOCD fields) is rejected.
-   2. Check the entry count from the EOCD against the cap **before** any per-entry work. The central directory offset and size must lie inside the file, before the EOCD.
-   3. Every central-directory entry: valid signature; not encrypted (flag bit 0 clear); method 0 (stored) or 8 (deflate); name 1–512 bytes, no NUL, no backslash, not absolute, no `..` segment; the sum of declared uncompressed sizes within the cap; compressed size 0 only when the uncompressed size is 0; uncompressed / compressed ≤ the ratio cap.
+   1. Find the end-of-central-directory (EOCD) record by scanning back over at most the last 65,557 bytes. Its comment must end exactly at the end of the file, and the comment must not contain `PK\x05\x06`, `PK\x06\x06` or `PK\x06\x07` (so the chosen EOCD is the one Python `zipfile` chooses). One disk only. ZIP64 (a ZIP64 locator, or `0xFFFF` / `0xFFFFFFFF` in EOCD fields) is rejected.
+   2. Check the entry count from the EOCD against the cap **before** any per-entry work. The central directory must end exactly at the EOCD (`cd_offset + cd_size == eocd_offset`, no gap): `zipfile` locates it as `eocd_offset - cd_size` and ignores `cd_offset`. The number of entries parsed must equal the EOCD entry count.
+   3. Every central-directory entry: valid signature; not encrypted (flag bit 0 clear); method 0 (stored) or 8 (deflate); name 1–512 bytes of printable ASCII (0x20–0x7E; OPC part names are ASCII), no backslash, not absolute (no leading `/`, no drive letter `C:`), no `..` or `.` segment, no empty segment (a trailing `/` only for a directory entry of size 0), no segment ending in `.`; the sum of declared uncompressed sizes within the cap; compressed size 0 only when the uncompressed size is 0; uncompressed / compressed ≤ the ratio cap.
    4. No two names that are equal after `casefold()` (OPC part names are case-insensitive; duplicates let different readers see different parts).
    5. Classification by names only: any `Index/*.iwa` → `pages_unsupported`; `[Content_Types].xml` and `_rels/.rels` present and no name under `xl/` or `ppt/` → `docx`; any other ZIP (ODF `mimetype` included) → `unsupported_type`. Stage 3 confirms the main part through relationships (ADR 0009 Layer 0).
    6. Nothing is decompressed in stage 2. `zipfile` may be used only after steps 1 and 2, or not at all.
 4. PNG, JPEG, GIF, TIFF, RIFF (WebP) or `{\rtf` signatures → `unsupported_type`.
-5. Plain text: a UTF-8 BOM or a UTF-16 BOM (`FF FE`, `FE FF`) → `text`. Otherwise, in the first 64 KiB: any NUL byte → `unsupported_type`; more than 1 % C0 control characters other than TAB, LF, CR and FF → `unsupported_type`; else → `text`. Decoding (UTF-8, UTF-16, CP1251) is stage 3.
+5. Plain text: a UTF-16 BOM (`FF FE`, `FE FF`) with an even total length → `text` (odd length → `unsupported_type`). Otherwise (a UTF-8 BOM is skipped first), in the first 64 KiB: any NUL byte → `unsupported_type`; more than 1 % C0 control characters other than TAB, LF, CR and FF → `unsupported_type`; else → `text`. This only classifies the file: stage 3 decodes the whole file strictly (UTF-8, UTF-16, CP1251) and runs the control-character rule again on all of the text, failing closed.
 
 Detection is a pure function on bytes in memory. It reads only fixed-size headers and a capped central directory, so its work is linear and bounded; it runs in-process. Stage 3 runs extraction in the parsing subprocess.
 
@@ -76,7 +81,8 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
   - `app/api/extract.py`: router with `POST /api/extract`.
   - `app/extraction/limiter.py`: `class ExtractionLimiter` with `try_acquire() -> bool` and `release() -> None`; the app keeps one instance in `app.state.extraction_limiter`. Tests may take all slots to force `busy`.
   - `app/middleware/body_limit.py`: `BodySizeLimitMiddleware` (pure ASGI).
-  - Settings (environment variables, positive integers, validated): `MAX_FILE_BYTES` (10485760), `MAX_JSON_BODY_BYTES` (65536), `MAX_CONCURRENT_EXTRACTIONS` (2), `MAX_ZIP_ENTRIES` (2000), `MAX_ZIP_UNCOMPRESSED_BYTES` (104857600), `MAX_ZIP_RATIO` (200).
+  - Settings (environment variables, positive integers, validated): `MAX_FILE_BYTES` (10485760), `MAX_JSON_BODY_BYTES` (65536), `MAX_CONCURRENT_EXTRACTIONS` (2), `MAX_ZIP_ENTRIES` (2000), `MAX_ZIP_UNCOMPRESSED_BYTES` (104857600), `MAX_ZIP_RATIO` (200), `EXTRACT_BODY_TIMEOUT_SECONDS` (60), `EXTRACT_MIN_RATE_BYTES_PER_SECOND` (32768; checked after a 5 s grace period).
+  - `ExtractionLimiter` also offers a context manager `slot()` (or an equivalent token) that releases exactly once; the handler uses it. `release()` without a held slot raises.
 - AC:
   1. `POST /api/extract` follows the API contract table exactly: status codes, JSON bodies, `Retry-After`.
   2. Detection follows the detection rules. Tests build every fixture in memory: a minimal valid DOCX (built with `zipfile`), XLSX-like and PPTX-like archives, an ODF archive, a Pages-like archive, an encrypted entry, ZIP64 markers, trailing data after the EOCD, an entry count above the cap, a declared size above the cap, a ratio above the cap, compressed size 0 with uncompressed size above 0, duplicate names (exact and case-folded), absolute names, `..` names, backslash names, a central directory outside the file, PDF, OLE2, PNG, JPEG, RTF, UTF-8 text, UTF-8 with BOM, UTF-16 LE and BE with BOM, CP1251 bytes (→ `text`), binary with NUL, text with many control characters.
@@ -88,6 +94,7 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
   8. CORS: a preflight for `POST /api/extract` with `Content-Type` from an allowed origin succeeds; the allowed headers stay `Content-Type` and `X-Provider-Key`.
   9. CI: the Compose smoke test also sends a small text body through the frontend proxy (`http://localhost:5173/api/extract`) and expects `"kind":"text"`.
   10. ruff, ruff format, mypy strict and pytest are green. No new runtime or dev dependency.
+- Review round 1 (PR #15) added to the AC: body deadline and minimum rate (408); `Connection: close` on early responses; `Transfer-Encoding` → 411; `received == Content-Length` (else 400); huge `Content-Length` → 413; `Retry-After` exposed by CORS; body accumulated in one `bytearray` (peak memory for 1-byte chunks below 2.5× the body); ZIP read the same way as `zipfile` (fixtures with a second central directory and with a fake EOCD in the comment are rejected; for valid archives `zipfile` sees the same names); stricter entry names; BOM rules; the handler's own 413 paths tested without the middleware; one `http.response.start` per response; `EXTRACT_PATH` and `declared_length` in a shared module (`app/http_limits.py`); the backend runs as a single worker (the limiter counts per process): policy test that the Dockerfile `CMD` has no `--workers`.
 - Threats: T3, T4, T6, T11.
 
 ### S2-T2 Upload form in the browser
@@ -124,6 +131,10 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
 
 ### S2 follow-ups (from the ADR 0008/0009 design review, for later stages)
 
+- Stage 3 (from the PR #15 security review): before any reader opens a ZIP — every local header at an offset below `cd_offset` with a valid signature, offsets strictly increasing from 0, no overlap and no gap, local name, flags, method, CRC and sizes equal to the central directory (data descriptor handled), real decompressed size enforced while streaming; OPC part-name grammar (ECMA-376 Part 2 §6.2.2: no percent-encoded unreserved characters or `/`) and duplicates checked after canonical decoding; extraction uses only the kind the server detected on the same bytes in the same request.
+- Stage 6 / before stage 13 (**release blocker**): at most 1 extraction slot per client IP (T6 control 7 client-IP rule).
+- Stage 3: test detection against a corpus of real UK/RU DOCX files (some generators store raw UTF-8 part names, now `archive_rejected`); the `archive_rejected` message tells the user to save the file again in Word or export to PDF.
+- Effective upload minimum: a 10 MiB file needs about 1.4 Mbit/s to finish within 60 s; the `upload_timeout` message mentions a slow connection or a smaller file.
 - Stage 3: pdfminer xref warnings, long or looping `Prev` chains (`RecursionError` → `pdf_damaged`) and an unreadable latest revision make the incremental-update warning material; local file header names must match the central directory.
 - Stage 3 and 5b: tests on clean UK and RU contracts show no mixed-script and no overlap flags (combining marks excluded).
 - Stage 8: model tags that push a topic over its cap are dropped; a topic not analyzed shows 🟡.

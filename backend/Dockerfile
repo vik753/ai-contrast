@@ -63,4 +63,6 @@ EXPOSE 8000
 #   IP yet. When per-IP rate limiting arrives, enable proxy headers with
 #   `--forwarded-allow-ips` restricted to the hosting proxy, and document it.
 # `sh -c` expands $PORT (set by the host, for example Render); `exec` makes uvicorn PID 1.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --no-access-log --no-proxy-headers --no-server-header --log-config log_config.json"]
+# Single worker only: the extraction limiter counts slots per process, so more
+# worker processes would multiply the limit (threat model T6). Keep `--workers 1`.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --workers 1 --no-access-log --no-proxy-headers --no-server-header --log-config log_config.json"]
