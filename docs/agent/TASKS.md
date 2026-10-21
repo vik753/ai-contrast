@@ -220,6 +220,7 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
 - Threats: T3, T4, T6.
 
 - S3-T1 follow-up (security delta review, PR #20): in plain text, form feed (FF) and vertical tab (VT) become `\n` instead of being removed (words must not run together) — do it in S3-T2 with the shared text normalization.
+- Server list caps to match the browser (S3-T4): `removed` ≤ 1,000 items, `warnings` ≤ 1,000 items, `pages` ≤ 100, `ocr_pages` strictly increasing, warning pages strictly increasing per warning code — add to the result model in S3-T2 or S3-T3.
 - Stage 13 blockers: header-read timeout / slowloris with `--limit-concurrency 32`, and kernel send buffers of cut-off connections (threat model T6 control 9).
 
 ### S3-T2 DOCX extraction
