@@ -30,7 +30,68 @@
       "evidence": "Every rating comes with an explanation and a quote from the contract."
     },
     "byok": "Start free with the built-in AI model, or connect your own AI provider key. Contract text goes only to the AI provider that processes it.",
-    "status": "Early version: contract comparison is coming soon."
+    "status": "Early version: you can add contracts and check the files now. Comparison is coming soon."
+  },
+  "upload": {
+    "title": "Contracts to compare",
+    "intro": "Add each contract with its annexes. Labels A, B, C… follow the order of the contracts.",
+    "contract": "Contract {{label}}",
+    "addFiles": "Add files",
+    "addFilesTo": "Add files to Contract {{label}}",
+    "dropHint": "Or drop files here. PDF, DOCX or TXT, up to 10 MB per file, up to 5 files per contract.",
+    "noFiles": "No files yet.",
+    "addContract": "Add contract",
+    "removeContract": "Remove contract",
+    "removeContractNamed": "Remove Contract {{label}}",
+    "removeFile": "Remove",
+    "removeFileNamed": "Remove {{name}}",
+    "size": {
+      "bytes": "{{value}} B",
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    },
+    "status": {
+      "queued": "Waiting",
+      "checking": "Checking…"
+    },
+    "kind": {
+      "pdf": "PDF",
+      "docx": "Word document",
+      "text": "Text file"
+    },
+    "errors": {
+      "length_required": "The server could not read the file size. Remove the file and add it again.",
+      "file_too_large": "The file is larger than 10 MB. Make it smaller or split it into parts.",
+      "request_too_large": "The request is too large for the server. Remove the file and add a smaller one.",
+      "unsupported_media_type": "The server did not accept the upload. Reload the page and add the file again.",
+      "empty_file": "The file is empty. Choose a file with the contract text.",
+      "unsupported_type": "This file type is not supported. Use PDF, DOCX or TXT.",
+      "legacy_office_unsupported": "This is an old Word (.doc) file or a password-protected file. Remove the password if there is one. Save the file as .docx or PDF and try again.",
+      "pages_unsupported": "Apple Pages files are not supported. Export to PDF: File → Export To → PDF.",
+      "archive_rejected": "The file is damaged or has an unsafe structure. Open it in your editor, save it again and add it again.",
+      "busy": "The server is busy. Remove the file and add it again in a minute.",
+      "network_error": "No connection to the server. Check your internet connection, then remove the file and add it again.",
+      "timeout": "The check took too long. Remove the file and add it again.",
+      "aborted": "The check was stopped. Remove the file and add it again.",
+      "unknown_error": "The server gave an unexpected answer. Remove the file and add it again.",
+      "too_many_files": "A contract can have at most 5 files. Remove a file first.",
+      "total_too_large": "All files together can be at most 50 MB. Remove some files first."
+    },
+    "readiness": {
+      "contract_without_file": "Add at least one file to each contract",
+      "checking": "Checking files…",
+      "ready_one": "Ready to compare: {{count}} contract",
+      "ready_other": "Ready to compare: {{count}} contracts"
+    },
+    "privacy": "Our server checks each file and does not keep it: files are not stored. File names stay in your browser and are never sent.",
+    "announce": {
+      "contractAdded": "Contract {{label}} added.",
+      "contractRemoved": "Contract {{label}} removed. The labels of the next contracts moved up.",
+      "filesAdded": "Files added to Contract {{label}}: {{count}}.",
+      "fileRemoved": "File {{name}} removed.",
+      "fileAccepted": "File {{name}} accepted: {{kind}}.",
+      "fileRejected": "File {{name}} not accepted. {{reason}}"
+    }
   },
   "footer": {
     "privacy": "We store nothing on our server: no contracts, no keys, no results.",

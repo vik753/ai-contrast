@@ -3,6 +3,7 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { RatingIcon, type Rating } from "./components/RatingIcon";
 import { SOURCE_CODE_URL } from "./config";
+import { UploadForm } from "./upload/UploadForm";
 
 const RATINGS: readonly Rating[] = ["green", "yellow", "red"];
 
@@ -25,6 +26,8 @@ function Shell() {
           </h1>
           <p className="intro__lead">{t("home.description")}</p>
         </section>
+
+        <UploadForm />
 
         <section className="card" aria-labelledby="ratings-title">
           <h2 id="ratings-title" className="card__title">
