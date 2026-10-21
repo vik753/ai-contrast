@@ -245,9 +245,12 @@ def test_policy_dockerfile_has_cmd_running_uvicorn() -> None:
     assert any("uvicorn" in line for line in instructions), instructions
 
 
-def test_policy_dockerfile_cmd_has_no_workers_option() -> None:
-    for line in _dockerfile_run_instructions():
-        assert "--workers" not in line, line
+def test_policy_dockerfile_cmd_runs_exactly_one_worker() -> None:
+    uvicorn_lines = [line for line in _dockerfile_run_instructions() if "uvicorn" in line]
+    assert uvicorn_lines
+
+    for line in uvicorn_lines:
+        assert re.findall(r"--workers(?:=|\s+)(\S+)", line) == ["1"], line
 
 
 def test_policy_dockerfile_does_not_set_web_concurrency() -> None:
@@ -255,7 +258,6 @@ def test_policy_dockerfile_does_not_set_web_concurrency() -> None:
     text = _without_hash_comments(DOCKERFILE.read_text(encoding="utf-8"))
 
     assert "WEB_CONCURRENCY" not in text
-    assert "--workers" not in text
 
 
 def test_policy_compose_has_no_workers_option() -> None:

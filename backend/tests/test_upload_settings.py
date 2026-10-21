@@ -86,3 +86,41 @@ def test_upload_setting_validation_error_hides_value(
         Settings()
 
     assert "987654321" not in str(info.value)
+
+
+# --- EXTRACT_RATE_GRACE_SECONDS (round 2): a positive number, floats allowed ----------
+
+
+def test_rate_grace_setting_default_is_five_seconds() -> None:
+    assert Settings().extract_rate_grace_seconds == 5
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("0.5", 0.5), ("2", 2), ("12.25", 12.25)])
+def test_rate_grace_setting_read_from_env(
+    monkeypatch: pytest.MonkeyPatch, raw: str, expected: float
+) -> None:
+    monkeypatch.setenv("EXTRACT_RATE_GRACE_SECONDS", raw)
+
+    assert Settings().extract_rate_grace_seconds == expected
+
+
+@pytest.mark.parametrize("raw", ["0", "-1", "-0.5", "0.0", "abc", "nan", "inf", ""])
+def test_rate_grace_setting_env_invalid_rejected(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
+    monkeypatch.setenv("EXTRACT_RATE_GRACE_SECONDS", raw)
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+@pytest.mark.parametrize("value", [0, -1, -0.5])
+def test_rate_grace_setting_direct_non_positive_rejected(value: float) -> None:
+    with pytest.raises(ValidationError) as info:
+        Settings(extract_rate_grace_seconds=value)
+
+    errors = info.value.errors()
+    assert [e["loc"] for e in errors] == [("extract_rate_grace_seconds",)]
+    assert errors[0]["type"] != "extra_forbidden"
+
+
+def test_rate_grace_setting_direct_float_accepted() -> None:
+    assert Settings(extract_rate_grace_seconds=0.25).extract_rate_grace_seconds == 0.25

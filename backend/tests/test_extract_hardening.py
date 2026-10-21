@@ -13,9 +13,9 @@
   held slot raises.
 - ``app/http_limits.py`` exports ``EXTRACT_PATH`` and ``declared_length``.
 
-Timing approach for the 408 tests: the grace period (5 s) is not a setting,
-so the minimum-rate tests run in real time with a slow trickle (about 5-6 s
-each). The deadline test uses ``EXTRACT_BODY_TIMEOUT_SECONDS=1`` and a body
+Timing approach for the 408 tests: the minimum-rate tests run in real time
+with a slow trickle and a short ``EXTRACT_RATE_GRACE_SECONDS`` (0.5 s).
+The deadline test uses ``EXTRACT_BODY_TIMEOUT_SECONDS=1`` and a body
 that stalls after one byte. No clock is patched, so the tests do not depend
 on which clock the implementation reads.
 """
@@ -51,7 +51,7 @@ EXTRACT = "/api/extract"
 ECHO = "/api/test/echo-size"
 MIB = 1024 * 1024
 TEXT = b"Synthetic contract text. Clause 1. Payment within 30 days.\n"
-GRACE_SECONDS = 5.0
+GRACE_SECONDS = 0.5  # EXTRACT_RATE_GRACE_SECONDS in the rate tests
 
 Message = dict[str, Any]
 
@@ -147,25 +147,28 @@ def test_extract_stalled_body_slot_free_after_408(make_app: Callable[..., FastAP
 def test_extract_slow_body_below_min_rate_after_grace_returns_408(
     make_app: Callable[..., FastAPI],
 ) -> None:
-    # About 400 B/s against a minimum of 1 MB/s: rejected once the grace ends.
-    app = make_app(extract_min_rate_bytes_per_second=1_000_000)
-    receive = _trickle(b"a" * 100, interval=0.25, total=1_000_000)
+    # About 1,000 B/s against a minimum of 1 MB/s: rejected once the grace ends.
+    app = make_app(
+        extract_min_rate_bytes_per_second=1_000_000, extract_rate_grace_seconds=GRACE_SECONDS
+    )
+    receive = _trickle(b"a" * 100, interval=0.1, total=1_000_000)
 
     run, elapsed = _timed(app, post_scope(EXTRACT, content_length=1_000_000), receive)
 
     assert run.status == 408
     assert json.loads(run.body) == {"error": "upload_timeout"}
     assert _connection_close(run)
-    assert GRACE_SECONDS - 0.5 <= elapsed < GRACE_SECONDS + 3.0, f"after {elapsed:.2f} s"
+    assert GRACE_SECONDS - 0.1 <= elapsed < GRACE_SECONDS + 3.0, f"after {elapsed:.2f} s"
     assert _slot_free(app)
 
 
 def test_extract_slow_body_within_grace_period_accepted(
     make_app: Callable[..., FastAPI],
 ) -> None:
-    # Far below the minimum rate, but complete before the grace period ends.
-    app = make_app(extract_min_rate_bytes_per_second=1_000_000)
-    receive = _trickle(b"a" * 100, interval=0.1, total=1000)
+    # Far below the minimum rate, but complete (about 0.5 s) long before the
+    # grace period (3 s) ends.
+    app = make_app(extract_min_rate_bytes_per_second=1_000_000, extract_rate_grace_seconds=3)
+    receive = _trickle(b"a" * 200, interval=0.1, total=1000)
 
     run, _ = _timed(app, post_scope(EXTRACT, content_length=1000), receive)
 
@@ -176,10 +179,10 @@ def test_extract_slow_body_within_grace_period_accepted(
 def test_extract_body_above_min_rate_after_grace_period_accepted(
     make_app: Callable[..., FastAPI],
 ) -> None:
-    # About 4,000 B/s for about 6 s against a minimum of 1,000 B/s.
-    app = make_app(extract_min_rate_bytes_per_second=1000)
-    total = 24 * 1000
-    receive = _trickle(b"a" * 1000, interval=0.25, total=total)
+    # About 10,000 B/s for about 2 s against a minimum of 1,000 B/s (10x margin).
+    app = make_app(extract_min_rate_bytes_per_second=1000, extract_rate_grace_seconds=GRACE_SECONDS)
+    total = 20 * 1000
+    receive = _trickle(b"a" * 1000, interval=0.1, total=total)
 
     run, elapsed = _timed(app, post_scope(EXTRACT, content_length=total), receive)
 
@@ -527,32 +530,34 @@ def test_extract_413_with_origin_frees_slot(
 
 # --- 12. Memory ------------------------------------------------------------------------
 
-MEMORY_BODY_BYTES = 512 * 1024
+MEMORY_BODY_BYTES = 128 * 1024
+MEMORY_SMALL_BODY_BYTES = 64 * 1024
 MEMORY_FACTOR = 2.5
 
 
-def test_extract_one_byte_chunks_peak_memory_below_two_and_a_half_times_body(
-    make_app: Callable[..., FastAPI],
-) -> None:
-    app = make_app()
-    scope = post_scope(EXTRACT, content_length=MEMORY_BODY_BYTES)
-    # Warm up: build the middleware stack and import everything first.
-    run_driven(app, post_scope(EXTRACT, content_length=len(TEXT)), chunks(TEXT))
-
-    remaining = MEMORY_BODY_BYTES
+def _peak_growth_one_byte_chunks(app: FastAPI, size: int) -> int:
+    """Peak traced memory growth while the app reads ``size`` bytes sent in
+    1-byte chunks. Includes fixed costs (event loop, buffers, response)."""
+    remaining = size
     status: list[int] = []
+
+    # A PDF signature first: detection then needs no 64 KiB text window, so
+    # only the body buffer itself grows with the size.
+    prefix = iter(b"%PDF-")
 
     async def receive() -> Message:
         nonlocal remaining
         if remaining == 0:
             await asyncio.Event().wait()
         remaining -= 1
-        return {"type": "http.request", "body": b"a", "more_body": remaining > 0}
+        byte = bytes([next(prefix, 0x61)])
+        return {"type": "http.request", "body": byte, "more_body": remaining > 0}
 
     async def send(message: Message) -> None:
         if message["type"] == "http.response.start":
             status.append(int(message["status"]))
 
+    scope = post_scope(EXTRACT, content_length=size)
     tracemalloc.start()
     try:
         baseline, _ = tracemalloc.get_traced_memory()
@@ -561,12 +566,28 @@ def test_extract_one_byte_chunks_peak_memory_below_two_and_a_half_times_body(
         _, peak = tracemalloc.get_traced_memory()
     finally:
         tracemalloc.stop()
-
     assert status == [200]
-    growth = peak - baseline
-    assert growth < MEMORY_FACTOR * MEMORY_BODY_BYTES, (
-        f"peak grew by {growth / MEMORY_BODY_BYTES:.2f}x the body"
-    )
+    return peak - baseline
+
+
+def test_extract_one_byte_chunks_peak_memory_below_two_and_a_half_times_body(
+    make_app: Callable[..., FastAPI],
+) -> None:
+    # Rate and deadline checks off in practice: this test measures memory only,
+    # and 1-byte chunks are slow under CPU load.
+    app = make_app(extract_min_rate_bytes_per_second=1, extract_body_timeout_seconds=3600)
+    # Warm up: build the middleware stack and import everything first.
+    run_driven(app, post_scope(EXTRACT, content_length=len(TEXT)), chunks(TEXT))
+
+    # The marginal cost per body byte, measured between two body sizes, so
+    # fixed costs cancel out. One growing bytearray plus one copy is about 2;
+    # a list of 1-byte chunks is about 40.
+    small = _peak_growth_one_byte_chunks(app, MEMORY_SMALL_BODY_BYTES)
+    large = _peak_growth_one_byte_chunks(app, MEMORY_BODY_BYTES)
+
+    extra = MEMORY_BODY_BYTES - MEMORY_SMALL_BODY_BYTES
+    per_byte = (large - small) / extra
+    assert per_byte < MEMORY_FACTOR, f"peak grows by {per_byte:.2f} bytes per body byte"
 
 
 # --- 13. Limiter slot() --------------------------------------------------------------------
