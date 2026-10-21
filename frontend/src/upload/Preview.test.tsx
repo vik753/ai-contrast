@@ -512,8 +512,12 @@ describe("AC5 — untrusted text is plain text inside <bdi>", () => {
 
   it.each(PAYLOADS)("test_block_%j_renders_literally_inside_bdi", async (payload) => {
     const container = await renderPayloads();
-    const element = within(container).getByText(payload);
-    expect(element.closest("bdi")).not.toBeNull();
+    // The payload can appear more than once (as a block and as a removed sample).
+    const elements = within(container).getAllByText(payload);
+    expect(elements.length).toBeGreaterThan(0);
+    for (const element of elements) {
+      expect(element.closest("bdi")).not.toBeNull();
+    }
   });
 
   it("test_no_html_elements_are_created_from_text", async () => {

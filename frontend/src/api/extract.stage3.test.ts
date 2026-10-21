@@ -455,7 +455,7 @@ describe("AC1 — 501 not_implemented (temporary)", () => {
   it("test_501_not_implemented_maps_to_not_implemented", async () => {
     expectError(
       await extractWith(jsonResponse(501, { error: "not_implemented" })),
-      "not_implemented" as ExtractErrorCode,
+      "not_implemented",
     );
   });
 
