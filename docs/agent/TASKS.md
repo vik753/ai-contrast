@@ -206,6 +206,9 @@ Order: S3-T1 first (sandbox and response contract). Then S3-T2 (DOCX) and S3-T3 
   - Starting the child can fail (`OSError`) → `extraction_failed`, no traceback. The parent waits for the process and drains the pipes together (no hang on Python 3.13.0). The app root is appended to `sys.path`, not inserted first.
 - Threats: T3, T4, T6.
 
+- S3-T1 follow-up (security delta review, PR #20): in plain text, form feed (FF) and vertical tab (VT) become `\n` instead of being removed (words must not run together) — do it in S3-T2 with the shared text normalization.
+- Stage 13 blockers: header-read timeout / slowloris with `--limit-concurrency 32`, and kernel send buffers of cut-off connections (threat model T6 control 9).
+
 ### S3-T2 DOCX extraction (outline)
 
 ZIP stage 3 checks (local headers equal to the central directory, no overlap or gap, first entry at 0, real decompressed size enforced while streaming, OPC part-name grammar), relationship resolution and package anomalies (ADR 0009 Layer 0), own walker (`defusedxml`) over main part, footnotes, endnotes, headers, footers, text boxes, content controls, tracked insertions, fields, `w:sym`; effective formatting for hidden text; symbol-font checkboxes; material "Not read" warnings (`altChunk`, OLE); strict OOXML rejected.
