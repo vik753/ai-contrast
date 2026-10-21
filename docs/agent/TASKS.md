@@ -159,6 +159,19 @@ Design: ADR 0011 (parsing sandbox), ADR 0009 Layer 0 (read what the person reads
 
 Order: S3-T1 first (sandbox and response contract). Then S3-T2 (DOCX) and S3-T3 (PDF), one after the other (both change `uv.lock`). S3-T4 (preview UI) can start after S3-T1. S3-T5 (browser OCR) after S3-T3. S3-T6 (Google Docs link) last. Detailed AC for S3-T2…T6 are written when each task starts.
 
+### Stage 3 dependencies (approved by `security-reviewer`, 2026-10-21)
+
+| Package | Version | Conditions |
+| --- | --- | --- |
+| `defusedxml` | 0.7.1 | `forbid_dtd=True`; any DTD → `suspicious_package`. |
+| `pdfminer.six` | 20260107 (adds `cryptography` 50.0.2, `cffi`, `pycparser`) | CMaps as JSON only (this version); `CMAP_PATH` unset; `pdfminer` logger at ERROR (messages contain PDF data); encrypted PDFs opened only when the empty user password works, otherwise "Not read" / `encrypted_unsupported`. |
+| `pdfjs-dist` | 6.4.299 (not ≤ 4.1.392: CVE-2024-4367; not 5.6.83–6.2.107: CVE-2026-16633) | Same-origin `workerPort`; `enableXfa: false`, `disableFontFace: true`, `useSystemFonts: false`; self-hosted cMap, font, wasm and ICC URLs; no text or annotation layer; do not ship `quickjs-eval.*` or `pdf.sandbox`; render with `AnnotationMode.ENABLE` so OCR reads form values. |
+| `tesseract.js`, `tesseract.js-core` | 7.0.0 both, pinned exactly | `workerBlobURL: false`, `cacheMethod: 'none'`, LSTM only (ship only `*-lstm.wasm.js`); input only canvas or ImageData, never URL strings. |
+| `@tesseract.js-data/{eng,ukr,rus}` | 1.0.0, copy only `4.0.0_best_int` | SHA-256 manifest test: eng `45b4cb346724ac1774f1c36f42f182b887bcdb28ebe63e6fff90ac41f3fcff91`, ukr `ea2789a0ad99ff84bfd252a7410a1e8661a7bc5acaa41573d23b54b71446aa4c`, rus `f51f5edc992249ff9b70a227b22f242dfa47b2b1bbc7ae0ea74908640c101f6a`. |
+
+CSP (S3-T5): no `'unsafe-eval'`; remove `blob:` from `worker-src`; Trusted Types `default` policy with `createScriptURL` only and an exact URL allowlist; the OCR worker uses our classic wrapper that sets the same policy before `importScripts`.
+Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `blob:`), T4 (encrypted PDF rule, pdfminer logging), T8 (language-data hash manifest), ADR 0004 title and `CLAUDE.md` architecture row (no pdfplumber, no python-docx).
+
 ### Response contract: `POST /api/extract` `200` from stage 3
 
 ```json
@@ -209,17 +222,38 @@ Order: S3-T1 first (sandbox and response contract). Then S3-T2 (DOCX) and S3-T3 
 - S3-T1 follow-up (security delta review, PR #20): in plain text, form feed (FF) and vertical tab (VT) become `\n` instead of being removed (words must not run together) — do it in S3-T2 with the shared text normalization.
 - Stage 13 blockers: header-read timeout / slowloris with `--limit-concurrency 32`, and kernel send buffers of cut-off connections (threat model T6 control 9).
 
-### S3-T2 DOCX extraction (outline)
+### S3-T2 DOCX extraction
 
-ZIP stage 3 checks (local headers equal to the central directory, no overlap or gap, first entry at 0, real decompressed size enforced while streaming, OPC part-name grammar), relationship resolution and package anomalies (ADR 0009 Layer 0), own walker (`defusedxml`) over main part, footnotes, endnotes, headers, footers, text boxes, content controls, tracked insertions, fields, `w:sym`; effective formatting for hidden text; symbol-font checkboxes; material "Not read" warnings (`altChunk`, OLE); strict OOXML rejected.
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-docx` (worktree `/home/claude/wt/s3-docx`). New dependency: `defusedxml==0.7.1` (approved, conditions above).
+- Public interface: `app/extraction/docx.py`: `extract_docx(data: bytes, *, max_chars: int, max_blocks: int, limits: DocxLimits) -> ExtractionResult` (runs inside the child); `@dataclass(frozen=True) class DocxLimits` (`max_part_bytes`, `max_total_bytes`, `max_xml_depth`, `max_elements`). Settings: `MAX_DOCX_PART_BYTES` (32 MiB), `MAX_DOCX_XML_DEPTH` (256), `MAX_DOCX_ELEMENTS` (2,000,000); the total uses `MAX_ZIP_UNCOMPRESSED_BYTES`.
+- AC:
+  1. **ZIP, before any reader opens a part:** every local header has a valid signature at an offset below `cd_offset`; offsets strictly increase from 0; entries do not overlap and leave no gap (local header + name + extra + compressed data + optional data descriptor ends where the next begins; the last ends at `cd_offset`); local name, flags, method, CRC and sizes equal the central directory (data descriptor handled). Real decompressed size enforced while streaming, CRC checked. Any failure → `archive_rejected`.
+  2. **OPC part names** (ECMA-376 Part 2 §6.2.2): percent-encoded unreserved characters or `/` → `archive_rejected`; duplicates compared after percent-decoding and `casefold()`.
+  3. **Package (ADR 0009 Layer 0):** `[Content_Types].xml` and every `.rels` parsed with `defusedxml`, `forbid_dtd=True`; any DTD → `suspicious_package`. Exactly one `officeDocument` relationship in `_rels/.rels` (the strict OOXML relationship type or namespaces → `docx_strict_unsupported`); its target is internal and its content type is `wordprocessingml.document.main+xml` (macro-enabled or template types → `unsupported_type`); a `word/document.xml` that exists but is not the target, more than one `officeDocument` relationship, or a target outside the package → `suspicious_package`. Footnotes, endnotes, headers and footers come only from the main part's relationships.
+  4. **Walker** (streaming, `iterparse`, elements cleared; depth and element caps → `suspicious_package`): `w:t`; `w:tab` → TAB; `w:br`, `w:cr` → `\n`; one block per paragraph; `w:ins` and `w:moveTo` included, `w:del` and `w:moveFrom` excluded; `w:sdtContent` (inline and block); `w:txbxContent` with `mc:AlternateContent` read once (`mc:Choice` when its `Requires` namespaces are known, else `mc:Fallback`); `w:fldSimple` and complex field results (between `separate` and `end`; field codes excluded); `w:smartTag`, `w:customXml`; `w:noBreakHyphen` → `-`, `w:softHyphen` dropped. `part`: `body`, `footnote`, `endnote`, `header`, `footer`, `textbox`. Header and footer lines that hold only a page number or repeat across header parts are dropped with a count.
+  5. **Hidden text by effective formatting** (docDefaults → paragraph style with `basedOn` chain (cycle guard) → character style → direct `w:rPr`): `w:vanish`, `w:specVanish`, `w:webHidden` → removed (`hidden_formatting`); white text on no or white shading, or text colour equal to the shading fill → removed (`same_color`); `w:sz` ≤ 2 half-points or `w:w` < 20 % → removed (`tiny_text`); `w:sz` ≤ 8 half-points, near-white colour, negative `w:spacing` or `w:position` → kept, warning `borderline_text`. Removed text goes to `removed` with a sample.
+  6. **Symbols:** `w:sym` with Wingdings/Symbol checkbox codes (F0FE, F0FD, F0A8, F06F, F078) → ☒, ☑, ☐; `w14:checkbox` content controls → ☐/☒ by `w14:checked`.
+  7. **"Not read" (material):** `w:altChunk`, OLE objects (`w:object`, `o:OLEObject`), external `w:subDoc` → warnings `not_read_altchunk`, `not_read_object`, `not_read_subdocument`.
+  8. **Text normalization** shared with plain text: FF and VT → `\n` (S3-T1 follow-up); Cc rule of S3-T1.
+  9. Language detection; `pages` and `page` null; zero text → `no_text_extracted`; caps of S3-T1.
+  10. Fixtures built in tests (`zipfile` + XML strings), synthetic text only. A worst-case DOCX at the caps finishes inside the child limits.
+  11. Docs: threat model T4 (DTD rule), ADR 0004 title and `CLAUDE.md` architecture row (no pdfplumber, no python-docx).
+- Threats: T4, T5, T11.
 
 ### S3-T3 PDF extraction (outline)
 
 `pdfminer.six` with a custom device (render mode), provably invisible text dropped and reported, borderline text flagged, overlapping glyphs, page cap, `ocr_pages` for pages without text, encrypted PDFs rejected, xref fallback / parse warnings / long or looping `Prev` chain → `pdf_damaged` or a material warning, incremental updates warning, annotations with values → "Not read".
 
-### S3-T4 Preview in the browser (outline)
+### S3-T4 Preview in the browser
 
-Per contract: extracted text as plain text, part labels, removed text (expandable), warnings with icon and text, language; uses the stage 3 contract.
+- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-preview` (worktree `/home/claude/wt/s3-preview`). No new dependency.
+- AC:
+  1. `extractFile` validates the stage 3 `200` contract strictly (all fields, enums, caps); a `200` body may be up to 4 MiB + 64 KiB (error bodies stay capped at 4 KiB); anything invalid → `unknown_error`. `501 not_implemented` maps to "PDF and Word support is coming" (temporary).
+  2. An accepted file keeps its extraction result in memory (never in storage in this stage).
+  3. Per contract, a "Preview" section (collapsed by default): the files in order (main text, then annexes) with their language label, then the blocks as plain text with part labels (Body, Footnote, Endnote, Header, Footer, Text box) and page numbers when present. Long text: the first 200 blocks, then "Show all" (no rendering of 1,000,000 characters by default).
+  4. **Removed text** (expandable): count per reason with the sample, labelled "Hidden text removed". **Warnings**: icon + text per code (`not_read_*`, `borderline_text`, `pdf_edited`, `external_reference`, and unknown codes as a generic "Some content could not be read"). `ocr_pages` shows "Pages N need text recognition" (OCR comes in S3-T5).
+  5. All text is plain text (no HTML sinks), inside `<bdi>` where it is untrusted; i18n en/uk/ru; accessible headings and disclosure buttons.
+- Threats: T1, T3, T5.
 
 ### S3-T5 OCR of scans in the browser (outline)
 
