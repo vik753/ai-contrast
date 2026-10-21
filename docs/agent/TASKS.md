@@ -334,7 +334,9 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
 ### S2 follow-ups (from the ADR 0008/0009 design review, for later stages)
 
 - Stage 3 (from the PR #15 security review): before any reader opens a ZIP — every local header at an offset below `cd_offset` with a valid signature, offsets strictly increasing from 0, no overlap and no gap, local name, flags, method, CRC and sizes equal to the central directory (data descriptor handled), real decompressed size enforced while streaming; OPC part-name grammar (ECMA-376 Part 2 §6.2.2: no percent-encoded unreserved characters or `/`) and duplicates checked after canonical decoding; extraction uses only the kind the server detected on the same bytes in the same request.
-- Stage 6 / before stage 13: at most 1 extraction slot per client IP (T6 control 7 client-IP rule).
+- Stage 6 / before stage 13 (**release blocker**): at most 1 extraction slot per client IP (T6 control 7 client-IP rule).
+- Stage 3: test detection against a corpus of real UK/RU DOCX files (some generators store raw UTF-8 part names, now `archive_rejected`); the `archive_rejected` message tells the user to save the file again in Word or export to PDF.
+- Effective upload minimum: a 10 MiB file needs about 1.4 Mbit/s to finish within 60 s; the `upload_timeout` message mentions a slow connection or a smaller file.
 - Stage 3: pdfminer xref warnings, long or looping `Prev` chains (`RecursionError` → `pdf_damaged`) and an unreadable latest revision make the incremental-update warning material; local file header names must match the central directory.
 - Stage 3 and 5b: tests on clean UK and RU contracts show no mixed-script and no overlap flags (combining marks excluded).
 - Stage 8: model tags that push a topic over its cap are dropped; a topic not analyzed shows 🟡.
