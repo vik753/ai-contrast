@@ -75,6 +75,7 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
 
 ### S2-T1 Extract endpoint: upload, limits and type detection
 
+- Status: **merged** (PR #15).
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s2-extract-api` (worktree `/home/claude/wt/s2-extract-api`).
 - Public interface (contract between `test-engineer` and `backend-dev`):
   - `app/extraction/detect.py`: `class FileKind(StrEnum)` with `PDF = "pdf"`, `DOCX = "docx"`, `TEXT = "text"`; `class DetectionError(Exception)` with a `code: str` attribute (one of the `422` codes above, never content); `def detect_kind(data: bytes, *, limits: ZipLimits) -> FileKind`; `@dataclass(frozen=True) class ZipLimits` with `max_entries`, `max_uncompressed_bytes`, `max_ratio`.
@@ -99,6 +100,7 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
 
 ### S2-T2 Upload form in the browser
 
+- Status: **merged** (PR #16).
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s2-upload-ui` (worktree `/home/claude/wt/s2-upload-ui`).
 - Public interface:
   - `src/api/extract.ts`: `type FileKind = "pdf" | "docx" | "text"`; `type ExtractErrorCode` = every server code above plus `"request_too_large" | "network_error" | "timeout" | "aborted" | "unknown_error"`; `type ExtractResult = { ok: true; kind: FileKind; bytes: number } | { ok: false; code: ExtractErrorCode; retryAfterSeconds?: number }`; `function extractFile(file: Blob, options?: { signal?: AbortSignal; fetchImpl?: typeof fetch; timeoutMs?: number }): Promise<ExtractResult>`. It never throws.
@@ -132,6 +134,7 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
 
 ### S2-T3 Docs and threat model for stage 2
 
+- Status: **merged** (this PR).
 - Owner: `docs-writer` after S2-T1 and S2-T2 are merged; tech lead checks.
 - AC:
   1. Threat model: T4 control 1 shows the limits table above (separate limits for file size, files per contract, contracts per analysis, total size and pages); T10 control 5 says "2 contracts, 30 pages in total"; T6 control 3 names `BodySizeLimitMiddleware` and the extraction limiter; T3 control 1 and T11 control 8 say that uploads are raw bytes with no file name (ADR 0010).
@@ -141,10 +144,11 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
 ### S2 follow-ups (from the ADR 0008/0009 design review, for later stages)
 
 - Stage 3 (from the PR #15 security review): before any reader opens a ZIP — every local header at an offset below `cd_offset` with a valid signature, offsets strictly increasing from 0, no overlap and no gap, local name, flags, method, CRC and sizes equal to the central directory (data descriptor handled), real decompressed size enforced while streaming; OPC part-name grammar (ECMA-376 Part 2 §6.2.2: no percent-encoded unreserved characters or `/`) and duplicates checked after canonical decoding; extraction uses only the kind the server detected on the same bytes in the same request.
-- Stage 6 / before stage 13 (**release blocker**): at most 1 extraction slot per client IP (T6 control 7 client-IP rule).
+- Stage 6 / before stage 13 (**release blocker**): at most 1 extraction slot per client IP (T6 control 6 client-IP rule).
 - Stage 3: test detection against a corpus of real UK/RU DOCX files (some generators store raw UTF-8 part names, now `archive_rejected`); the `archive_rejected` message tells the user to save the file again in Word or export to PDF.
 - Effective upload minimum: a 10 MiB file needs about 1.4 Mbit/s to finish within 60 s; the `upload_timeout` message mentions a slow connection or a smaller file.
 - Stage 3: pdfminer xref warnings, long or looping `Prev` chains (`RecursionError` → `pdf_damaged`) and an unreadable latest revision make the incremental-update warning material; local file header names must match the central directory.
 - Stage 3 and 5b: tests on clean UK and RU contracts show no mixed-script and no overlap flags (combining marks excluded).
+- Stage 10 polish: show limits in messages with the `upload.size.mb` template ("10 MB") and narrow the size test to `.file-row__size` (code review PR #16).
 - Stage 8: model tags that push a topic over its cap are dropped; a topic not analyzed shows 🟡.
 - Stage 9: global-override markers; "at most one document per call" policy test.

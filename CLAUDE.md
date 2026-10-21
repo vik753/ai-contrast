@@ -152,6 +152,14 @@ ENVIRONMENT=development ALLOWED_ORIGINS=http://localhost:5173 \
 
 Expected: uvicorn prints `Uvicorn running on http://127.0.0.1:8000`.
 `curl http://127.0.0.1:8000/api/health` returns `{"status":"ok","version":"0.1.0"}`, and the log shows `GET /api/health 200 duration_ms=...`.
+Check the upload endpoint (the body is raw bytes, no file name):
+
+```bash
+curl -sS -X POST -H 'Content-Type: application/octet-stream' --data-binary 'Hello, contract.' http://127.0.0.1:8000/api/extract
+```
+
+Expected: `{"kind":"text","bytes":16}`.
+
 Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
 
 Backend checks (the same as CI):

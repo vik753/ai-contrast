@@ -47,7 +47,7 @@ Browser controls:
 2. Opt-in "Remember on this device": `localStorage`, with a warning.
 3. "Forget key" button.
 4. Strict CSP (see T9). No third-party scripts, analytics or CDNs.
-5. React escaping only. Raw HTML sinks are banned by lint (`no-restricted-syntax` with T1 messages): `dangerouslySetInnerHTML`, `__html`, `innerHTML`/`outerHTML` writes, `insertAdjacentHTML`, `createContextualFragment`, `setHTMLUnsafe`, `parseHTMLUnsafe`, `document.write`, `DOMParser`, `srcDoc`. Inline `eslint-disable` has no effect (`noInlineConfig`). Runtime backstop: Trusted Types (`require-trusted-types-for 'script'; trusted-types 'none'`). Untrusted text is never passed through i18n `<Trans>` and never used as a translation key.
+5. React escaping only. Raw HTML sinks are banned by lint (`no-restricted-syntax` with T1 messages): `dangerouslySetInnerHTML`, `__html`, `innerHTML`/`outerHTML` writes, `insertAdjacentHTML`, `createContextualFragment`, `setHTMLUnsafe`, `parseHTMLUnsafe`, `document.write`, `DOMParser`, `srcDoc`. Inline `eslint-disable` has no effect (`noInlineConfig`). Runtime backstop: Trusted Types (`require-trusted-types-for 'script'; trusted-types 'none'`). Untrusted text is never passed through i18n `<Trans>` and never used as a translation key. Untrusted text such as file names reaches i18next `t()` only as interpolation values. `escapeValue: false` relies on React escaping. `skipOnVariables: true` is set explicitly. File names render inside `<bdi>`.
 6. UI tip: create a separate provider key for AI Contrast with a spending limit.
 
 Out of our control: malicious browser extensions and compromised client devices. The privacy policy says so.
@@ -76,7 +76,7 @@ Threats: files on server disk, logs, error trackers, server cache, the AI provid
 
 Controls:
 
-1. Files are processed in memory. Any temporary file a library needs is deleted in `finally`.
+1. Files are processed in memory. Any temporary file a library needs is deleted in `finally`. Uploads are raw bytes (`application/octet-stream`) with no file name in the URL, headers or body (ADR 0010). The browser sends them with `credentials: "omit"`, `redirect: "error"` and `cache: "no-store"`; tests pin these options.
 2. Logs contain no content: only sizes, counts, durations and error codes.
 3. No external error tracker in v1. If added later, it must scrub content.
 4. API responses carry `Cache-Control: no-store`.
@@ -90,7 +90,7 @@ Threats: zip bombs (DOCX is a ZIP), XXE, PDF bombs (huge page count, nested stre
 
 Controls:
 
-1. Limits (initial): 10 MB per file, 5 files per request, 100 pages per document.
+1. Limits (initial): 10 MiB per file; 5 files per contract; 5 contracts per analysis (free mode: 2); 50 MiB per analysis; 100 pages per document and 300 per analysis (from stage 3); ZIP: 2,000 entries, 100 MiB declared uncompressed size, compression ratio 200.
 2. File type by magic bytes, not by extension.
 3. DOCX: before parsing, check total uncompressed size, entry count and compression ratio.
    - **ZIP is read the same way as the stage 3 reader:** the central directory ends exactly at the EOCD; no EOCD or ZIP64 signature in the archive comment; the parsed entry count equals the EOCD count; entry names are printable ASCII with no `.`, `..` or empty segments and no segment ending in `.`; case-folded duplicates are rejected. Stage 3 adds: local headers match the central directory, no overlap or gap, first entry at offset 0, OPC part-name grammar, real decompressed size enforced while streaming. A test checks that `zipfile` and the detector see the same entries.
@@ -130,11 +130,15 @@ Controls:
 1. Per-IP rate limit in memory (slowapi).
 2. Concurrent analysis limit (initial: 2) because of 512 MB RAM.
 3. Request body size limit at the server: `BodySizeLimitMiddleware` on every route (64 KiB for JSON routes, 10 MiB for `/api/extract`); a `Content-Length` with more than 18 digits counts as too large. `/api/extract` also has the `ExtractionLimiter` (2 slots per process, `503 busy` with `Retry-After`, exposed by CORS), a body deadline of 60 s and a minimum average rate of 32 KiB/s after 5 s (`408 upload_timeout`), `Connection: close` on every response sent before the body is read, and `Transfer-Encoding` rejected (`411`). The limiter counts per process, so the backend runs as a single worker: `--workers 1` is explicit in the Dockerfile `CMD`, so `WEB_CONCURRENCY` cannot raise it (policy test).
-8. **Before stage 13:** at most 1 extraction slot per client IP (client IP derived as in control 7), with the stage 6 rate limiter. **Release blocker for stage 13.** Residual risk until then: one client can hold both slots with about 32 KiB/s per slot (about 2 MiB per minute), as a burst or a drip, and reconnect at each 60 s deadline.
-4. CORS allows only our frontend origin. CORS protects against other websites in a browser, not against scripts. `ALLOWED_ORIGINS` holds exact `https://host[:port]` origins; `null`, paths and wildcards are rejected; production requires it to be set explicitly.
-7. Per-IP limits behind Render's proxy: never trust the leftmost `X-Forwarded-For`; derive the client IP from the hop added by Render's proxy, and document it.
-5. No raw prompt endpoint. The server runs only our analysis pipeline, so it is useless as a generic AI proxy.
-6. If needed later: Cloudflare Turnstile.
+4. **Before stage 13:** at most 1 extraction slot per client IP (client IP derived as in control 6), with the stage 6 rate limiter. **Release blocker for stage 13.** Residual risk until then: one client can hold both slots with about 32 KiB/s per slot (about 2 MiB per minute), as a burst or a drip, and reconnect at each 60 s deadline.
+5. CORS allows only our frontend origin. CORS protects against other websites in a browser, not against scripts. `ALLOWED_ORIGINS` holds exact `https://host[:port]` origins; `null`, paths and wildcards are rejected; production requires it to be set explicitly.
+6. Per-IP limits behind Render's proxy: never trust the leftmost `X-Forwarded-For`; derive the client IP from the hop added by Render's proxy, and document it.
+7. No raw prompt endpoint. The server runs only our analysis pipeline, so it is useless as a generic AI proxy.
+8. If needed later: Cloudflare Turnstile.
+
+Browser controls:
+
+1. At most 2 checks are in flight in the whole form. A `busy` answer is retried at most 3 times, and `Retry-After` is limited to 1–10 s. The browser reads the response body up to 4 KiB.
 
 ## T7. Google Docs import
 
@@ -193,7 +197,7 @@ Controls:
 2. The Cloudflare account stays on the Workers Free plan: above 10,000 Neurons per day requests fail instead of being billed.
 3. Free mode requires a valid Cloudflare Turnstile token, verified server-side, one use per analysis.
 4. Per-IP daily limit and an in-memory global daily Neuron budget below the free allocation.
-5. Stricter size limits in free mode (initial: 2 documents, 30 pages in total).
+5. Stricter size limits in free mode (initial: 2 contracts and 30 pages per analysis).
 6. Free mode runs only our analysis pipeline with a fixed model; no raw prompts, no client-chosen model.
 7. Quota exhausted → `429` with code `free_quota_exhausted`; the UI offers the client's own key.
 8. The UI states which provider processes the text in free mode and its data policy.
@@ -211,7 +215,7 @@ Controls:
 5. The mapping stays in the browser; it is never sent to AI endpoints or providers and never logged; "Clear all" and retention cover it; exports use placeholders by default.
 6. **Fail-closed safety pass:** a detector version mismatch is rejected (`detector_version_mismatch`); idempotent input cleaning is only a check (`input_not_clean` if it would change anything, offsets never mapped); high-precision hits return `unmasked_identifier` with offsets, the browser pre-masks them and asks for a new confirmation; the server never changes confirmed text silently.
 7. **Type gate:** a frozen dataclass with a runtime sentinel, created only by `safety_pass()`; never a request model; the `AIProvider` port takes no `str`; topics and side text become `PseudonymizedText` or `ConfirmedTopic`; repair never re-sends model output; an AST policy test enforces this, including `__new__` and `object.__setattr__` on gate types.
-8. File names, PDF Info and XMP, DOCX `docProps`, embedded files and Google titles are never parsed into text, never logged, never sent.
+8. File names, PDF Info and XMP, DOCX `docProps`, embedded files and Google titles are never parsed into text, never logged, never sent. Uploads are raw bytes (`application/octet-stream`) with no file name in the URL, headers or body (ADR 0010). The browser sends them with `credentials: "omit"`, `redirect: "error"` and `cache: "no-store"`; tests pin these options.
 9. Cache key = SHA-256 of the final masked text plus prompt and model versions.
 10. **AI payload canaries on the wire** under the real `anthropic` and `openai` adapters (httpx `MockTransport`): URL, headers and the whole body, for every AI call type; plus negative checks for logs, SSE, errors, `422` and the browser's outgoing analysis request.
 11. The eval measures recall and precision per class and per language.

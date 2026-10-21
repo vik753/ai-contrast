@@ -8,7 +8,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | --- | --- | --- |
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
-| 2 | File upload | in progress |
+| 2 | File upload | done |
 | 3 | Text extraction | planned |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
@@ -52,3 +52,8 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-21 — PR #11 merged: ADR 0008 and 0009 after two security design reviews. PR #12: uv 0.11.33 (setup-uv `version` updated by hand, as the policy test requires).
 - 2026-10-21 — Customer enabled private vulnerability reporting, Dependabot alerts and security updates, and created the `main` ruleset (enforcement and check names still to fix).
 - 2026-10-21 — Stage 2 started: ADR 0010 (raw-bytes upload, one file per request), tasks S2-T1, S2-T2, S2-T3.
+- 2026-10-21 — PR #15 merged (S2-T1: `/api/extract`, upload limits, type detection) after two review rounds. 864 backend tests.
+- 2026-10-21 — PR #16 merged (S2-T2: upload form in the browser). 662 frontend tests.
+- 2026-10-21 — PR #17 merged: token economy rules in `CLAUDE.md`.
+- 2026-10-21 — Stage 2 done: S2-T3 docs and threat model (T1, T3, T4, T6, T10, T11), README, `CLAUDE.md` Commands.
+- Lesson: real-time upload tests and the memory test are CPU-sensitive. Run them under parallel load before approval.
