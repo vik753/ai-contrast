@@ -24,7 +24,9 @@ export type ServerErrorCode =
   | "legacy_office_unsupported"
   | "pages_unsupported"
   | "archive_rejected"
-  | "busy";
+  | "busy"
+  | "length_mismatch"
+  | "upload_timeout";
 
 /** Error codes produced in the browser only. */
 export type ClientErrorCode = "network_error" | "timeout" | "aborted" | "unknown_error";
@@ -71,6 +73,8 @@ const SERVER_ERRORS: ReadonlyMap<number, ReadonlySet<string>> = new Map<
       "archive_rejected",
     ]),
   ],
+  [400, new Set(["length_mismatch"])],
+  [408, new Set(["upload_timeout"])],
   [503, new Set(["busy"])],
 ]);
 

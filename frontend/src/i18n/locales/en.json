@@ -69,6 +69,8 @@
       "legacy_office_unsupported": "This is an old Word (.doc) file or a password-protected file. Remove the password if there is one. Save the file as .docx or PDF and try again.",
       "pages_unsupported": "Apple Pages files are not supported. Export to PDF: File → Export To → PDF.",
       "archive_rejected": "The file is damaged or has an unsafe structure. Open it in your editor, save it again and add it again.",
+      "length_mismatch": "The file did not arrive completely. Try again.",
+      "upload_timeout": "The upload took too long. Check your connection and try again.",
       "busy": "The server is busy. Remove the file and add it again in a minute.",
       "network_error": "No connection to the server. Check your internet connection, then remove the file and add it again.",
       "timeout": "The check took too long. Remove the file and add it again.",
