@@ -80,6 +80,8 @@ export function describeChange(
       return file === undefined ? [] : [{ type: "fileRemoved", name: file.name }];
     }
     case "fileCheckStarted":
+    case "checksRequeued":
+      // Internal steps; announcing them would only add noise.
       return [];
     case "fileChecked":
       return resultOf(findFile(next, action.fileId));
@@ -101,8 +103,14 @@ export function initialFormState(upload: UploadState): FormState {
   return { upload, announcements: [], nextAnnouncementId: 1 };
 }
 
+/** Form actions: upload actions plus clearing the live region. */
+export type FormAction = UploadAction | { type: "announcementsCleared" };
+
 /** `uploadReducer` plus the announcements of each change. Pure. */
-export function formReducer(state: FormState, action: UploadAction): FormState {
+export function formReducer(state: FormState, action: FormAction): FormState {
+  if (action.type === "announcementsCleared") {
+    return state.announcements.length === 0 ? state : { ...state, announcements: [] };
+  }
   const upload = uploadReducer(state.upload, action);
   if (upload === state.upload) {
     return state;

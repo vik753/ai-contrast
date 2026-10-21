@@ -62,11 +62,13 @@ export type UploadAction =
   | { type: "fileRemoved"; contractId: string; fileId: string }
   /** Internal: a queued file was sent to the server. */
   | { type: "fileCheckStarted"; fileId: string }
+  /** Internal: `checking` files without a request in flight go back to `queued`. */
+  | { type: "checksRequeued"; fileIds: readonly string[] }
   | { type: "fileChecked"; fileId: string; result: ExtractResult };
 
 export type Readiness =
   | { ready: true; contracts: number }
-  | { ready: false; reason: "contract_without_file" | "checking" };
+  | { ready: false; reason: "checking" | "rejected_files" | "contract_without_file" };
 
 function contractId(number: number): string {
   return `contract-${number}`;
@@ -236,27 +238,41 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
       return updateFile(state, action.fileId, (file) =>
         file.status === "queued" ? { ...file, status: "checking" } : file,
       );
+    case "checksRequeued": {
+      let next = state;
+      for (const fileId of action.fileIds) {
+        next = updateFile(next, fileId, (file) =>
+          file.status === "checking" ? { ...file, status: "queued" } : file,
+        );
+      }
+      return next;
+    }
     case "fileChecked":
       return updateFile(state, action.fileId, (file) => applyResult(file, action.result));
   }
 }
 
-/** Every file waiting for a server check, in display order. */
-export function queuedFiles(state: UploadState): UploadFile[] {
-  return state.contracts.flatMap((c) => c.files.filter((f) => f.status === "queued"));
+/** Every file with `status`, in display order. */
+export function filesWithStatus(state: UploadState, status: UploadFileStatus): UploadFile[] {
+  return state.contracts.flatMap((c) => c.files.filter((f) => f.status === status));
 }
 
 /**
- * Whether the contracts can be compared:
- * - every contract needs a file that is accepted or still being checked;
- * - then, every check must be finished.
+ * Whether the contracts can be compared. The first unmet condition wins:
+ * 1. every check is finished (`checking`);
+ * 2. no file was rejected: rejected files must be removed (`rejected_files`);
+ * 3. every contract has an accepted file (`contract_without_file`).
  */
 export function readiness(state: UploadState): Readiness {
+  const files = state.contracts.flatMap((c) => c.files);
+  if (files.some(isPending)) {
+    return { ready: false, reason: "checking" };
+  }
+  if (files.some((f) => f.status === "rejected")) {
+    return { ready: false, reason: "rejected_files" };
+  }
   if (!state.contracts.every((c) => c.files.some(isActive))) {
     return { ready: false, reason: "contract_without_file" };
-  }
-  if (state.contracts.some((c) => c.files.some(isPending))) {
-    return { ready: false, reason: "checking" };
   }
   return { ready: true, contracts: state.contracts.length };
 }

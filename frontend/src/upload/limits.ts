@@ -4,7 +4,10 @@
  * source of truth for the file size and type (threat model T4, T6).
  */
 
-/** Largest file in bytes (10 MiB). The server has the same limit. */
+/**
+ * Largest file in bytes (10 MiB). The server has the same limit.
+ * Sizes in the UI are 1024-based: "1 MB" means 1024² bytes (see `format.ts`).
+ */
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 /** Files per contract: main text plus annexes. */

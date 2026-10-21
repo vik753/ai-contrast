@@ -94,4 +94,15 @@ describe("formReducer", () => {
       code: "legacy_office_unsupported",
     });
   });
+
+  it("clears announcements and ignores internal steps", () => {
+    const state = run(
+      { type: "filesAdded", contractId: A, files: [{ id: "f1", name: "a.pdf", size: 10 }] },
+      { type: "fileCheckStarted", fileId: "f1" },
+      { type: "checksRequeued", fileIds: ["f1"] },
+    );
+    expect(messages(state)).toEqual([{ type: "filesAdded", label: "A", count: 1 }]);
+    expect(state.upload.contracts[0]?.files[0]?.status).toBe("queued");
+    expect(formReducer(state, { type: "announcementsCleared" }).announcements).toEqual([]);
+  });
 });

@@ -1,43 +1,74 @@
 /**
- * Upload form (S2-T2): contracts A…E, each with up to 5 files.
+ * Upload form (S2-T2): contracts A…E, each with its files.
  *
  * - Files are checked in the browser first (limits, `.doc`, `.pages`), then
- *   sent one by one to `POST /api/extract` as raw bytes (ADR 0010). At most
- *   2 checks run at a time in the whole form; the rest wait as `queued`.
- * - Removing a file or a contract aborts its checks and frees the slots.
- *   Unmounting the form aborts every check.
- * - File names are rendered as plain text only and never leave the browser
- *   (threat model T1, T11). Server text is never shown: only our messages
- *   for allowlisted error codes.
+ *   sent one by one to `POST /api/extract` as raw bytes (ADR 0010) by
+ *   `useCheckScheduler`: at most 2 checks at a time in the whole form.
+ * - Removing a file or a contract aborts its checks (the scheduler sees the
+ *   file leave the state). Unmounting the form aborts every check.
+ * - File names are rendered as plain text only, inside `<bdi>`, and never
+ *   leave the browser (threat model T1, T11). Server text is never shown:
+ *   only our messages for allowlisted error codes.
  */
 import type { TFunction } from "i18next";
-import { useEffect, useId, useReducer, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useId, useReducer, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { checkFile } from "./check";
+import { extractFile } from "../api/extract";
+import { formReducer, initialFormState, type Announcement } from "./announcements";
 import { FileStatusIcon } from "./FileStatusIcon";
-import { displaySize } from "./format";
-import { MAX_PARALLEL_REQUESTS } from "./limits";
+import { displaySize, limitText } from "./format";
+import { MAX_FILE_BYTES, MAX_FILES_PER_CONTRACT, MAX_TOTAL_BYTES } from "./limits";
 import {
   canAddContract,
   canRemoveContract,
   contractLabel,
   initialUploadState,
-  queuedFiles,
   readiness,
   type Contract,
+  type RejectionCode,
   type UploadFile,
 } from "./state";
-import { formReducer, initialFormState, type Announcement } from "./announcements";
+import { useCheckScheduler, type CheckFile } from "./useCheckScheduler";
 
 const ACCEPT = ".pdf,.docx,.txt";
 
-type FocusTarget = { type: "addFiles"; contractId: string } | { type: "addContract" };
+type FocusTarget =
+  | { type: "addFiles"; contractId: string }
+  | { type: "newContract"; count: number }
+  | { type: "addContract" };
 
 function hasFiles(event: DragEvent<HTMLElement>): boolean {
   return Array.from(event.dataTransfer.types).includes("Files");
 }
 
-function announcementText(t: TFunction, announcement: Announcement): string {
+/** Localized size text, for example "2 KB". */
+function sizeText(t: TFunction, bytes: number, locale: string): string {
+  const size = displaySize(bytes, locale);
+  return t(`upload.size.${size.unit}`, { value: size.value });
+}
+
+/** Codes whose message names a limit: a short reason plus a detail with the limit. */
+const LIMIT_CODES = ["file_too_large", "too_many_files", "total_too_large"] as const;
+type LimitCode = (typeof LIMIT_CODES)[number];
+
+function isLimitCode(code: RejectionCode): code is LimitCode {
+  return (LIMIT_CODES as readonly string[]).includes(code);
+}
+
+/** Message for an error code. Limits come from `limits.ts`, never from the strings. */
+function errorText(t: TFunction, code: RejectionCode, locale: string): string {
+  if (!isLimitCode(code)) {
+    return t(`upload.errors.${code}`);
+  }
+  const detail = t(`upload.errors.${code}.detail`, {
+    maxSize: limitText(MAX_FILE_BYTES, locale),
+    maxTotal: limitText(MAX_TOTAL_BYTES, locale),
+    maxFiles: MAX_FILES_PER_CONTRACT,
+  });
+  return `${t(`upload.errors.${code}.reason`)} ${detail}`;
+}
+
+function announcementText(t: TFunction, announcement: Announcement, locale: string): string {
   switch (announcement.type) {
     case "contractAdded":
       return t("upload.announce.contractAdded", { label: announcement.label });
@@ -58,12 +89,12 @@ function announcementText(t: TFunction, announcement: Announcement): string {
     case "fileRejected":
       return t("upload.announce.fileRejected", {
         name: announcement.name,
-        reason: t(`upload.errors.${announcement.code}`),
+        reason: errorText(t, announcement.code, locale),
       });
   }
 }
 
-function statusText(t: TFunction, file: UploadFile): string {
+function statusText(t: TFunction, file: UploadFile, locale: string): string {
   switch (file.status) {
     case "queued":
       return t("upload.status.queued");
@@ -72,8 +103,13 @@ function statusText(t: TFunction, file: UploadFile): string {
     case "accepted":
       return t(`upload.kind.${file.kind}`);
     case "rejected":
-      return t(`upload.errors.${file.code}`);
+      return errorText(t, file.code, locale);
   }
+}
+
+function useLocale(): string {
+  const { i18n } = useTranslation();
+  return i18n.resolvedLanguage ?? i18n.language;
 }
 
 interface FileRowProps {
@@ -82,19 +118,17 @@ interface FileRowProps {
 }
 
 function FileRow({ file, onRemove }: FileRowProps) {
-  const { t, i18n } = useTranslation();
-  const size = displaySize(file.size, i18n.resolvedLanguage ?? i18n.language);
+  const { t } = useTranslation();
+  const locale = useLocale();
   return (
     <li className={`file-row file-row--${file.status}`}>
       <span className="file-row__main">
-        <span className="file-row__name">{file.name}</span>
-        <span className="file-row__size">
-          {t(`upload.size.${size.unit}`, { value: size.value })}
-        </span>
+        <bdi className="file-row__name">{file.name}</bdi>
+        <span className="file-row__size">{sizeText(t, file.size, locale)}</span>
       </span>
       <span className="file-row__status">
         <FileStatusIcon status={file.status} />
-        <span className="file-row__status-text">{statusText(t, file)}</span>
+        <span className="file-row__status-text">{statusText(t, file, locale)}</span>
       </span>
       <button
         type="button"
@@ -128,6 +162,7 @@ function ContractCard({
   addButtonRef,
 }: ContractCardProps) {
   const { t } = useTranslation();
+  const locale = useLocale();
   const headingId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -217,7 +252,12 @@ function ContractCard({
         >
           {t("upload.addFiles")}
         </button>
-        <p className="contract__hint">{t("upload.dropHint")}</p>
+        <p className="contract__hint">
+          {t("upload.dropHint", {
+            maxSize: limitText(MAX_FILE_BYTES, locale),
+            maxFiles: MAX_FILES_PER_CONTRACT,
+          })}
+        </p>
       </div>
 
       {/* Opened by the button above; hidden from the tab order and from assistive technology. */}
@@ -244,63 +284,45 @@ function ContractCard({
 }
 
 export function UploadForm() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = useLocale();
   const titleId = useId();
   const [form, dispatch] = useReducer(formReducer, initialUploadState, initialFormState);
   const state = form.upload;
 
-  /** `File` objects by file id. They stay in memory in this tab only. */
+  /** `File` objects of files still waiting or accepted, by id. Only in this tab. */
   const filesRef = useRef(new Map<string, File>());
-  /** Checks in flight (also during a `busy` wait) by file id. */
-  const inFlightRef = useRef(new Map<string, AbortController>());
   const addButtonsRef = useRef(new Map<string, HTMLButtonElement>());
   const addContractRef = useRef<HTMLButtonElement>(null);
   const focusRef = useRef<FocusTarget | null>(null);
   const nextFileNumberRef = useRef(1);
 
-  // Scheduler: start queued checks while fewer than 2 are in flight.
-  useEffect(() => {
-    const inFlight = inFlightRef.current;
-    const free = MAX_PARALLEL_REQUESTS - inFlight.size;
-    if (free <= 0) {
-      return;
+  const check = useCallback<CheckFile>((file, signal) => {
+    const blob = filesRef.current.get(file.id);
+    if (blob === undefined) {
+      return Promise.resolve({ ok: false, code: "unknown_error" });
     }
-    const next = queuedFiles(state)
-      .filter((file) => !inFlight.has(file.id))
-      .slice(0, free);
-    for (const { id } of next) {
-      const blob = filesRef.current.get(id);
-      if (blob === undefined) {
-        continue;
+    return extractFile(blob, { signal });
+  }, []);
+
+  useCheckScheduler(state, dispatch, check);
+
+  // Drop `File` references of rejected and removed files.
+  useEffect(() => {
+    const keep = new Set(
+      state.contracts.flatMap((c) =>
+        c.files.filter((f) => f.status !== "rejected").map((f) => f.id),
+      ),
+    );
+    for (const id of filesRef.current.keys()) {
+      if (!keep.has(id)) {
+        filesRef.current.delete(id);
       }
-      const controller = new AbortController();
-      inFlight.set(id, controller);
-      dispatch({ type: "fileCheckStarted", fileId: id });
-      void checkFile(blob, controller.signal).then((result) => {
-        if (inFlight.get(id) !== controller) {
-          // Removed while in flight: its slot is already free.
-          return;
-        }
-        inFlight.delete(id);
-        if (!controller.signal.aborted) {
-          dispatch({ type: "fileChecked", fileId: id, result });
-        }
-      });
     }
   }, [state]);
 
-  // Unmount: abort every check.
-  useEffect(() => {
-    const inFlight = inFlightRef.current;
-    return () => {
-      for (const controller of inFlight.values()) {
-        controller.abort();
-      }
-      inFlight.clear();
-    };
-  }, []);
-
-  // Move focus after a removal, once the DOM shows the new state.
+  // Move focus after a contract or file change, once the DOM shows it.
+  // A target is applied only if its element still exists.
   useEffect(() => {
     const target = focusRef.current;
     if (target === null) {
@@ -309,50 +331,26 @@ export function UploadForm() {
     focusRef.current = null;
     if (target.type === "addFiles") {
       addButtonsRef.current.get(target.contractId)?.focus();
+    } else if (target.type === "newContract") {
+      const last = state.contracts.at(-1);
+      if (state.contracts.length === target.count && last !== undefined) {
+        addButtonsRef.current.get(last.id)?.focus();
+      }
     } else {
       addContractRef.current?.focus();
     }
   }, [state]);
 
-  const abortFile = (fileId: string): void => {
-    const controller = inFlightRef.current.get(fileId);
-    inFlightRef.current.delete(fileId);
-    controller?.abort();
-    filesRef.current.delete(fileId);
-  };
-
-  const addFiles = (contractId: string, files: File[]): void => {
-    const specs = files.map((file) => {
-      const id = `file-${nextFileNumberRef.current}`;
-      nextFileNumberRef.current += 1;
-      filesRef.current.set(id, file);
-      return { id, name: file.name, size: file.size };
-    });
-    dispatch({ type: "filesAdded", contractId, files: specs });
-  };
-
-  const removeFile = (contractId: string, fileId: string): void => {
-    abortFile(fileId);
-    focusRef.current = { type: "addFiles", contractId };
-    dispatch({ type: "fileRemoved", contractId, fileId });
-  };
-
-  const removeContract = (contractId: string): void => {
-    const contract = state.contracts.find((c) => c.id === contractId);
-    for (const file of contract?.files ?? []) {
-      abortFile(file.id);
-    }
-    focusRef.current = { type: "addContract" };
-    dispatch({ type: "contractRemoved", contractId });
-  };
-
-  const registerAddButton = (contractId: string, element: HTMLButtonElement | null): void => {
-    if (element === null) {
-      addButtonsRef.current.delete(contractId);
-    } else {
-      addButtonsRef.current.set(contractId, element);
-    }
-  };
+  // Old announcements are in the old language: clear them on a switch.
+  useEffect(() => {
+    const clear = (): void => {
+      dispatch({ type: "announcementsCleared" });
+    };
+    i18n.on("languageChanged", clear);
+    return () => {
+      i18n.off("languageChanged", clear);
+    };
+  }, [i18n]);
 
   // Keep a file dropped next to a card from replacing the whole page.
   useEffect(() => {
@@ -368,6 +366,39 @@ export function UploadForm() {
       window.removeEventListener("drop", block);
     };
   }, []);
+
+  const addFiles = (contractId: string, files: File[]): void => {
+    const specs = files.map((file) => {
+      const id = `file-${nextFileNumberRef.current}`;
+      nextFileNumberRef.current += 1;
+      filesRef.current.set(id, file);
+      return { id, name: file.name, size: file.size };
+    });
+    dispatch({ type: "filesAdded", contractId, files: specs });
+  };
+
+  const removeFile = (contractId: string, fileId: string): void => {
+    focusRef.current = { type: "addFiles", contractId };
+    dispatch({ type: "fileRemoved", contractId, fileId });
+  };
+
+  const removeContract = (contractId: string): void => {
+    focusRef.current = { type: "addContract" };
+    dispatch({ type: "contractRemoved", contractId });
+  };
+
+  const addContract = (): void => {
+    focusRef.current = { type: "newContract", count: state.contracts.length + 1 };
+    dispatch({ type: "contractAdded" });
+  };
+
+  const registerAddButton = (contractId: string, element: HTMLButtonElement | null): void => {
+    if (element === null) {
+      addButtonsRef.current.delete(contractId);
+    } else {
+      addButtonsRef.current.set(contractId, element);
+    }
+  };
 
   const ready = readiness(state);
   const removable = canRemoveContract(state);
@@ -400,9 +431,7 @@ export function UploadForm() {
           type="button"
           className="button"
           disabled={!canAddContract(state)}
-          onClick={() => {
-            dispatch({ type: "contractAdded" });
-          }}
+          onClick={addContract}
         >
           {t("upload.addContract")}
         </button>
@@ -417,7 +446,7 @@ export function UploadForm() {
 
       <div className="visually-hidden" aria-live="polite">
         {form.announcements.map((entry) => (
-          <p key={entry.id}>{announcementText(t, entry.announcement)}</p>
+          <p key={entry.id}>{announcementText(t, entry.announcement, locale)}</p>
         ))}
       </div>
     </section>

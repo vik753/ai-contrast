@@ -1,7 +1,7 @@
 /**
- * One file check with the `busy` retry policy (stage 2, S2-T2 AC4).
+ * The `busy` retry policy for one file check (S2-T2 AC4).
  */
-import { extractFile, type ExtractResult } from "../api/extract";
+import type { ExtractResult } from "../api/extract";
 import {
   DEFAULT_RETRY_DELAY_MS,
   MAX_CHECK_ATTEMPTS,
@@ -9,7 +9,7 @@ import {
   MIN_RETRY_DELAY_MS,
 } from "./limits";
 
-/** Delay before the next attempt after `busy`: `Retry-After`, capped. */
+/** Delay before the next attempt after `busy`: `Retry-After`, kept within 1–10 s. */
 export function retryDelayMs(retryAfterSeconds: number | undefined): number {
   const requested =
     retryAfterSeconds === undefined || !Number.isFinite(retryAfterSeconds)
@@ -38,13 +38,21 @@ function wait(ms: number, signal: AbortSignal): Promise<boolean> {
 }
 
 /**
- * Checks one file. A `busy` answer is retried after its `Retry-After`
- * (at most 10 s), with at most 3 attempts in total. Never throws.
+ * Runs `attempt` until it gives a result other than `busy`, waiting
+ * `Retry-After` (capped) between attempts; at most 3 attempts in total.
+ * An abort stops the waiting and gives `aborted`. Never throws if `attempt`
+ * never throws.
  */
-export async function checkFile(file: Blob, signal: AbortSignal): Promise<ExtractResult> {
-  for (let attempt = 1; ; attempt += 1) {
-    const result = await extractFile(file, { signal });
-    if (result.ok || result.code !== "busy" || attempt >= MAX_CHECK_ATTEMPTS) {
+export async function checkWithRetry(
+  attempt: (signal: AbortSignal) => Promise<ExtractResult>,
+  signal: AbortSignal,
+): Promise<ExtractResult> {
+  for (let number = 1; ; number += 1) {
+    if (signal.aborted) {
+      return { ok: false, code: "aborted" };
+    }
+    const result = await attempt(signal);
+    if (result.ok || result.code !== "busy" || number >= MAX_CHECK_ATTEMPTS) {
       return result;
     }
     const waited = await wait(retryDelayMs(result.retryAfterSeconds), signal);

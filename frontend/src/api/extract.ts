@@ -5,6 +5,7 @@
  *   the URL, the headers or the body (threat model T3, T11).
  * - The only header we set is `Content-Type: application/octet-stream`.
  *   The browser adds `Content-Length` for a `Blob` body.
+ * - The response must be `application/json` and at most 4 KiB.
  * - The response is validated strictly. Error codes pass an allowlist;
  *   anything else becomes `unknown_error`. Server text is never returned,
  *   so it can never be shown (threat model T1).
@@ -48,6 +49,9 @@ export interface ExtractOptions {
 
 export const EXTRACT_URL = "/api/extract";
 export const DEFAULT_EXTRACT_TIMEOUT_MS = 60_000;
+
+/** Largest response body we read. Real answers are a few dozen bytes. */
+export const MAX_RESPONSE_BYTES = 4 * 1024;
 
 const FILE_KINDS: ReadonlySet<string> = new Set<FileKind>(["pdf", "docx", "text"]);
 
@@ -104,6 +108,61 @@ function parseJson(text: string): unknown {
     return JSON.parse(text) as unknown;
   } catch {
     return undefined;
+  }
+}
+
+/** `application/json`, parameters allowed (`; charset=utf-8`), case-insensitive. */
+function isJson(headers: Headers): boolean {
+  const type = headers.get("Content-Type");
+  return type?.split(";")[0]?.trim().toLowerCase() === "application/json";
+}
+
+/** Marker for a body that is too large or not valid UTF-8. */
+const UNREADABLE = Symbol("unreadable");
+
+/**
+ * Reads the body as UTF-8 text, at most `MAX_RESPONSE_BYTES`. A larger
+ * declared `Content-Length` is rejected before reading; a larger streamed
+ * body stops the reading and cancels the stream. Stream errors are thrown.
+ */
+async function readCapped(response: Response): Promise<string | typeof UNREADABLE> {
+  const body = response.body;
+  const declared = response.headers.get("Content-Length");
+  if (
+    declared !== null &&
+    (!/^\d+$/.test(declared.trim()) || Number(declared) > MAX_RESPONSE_BYTES)
+  ) {
+    void body?.cancel().catch(() => undefined);
+    return UNREADABLE;
+  }
+  if (body === null) {
+    return "";
+  }
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    total += value.byteLength;
+    if (total > MAX_RESPONSE_BYTES) {
+      void reader.cancel().catch(() => undefined);
+      return UNREADABLE;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return UNREADABLE;
   }
 }
 
@@ -179,7 +238,7 @@ export async function extractFile(
 
   try {
     let response: Response;
-    let text: string;
+    let text: string | typeof UNREADABLE;
     try {
       // Read the global at call time, so a replaced `fetch` is used.
       const doFetch = fetchImpl ?? globalThis.fetch;
@@ -192,12 +251,19 @@ export async function extractFile(
         cache: "no-store",
         redirect: "error",
       });
-      text = await response.text();
+      if (!isJson(response.headers)) {
+        void response.body?.cancel().catch(() => undefined);
+        return failure("unknown_error");
+      }
+      text = await readCapped(response);
     } catch {
       return failure(stopReason("network_error"));
     }
     if (controller.signal.aborted) {
       return failure(stopReason("aborted"));
+    }
+    if (text === UNREADABLE) {
+      return failure("unknown_error");
     }
     return interpret(response.status, parseJson(text), file, response.headers);
   } finally {
