@@ -48,6 +48,7 @@ REL_ALT_CHUNK = R + "/aFChunk"
 REL_SUBDOCUMENT = R + "/subDocument"
 REL_OLE = R + "/oleObject"
 REL_HYPERLINK = R + "/hyperlink"
+REL_SETTINGS = R + "/settings"
 
 CT_MAIN = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 CT_TEMPLATE = "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"
@@ -58,6 +59,7 @@ CT_FOOTNOTES = "application/vnd.openxmlformats-officedocument.wordprocessingml.f
 CT_ENDNOTES = "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"
 CT_HEADER = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
 CT_FOOTER = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
+CT_SETTINGS = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
 CT_RELS = "application/vnd.openxmlformats-package.relationships+xml"
 
 NS_DECL = (
@@ -119,6 +121,10 @@ def notes_xml(tag: str, notes: Sequence[str]) -> bytes:
 
 def hdr_xml(body: str, tag: str = "hdr") -> bytes:
     return f"{XML_DECL}<w:{tag} {NS_DECL}>{body}</w:{tag}>".encode()
+
+
+def settings_xml(inner: str = "") -> bytes:
+    return f"{XML_DECL}<w:settings {NS_DECL}>{inner}</w:settings>".encode()
 
 
 def style(
@@ -199,6 +205,46 @@ class Package:
     doc_rels_xml: bytes | None = None
     extra: Sequence[tuple[str, bytes]] = ()
     extra_overrides: Sequence[tuple[str, str]] = ()
+    # Review round 0: only displayed parts are read.
+    # ``sections``: the inner XML of each w:sectPr (header/footer references,
+    # w:titlePg). ``None``: one section per header/footer index ``i`` with
+    # default references to header ``i`` and footer ``i``.
+    sections: Sequence[str] | None = None
+    # A paragraph with a reference to every footnote and endnote (default on).
+    note_refs: bool = True
+    settings: bytes | None = None
+
+    def _sections(self) -> list[str]:
+        if self.sections is not None:
+            return list(self.sections)
+        out: list[str] = []
+        for i in range(max(len(self.headers), len(self.footers))):
+            refs = ""
+            if i < len(self.headers):
+                refs += f'<w:headerReference w:type="default" r:id="rIdH{i + 1}"/>'
+            if i < len(self.footers):
+                refs += f'<w:footerReference w:type="default" r:id="rIdF{i + 1}"/>'
+            out.append(refs)
+        return out
+
+    def _main_body(self) -> str:
+        refs = ""
+        if self.note_refs:
+            refs += "".join(
+                f'<w:r><w:footnoteReference w:id="{i}"/></w:r>'
+                for i in range(1, len(self.footnotes) + 1)
+            )
+            refs += "".join(
+                f'<w:r><w:endnoteReference w:id="{i}"/></w:r>'
+                for i in range(1, len(self.endnotes) + 1)
+            )
+        body = self.body + (f"<w:p>{refs}</w:p>" if refs else "")
+        sections = self._sections()
+        for inner in sections[:-1]:
+            body += f"<w:p><w:pPr><w:sectPr>{inner}</w:sectPr></w:pPr></w:p>"
+        if sections:
+            body += f"<w:sectPr>{sections[-1]}</w:sectPr>"
+        return body
 
     def _rel_dir(self) -> str:
         head, _, _ = self.main_part.rpartition("/")
@@ -239,9 +285,11 @@ class Package:
             add(f"rIdH{i}", REL_HEADER, f"header{i}.xml", hdr_xml(body, "hdr"), CT_HEADER)
         for i, body in enumerate(self.footers, 1):
             add(f"rIdF{i}", REL_FOOTER, f"footer{i}.xml", hdr_xml(body, "ftr"), CT_FOOTER)
+        if self.settings is not None:
+            add("rIdSettings", REL_SETTINGS, "settings.xml", self.settings, CT_SETTINGS)
         overrides.extend(self.extra_overrides)
 
-        main = self.document if self.document is not None else document_xml(self.body)
+        main = self.document if self.document is not None else document_xml(self._main_body())
         folder = self._rel_dir()
         base = self.main_part.rpartition("/")[2]
         rels_name = f"{folder}/_rels/{base}.rels" if folder else f"_rels/{base}.rels"

@@ -28,7 +28,7 @@ from tests.docxbuild import (
     r,
     t,
 )
-from tests.docxrun import code, extract, joined, texts, warning_codes
+from tests.docxrun import code, content_texts, extract, joined, texts, warning_codes
 
 SUSPICIOUS = "suspicious_package"
 
@@ -327,7 +327,7 @@ def test_walker_footer_clause_kept_with_part_label() -> None:
 def test_walker_footnote_separators_give_no_block() -> None:
     pkg = Package(body=para(CLAUSE), footnotes=[para("Note.")])
 
-    assert sorted(texts(extract(build_docx(pkg)))) == sorted([CLAUSE, "Note."])
+    assert sorted(content_texts(extract(build_docx(pkg)))) == sorted([CLAUSE, "Note."])
 
 
 # --- AC4: header and footer page numbers and repeated lines -----------------------------------

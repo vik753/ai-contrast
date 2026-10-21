@@ -70,3 +70,9 @@ def reasons(result: ExtractionResult) -> dict[str, int]:
 
 def warning_codes(result: ExtractionResult) -> list[str]:
     return [w.code for w in result.warnings]
+
+
+def content_texts(result: ExtractionResult, part: str | None = None) -> list[str]:
+    """``texts`` without blocks that hold only note reference marks (digits): what a
+    footnote or endnote reference contributes to the body is not specified."""
+    return [text for text in texts(result, part) if text.strip("0123456789 \t\n") != ""]

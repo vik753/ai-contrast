@@ -210,17 +210,7 @@ def test_chain_character_style_based_on_hidden_removed() -> None:
     assert HIDDEN not in text
 
 
-def test_chain_character_style_overrides_paragraph_style() -> None:
-    styles = styles_xml(
-        style("HiddenPara", rpr="<w:vanish/>"),
-        style("ShownChar", kind="character", rpr='<w:vanish w:val="0"/>'),
-    )
-
-    text, _ = _with(
-        '<w:rStyle w:val="ShownChar"/>', ppr='<w:pStyle w:val="HiddenPara"/>', styles=styles
-    )
-
-    assert HIDDEN in text
+# Toggle properties (review round 0): tests/test_docx_round0.py.
 
 
 def test_chain_direct_overrides_styles() -> None:
