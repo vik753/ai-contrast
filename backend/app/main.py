@@ -14,9 +14,15 @@ from fastapi.telemetry import TelemetryConfig
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import health
+from app.api import extract, health
 from app.api.validation_errors import validation_error_handler
-from app.middleware import AccessLogMiddleware, ErrorCatcherMiddleware, SecurityHeadersMiddleware
+from app.extraction.limiter import ExtractionLimiter
+from app.middleware import (
+    AccessLogMiddleware,
+    BodySizeLimitMiddleware,
+    ErrorCatcherMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.settings import Settings
 
 CORS_ALLOWED_METHODS = ["GET", "POST"]
@@ -49,10 +55,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(health.router)
+    app.include_router(extract.router)
+    app.state.settings = settings
+    # One limiter per app: extractions in progress on this server (T6, ADR 0010).
+    app.state.extraction_limiter = ExtractionLimiter(settings.max_concurrent_extractions)
 
     # `add_middleware` puts each new middleware outside the previous ones,
     # so they are added from the innermost to the outermost.
     app.add_middleware(ErrorCatcherMiddleware)
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_file_bytes=settings.max_file_bytes,
+        max_json_body_bytes=settings.max_json_body_bytes,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
