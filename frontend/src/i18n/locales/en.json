@@ -86,7 +86,63 @@
       "total_too_large": {
         "reason": "The files are too large together.",
         "detail": "All files together can be at most {{maxTotal}}. Remove some files first."
-      }
+      },
+      "extraction_failed": "We could not read the text of this file. Open the file, save it again as PDF or DOCX, then add it again.",
+      "extraction_timeout": "Reading the file took too long. Split it into smaller files or save it as a new PDF, then add it again.",
+      "too_many_pages": "The file has too many pages. Split it into parts and add them as separate files.",
+      "too_much_text": "The file has too much text. Split it into parts and add them as separate files.",
+      "encrypted_unsupported": "The file is password-protected or encrypted. Remove the protection, save the file and add it again.",
+      "no_text_extracted": "No text was found in the file. Check that this is the contract file and add it again.",
+      "text_decoding_failed": "The text encoding of the file is not supported. Save the file as UTF-8 text and add it again.",
+      "suspicious_package": "The file has an unsafe structure. Open it in Word and save it as a new .docx file, or export it to PDF, then add it again.",
+      "docx_strict_unsupported": "This .docx file uses the Strict Open XML format. In Word, save it again in the standard .docx format, then add it again.",
+      "pdf_damaged": "The PDF file is damaged. Open it and save or print it to a new PDF, then add it again.",
+      "not_implemented": "PDF and Word support is coming. For now, save the contract as a .txt file and add it."
+    },
+    "preview": {
+      "title": "Preview",
+      "languageLabel": "Language:",
+      "language": {
+        "en": "English",
+        "uk": "Ukrainian",
+        "ru": "Russian",
+        "mixed": "Several languages",
+        "unknown": "Not detected"
+      },
+      "part": {
+        "body": "Body",
+        "footnote": "Footnote",
+        "endnote": "Endnote",
+        "header": "Header",
+        "footer": "Footer",
+        "textbox": "Text box"
+      },
+      "page": "Page {{page}}",
+      "showAll_one": "Show all {{count}} block",
+      "showAll_other": "Show all {{count}} blocks",
+      "removed": {
+        "title": "Hidden text removed",
+        "count_one": "{{count}} fragment",
+        "count_other": "{{count}} fragments",
+        "reason": {
+          "hidden_formatting": "Hidden by formatting",
+          "same_color": "Same color as the background",
+          "tiny_text": "Too small to read",
+          "control_characters": "Control characters",
+          "other": "Other invisible text"
+        }
+      },
+      "warning": {
+        "not_read_altchunk": "An embedded document was not read. Check it in the original file.",
+        "not_read_object": "An embedded object was not read. Check it in the original file.",
+        "not_read_subdocument": "A linked subdocument was not read. Check it in the original file.",
+        "borderline_text": "Some text is very small or very light. Check it in the original file.",
+        "pdf_edited": "The PDF was changed after it was first saved. Make sure this is the final version.",
+        "external_reference": "The file refers to outside content that was not read. Check it in the original file.",
+        "unknown": "Some content could not be read. Check it in the original file."
+      },
+      "warningPages": "(pages: {{pages}})",
+      "ocrPages": "Pages that need text recognition: {{pages}}."
     },
     "readiness": {
       "contract_without_file": "Add at least one file to each contract",

@@ -5,7 +5,7 @@
  * (ADR 0010, threat model T11). The `File` objects themselves live outside
  * the state (see `UploadForm`), so the state stays serializable.
  */
-import type { ExtractErrorCode, ExtractResult, FileKind } from "../api/extract";
+import type { ExtractErrorCode, ExtractResult, Extraction, FileKind } from "../api/extract";
 import {
   MAX_CONTRACTS,
   MAX_FILE_BYTES,
@@ -35,7 +35,12 @@ interface UploadFileBase {
 
 export type UploadFile =
   | (UploadFileBase & { readonly status: "queued" | "checking" })
-  | (UploadFileBase & { readonly status: "accepted"; readonly kind: FileKind })
+  | (UploadFileBase & {
+      readonly status: "accepted";
+      readonly kind: FileKind;
+      /** Extracted text, in memory only (never written to storage). */
+      readonly extraction: Extraction;
+    })
   | (UploadFileBase & { readonly status: "rejected"; readonly code: RejectionCode });
 
 export interface Contract {
@@ -198,7 +203,7 @@ function applyResult(file: UploadFile, result: ExtractResult): UploadFile {
   }
   const base: UploadFileBase = { id: file.id, name: file.name, size: file.size };
   return result.ok
-    ? { ...base, status: "accepted", kind: result.kind }
+    ? { ...base, status: "accepted", kind: result.kind, extraction: result.extraction }
     : { ...base, status: "rejected", code: result.code };
 }
 
