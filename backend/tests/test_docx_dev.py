@@ -350,3 +350,34 @@ def test_sandbox_limits_docx_defaults_match_settings() -> None:
         settings.max_docx_xml_depth,
         settings.max_docx_elements,
     )
+
+
+# --- Review round 0: displayed parts (developer tests) ---------------------------------------
+
+
+def test_first_page_header_inherited_by_later_title_page_section() -> None:
+    sections = [
+        '<w:headerReference w:type="first" r:id="rIdH1"/>',
+        "<w:titlePg/>",
+    ]
+    pkg = Package(body=para(CLAUSE), headers=[para("Inherited first.")], sections=sections)
+
+    assert texts(extract(build_docx(pkg)), "header") == ["Inherited first."]
+
+
+def test_footnote_referenced_only_from_hidden_run_not_displayed() -> None:
+    ref = '<w:r><w:rPr><w:vanish/></w:rPr><w:footnoteReference w:id="1"/></w:r>'
+    pkg = Package(body=para(CLAUSE) + p(ref), footnotes=[para("Hidden note.")], note_refs=False)
+    result = extract(build_docx(pkg))
+
+    assert texts(result, "footnote") == []
+    assert [x.reason for x in result.removed] == ["not_displayed"]
+
+
+def test_hidden_runs_in_one_paragraph_one_span() -> None:
+    hidden = r("one ", "<w:vanish/>") + r("two", "<w:vanish/>")
+    result = extract(body_docx(para(CLAUSE), p(r("Shown "), hidden)))
+
+    assert [(x.reason, x.count, x.sample) for x in result.removed] == [
+        ("hidden_formatting", 7, "one two")
+    ]

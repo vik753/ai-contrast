@@ -213,6 +213,11 @@ class Styles:
             return {}, None
         return self._chain(style_id, "paragraph")
 
+    def table(self, style_id: str | None) -> Props:
+        if style_id is None:
+            return {}
+        return self._chain(style_id, "table")[0]
+
     def character(self, style_id: str | None) -> Props:
         if style_id is None:
             return {}
