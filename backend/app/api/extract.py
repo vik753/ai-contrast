@@ -19,7 +19,7 @@ Order of checks (each answers before the next step):
    above the limit → ``413``; more bytes than ``Content-Length``, or fewer when the
    body ends → ``400 length_mismatch``; not complete within
    ``EXTRACT_BODY_TIMEOUT_SECONDS``, or an average rate below
-   ``EXTRACT_MIN_RATE_BYTES_PER_SECOND`` after ``RATE_GRACE_SECONDS`` →
+   ``EXTRACT_MIN_RATE_BYTES_PER_SECOND`` after ``EXTRACT_RATE_GRACE_SECONDS`` →
    ``408 upload_timeout``;
 6. zero bytes → ``422 empty_file``;
 7. detection → ``200 {"kind", "bytes"}`` or ``422`` with the detection code.
@@ -46,7 +46,7 @@ from pydantic import BaseModel
 from starlette.requests import ClientDisconnect
 
 from app.extraction.detect import DetectionError, FileKind, ZipLimits, detect_kind
-from app.extraction.limiter import ExtractionBusyError, ExtractionLimiter
+from app.extraction.limiter import ExtractionLimiter
 from app.http_limits import EXTRACT_PATH, declared_length
 from app.settings import Settings
 
@@ -54,7 +54,6 @@ router = APIRouter()
 
 ACCEPTED_MEDIA_TYPE: Final = "application/octet-stream"
 RETRY_AFTER_SECONDS: Final = 5
-RATE_GRACE_SECONDS: Final = 5.0
 # How late a stalled stream may be detected after its rate falls below the minimum.
 RATE_TICK_SECONDS: Final = 1.0
 
@@ -124,14 +123,15 @@ async def _read_body(request: Request, declared: int, settings: Settings) -> byt
     below the minimum at ``fail_at = max(grace_end, start + received / min_rate)``.
     The timeout is kept between ``fail_at`` and ``fail_at + RATE_TICK_SECONDS``
     (never after the deadline), so it never fires early and a stalled stream is
-    caught within one tick. It is moved only when ``fail_at`` passes it, so there are
-    at most ``max_file_bytes / (min_rate * RATE_TICK_SECONDS)`` reschedules, not one
-    timer per chunk. The rate is also checked when a chunk arrives.
+    caught within one tick. It is moved only when ``fail_at`` passes it, and each move
+    sets it at least one tick later, before the deadline: so there are at most
+    ``extract_body_timeout_seconds / RATE_TICK_SECONDS`` reschedules (60 by default),
+    not one timer per chunk. The rate is also checked when a chunk arrives.
     """
     loop = asyncio.get_running_loop()
     start = loop.time()
     deadline = start + settings.extract_body_timeout_seconds
-    grace_end = start + RATE_GRACE_SECONDS
+    grace_end = start + settings.extract_rate_grace_seconds
     min_rate = settings.extract_min_rate_bytes_per_second
     buffer = bytearray(declared)
     received = 0
@@ -188,11 +188,11 @@ async def extract(request: Request) -> ExtractResponse | JSONResponse:
     checked = _check_headers(request, settings)
     if isinstance(checked, JSONResponse):
         return checked
-    try:
-        with limiter.slot():
-            return await _receive_and_detect(request, checked, settings)
-    except ExtractionBusyError:
+    slot = limiter.try_slot()
+    if slot is None:
         return _early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
+    with slot:
+        return await _receive_and_detect(request, checked, settings)
 
 
 async def _receive_and_detect(

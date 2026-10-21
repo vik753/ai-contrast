@@ -12,7 +12,7 @@ no lock is needed.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 
 
 class ExtractionBusyError(Exception):
@@ -45,15 +45,27 @@ class ExtractionLimiter:
             raise RuntimeError(msg)
         self._in_use -= 1
 
-    @contextmanager
-    def slot(self) -> Iterator[None]:
-        """Hold one slot for the ``with`` block; release it exactly once on exit,
-        also on exceptions and cancellation.
+    def try_slot(self) -> AbstractContextManager[None] | None:
+        """Take a slot now (never waits) and return a context manager that holds it
+        and releases it exactly once on exit, also on exceptions and cancellation.
+        Return ``None`` if no slot is free.
 
-        Raises ``ExtractionBusyError`` on enter if no slot is free (never waits).
+        Enter the result at once (``with slot:``); a result that is never entered
+        keeps its slot.
         """
         if not self.try_acquire():
+            return None
+        return self._held()
+
+    def slot(self) -> AbstractContextManager[None]:
+        """Like ``try_slot`` but raises ``ExtractionBusyError`` if no slot is free."""
+        held = self.try_slot()
+        if held is None:
             raise ExtractionBusyError
+        return held
+
+    @contextmanager
+    def _held(self) -> Iterator[None]:
         try:
             yield
         finally:

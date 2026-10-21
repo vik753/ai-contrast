@@ -83,7 +83,9 @@ class Settings(BaseSettings):
     - ``MAX_ZIP_RATIO``: uncompressed / compressed size of one archive entry.
     - ``EXTRACT_BODY_TIMEOUT_SECONDS``: deadline to receive the whole upload body.
     - ``EXTRACT_MIN_RATE_BYTES_PER_SECOND``: minimum average upload rate, checked
-      after a fixed grace period (``app.api.extract.RATE_GRACE_SECONDS``).
+      after the grace period.
+    - ``EXTRACT_RATE_GRACE_SECONDS``: grace period before the minimum rate applies
+      (a positive, finite number of seconds).
     """
 
     model_config = SettingsConfigDict(
@@ -107,6 +109,7 @@ class Settings(BaseSettings):
     max_zip_ratio: PositiveInt = 200
     extract_body_timeout_seconds: PositiveInt = 60
     extract_min_rate_bytes_per_second: PositiveInt = 32 * 1024
+    extract_rate_grace_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 5.0
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
