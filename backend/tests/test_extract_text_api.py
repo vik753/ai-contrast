@@ -1,6 +1,6 @@
 """S3-T1 AC2, AC6, AC7, AC10: ``POST /api/extract`` returns the stage 3
-response contract for text files; PDF and DOCX get ``501 not_implemented``
-until S3-T2/S3-T3.
+response contract for text files; PDF gets ``501 not_implemented``
+until S3-T3 (DOCX: S3-T2, tests/test_docx_api.py).
 
 Assumed contract (see the test report): ``app/api/extract.py`` imports
 ``run_extraction`` by name and calls it as
@@ -27,7 +27,7 @@ from app.extraction.model import ExtractionError, ExtractionResult
 from app.extraction.text import extract_text_file
 from tests.asgi_stream import AsgiRun, chunks, drive, drive_receive, post_scope
 from tests.helpers import access_lines, all_log_text, new_canary
-from tests.zipbuild import PDF_SAMPLE, minimal_docx
+from tests.zipbuild import PDF_SAMPLE
 
 EXTRACT = "/api/extract"
 OCTET = {"Content-Type": "application/octet-stream"}
@@ -135,7 +135,9 @@ def test_extract_text_encodings_decoded_to_ukrainian(
 
 
 @pytest.mark.parametrize(
-    "body", [pytest.param(PDF_SAMPLE, id="pdf"), pytest.param(minimal_docx(), id="docx")]
+    # S3-T2: DOCX is extracted now (tests/test_docx_api.py); PDF until S3-T3.
+    "body",
+    [pytest.param(PDF_SAMPLE, id="pdf")],
 )
 def test_extract_pdf_and_docx_return_501_not_implemented(
     make_client: Callable[..., TestClient], body: bytes
@@ -147,7 +149,9 @@ def test_extract_pdf_and_docx_return_501_not_implemented(
 
 
 @pytest.mark.parametrize(
-    "body", [pytest.param(PDF_SAMPLE, id="pdf"), pytest.param(minimal_docx(), id="docx")]
+    # S3-T2: DOCX is extracted now (tests/test_docx_api.py); PDF until S3-T3.
+    "body",
+    [pytest.param(PDF_SAMPLE, id="pdf")],
 )
 def test_extract_pdf_and_docx_slot_released(
     make_app: Callable[..., FastAPI], make_client: Callable[..., TestClient], body: bytes
@@ -380,7 +384,9 @@ def test_extract_sandbox_limits_follow_settings(
 
 
 @pytest.mark.parametrize(
-    "body", [pytest.param(PDF_SAMPLE, id="pdf"), pytest.param(minimal_docx(), id="docx")]
+    # S3-T2: DOCX is extracted now (tests/test_docx_api.py); PDF until S3-T3.
+    "body",
+    [pytest.param(PDF_SAMPLE, id="pdf")],
 )
 def test_extract_pdf_and_docx_never_reach_the_sandbox(
     make_client: Callable[..., TestClient],
