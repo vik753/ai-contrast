@@ -152,3 +152,72 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
 - Stage 10 polish: show limits in messages with the `upload.size.mb` template ("10 MB") and narrow the size test to `.file-row__size` (code review PR #16).
 - Stage 8: model tags that push a topic over its cap are dropped; a topic not analyzed shows 🟡.
 - Stage 9: global-override markers; "at most one document per call" policy test.
+
+## Stage 3 — Text extraction
+
+Design: ADR 0011 (parsing sandbox), ADR 0009 Layer 0 (read what the person reads), ADR 0004 revision. Threats: T3, T4, T5, T6, T11.
+
+Order: S3-T1 first (sandbox and response contract). Then S3-T2 (DOCX) and S3-T3 (PDF), one after the other (both change `uv.lock`). S3-T4 (preview UI) can start after S3-T1. S3-T5 (browser OCR) after S3-T3. S3-T6 (Google Docs link) last. Detailed AC for S3-T2…T6 are written when each task starts.
+
+### Response contract: `POST /api/extract` `200` from stage 3
+
+```json
+{
+  "kind": "pdf" | "docx" | "text",
+  "bytes": 12345,
+  "language": "uk" | "ru" | "en" | "mixed" | "unknown",
+  "pages": 3,
+  "blocks": [{ "text": "…", "part": "body" | "footnote" | "endnote" | "header" | "footer" | "textbox", "page": 1 }],
+  "ocr_pages": [2],
+  "removed": [{ "reason": "<code>", "count": 4, "sample": "…" }],
+  "warnings": [{ "code": "<code>", "page": 2 }]
+}
+```
+
+- `pages` and `page` are `null` for DOCX and text. `ocr_pages` lists PDF pages with no text layer that the browser must OCR (stage 3, S3-T5); it is empty for other kinds.
+- `removed` lists text that was dropped as provably invisible, by reason, with a short sample (at most 200 characters) for the preview. `warnings` use codes only (plus a page number).
+- Every list and the total text have caps; a cap fails closed with an error code, never a truncated result.
+- New error codes (`422` unless noted): `extraction_failed`, `extraction_timeout`, `too_many_pages`, `too_much_text`, `encrypted_unsupported`, `no_text_extracted`, `text_decoding_failed`, `suspicious_package`, `docx_strict_unsupported`, `pdf_damaged`.
+
+### S3-T1 Parsing sandbox, response contract and plain text
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-sandbox` (worktree `/home/claude/wt/s3-sandbox`).
+- Public interface:
+  - `app/extraction/sandbox.py`: `async def run_extraction(data: bytes, kind: FileKind, *, limits: SandboxLimits) -> ExtractionResult` (raises `ExtractionError(code)`); `@dataclass(frozen=True) class SandboxLimits` (`memory_bytes`, `cpu_seconds`, `wall_seconds`, `max_result_bytes`).
+  - `app/extraction/worker.py`: the child entry point (`python -I -m app.extraction.worker`); `app/extraction/text.py`: `extract_text_file(data: bytes) -> ExtractionResult` (pure, runs inside the child).
+  - `app/extraction/model.py`: Pydantic models for the response contract above (`ExtractionResult`, `Block`, `Removed`, `Warning`), strict, `extra="forbid"`.
+  - Settings: `EXTRACT_WORKER_MEMORY_MB` (192), `EXTRACT_WORKER_CPU_SECONDS` (20), `EXTRACT_WORKER_WALL_SECONDS` (30), `EXTRACT_MAX_RESULT_BYTES` (8 MiB), `EXTRACT_MAX_TEXT_CHARS` (2,000,000), `EXTRACT_MAX_BLOCKS` (20,000).
+- AC:
+  1. ADR 0011: one subprocess per file; limits set by the child before it reads input (`RLIMIT_AS`, `RLIMIT_CPU`, `RLIMIT_FSIZE` = 0, `RLIMIT_NOFILE`, `RLIMIT_CORE` = 0); minimal environment; `-I`; stderr read and discarded, never logged.
+  2. The parent kills the child on the wall deadline (`extraction_timeout`), on a non-zero exit or a signal (`extraction_failed`; memory or CPU limit included), and on a result above `EXTRACT_MAX_RESULT_BYTES` (`extraction_failed`, reading stops at the cap). No zombie processes remain (test). The extraction slot is held while the child runs.
+  3. The child result is validated by the Pydantic model in the parent; invalid JSON or schema → `extraction_failed`.
+  4. Plain text: strict UTF-8 (BOM optional), strict UTF-16 with BOM, otherwise strict CP1251; failure → `text_decoding_failed`. The control-character rule of detection runs again on the whole decoded text (fail closed). Newlines normalized to `\n`. Text is split into blocks by blank lines. `part` = `body`.
+  5. Language: rule-based, no dependency: Ukrainian-only letters (і, ї, є, ґ) vs Russian-only letters (ы, э, ъ, ё) vs Latin share; `mixed` when two languages are both significant, `unknown` for too little text. Thresholds documented and tested with en/uk/ru samples.
+  6. Caps: total characters above `EXTRACT_MAX_TEXT_CHARS` → `too_much_text`; blocks above `EXTRACT_MAX_BLOCKS` → `too_much_text`; zero characters after decoding → `no_text_extracted`.
+  7. `POST /api/extract` returns the stage 3 contract for `text`. For `pdf` and `docx` it returns `501 {"error": "not_implemented"}` until S3-T2/S3-T3 (temporary; removed by those tasks).
+  8. Robustness tests in the child: a test-only kind or hook that allocates memory beyond the limit, burns CPU, sleeps past the wall deadline, writes huge output, exits non-zero, and tries to write a file → each gives the right code; the server keeps working and the slot is free.
+  9. Memory budget measured and written in ADR 0011: parent RSS plus two children at their limit stays under 512 MB.
+  10. Logs: only the error code and duration; no child output, no text. Log canary test with a canary inside the text file.
+  11. No new dependency. ruff, mypy strict, pytest green.
+- Threats: T3, T4, T6.
+
+### S3-T2 DOCX extraction (outline)
+
+ZIP stage 3 checks (local headers equal to the central directory, no overlap or gap, first entry at 0, real decompressed size enforced while streaming, OPC part-name grammar), relationship resolution and package anomalies (ADR 0009 Layer 0), own walker (`defusedxml`) over main part, footnotes, endnotes, headers, footers, text boxes, content controls, tracked insertions, fields, `w:sym`; effective formatting for hidden text; symbol-font checkboxes; material "Not read" warnings (`altChunk`, OLE); strict OOXML rejected.
+
+### S3-T3 PDF extraction (outline)
+
+`pdfminer.six` with a custom device (render mode), provably invisible text dropped and reported, borderline text flagged, overlapping glyphs, page cap, `ocr_pages` for pages without text, encrypted PDFs rejected, xref fallback / parse warnings / long or looping `Prev` chain → `pdf_damaged` or a material warning, incremental updates warning, annotations with values → "Not read".
+
+### S3-T4 Preview in the browser (outline)
+
+Per contract: extracted text as plain text, part labels, removed text (expandable), warnings with icon and text, language; uses the stage 3 contract.
+
+### S3-T5 OCR of scans in the browser (outline)
+
+`tesseract.js` and `pdfjs-dist` self-hosted (worker, wasm, language data from our origin), `ocr_pages` and image-only PDFs, confidence per page, low confidence warning; CSP unchanged or changed with security review.
+
+### S3-T6 Google Docs by public link (outline)
+
+Strict link format, export URL built by the server, allowlisted Google hosts, size limit and timeout; the result goes through the same detection and extraction. Google Picker is out of v1 (it needs third-party scripts, CLAUDE.md rule 8).
+
