@@ -189,7 +189,7 @@ def test_extract_streamed_overflow_canary_absent_from_logs(
     app = make_app(max_file_bytes=4096)
     scope = post_scope(
         EXTRACT,
-        content_length=10,
+        content_length=4096,
         extra_headers=[
             ("content-disposition", f'attachment; filename="{canary}"'),
             ("x-file-name", canary),

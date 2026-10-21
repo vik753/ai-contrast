@@ -10,7 +10,7 @@ answered *before* it read any part of the body.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -101,6 +101,33 @@ async def drive(app: Any, scope: dict[str, Any], messages: Iterator[Message]) ->
 
     await asyncio.wait_for(app(scope, receive, send), RUN_TIMEOUT_SECONDS)
     return run
+
+
+async def drive_receive(
+    app: Any, scope: dict[str, Any], receive: Callable[[], Awaitable[Message]]
+) -> AsgiRun:
+    """Like ``drive`` but with a custom async ``receive`` (for stalls and
+    slow trickles). The custom receive is responsible for its own timing."""
+    run = AsgiRun()
+
+    async def tracked_receive() -> Message:
+        message = await receive()
+        run.events.append(f"receive:{message['type']}")
+        if message["type"] == "http.request":
+            run.body_messages_delivered += 1
+            run.body_bytes_delivered += len(message.get("body", b""))
+        return message
+
+    async def send(message: Message) -> None:
+        run.events.append(f"send:{message['type']}")
+        run.sent.append(message)
+
+    await asyncio.wait_for(app(scope, tracked_receive, send), RUN_TIMEOUT_SECONDS)
+    return run
+
+
+def response_starts(run: AsgiRun) -> int:
+    return sum(1 for m in run.sent if m["type"] == "http.response.start")
 
 
 def run_driven(app: Any, scope: dict[str, Any], messages: Iterator[Message]) -> AsgiRun:

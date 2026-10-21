@@ -191,9 +191,11 @@ def test_extract_huge_content_length_returns_413(make_app: Callable[..., FastAPI
 def test_extract_body_longer_than_content_length_and_limit_returns_413(
     make_app: Callable[..., FastAPI],
 ) -> None:
-    # Content-Length claims 10 bytes; the stream keeps coming.
+    # Content-Length is exactly at the limit; the stream keeps coming. The body
+    # grows above the limit, so 413 (not 400 length_mismatch, which is for a
+    # wrong length under the cap).
     app = make_app(max_file_bytes=4096)
-    scope = post_scope(EXTRACT, content_length=10)
+    scope = post_scope(EXTRACT, content_length=4096)
 
     run = run_driven(app, scope, endless(b"a" * 1024, max_total=10 * MIB))
 
@@ -203,7 +205,7 @@ def test_extract_body_longer_than_content_length_and_limit_returns_413(
 
 def test_extract_body_above_limit_stops_reading(make_app: Callable[..., FastAPI]) -> None:
     app = make_app(max_file_bytes=4096)
-    scope = post_scope(EXTRACT, content_length=10)
+    scope = post_scope(EXTRACT, content_length=4096)
 
     run = run_driven(app, scope, endless(b"a" * 1024, max_total=10 * MIB))
 
@@ -449,7 +451,7 @@ def test_extract_slot_released_after_streamed_body_above_limit(
     app = make_app(max_concurrent_extractions=1, max_file_bytes=4096)
 
     run = run_driven(
-        app, post_scope(EXTRACT, content_length=10), endless(b"a" * 1024, max_total=MIB)
+        app, post_scope(EXTRACT, content_length=4096), endless(b"a" * 1024, max_total=MIB)
     )
 
     assert run.status == 413
@@ -464,7 +466,7 @@ def test_extract_slot_released_after_client_disconnect(
 
     run = run_driven(app, scope, then_disconnect(b"a" * 100))
 
-    assert run.status != 200
+    assert run.status is None  # nobody to answer
     assert _slot_free(app)
 
 

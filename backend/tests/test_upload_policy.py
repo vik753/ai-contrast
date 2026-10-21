@@ -213,3 +213,55 @@ def test_ci_compose_extract_smoke_expects_kind_text() -> None:
     blocks = _extract_smoke_blocks()
 
     assert any('"kind":"text"' in b for b in blocks)
+
+
+# --- Review round 1: single worker (the limiter counts per process) -------------------
+
+DOCKERFILE = BACKEND / "Dockerfile"
+COMPOSE_FILES = [
+    BACKEND.parent / name
+    for name in ("compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml")
+]
+
+
+def _without_hash_comments(text: str) -> str:
+    return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+
+
+def _dockerfile_run_instructions() -> list[str]:
+    """Every CMD and ENTRYPOINT instruction, with continuation lines joined."""
+    text = _without_hash_comments(DOCKERFILE.read_text(encoding="utf-8"))
+    joined = re.sub(r"\\\n", " ", text)
+    return [
+        line
+        for line in joined.splitlines()
+        if re.match(r"\s*(CMD|ENTRYPOINT)\b", line, re.IGNORECASE)
+    ]
+
+
+def test_policy_dockerfile_has_cmd_running_uvicorn() -> None:
+    instructions = _dockerfile_run_instructions()
+
+    assert any("uvicorn" in line for line in instructions), instructions
+
+
+def test_policy_dockerfile_cmd_has_no_workers_option() -> None:
+    for line in _dockerfile_run_instructions():
+        assert "--workers" not in line, line
+
+
+def test_policy_dockerfile_does_not_set_web_concurrency() -> None:
+    # uvicorn reads WEB_CONCURRENCY as the default number of workers.
+    text = _without_hash_comments(DOCKERFILE.read_text(encoding="utf-8"))
+
+    assert "WEB_CONCURRENCY" not in text
+    assert "--workers" not in text
+
+
+def test_policy_compose_has_no_workers_option() -> None:
+    found = [p for p in COMPOSE_FILES if p.is_file()]
+    assert len(found) == 1
+    text = _without_hash_comments(found[0].read_text(encoding="utf-8"))
+
+    assert "--workers" not in text
+    assert "WEB_CONCURRENCY" not in text

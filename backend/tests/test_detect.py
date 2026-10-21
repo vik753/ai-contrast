@@ -290,10 +290,13 @@ def test_detect_docx_with_empty_directory_entry_returns_docx() -> None:
     assert detect(build_zip(docx_entries(stored("word/media/")))) == kind("DOCX")
 
 
-def test_detect_docx_with_utf8_name_returns_docx() -> None:
-    assert detect(build_zip(docx_entries(stored("word/media/зображення.txt", b"x")))) == kind(
-        "DOCX"
-    )
+def test_detect_docx_with_percent_encoded_name_returns_docx() -> None:
+    # Not rejected in stage 2: "%64" is a valid printable-ASCII name. The OPC
+    # part-name grammar (no percent-encoded unreserved characters) and the
+    # duplicate check after canonical decoding are stage 3 rules.
+    data = build_zip(docx_entries(stored("word/%64ocument.xml", b"<w/>")))
+
+    assert detect(data) == kind("DOCX")
 
 
 def test_detect_xlsx_like_archive_returns_unsupported_type() -> None:

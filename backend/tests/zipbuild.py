@@ -231,6 +231,120 @@ def build_zip(  # noqa: PLR0913 - every keyword is one field a test may break
     return out.getvalue()
 
 
+def local_section(entries: list[RawEntry], *, base: int = 0) -> tuple[bytes, list[int]]:
+    """Local headers and data of ``entries`` as written by ``build_zip``,
+    placed at file offset ``base``. Returns the bytes and each header offset."""
+    data = build_zip(entries)
+    cd_start = len(data) - 22 - _central_size(entries)
+    first = [0]
+    for entry in entries[:-1]:
+        first.append(first[-1] + 30 + len(entry.name_bytes()) + len(entry.extra) + len(entry.data))
+    return data[:cd_start], [base + offset for offset in first]
+
+
+def _central_size(entries: list[RawEntry]) -> int:
+    return sum(46 + len(e.name_bytes()) + len(e.extra) for e in entries)
+
+
+def central_section(entries: list[RawEntry], offsets: list[int]) -> bytes:
+    """Central directory records of ``entries`` pointing at ``offsets``."""
+    out = io.BytesIO()
+    for entry, local_offset in zip(entries, offsets, strict=True):
+        name = entry.name_bytes()
+        csize, usize = entry.sizes()
+        out.write(entry.cd_signature)
+        out.write(
+            struct.pack(
+                "<HHHHHHIIIHHHHHII",
+                20,
+                20,
+                entry.all_flags(),
+                entry.method,
+                DOS_TIME,
+                DOS_DATE,
+                entry.crc_value(),
+                csize & 0xFFFFFFFF,
+                usize & 0xFFFFFFFF,
+                len(name),
+                len(entry.extra),
+                0,
+                0,
+                0,
+                0,
+                local_offset,
+            )
+        )
+        out.write(name)
+        out.write(entry.extra)
+    return out.getvalue()
+
+
+def eocd_record(*, count: int, cd_size: int, cd_offset: int, comment: bytes = b"") -> bytes:
+    """A one-disk EOCD record with ``comment``."""
+    return (
+        EOCD_SIG
+        + struct.pack("<HHHHIIH", 0, 0, count, count, cd_size, cd_offset, len(comment))
+        + comment
+    )
+
+
+def second_central_directory_archive() -> tuple[bytes, list[str], list[str]]:
+    """``[locals benign][locals evil][CD benign][CD evil][EOCD -> CD benign]``.
+
+    The EOCD ``cd_offset`` points at the benign directory, but the evil
+    directory has the same size and ends at the EOCD. Python ``zipfile``
+    locates the directory as ``eocd_offset - cd_size`` and reads the evil one.
+    Returns the archive, the benign names and the evil names.
+    """
+    benign = docx_entries()
+    evil = [stored(name, data) for name, data in _evil_parts()]
+    local_bytes, offsets = local_section(benign + evil)
+    cd_benign = central_section(benign, offsets[: len(benign)])
+    cd_evil = central_section(evil, offsets[len(benign) :])
+    assert len(cd_benign) == len(cd_evil)
+    cd_offset = len(local_bytes)
+    data = (
+        local_bytes
+        + cd_benign
+        + cd_evil
+        + eocd_record(count=len(benign), cd_size=len(cd_benign), cd_offset=cd_offset)
+    )
+    return data, [e.name_bytes().decode() for e in benign], [e.name_bytes().decode() for e in evil]
+
+
+def fake_eocd_in_comment_archive(*, fake_comment: bytes = b"") -> tuple[bytes, list[str]]:
+    """A valid DOCX whose EOCD comment holds a second central directory and a
+    fake EOCD that points at it (with ``fake_comment`` after it, so the fake
+    comment also ends at the end of the file). Returns the archive and the
+    names in the hidden directory."""
+    benign = docx_entries()
+    evil = [stored(name, data) for name, data in _evil_parts()]
+    local_bytes, offsets = local_section(benign + evil)
+    cd_benign = central_section(benign, offsets[: len(benign)])
+    cd_evil = central_section(evil, offsets[len(benign) :])
+    real_eocd_offset = len(local_bytes) + len(cd_benign)
+    evil_cd_offset = real_eocd_offset + 22  # the comment starts after the fixed record
+    fake = eocd_record(
+        count=len(evil), cd_size=len(cd_evil), cd_offset=evil_cd_offset, comment=fake_comment
+    )
+    real = eocd_record(
+        count=len(benign),
+        cd_size=len(cd_benign),
+        cd_offset=len(local_bytes),
+        comment=cd_evil + fake,
+    )
+    return local_bytes + cd_benign + real, [e.name_bytes().decode() for e in evil]
+
+
+def _evil_parts() -> tuple[tuple[str, bytes], ...]:
+    """Same name lengths as ``DOCX_PARTS``, so both directories have the same size."""
+    return (
+        ("[Content_Types].xml", CONTENT_TYPES_XML),
+        ("_rels/.rels", RELS_XML),
+        ("word/documenX.xml", b"<w:document>Hidden clause (synthetic).</w:document>"),
+    )
+
+
 def zipfile_archive(
     members: list[tuple[str, bytes]],
     *,

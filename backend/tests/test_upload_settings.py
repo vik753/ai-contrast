@@ -18,6 +18,9 @@ DEFAULTS = {
     "max_zip_entries": 2_000,
     "max_zip_uncompressed_bytes": 104_857_600,
     "max_zip_ratio": 200,
+    # Review round 1 (PR #15): body deadline and minimum average rate.
+    "extract_body_timeout_seconds": 60,
+    "extract_min_rate_bytes_per_second": 32_768,
 }
 FIELDS = sorted(DEFAULTS)
 
