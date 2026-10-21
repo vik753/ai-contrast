@@ -5,8 +5,12 @@
  *   the URL, the headers or the body (threat model T3, T11).
  * - The only header we set is `Content-Type: application/octet-stream`.
  *   The browser adds `Content-Length` for a `Blob` body.
- * - The response must be `application/json` and at most 4 KiB.
- * - The response is validated strictly. Error codes pass an allowlist;
+ * - The response must be `application/json`. A `200` body may be up to
+ *   4 MiB + 64 KiB (the stage 3 extraction result); any other body at most
+ *   4 KiB.
+ * - The response is validated strictly: a `200` body must match the stage 3
+ *   contract exactly (all fields, enums, caps, no unknown fields), like the
+ *   server model (`extra="forbid"`). Error codes pass an allowlist;
  *   anything else becomes `unknown_error`. Server text is never returned,
  *   so it can never be shown (threat model T1).
  * - `extractFile` never throws.
@@ -27,15 +31,61 @@ export type ServerErrorCode =
   | "archive_rejected"
   | "busy"
   | "length_mismatch"
-  | "upload_timeout";
+  | "upload_timeout"
+  // Stage 3 extraction (422).
+  | "extraction_failed"
+  | "extraction_timeout"
+  | "too_many_pages"
+  | "too_much_text"
+  | "encrypted_unsupported"
+  | "no_text_extracted"
+  | "text_decoding_failed"
+  | "suspicious_package"
+  | "docx_strict_unsupported"
+  | "pdf_damaged"
+  // Temporary (501) until PDF and DOCX extraction ship.
+  | "not_implemented";
 
 /** Error codes produced in the browser only. */
 export type ClientErrorCode = "network_error" | "timeout" | "aborted" | "unknown_error";
 
 export type ExtractErrorCode = ServerErrorCode | ClientErrorCode;
 
+export type Language = "uk" | "ru" | "en" | "mixed" | "unknown";
+
+export type BlockPart = "body" | "footnote" | "endnote" | "header" | "footer" | "textbox";
+
+/** One paragraph-like block of extracted text. `page` is `null` for DOCX and text. */
+export interface Block {
+  readonly text: string;
+  readonly part: BlockPart;
+  readonly page: number | null;
+}
+
+/** Text dropped as provably invisible, per reason, with a short sample. */
+export interface RemovedText {
+  readonly reason: string;
+  readonly count: number;
+  readonly sample: string;
+}
+
+export interface ExtractionWarning {
+  readonly code: string;
+  readonly page: number | null;
+}
+
+/** The validated stage 3 extraction result. Kept in memory only. */
+export interface Extraction {
+  readonly language: Language;
+  readonly pages: number | null;
+  readonly blocks: readonly Block[];
+  readonly ocrPages: readonly number[];
+  readonly removed: readonly RemovedText[];
+  readonly warnings: readonly ExtractionWarning[];
+}
+
 export type ExtractResult =
-  | { ok: true; kind: FileKind; bytes: number }
+  | { ok: true; kind: FileKind; bytes: number; extraction: Extraction }
   | { ok: false; code: ExtractErrorCode; retryAfterSeconds?: number };
 
 export interface ExtractOptions {
@@ -50,8 +100,24 @@ export interface ExtractOptions {
 export const EXTRACT_URL = "/api/extract";
 export const DEFAULT_EXTRACT_TIMEOUT_MS = 60_000;
 
-/** Largest response body we read. Real answers are a few dozen bytes. */
+/** Largest error body we read. Real error answers are a few dozen bytes. */
 export const MAX_RESPONSE_BYTES = 4 * 1024;
+
+/** Largest `200` body we read: the server result cap (4 MiB) plus JSON overhead. */
+export const MAX_SUCCESS_RESPONSE_BYTES = 4 * 1024 * 1024 + 64 * 1024;
+
+/** Client caps, equal to the server caps (`EXTRACT_MAX_BLOCKS`, `EXTRACT_MAX_TEXT_CHARS`). */
+export const MAX_BLOCKS = 20_000;
+export const MAX_TEXT_CHARS = 1_000_000;
+export const MAX_SAMPLE_CHARS = 200;
+
+/**
+ * List caps. The server must keep the same caps (S3-T2/T3 add them to the
+ * server model); a body above a cap fails closed here as `unknown_error`.
+ */
+export const MAX_PAGES = 100;
+export const MAX_REMOVED = 1_000;
+export const MAX_WARNINGS = 1_000;
 
 const FILE_KINDS: ReadonlySet<string> = new Set<FileKind>(["pdf", "docx", "text"]);
 
@@ -75,12 +141,51 @@ const SERVER_ERRORS: ReadonlyMap<number, ReadonlySet<string>> = new Map<
       "legacy_office_unsupported",
       "pages_unsupported",
       "archive_rejected",
+      "extraction_failed",
+      "extraction_timeout",
+      "too_many_pages",
+      "too_much_text",
+      "encrypted_unsupported",
+      "no_text_extracted",
+      "text_decoding_failed",
+      "suspicious_package",
+      "docx_strict_unsupported",
+      "pdf_damaged",
     ]),
   ],
   [400, new Set(["length_mismatch"])],
   [408, new Set(["upload_timeout"])],
+  [501, new Set(["not_implemented"])],
   [503, new Set(["busy"])],
 ]);
+
+const LANGUAGES: ReadonlySet<string> = new Set<Language>(["uk", "ru", "en", "mixed", "unknown"]);
+
+const PARTS: ReadonlySet<string> = new Set<BlockPart>([
+  "body",
+  "footnote",
+  "endnote",
+  "header",
+  "footer",
+  "textbox",
+]);
+
+/** Reasons and warning codes are fixed identifiers (same pattern as the server). */
+const CODE_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
+const RESULT_KEYS = [
+  "kind",
+  "bytes",
+  "language",
+  "pages",
+  "blocks",
+  "ocr_pages",
+  "removed",
+  "warnings",
+] as const;
+const BLOCK_KEYS = ["text", "part", "page"] as const;
+const REMOVED_KEYS = ["reason", "count", "sample"] as const;
+const WARNING_KEYS = ["code", "page"] as const;
 
 function isServerErrorCode(status: number, code: string): code is ServerErrorCode {
   return SERVER_ERRORS.get(status)?.has(code) === true;
@@ -88,6 +193,62 @@ function isServerErrorCode(status: number, code: string): code is ServerErrorCod
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Exactly these own keys, no more (`extra="forbid"`). `JSON.parse` makes a
+ * `"__proto__"` key an own property, so it is caught here as an unknown key.
+ */
+function hasExactKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  const own = Object.keys(record);
+  return own.length === keys.length && keys.every((key) => Object.hasOwn(record, key));
+}
+
+function isPositiveInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isCode(value: unknown): value is string {
+  return typeof value === "string" && CODE_PATTERN.test(value);
+}
+
+/**
+ * Number of characters (code points, as the server counts them), counted
+ * up to `limit + 1` at most. A string of at most `limit` UTF-16 units has at
+ * most `limit` code points, so the caller scans only longer text.
+ */
+function codePointsUpTo(text: string, limit: number): number {
+  let count = 0;
+  for (let i = 0; i < text.length && count <= limit; i += 1) {
+    const unit = text.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < text.length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        i += 1;
+      }
+    }
+    count += 1;
+  }
+  return count;
+}
+
+/** At most `limit` characters (code points) in total. */
+function withinCharCap(texts: readonly string[], limit: number): boolean {
+  let units = 0;
+  for (const text of texts) {
+    units += text.length;
+  }
+  if (units <= limit) {
+    return true;
+  }
+  let chars = 0;
+  for (const text of texts) {
+    chars += codePointsUpTo(text, limit - chars);
+    if (chars > limit) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** Own property only: inherited names such as `constructor` never count. */
@@ -117,21 +278,171 @@ function isJson(headers: Headers): boolean {
   return type?.split(";")[0]?.trim().toLowerCase() === "application/json";
 }
 
+/**
+ * A page number: positive, and within `pages` for a PDF. DOCX and text have
+ * no pages, so their page is always `null`.
+ */
+function isPageOf(value: unknown, pages: number | null): value is number {
+  return pages !== null && isPositiveInt(value) && value <= pages;
+}
+
+function parseBlocks(value: unknown, pages: number | null): Block[] | null {
+  if (!Array.isArray(value) || value.length > MAX_BLOCKS) {
+    return null;
+  }
+  const blocks: Block[] = [];
+  for (const item of value as unknown[]) {
+    if (!isPlainObject(item) || !hasExactKeys(item, BLOCK_KEYS)) {
+      return null;
+    }
+    const { text, part, page } = item;
+    if (typeof text !== "string" || typeof part !== "string" || !PARTS.has(part)) {
+      return null;
+    }
+    if (pages === null ? page !== null : !isPageOf(page, pages)) {
+      return null;
+    }
+    blocks.push({ text, part: part as BlockPart, page: page as number | null });
+  }
+  return withinCharCap(
+    blocks.map((block) => block.text),
+    MAX_TEXT_CHARS,
+  )
+    ? blocks
+    : null;
+}
+
+function parseOcrPages(value: unknown, pages: number | null): number[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const list = value as unknown[];
+  if (pages === null) {
+    return list.length === 0 ? [] : null;
+  }
+  // Strictly increasing, so no duplicates and at most `pages` entries.
+  let last = 0;
+  for (const page of list) {
+    if (!isPageOf(page, pages) || page <= last) {
+      return null;
+    }
+    last = page;
+  }
+  return list as number[];
+}
+
+function parseRemoved(value: unknown): RemovedText[] | null {
+  if (!Array.isArray(value) || value.length > MAX_REMOVED) {
+    return null;
+  }
+  const removed: RemovedText[] = [];
+  for (const item of value as unknown[]) {
+    if (!isPlainObject(item) || !hasExactKeys(item, REMOVED_KEYS)) {
+      return null;
+    }
+    const { reason, count, sample } = item;
+    if (
+      !isCode(reason) ||
+      !isPositiveInt(count) ||
+      typeof sample !== "string" ||
+      !withinCharCap([sample], MAX_SAMPLE_CHARS)
+    ) {
+      return null;
+    }
+    removed.push({ reason, count, sample });
+  }
+  return removed;
+}
+
+/**
+ * Warnings: at most `MAX_WARNINGS`; the pages of one code are strictly
+ * increasing (one warning per code and page; different codes may share a page).
+ */
+function parseWarnings(value: unknown, pages: number | null): ExtractionWarning[] | null {
+  if (!Array.isArray(value) || value.length > MAX_WARNINGS) {
+    return null;
+  }
+  const warnings: ExtractionWarning[] = [];
+  const lastPage = new Map<string, number>();
+  for (const item of value as unknown[]) {
+    if (!isPlainObject(item) || !hasExactKeys(item, WARNING_KEYS)) {
+      return null;
+    }
+    const { code, page } = item;
+    if (!isCode(code) || (page !== null && !isPageOf(page, pages))) {
+      return null;
+    }
+    if (page !== null) {
+      if (page <= (lastPage.get(code) ?? 0)) {
+        return null;
+      }
+      lastPage.set(code, page);
+    }
+    warnings.push({ code, page });
+  }
+  return warnings;
+}
+
+/** The stage 3 `200` body, validated strictly. `null` when anything is off. */
+function parseSuccess(body: Record<string, unknown>, file: Blob): ExtractResult | null {
+  if (!hasExactKeys(body, RESULT_KEYS)) {
+    return null;
+  }
+  const { kind, bytes, language, pages } = body;
+  if (
+    typeof kind !== "string" ||
+    !FILE_KINDS.has(kind) ||
+    typeof bytes !== "number" ||
+    !Number.isSafeInteger(bytes) ||
+    bytes !== file.size ||
+    typeof language !== "string" ||
+    !LANGUAGES.has(language)
+  ) {
+    return null;
+  }
+  // Only a PDF has pages (1…MAX_PAGES); DOCX and text have `null`. Client and
+  // server must agree on this nullability when S3-T3 (PDF) lands.
+  if (kind === "pdf" ? !isPositiveInt(pages) || pages > MAX_PAGES : pages !== null) {
+    return null;
+  }
+  const pageCount = pages as number | null;
+  const blocks = parseBlocks(body.blocks, pageCount);
+  const ocrPages = parseOcrPages(body.ocr_pages, pageCount);
+  const removed = parseRemoved(body.removed);
+  const warnings = parseWarnings(body.warnings, pageCount);
+  if (blocks === null || ocrPages === null || removed === null || warnings === null) {
+    return null;
+  }
+  return {
+    ok: true,
+    kind: kind as FileKind,
+    bytes,
+    extraction: {
+      language: language as Language,
+      pages: pageCount,
+      blocks,
+      ocrPages,
+      removed,
+      warnings,
+    },
+  };
+}
+
 /** Marker for a body that is too large or not valid UTF-8. */
 const UNREADABLE = Symbol("unreadable");
 
 /**
- * Reads the body as UTF-8 text, at most `MAX_RESPONSE_BYTES`. A larger
+ * Reads the body as UTF-8 text, at most `maxBytes`. A larger
  * declared `Content-Length` is rejected before reading; a larger streamed
  * body stops the reading and cancels the stream. Stream errors are thrown.
  */
-async function readCapped(response: Response): Promise<string | typeof UNREADABLE> {
+async function readCapped(
+  response: Response,
+  maxBytes: number,
+): Promise<string | typeof UNREADABLE> {
   const body = response.body;
   const declared = response.headers.get("Content-Length");
-  if (
-    declared !== null &&
-    (!/^\d+$/.test(declared.trim()) || Number(declared) > MAX_RESPONSE_BYTES)
-  ) {
+  if (declared !== null && (!/^\d+$/.test(declared.trim()) || Number(declared) > maxBytes)) {
     void body?.cancel().catch(() => undefined);
     return UNREADABLE;
   }
@@ -147,7 +458,7 @@ async function readCapped(response: Response): Promise<string | typeof UNREADABL
       break;
     }
     total += value.byteLength;
-    if (total > MAX_RESPONSE_BYTES) {
+    if (total > maxBytes) {
       void reader.cancel().catch(() => undefined);
       return UNREADABLE;
     }
@@ -175,18 +486,7 @@ function interpret(status: number, body: unknown, file: Blob, headers: Headers):
     return failure("unknown_error");
   }
   if (status === 200) {
-    const kind = ownValue(body, "kind");
-    const bytes = ownValue(body, "bytes");
-    if (
-      typeof kind === "string" &&
-      FILE_KINDS.has(kind) &&
-      typeof bytes === "number" &&
-      Number.isSafeInteger(bytes) &&
-      bytes === file.size
-    ) {
-      return { ok: true, kind: kind as FileKind, bytes };
-    }
-    return failure("unknown_error");
+    return parseSuccess(body, file) ?? failure("unknown_error");
   }
   const code = ownValue(body, "error");
   if (typeof code !== "string" || !isServerErrorCode(status, code)) {
@@ -202,8 +502,9 @@ function interpret(status: number, body: unknown, file: Blob, headers: Headers):
 }
 
 /**
- * Sends one file to the server for the type check. Never throws.
- * The result never contains text from the server.
+ * Sends one file to the server for the type check and text extraction.
+ * Never throws. An error result never contains text from the server; an ok
+ * result carries the validated extraction (plain text, shown as text only).
  */
 export async function extractFile(
   file: Blob,
@@ -255,7 +556,10 @@ export async function extractFile(
         void response.body?.cancel().catch(() => undefined);
         return failure("unknown_error");
       }
-      text = await readCapped(response);
+      text = await readCapped(
+        response,
+        response.status === 200 ? MAX_SUCCESS_RESPONSE_BYTES : MAX_RESPONSE_BYTES,
+      );
     } catch {
       return failure(stopReason("network_error"));
     }

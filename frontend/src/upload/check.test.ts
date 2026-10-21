@@ -3,13 +3,14 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtractResult } from "../api/extract";
+import { okResult } from "../test/upload-fakes";
 import { checkWithRetry, retryDelayMs } from "./check";
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-const ok: ExtractResult = { ok: true, kind: "pdf", bytes: 1 };
+const ok: ExtractResult = okResult("pdf", 1);
 const busy = (retryAfterSeconds?: number): ExtractResult =>
   retryAfterSeconds === undefined
     ? { ok: false, code: "busy" }

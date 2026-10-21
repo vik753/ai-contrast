@@ -9,15 +9,27 @@
  * - File names are rendered as plain text only, inside `<bdi>`, and never
  *   leave the browser (threat model T1, T11). Server text is never shown:
  *   only our messages for allowlisted error codes.
+ * - Accepted files keep their extracted text in memory only; the per-contract
+ *   `Preview` shows it as plain text (S3-T4).
  */
 import type { TFunction } from "i18next";
-import { useCallback, useEffect, useId, useReducer, useRef, useState, type DragEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { extractFile } from "../api/extract";
 import { formReducer, initialFormState, type Announcement } from "./announcements";
 import { FileStatusIcon } from "./FileStatusIcon";
 import { displaySize, limitText } from "./format";
 import { MAX_FILE_BYTES, MAX_FILES_PER_CONTRACT, MAX_TOTAL_BYTES } from "./limits";
+import { Preview, type PreviewFile } from "./Preview";
 import {
   canAddContract,
   canRemoveContract,
@@ -107,6 +119,10 @@ function statusText(t: TFunction, file: UploadFile, locale: string): string {
   }
 }
 
+function isPreviewFile(file: UploadFile): file is UploadFile & PreviewFile {
+  return file.status === "accepted";
+}
+
 function useLocale(): string {
   const { i18n } = useTranslation();
   return i18n.resolvedLanguage ?? i18n.language;
@@ -167,6 +183,7 @@ function ContractCard({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const label = contractLabel(index);
+  const previewFiles = useMemo(() => contract.files.filter(isPreviewFile), [contract.files]);
 
   const onDragOver = (event: DragEvent<HTMLElement>): void => {
     if (!hasFiles(event)) {
@@ -259,6 +276,8 @@ function ContractCard({
           })}
         </p>
       </div>
+
+      {previewFiles.length > 0 && <Preview files={previewFiles} />}
 
       {/* Opened by the button above; hidden from the tab order and from assistive technology. */}
       <input

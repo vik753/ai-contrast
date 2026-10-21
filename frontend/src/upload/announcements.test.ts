@@ -10,6 +10,7 @@ import {
   initialFormState,
   type FormState,
 } from "./announcements";
+import { okResult } from "../test/upload-fakes";
 import { initialUploadState, uploadReducer, type UploadAction } from "./state";
 
 const A = initialUploadState.contracts[0]?.id ?? "";
@@ -49,7 +50,7 @@ describe("describeChange", () => {
     const state = run(
       { type: "filesAdded", contractId: A, files: [{ id: "f1", name: "a.pdf", size: 10 }] },
       { type: "fileCheckStarted", fileId: "f1" },
-      { type: "fileChecked", fileId: "f1", result: { ok: true, kind: "docx", bytes: 10 } },
+      { type: "fileChecked", fileId: "f1", result: okResult("docx", 10) },
       { type: "fileRemoved", contractId: A, fileId: "f1" },
     );
     expect(messages(state)).toEqual([
