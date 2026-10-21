@@ -9,7 +9,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
 | 2 | File upload | done |
-| 3 | Text extraction | in progress |
+| 3 | Text extraction | in progress: S3-T1 done; S3-T2 (DOCX) in development; S3-T4 (preview) in review fixes; S3-T3, T5, T6 planned |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
 | 5b | Pseudonymization | planned |
@@ -57,3 +57,11 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-21 — PR #17 merged: token economy rules in `CLAUDE.md`.
 - 2026-10-21 — Stage 2 done: S2-T3 docs and threat model (T1, T3, T4, T6, T10, T11), README, `CLAUDE.md` Commands.
 - Lesson: real-time upload tests and the memory test are CPU-sensitive. Run them under parallel load before approval.
+- 2026-10-21 — Stage 3 started. Security reviewer approved the stage 3 dependencies with pinned versions and conditions (`defusedxml`, `pdfminer.six`, `pdfjs-dist`, `tesseract.js`, language data); python-docx and pdfplumber dropped (see `docs/agent/TASKS.md`, "Stage 3 dependencies").
+- 2026-10-21 — PR #19 merged: stage 3 plan and ADR 0011 (parsing sandbox: one subprocess per file with OS limits).
+- 2026-10-21 — PR #20 merged (S3-T1: sandbox, stage 3 response contract, plain text, language detection). Security review round 1: slot held until the response is sent, `RLIMIT_NPROC` = 0, control characters removed. Memory budget 468.2 MiB worst case. 1158 backend tests. Merged by the customer with a merge commit.
+- 2026-10-21 — PR #22 merged (replaces #21, whose head GitHub did not sync): stage 13 blockers (slowloris with `--limit-concurrency`, kernel send buffers), S3-T2 and S3-T4 tasks.
+- 2026-10-21 — S3-T2 (DOCX): 233 tests written, implementation in progress (`feat/s3-docx`). S3-T4 (preview): PR #23, code and security review approved; review fixes in progress.
+- Lesson: GitHub can lag in syncing a PR head after a push; if CI does not start within minutes, push to a new branch and open a new PR.
+- Lesson: start a new agent for a new task (fresh context is cheaper); resume the same agent only for its own review rounds.
+
