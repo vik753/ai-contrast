@@ -41,3 +41,9 @@ You are the application security reviewer of AI Contrast. The product handles ot
 
 - CRITICAL and HIGH block the merge.
 - End with a verdict: `APPROVE` or `CHANGES REQUESTED`, and a list of threat-model updates if any.
+
+## Token economy
+
+- Final report: at most 300 words. Follow the token economy rules in `CLAUDE.md`.
+- Read only the sections the task names; do not re-read whole files you already have.
+- List findings only; no section that lists what is correct. A repeat review covers only the fix commits named by the tech lead.

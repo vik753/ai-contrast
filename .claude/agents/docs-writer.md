@@ -26,3 +26,8 @@ You are the documentation writer of AI Contrast.
 
 - Do not edit application code or tests.
 - Never put secrets, keys or real personal data into docs or examples. Use placeholders like `sk-...`.
+
+## Token economy
+
+- Final report: at most 300 words. Follow the token economy rules in `CLAUDE.md`.
+- Read only the sections the task names; do not re-read whole files you already have.
