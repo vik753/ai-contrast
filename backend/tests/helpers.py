@@ -10,7 +10,18 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 
-SETTINGS_ENV_VARS = ("ENVIRONMENT", "ALLOWED_ORIGINS", "ALLOW_PRIVATE_PROVIDER_URLS")
+SETTINGS_ENV_VARS = (
+    "ENVIRONMENT",
+    "ALLOWED_ORIGINS",
+    "ALLOW_PRIVATE_PROVIDER_URLS",
+    # Stage 2 (S2-T1) upload limits.
+    "MAX_FILE_BYTES",
+    "MAX_JSON_BODY_BYTES",
+    "MAX_CONCURRENT_EXTRACTIONS",
+    "MAX_ZIP_ENTRIES",
+    "MAX_ZIP_UNCOMPRESSED_BYTES",
+    "MAX_ZIP_RATIO",
+)
 
 ALLOWED_ORIGIN = "https://app.example"
 OTHER_ORIGIN = "https://evil.example"
