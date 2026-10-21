@@ -96,7 +96,7 @@ Controls:
    - **ZIP is read the same way as the stage 3 reader:** the central directory ends exactly at the EOCD; no EOCD or ZIP64 signature in the archive comment; the parsed entry count equals the EOCD count; entry names are printable ASCII with no `.`, `..` or empty segments and no segment ending in `.`; case-folded duplicates are rejected. Stage 3 adds: local headers match the central directory, no overlap or gap, first entry at offset 0, OPC part-name grammar, real decompressed size enforced while streaming. A test checks that `zipfile` and the detector see the same entries.
    - Text detection only classifies the file; stage 3 decodes the whole file strictly and repeats the control-character rule, failing closed. Extraction uses only the kind the server detected on the same bytes in the same request.
 4. XML parsing without external entities (`defusedxml` or `resolve_entities=False`).
-5. Parsing runs in a subprocess with time and memory limits.
+5. Parsing runs in a subprocess with time and memory limits (ADR 0011): one child per file, `RLIMIT_AS`, `RLIMIT_CPU`, `RLIMIT_FSIZE` = 0, `RLIMIT_NOFILE`, `RLIMIT_CORE` = 0 and `RLIMIT_NPROC` = 0 (a compromised child cannot leave processes behind); wall deadline and result cap in the parent; stderr never logged.
 6. Docker: non-root user, read-only root filesystem, in-memory temp directory. Compose uses `read_only`, `tmpfs` for `/tmp`, `cap_drop: [ALL]` and `no-new-privileges`. Render cannot enforce a read-only root filesystem (residual risk). Compose ports bind to 127.0.0.1; Docker Engine 28.0 or later is required for LAN isolation. The local backend has `mem_limit: 512m`, the same as Render.
 
 ## T5. Prompt injection (ADR 0009)
@@ -135,6 +135,7 @@ Controls:
 6. Per-IP limits behind Render's proxy: never trust the leftmost `X-Forwarded-For`; derive the client IP from the hop added by Render's proxy, and document it.
 7. No raw prompt endpoint. The server runs only our analysis pipeline, so it is useless as a generic AI proxy.
 8. If needed later: Cloudflare Turnstile.
+9. The extraction slot covers sending the response: a send deadline (30 s) cuts off a client that does not read; uvicorn `--limit-concurrency 32` caps open connections.
 
 Browser controls:
 

@@ -1,6 +1,9 @@
-"""``POST /api/extract``: one file as raw bytes (ADR 0010; threat model T3, T4, T6, T11).
+"""``POST /api/extract``: one file as raw bytes (ADR 0010, ADR 0011; threat model T3, T4,
+T6, T11).
 
-Stage 2 checks the file and returns its kind; stage 3 adds the extracted text.
+The file is checked, its kind detected, and its text extracted in the parsing
+sandbox (one child process per file). The answer is the stage 3 contract
+(``ExtractionResult``, docs/agent/TASKS.md, Stage 3).
 
 Request: the raw file bytes, ``Content-Type: application/octet-stream`` (media type
 compared without parameters, case-insensitive), ``Content-Length`` and no
@@ -22,14 +25,20 @@ Order of checks (each answers before the next step):
    ``EXTRACT_MIN_RATE_BYTES_PER_SECOND`` after ``EXTRACT_RATE_GRACE_SECONDS`` →
    ``408 upload_timeout``;
 6. zero bytes → ``422 empty_file``;
-7. detection → ``200 {"kind", "bytes"}`` or ``422`` with the detection code.
+7. detection → ``422`` with the detection code;
+8. ``pdf`` and ``docx`` → ``501 not_implemented`` (until S3-T2 and S3-T3);
+9. extraction in the sandbox, with the slot still held → ``200`` with the stage 3
+   contract, or ``422`` with the extraction code.
 
 Every response sent before the whole body is read (400, 408, 411, 413, 415, 503)
 carries ``Connection: close``: the server does not drain the rest of the body.
 
-The slot from step 4 is released exactly once when the ``with`` block ends: on
-success, on every error, on a client disconnect (``ClientDisconnect``, which the
-error catcher swallows) and on cancellation.
+The slot from step 4 is held until the last byte of the response (success or
+error) is sent, or until the send deadline ``EXTRACT_SEND_TIMEOUT_SECONDS`` cuts off
+a client that does not read (``_SlotResponse``). It is released exactly once when
+the ``with`` block ends: on success, on every error, on a client disconnect
+(``ClientDisconnect``, which the error catcher swallows), on the send deadline and
+on cancellation.
 
 The body is never written to disk, never logged and never echoed. Error bodies hold
 fixed codes only.
@@ -38,19 +47,23 @@ fixed codes only.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Final
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, Response
 from starlette.requests import ClientDisconnect
+from starlette.types import Receive, Scope, Send
 
 from app.extraction.detect import DetectionError, FileKind, ZipLimits, detect_kind
 from app.extraction.limiter import ExtractionLimiter
+from app.extraction.model import ExtractionError, ExtractionResult
+from app.extraction.sandbox import SandboxLimits, run_extraction
 from app.http_limits import EXTRACT_PATH, declared_length
 from app.settings import Settings
 
 router = APIRouter()
+logger = logging.getLogger("ai_contrast.extract")
 
 ACCEPTED_MEDIA_TYPE: Final = "application/octet-stream"
 RETRY_AFTER_SECONDS: Final = 5
@@ -58,11 +71,8 @@ RETRY_AFTER_SECONDS: Final = 5
 RATE_TICK_SECONDS: Final = 1.0
 
 CLOSE: Final = {"Connection": "close"}
-
-
-class ExtractResponse(BaseModel):
-    kind: FileKind
-    bytes: int
+MIB: Final = 1024 * 1024
+SEND_CHUNK_BYTES: Final = 64 * 1024
 
 
 class _BodyRejectedError(Exception):
@@ -169,7 +179,7 @@ async def _read_body(request: Request, declared: int, settings: Settings) -> byt
 
 @router.post(
     EXTRACT_PATH,
-    response_model=ExtractResponse,
+    response_model=ExtractionResult,
     responses={
         400: {"description": "length_mismatch"},
         408: {"description": "upload_timeout"},
@@ -178,26 +188,91 @@ async def _read_body(request: Request, declared: int, settings: Settings) -> byt
         415: {"description": "unsupported_media_type"},
         422: {
             "description": "empty_file, unsupported_type, legacy_office_unsupported, "
-            "pages_unsupported or archive_rejected"
+            "pages_unsupported, archive_rejected, extraction_failed, extraction_timeout, "
+            "too_much_text, no_text_extracted or text_decoding_failed"
         },
+        501: {"description": "not_implemented (PDF and DOCX until S3-T2 and S3-T3)"},
         503: {"description": "busy"},
     },
 )
-async def extract(request: Request) -> ExtractResponse | JSONResponse:
+async def extract(request: Request) -> Response:
     settings, limiter = _app_state(request)
     checked = _check_headers(request, settings)
     if isinstance(checked, JSONResponse):
         return checked
-    slot = limiter.try_slot()
-    if slot is None:
-        return _early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
-    with slot:
-        return await _receive_and_detect(request, checked, settings)
+    return _SlotResponse(request, checked, settings, limiter)
 
 
-async def _receive_and_detect(
-    request: Request, declared: int, settings: Settings
-) -> ExtractResponse | JSONResponse:
+class _SlotResponse(Response):
+    """Takes the extraction slot, reads, extracts and sends, all under one slot.
+
+    The work runs when the response is called, not in the handler, so the slot is
+    taken and released inside one ``with`` block and covers sending the last byte
+    (threat model T6 control 9). Sending has a deadline
+    (``EXTRACT_SEND_TIMEOUT_SECONDS``); a client that does not read is cut off: the
+    app returns before the response is complete, and the server closes the
+    connection. The body goes out in chunks of ``SEND_CHUNK_BYTES``, so a stalled
+    connection keeps at most about one chunk in the server's write buffer.
+    """
+
+    def __init__(
+        self, request: Request, declared: int, settings: Settings, limiter: ExtractionLimiter
+    ) -> None:
+        super().__init__()
+        self._request = request
+        self._declared = declared
+        self._settings = settings
+        self._limiter = limiter
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        slot = self._limiter.try_slot()
+        if slot is None:
+            busy = _early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
+            await busy(scope, receive, send)
+            return
+        with slot:
+            response = await _receive_and_extract(self._request, self._declared, self._settings)
+            try:
+                async with asyncio.timeout(self._settings.extract_send_timeout_seconds):
+                    await _send_in_chunks(response, send)
+            except TimeoutError:
+                logger.info("extract_send_timeout")
+
+
+async def _send_in_chunks(response: Response, send: Send) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": response.status_code,
+            "headers": response.raw_headers,
+        }
+    )
+    body = memoryview(response.body)
+    for offset in range(0, len(body), SEND_CHUNK_BYTES):
+        end = offset + SEND_CHUNK_BYTES
+        await send(
+            {
+                "type": "http.response.body",
+                "body": bytes(body[offset:end]),
+                "more_body": end < len(body),
+            }
+        )
+    if not body:
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
+
+
+def _sandbox_limits(settings: Settings) -> SandboxLimits:
+    return SandboxLimits(
+        memory_bytes=settings.extract_worker_memory_mb * MIB,
+        cpu_seconds=settings.extract_worker_cpu_seconds,
+        wall_seconds=settings.extract_worker_wall_seconds,
+        max_result_bytes=settings.extract_max_result_bytes,
+        max_text_chars=settings.extract_max_text_chars,
+        max_blocks=settings.extract_max_blocks,
+    )
+
+
+async def _receive_and_extract(request: Request, declared: int, settings: Settings) -> Response:
     try:
         data = await _read_body(request, declared, settings)
     except _BodyRejectedError as rejected:
@@ -213,4 +288,10 @@ async def _receive_and_detect(
         kind = detect_kind(data, limits=limits)
     except DetectionError as error:
         return _error(error.code, 422)
-    return ExtractResponse(kind=kind, bytes=len(data))
+    if kind is not FileKind.TEXT:
+        return _error("not_implemented", 501)
+    try:
+        result = await run_extraction(data, kind, limits=_sandbox_limits(settings))
+    except ExtractionError as error:
+        return _error(error.code, 422)
+    return Response(result.model_dump_json(), media_type="application/json")

@@ -184,9 +184,9 @@ Order: S3-T1 first (sandbox and response contract). Then S3-T2 (DOCX) and S3-T3 
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-sandbox` (worktree `/home/claude/wt/s3-sandbox`).
 - Public interface:
   - `app/extraction/sandbox.py`: `async def run_extraction(data: bytes, kind: FileKind, *, limits: SandboxLimits) -> ExtractionResult` (raises `ExtractionError(code)`); `@dataclass(frozen=True) class SandboxLimits` (`memory_bytes`, `cpu_seconds`, `wall_seconds`, `max_result_bytes`).
-  - `app/extraction/worker.py`: the child entry point (`python -I -m app.extraction.worker`); `app/extraction/text.py`: `extract_text_file(data: bytes) -> ExtractionResult` (pure, runs inside the child).
+  - `app/extraction/worker.py`: the child entry point (started with the `-I -c` bootstrap of ADR 0011); `app/extraction/text.py`: `extract_text_file(data: bytes) -> ExtractionResult` (pure, runs inside the child).
   - `app/extraction/model.py`: Pydantic models for the response contract above (`ExtractionResult`, `Block`, `Removed`, `Warning`), strict, `extra="forbid"`.
-  - Settings: `EXTRACT_WORKER_MEMORY_MB` (192), `EXTRACT_WORKER_CPU_SECONDS` (20), `EXTRACT_WORKER_WALL_SECONDS` (30), `EXTRACT_MAX_RESULT_BYTES` (8 MiB), `EXTRACT_MAX_TEXT_CHARS` (2,000,000), `EXTRACT_MAX_BLOCKS` (20,000).
+  - Settings: `EXTRACT_WORKER_MEMORY_MB` (192), `EXTRACT_WORKER_CPU_SECONDS` (20), `EXTRACT_WORKER_WALL_SECONDS` (30), `EXTRACT_MAX_RESULT_BYTES` (4 MiB), `EXTRACT_MAX_TEXT_CHARS` (1,000,000), `EXTRACT_MAX_BLOCKS` (20,000).
 - AC:
   1. ADR 0011: one subprocess per file; limits set by the child before it reads input (`RLIMIT_AS`, `RLIMIT_CPU`, `RLIMIT_FSIZE` = 0, `RLIMIT_NOFILE`, `RLIMIT_CORE` = 0); minimal environment; `-I`; stderr read and discarded, never logged.
   2. The parent kills the child on the wall deadline (`extraction_timeout`), on a non-zero exit or a signal (`extraction_failed`; memory or CPU limit included), and on a result above `EXTRACT_MAX_RESULT_BYTES` (`extraction_failed`, reading stops at the cap). No zombie processes remain (test). The extraction slot is held while the child runs.
@@ -199,6 +199,11 @@ Order: S3-T1 first (sandbox and response contract). Then S3-T2 (DOCX) and S3-T3 
   9. Memory budget measured and written in ADR 0011: parent RSS plus two children at their limit stays under 512 MB.
   10. Logs: only the error code and duration; no child output, no text. Log canary test with a canary inside the text file.
   11. No new dependency. ruff, mypy strict, pytest green.
+- Review round 1 (PR #20) added to the AC:
+  - The extraction slot is held until the last response byte is sent (a response class that releases the slot in `finally`), with a send deadline `EXTRACT_SEND_TIMEOUT_SECONDS` (30): a client that does not read is cut off and the slot is freed. The Dockerfile `CMD` has `--limit-concurrency 32` (policy test). Caps lowered: result 4 MiB, text 1,000,000 characters. The memory budget is measured again with two results at the cap made of non-BMP characters and written in ADR 0011.
+  - The child sets `RLIMIT_NPROC` = 0 (no `fork`; the container user is not root); a test checks that `fork` fails in the child (skipped when the tests run as root).
+  - Plain text: control characters (Cc) other than TAB and LF are removed and counted in `removed` (reason `control_characters`); NEL (U+0085), LS (U+2028) and PS (U+2029) become `\n`.
+  - Starting the child can fail (`OSError`) → `extraction_failed`, no traceback. The parent waits for the process and drains the pipes together (no hang on Python 3.13.0). The app root is appended to `sys.path`, not inserted first.
 - Threats: T3, T4, T6.
 
 ### S3-T2 DOCX extraction (outline)

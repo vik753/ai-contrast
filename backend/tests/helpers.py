@@ -24,6 +24,16 @@ SETTINGS_ENV_VARS = (
     "EXTRACT_BODY_TIMEOUT_SECONDS",
     "EXTRACT_MIN_RATE_BYTES_PER_SECOND",
     "EXTRACT_RATE_GRACE_SECONDS",
+    # Stage 3 (S3-T1) parsing sandbox and text caps.
+    "EXTRACT_WORKER_MEMORY_MB",
+    "EXTRACT_WORKER_CPU_SECONDS",
+    "EXTRACT_WORKER_WALL_SECONDS",
+    "EXTRACT_MAX_RESULT_BYTES",
+    "EXTRACT_MAX_TEXT_CHARS",
+    "EXTRACT_MAX_BLOCKS",
+    "EXTRACT_SEND_TIMEOUT_SECONDS",
+    # S3-T1 test-only worker hook: never set in the server environment.
+    "AI_CONTRAST_WORKER_TEST_HOOK",
 )
 
 ALLOWED_ORIGIN = "https://app.example"

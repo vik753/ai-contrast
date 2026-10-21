@@ -65,4 +65,5 @@ EXPOSE 8000
 # `sh -c` expands $PORT (set by the host, for example Render); `exec` makes uvicorn PID 1.
 # Single worker only: the extraction limiter counts slots per process, so more
 # worker processes would multiply the limit (threat model T6). Keep `--workers 1`.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --workers 1 --no-access-log --no-proxy-headers --no-server-header --log-config log_config.json"]
+# `--limit-concurrency 32`: at most 32 connections and tasks; more get 503 (T6 control 9).
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"${PORT:-8000}\" --workers 1 --limit-concurrency 32 --no-access-log --no-proxy-headers --no-server-header --log-config log_config.json"]

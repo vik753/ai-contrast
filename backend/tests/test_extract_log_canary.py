@@ -46,8 +46,9 @@ def _bodies(canary: str) -> dict[str, tuple[bytes, int]]:
     marker = canary.encode()
     return {
         "text": (b"Synthetic contract. Party: " + marker + b". Pay in 30 days.\n", 200),
-        "pdf": (b"%PDF-1.7\n% " + marker + b"\n%%EOF\n", 200),
-        "docx": (build_zip(docx_entries(stored(f"word/{canary}.xml", marker))), 200),
+        # S3-T1: PDF and DOCX return 501 until S3-T2/S3-T3.
+        "pdf": (b"%PDF-1.7\n% " + marker + b"\n%%EOF\n", 501),
+        "docx": (build_zip(docx_entries(stored(f"word/{canary}.xml", marker))), 501),
         "binary": (b"synthetic\x00" + marker, 422),
         "controls": (b"\x01" * 100 + marker, 422),
         "duplicate-name": (
@@ -93,12 +94,18 @@ def test_extract_canary_absent_from_response(
     make_client: Callable[..., TestClient], case: str
 ) -> None:
     canary = new_canary()
+    header_canary = new_canary()
     body, status = _bodies(canary)[case]
 
-    response = make_client().post(EXTRACT, content=body, headers=_headers(canary))
+    response = make_client().post(EXTRACT, content=body, headers=_headers(header_canary))
 
     assert response.status_code == status
-    _assert_absent_from_response(response, canary)
+    # File names and other header values never come back.
+    _assert_absent_from_response(response, header_canary)
+    if case != "text":
+        # Stage 3 returns the extracted text of a text file by design; any other
+        # body content never comes back.
+        _assert_absent_from_response(response, canary)
 
 
 def test_extract_too_large_canary_absent_from_logs_and_response(
