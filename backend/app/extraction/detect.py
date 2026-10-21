@@ -14,8 +14,14 @@ Rules (docs/agent/TASKS.md, Stage 2, "Detection rules"):
 3. ``PK\\x03\\x04`` at offset 0 goes through the ZIP checks. A structure failure is
    ``archive_rejected``; the archive is then classified by entry names only.
 4. Image and RTF signatures are ``unsupported_type``.
-5. Anything else is plain text, unless the first 64 KiB hold a NUL byte or more
-   than 1 % C0 control characters other than TAB, LF, CR and FF.
+5. A UTF-16 BOM with an even total length is text (odd length: ``unsupported_type``).
+   Anything else is plain text (a UTF-8 BOM is skipped first), unless the first
+   64 KiB hold a NUL byte or more than 1 % C0 control characters other than TAB,
+   LF, CR and FF. This only classifies; stage 3 decodes strictly and fails closed.
+
+The ZIP checks read an archive the same way as Python ``zipfile`` (the stage 3
+reader): the same EOCD record, a central directory that ends exactly at it, and the
+same entry count, so both see the same entry names.
 
 ``DetectionError`` carries a fixed code only. Its message never holds input bytes,
 entry names or offsets, so it is safe to log and to return.
@@ -23,6 +29,7 @@ entry names or offsets, so it is safe to log and to return.
 
 from __future__ import annotations
 
+import re
 import string
 import struct
 from dataclasses import dataclass
@@ -72,8 +79,8 @@ REJECTED_SIGNATURES: Final = (
     b"RIFF",  # RIFF container (WebP and others)
     b"{\\rtf",  # RTF
 )
-TEXT_BOMS: Final = (
-    b"\xef\xbb\xbf",  # UTF-8
+UTF8_BOM: Final = b"\xef\xbb\xbf"
+UTF16_BOMS: Final = (
     b"\xff\xfe",  # UTF-16 LE
     b"\xfe\xff",  # UTF-16 BE
 )
@@ -92,7 +99,15 @@ _NOT_CONTROL_BYTES: Final = bytes(b for b in range(256) if b not in _CONTROL_BYT
 
 EOCD_SIGNATURE: Final = b"PK\x05\x06"
 CENTRAL_HEADER_SIGNATURE: Final = b"PK\x01\x02"
+ZIP64_EOCD_SIGNATURE: Final = b"PK\x06\x06"
 ZIP64_LOCATOR_SIGNATURE: Final = b"PK\x06\x07"
+# None of these may appear in the archive comment: another reader could take one
+# of them as the end of the archive.
+COMMENT_FORBIDDEN_SIGNATURES: Final = (
+    EOCD_SIGNATURE,
+    ZIP64_EOCD_SIGNATURE,
+    ZIP64_LOCATOR_SIGNATURE,
+)
 
 # signature, disk, cd disk, entries on disk, total entries, cd size, cd offset,
 # comment length.
@@ -108,7 +123,6 @@ EOCD_SCAN_BYTES: Final = _EOCD.size + MAX_COMMENT_LENGTH  # 65,557
 ZIP64_MARKER_16: Final = 0xFFFF
 ZIP64_MARKER_32: Final = 0xFFFFFFFF
 FLAG_ENCRYPTED: Final = 0x0001
-FLAG_UTF8_NAME: Final = 0x0800
 METHOD_STORED: Final = 0
 METHOD_DEFLATED: Final = 8
 MAX_NAME_BYTES: Final = 512
@@ -118,6 +132,8 @@ NON_WORD_OOXML_PREFIXES: Final = ("xl/", "ppt/")
 PAGES_INDEX_PREFIX: Final = "index/"
 PAGES_INDEX_SUFFIX: Final = ".iwa"
 _ASCII_LETTERS: Final = frozenset(string.ascii_letters)
+# Entry names: printable ASCII only (OPC part names are ASCII), 1 to 512 bytes.
+_PRINTABLE_ASCII_NAME: Final = re.compile(rb"[\x20-\x7e]{1,%d}" % MAX_NAME_BYTES)
 
 
 def detect_kind(data: bytes, *, limits: ZipLimits) -> FileKind:
@@ -136,9 +152,13 @@ def detect_kind(data: bytes, *, limits: ZipLimits) -> FileKind:
 
 
 def _check_plain_text(data: bytes) -> FileKind:
-    if data.startswith(TEXT_BOMS):
+    if data.startswith(UTF16_BOMS):
+        # UTF-16 text is made of 2-byte code units.
+        if len(data) % 2:
+            raise DetectionError(UNSUPPORTED_TYPE)
         return FileKind.TEXT
-    sample = data[:TEXT_SAMPLE_BYTES]
+    start = len(UTF8_BOM) if data.startswith(UTF8_BOM) else 0
+    sample = data[start : start + TEXT_SAMPLE_BYTES]
     if b"\x00" in sample:
         raise DetectionError(UNSUPPORTED_TYPE)
     controls = len(sample.translate(None, _NOT_CONTROL_BYTES))
@@ -151,24 +171,43 @@ def _reject() -> DetectionError:
     return DetectionError(ARCHIVE_REJECTED)
 
 
-def _find_eocd(data: bytes) -> int:
-    """Offset of the EOCD record whose comment ends exactly at the end of ``data``.
+def _ends_at_eof(data: bytes, offset: int) -> bool:
+    """True if an EOCD record at ``offset`` is complete and its comment ends exactly
+    at the end of ``data``."""
+    record_end = offset + _EOCD.size
+    if record_end > len(data):
+        return False
+    comment_length: int = struct.unpack_from("<H", data, record_end - 2)[0]
+    return record_end + comment_length == len(data)
 
-    Candidates are tried from the end backwards inside the scan window, so a
-    signature inside the comment cannot shadow the real record.
+
+def _find_eocd(data: bytes) -> int:
+    """Offset of the EOCD record, chosen the same way as Python ``zipfile``.
+
+    ``zipfile`` takes the last EOCD signature in the last 65,557 bytes. This returns
+    that offset only if, in addition:
+
+    - the record is complete and its comment ends exactly at the end of the file;
+    - the comment holds no EOCD, ZIP64 EOCD or ZIP64 locator signature;
+    - no earlier EOCD signature in the window also has a comment that ends exactly
+      at the end of the file (a second, nested EOCD that another reader could use).
+
+    So exactly one record can be read as the end of the archive. Otherwise the
+    archive is rejected.
     """
-    size = len(data)
-    window_start = max(0, size - EOCD_SCAN_BYTES)
-    end = size - _EOCD.size + len(EOCD_SIGNATURE)
-    while True:
-        offset = data.rfind(EOCD_SIGNATURE, window_start, end)
-        if offset < 0:
+    window_start = max(0, len(data) - EOCD_SCAN_BYTES)
+    offset = data.rfind(EOCD_SIGNATURE, window_start)
+    if offset < 0 or not _ends_at_eof(data, offset):
+        raise _reject()
+    comment = data[offset + _EOCD.size :]
+    if any(signature in comment for signature in COMMENT_FORBIDDEN_SIGNATURES):
+        raise _reject()
+    other = data.rfind(EOCD_SIGNATURE, window_start, offset + len(EOCD_SIGNATURE) - 1)
+    while other >= 0:
+        if _ends_at_eof(data, other):
             raise _reject()
-        if offset + _EOCD.size <= size:
-            comment_length = struct.unpack_from("<H", data, offset + _EOCD.size - 2)[0]
-            if offset + _EOCD.size + comment_length == size:
-                return offset
-        end = offset + len(EOCD_SIGNATURE) - 1
+        other = data.rfind(EOCD_SIGNATURE, window_start, other + len(EOCD_SIGNATURE) - 1)
+    return offset
 
 
 def _central_directory(data: bytes, limits: ZipLimits) -> tuple[int, int, int]:
@@ -193,12 +232,13 @@ def _central_directory(data: bytes, limits: ZipLimits) -> tuple[int, int, int]:
     if locator >= 0 and data.startswith(ZIP64_LOCATOR_SIGNATURE, locator):
         raise _reject()
 
-    # 3.2: entry count before any per-entry work; the central directory lies inside
-    # the file, before the EOCD.
+    # 3.2: entry count before any per-entry work. The central directory ends exactly
+    # at the EOCD: `zipfile` locates it as `eocd - cd_size` and ignores `cd_offset`,
+    # so a gap would let it read a different directory than this one.
     if total_entries > limits.max_entries:
         raise _reject()
     cd_end = cd_offset + cd_size
-    if cd_end > eocd:
+    if cd_end != eocd:
         raise _reject()
     return total_entries, cd_offset, cd_end
 
@@ -237,8 +277,6 @@ def _read_entry(
         raise _reject()
     if ZIP64_MARKER_32 in (compressed, uncompressed):
         raise _reject()
-    if not 1 <= name_length <= MAX_NAME_BYTES:
-        raise _reject()
     name_start = position + _CENTRAL_HEADER.size
     next_position = name_start + name_length + extra_length + comment_length
     if next_position > cd_end:
@@ -248,8 +286,8 @@ def _read_entry(
         raise _reject()
     if uncompressed > compressed * limits.max_ratio:
         raise _reject()
-    name = _decode_name(bytes(view[name_start : name_start + name_length]), flags)
-    _check_name(name)
+    name = _entry_name(bytes(view[name_start : name_start + name_length]))
+    _check_name(name, is_empty=uncompressed == 0 and compressed == 0)
     return name, uncompressed, next_position
 
 
@@ -277,22 +315,35 @@ def _zip_entry_names(data: bytes, limits: ZipLimits) -> list[str]:
     return names
 
 
-def _decode_name(raw: bytes, flags: int) -> str:
-    if flags & FLAG_UTF8_NAME:
-        try:
-            return raw.decode("utf-8")
-        except UnicodeDecodeError:
-            raise _reject() from None
-    return raw.decode("cp437")
+def _entry_name(raw: bytes) -> str:
+    """The name as text: 1 to 512 bytes of printable ASCII (0x20-0x7E), else rejected.
 
-
-def _check_name(name: str) -> None:
-    if "\x00" in name or "\\" in name:
+    The UTF-8 flag (bit 11) does not matter: an ASCII name reads the same in UTF-8
+    and CP437, so every reader sees the same name.
+    """
+    if _PRINTABLE_ASCII_NAME.fullmatch(raw) is None:
         raise _reject()
+    return raw.decode("ascii")
+
+
+def _check_name(name: str, *, is_empty: bool) -> None:
+    """Rule 3.3 name shape. ``word/%64ocument.xml`` passes: OPC part-name grammar
+    and percent-decoding are stage 3 rules."""
+    if "\\" in name:
+        raise _reject()
+    # Absolute: a leading "/" or a drive letter ("C:").
     if name.startswith("/") or (name[:1] in _ASCII_LETTERS and name[1:2] == ":"):
-        raise _reject()  # absolute: "/..." or a drive letter ("C:...")
-    if ".." in name.split("/"):
         raise _reject()
+    path = name
+    if name.endswith("/"):
+        # A trailing "/" marks a directory entry, which must hold no data.
+        if not is_empty:
+            raise _reject()
+        path = name[:-1]
+    for segment in path.split("/"):
+        # No empty, "." or ".." segment and no segment ending in "." (Windows drops it).
+        if not segment or segment.endswith("."):
+            raise _reject()
 
 
 def _classify_zip(names: list[str]) -> FileKind:
