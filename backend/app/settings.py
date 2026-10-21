@@ -13,6 +13,8 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from app.extraction.model import DEFAULT_MAX_BLOCKS, DEFAULT_MAX_TEXT_CHARS
+
 DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173"]
 
 MIB = 1024 * 1024
@@ -86,6 +88,16 @@ class Settings(BaseSettings):
       after the grace period.
     - ``EXTRACT_RATE_GRACE_SECONDS``: grace period before the minimum rate applies
       (a positive, finite number of seconds).
+
+    Parsing sandbox and text caps (positive integers, threat model T4 and T6,
+    ADR 0011):
+
+    - ``EXTRACT_WORKER_MEMORY_MB``: address space limit of one parsing child, in MiB.
+    - ``EXTRACT_WORKER_CPU_SECONDS``: CPU time limit of one parsing child.
+    - ``EXTRACT_WORKER_WALL_SECONDS``: wall-clock deadline of one parsing child.
+    - ``EXTRACT_MAX_RESULT_BYTES``: size of the child's JSON result.
+    - ``EXTRACT_MAX_TEXT_CHARS``: characters of extracted text of one file.
+    - ``EXTRACT_MAX_BLOCKS``: text blocks of one file.
     """
 
     model_config = SettingsConfigDict(
@@ -110,6 +122,12 @@ class Settings(BaseSettings):
     extract_body_timeout_seconds: PositiveInt = 60
     extract_min_rate_bytes_per_second: PositiveInt = 32 * 1024
     extract_rate_grace_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 5.0
+    extract_worker_memory_mb: PositiveInt = 192
+    extract_worker_cpu_seconds: PositiveInt = 20
+    extract_worker_wall_seconds: PositiveInt = 30
+    extract_max_result_bytes: PositiveInt = 8 * MIB
+    extract_max_text_chars: PositiveInt = DEFAULT_MAX_TEXT_CHARS
+    extract_max_blocks: PositiveInt = DEFAULT_MAX_BLOCKS
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
