@@ -5,6 +5,7 @@ description = "AI Contrast backend: stateless API that compares contracts clause
 requires-python = ">=3.13"
 license = "AGPL-3.0-only"
 dependencies = [
+    "defusedxml==0.7.1",
     "fastapi>=0.143.0",
     "pydantic-settings>=2.15.0",
     "uvicorn>=0.54.0",
