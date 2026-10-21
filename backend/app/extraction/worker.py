@@ -3,8 +3,9 @@
 Started by ``app.extraction.sandbox`` only, never by hand. Protocol:
 
 - argv: ``memory_bytes cpu_seconds`` (set by the parent, never from input).
-- stdin: one JSON header line ``{"kind", "size", "max_text_chars", "max_blocks"}``,
-  then exactly ``size`` bytes of the file.
+- stdin: one JSON header line ``{"kind", "size", "max_text_chars", "max_blocks",
+  "docx_max_part_bytes", "docx_max_total_bytes", "docx_max_xml_depth",
+  "docx_max_elements"}``, then exactly ``size`` bytes of the file.
 - stdout: one JSON object, ``{"result": <ExtractionResult>}`` or
   ``{"error": "<code>"}``; exit status 0.
 - Any other failure: exit status 1 and nothing on stdout. stderr is drained and
@@ -121,14 +122,32 @@ def _fork_probe() -> None:
     os._exit(_HOOK_EXIT)
 
 
-def _extract(kind: str, data: bytes, *, max_text_chars: int, max_blocks: int) -> bytes:
-    from app.extraction.model import ExtractionError  # noqa: PLC0415 - after the limits
-    from app.extraction.text import extract_text_file  # noqa: PLC0415 - after the limits
+def _extract(kind: str, data: bytes, header: dict[str, object]) -> bytes:
+    from app.extraction.model import (  # noqa: PLC0415 - after the limits
+        ExtractionError,
+        ExtractionResult,
+    )
 
-    if kind != "text":
-        raise ValueError
+    max_chars = _non_negative(header, "max_text_chars")
+    max_blocks = _non_negative(header, "max_blocks")
+    result: ExtractionResult
     try:
-        result = extract_text_file(data, max_chars=max_text_chars, max_blocks=max_blocks)
+        if kind == "text":
+            from app.extraction.text import extract_text_file  # noqa: PLC0415 - after the limits
+
+            result = extract_text_file(data, max_chars=max_chars, max_blocks=max_blocks)
+        elif kind == "docx":
+            from app.extraction.docx import DocxLimits, extract_docx  # noqa: PLC0415
+
+            limits = DocxLimits(
+                max_part_bytes=_non_negative(header, "docx_max_part_bytes"),
+                max_total_bytes=_non_negative(header, "docx_max_total_bytes"),
+                max_xml_depth=_non_negative(header, "docx_max_xml_depth"),
+                max_elements=_non_negative(header, "docx_max_elements"),
+            )
+            result = extract_docx(data, max_chars=max_chars, max_blocks=max_blocks, limits=limits)
+        else:
+            raise ValueError
     except ExtractionError as error:
         return json.dumps({"error": error.code}).encode()
     return b'{"result":' + result.model_dump_json().encode() + b"}"
@@ -146,15 +165,13 @@ def _main(argv: list[str]) -> None:
     if not isinstance(kind, str):
         raise TypeError
     data = _read_exact(stdin, _non_negative(header, "size"))
-    max_text_chars = _non_negative(header, "max_text_chars")
-    max_blocks = _non_negative(header, "max_blocks")
 
     out = sys.stdout.buffer
     hook = os.environ.get(HOOK_ENV)
     if hook is not None:
         _run_hook(hook, data, out)
 
-    reply = _extract(kind, data, max_text_chars=max_text_chars, max_blocks=max_blocks)
+    reply = _extract(kind, data, header)
     out.write(reply)
     out.flush()
 

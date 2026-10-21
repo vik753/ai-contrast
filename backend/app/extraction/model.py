@@ -41,6 +41,8 @@ PDF_DAMAGED: Final = "pdf_damaged"
 # Codes that the parsing child may report. The parent's own codes (timeout and
 # failure) are not in this list: a child cannot claim them.
 ChildErrorCode = Literal[
+    "archive_rejected",
+    "unsupported_type",
     "too_many_pages",
     "too_much_text",
     "encrypted_unsupported",

@@ -57,6 +57,7 @@ logger = logging.getLogger("ai_contrast.extraction")
 WORKER_CWD: Final = "/tmp"  # noqa: S108 - the child writes no files (RLIMIT_FSIZE = 0)
 HOOK_ENV: Final = "AI_CONTRAST_WORKER_TEST_HOOK"
 READ_CHUNK: Final = 64 * 1024
+MIB: Final = 1024 * 1024
 # After the kill, the rest of the pipes is read and thrown away within this time.
 DISCARD_SECONDS: Final = 5
 # The app root: the directory that holds the `app` package of this server.
@@ -74,6 +75,11 @@ class SandboxLimits:
     max_result_bytes: int
     max_text_chars: int = DEFAULT_MAX_TEXT_CHARS
     max_blocks: int = DEFAULT_MAX_BLOCKS
+    # DOCX caps (S3-T2); the defaults are the settings defaults.
+    docx_max_part_bytes: int = 32 * MIB
+    docx_max_total_bytes: int = 100 * MIB
+    docx_max_xml_depth: int = 256
+    docx_max_elements: int = 2_000_000
 
 
 class _ChildReply(BaseModel):
@@ -197,6 +203,10 @@ async def _run(
             "size": len(data),
             "max_text_chars": limits.max_text_chars,
             "max_blocks": limits.max_blocks,
+            "docx_max_part_bytes": limits.docx_max_part_bytes,
+            "docx_max_total_bytes": limits.docx_max_total_bytes,
+            "docx_max_xml_depth": limits.docx_max_xml_depth,
+            "docx_max_elements": limits.docx_max_elements,
         }
     ).encode()
     try:

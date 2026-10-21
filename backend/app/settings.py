@@ -100,6 +100,13 @@ class Settings(BaseSettings):
     - ``EXTRACT_MAX_BLOCKS``: text blocks of one file.
     - ``EXTRACT_SEND_TIMEOUT_SECONDS``: deadline to send the response of
       ``POST /api/extract``; a client that does not read is cut off.
+
+    DOCX extraction (positive integers, threat model T4 and T5, S3-T2):
+
+    - ``MAX_DOCX_PART_BYTES``: real uncompressed size of one archive part. The
+      total of all parts is capped by ``MAX_ZIP_UNCOMPRESSED_BYTES``.
+    - ``MAX_DOCX_XML_DEPTH``: element nesting depth of one XML part.
+    - ``MAX_DOCX_ELEMENTS``: XML elements of all parts of one document.
     """
 
     model_config = SettingsConfigDict(
@@ -131,6 +138,9 @@ class Settings(BaseSettings):
     extract_max_text_chars: PositiveInt = DEFAULT_MAX_TEXT_CHARS
     extract_max_blocks: PositiveInt = DEFAULT_MAX_BLOCKS
     extract_send_timeout_seconds: PositiveInt = 30
+    max_docx_part_bytes: PositiveInt = 32 * MIB
+    max_docx_xml_depth: PositiveInt = 256
+    max_docx_elements: PositiveInt = 2_000_000
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
