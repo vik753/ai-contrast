@@ -568,7 +568,10 @@ def _peak_growth_one_byte_chunks(app: FastAPI, size: int) -> int:
         _, peak = tracemalloc.get_traced_memory()
     finally:
         tracemalloc.stop()
-    assert status == [200]
+    # The body must be read in full; what extraction answers is not under test here
+    # (S3-T1: PDF is 501 until S3-T3; later a synthetic PDF may get a 422 code).
+    assert len(status) == 1
+    assert status[0] in {200, 422, 501}
     return peak - baseline
 
 

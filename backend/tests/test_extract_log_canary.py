@@ -94,12 +94,18 @@ def test_extract_canary_absent_from_response(
     make_client: Callable[..., TestClient], case: str
 ) -> None:
     canary = new_canary()
+    header_canary = new_canary()
     body, status = _bodies(canary)[case]
 
-    response = make_client().post(EXTRACT, content=body, headers=_headers(canary))
+    response = make_client().post(EXTRACT, content=body, headers=_headers(header_canary))
 
     assert response.status_code == status
-    _assert_absent_from_response(response, canary)
+    # File names and other header values never come back.
+    _assert_absent_from_response(response, header_canary)
+    if case != "text":
+        # Stage 3 returns the extracted text of a text file by design; any other
+        # body content never comes back.
+        _assert_absent_from_response(response, canary)
 
 
 def test_extract_too_large_canary_absent_from_logs_and_response(

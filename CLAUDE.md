@@ -158,7 +158,7 @@ Check the upload endpoint (the body is raw bytes, no file name):
 curl -sS -X POST -H 'Content-Type: application/octet-stream' --data-binary 'Hello, contract.' http://127.0.0.1:8000/api/extract
 ```
 
-Expected: `{"kind":"text","bytes":16}`.
+Expected: `{"kind":"text","bytes":16,"language":"unknown","pages":null,"blocks":[{"text":"Hello, contract.","part":"body","page":null}],"ocr_pages":[],"removed":[],"warnings":[]}` (`language` is `unknown` because the text is too short).
 
 Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
 
