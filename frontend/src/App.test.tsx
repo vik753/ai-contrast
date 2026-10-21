@@ -20,6 +20,7 @@ import {
   setBrowserLanguage,
 } from "./test/browser-env";
 import { allStrings, flattenLocale, text, type FlatLocale } from "./test/locale-utils";
+import { templateRegExp } from "./test/upload-fakes";
 
 const REPO_URL = "https://github.com/vik753/ai-contrast";
 const LANG_BUTTONS = ["EN", "UK", "RU"] as const;
@@ -332,8 +333,13 @@ describe("AC7 — no hard-coded UI strings", () => {
 
   function untranslated(locale: FlatLocale): string[] {
     const values = new Set(allStrings(locale).map((v) => v.trim()));
+    // S2-T2: values with `{{placeholders}}` ("Contract {{label}}") match as
+    // whole-string templates; the placeholder stands for any text.
+    const templates = allStrings(locale)
+      .filter((v) => /\{\{\s*\w+\s*\}\}/.test(v))
+      .map(templateRegExp);
     return collectUiStrings(document.body).filter(
-      (s) => !ALLOWED_LITERALS.has(s) && !values.has(s),
+      (s) => !ALLOWED_LITERALS.has(s) && !values.has(s) && !templates.some((t) => t.test(s)),
     );
   }
 
@@ -373,5 +379,24 @@ describe("T1 — no raw HTML in the rendered shell", () => {
   it("test_rendered_shell_contains_no_script_or_iframe_elements", async () => {
     await renderApp();
     expect(document.body.querySelectorAll("script, iframe, object, embed").length).toBe(0);
+  });
+});
+
+describe("S2-T2 — upload form in the app", () => {
+  it("test_app_renders_upload_form_after_the_intro", async () => {
+    await renderApp();
+    const main = screen.getByRole("main");
+    const intro = within(main).getByRole("heading", { level: 1, name: text(EN, "home.tagline") });
+    const contractA = within(main).getByRole("region", { name: "Contract A" });
+    expect(within(main).getByRole("region", { name: "Contract B" })).toBeTruthy();
+    expect(
+      intro.compareDocumentPosition(contractA) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("test_app_shows_add_files_buttons_for_both_contracts", async () => {
+    await renderApp();
+    expect(screen.getByRole("button", { name: "Add files to Contract A" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add files to Contract B" })).toBeTruthy();
   });
 });
