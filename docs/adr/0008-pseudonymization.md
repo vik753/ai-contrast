@@ -58,7 +58,7 @@ A defined term that equals a masked name ("(далі — «Іваненко»)")
 
 ### 3. Type gate (enforced at runtime and by a policy test)
 
-- `PseudonymizedDocument` (and `PseudonymizedText` for short strings) is a frozen dataclass with slots, **not** a Pydantic model. Its constructor checks a module-private sentinel at runtime; only `safety_pass()` can create it.
+- `PseudonymizedDocument`, `PseudonymizedText` (short strings) and `ConfirmedTopic` (ADR 0009 Layer 3) are frozen dataclasses with slots, **not** Pydantic models. Their constructors check a module-private sentinel at runtime; only `safety_pass()` can create them. `ConfirmedTopic` is created after masking, the Layer 2 check, the length cap and a placeholder-free check.
 - Request bodies use different types (`UntrustedMaskedClause`). The gate type never appears in a request model.
 - The `AIProvider` port accepts only domain types: the gate types, enums and constants. **No `str` parameter** anywhere on the port.
 - Custom topics, synonyms, the client's side and AI-suggested topics pass through the detector and become `PseudonymizedText`; a confirmed topic becomes `ConfirmedTopic` (ADR 0009 Layer 3). The connection test sends a constant probe.
