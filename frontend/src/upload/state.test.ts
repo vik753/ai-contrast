@@ -477,11 +477,60 @@ describe("AC9 — readiness()", () => {
     expect(readiness(state)).toEqual({ ready: false, reason: "contract_without_file" });
   });
 
-  it("test_contract_with_only_rejected_files_counts_as_without_file", () => {
+  // Review round 1: order checking -> rejected_files -> contract_without_file -> ready.
+  it("test_contract_with_only_rejected_files_is_rejected_files", () => {
     const a = spec("a.pdf");
     let state = accept(addFiles(initialUploadState, 0, a), a);
     state = addFiles(state, 1, spec("b.doc"));
-    expect(readiness(state)).toEqual({ ready: false, reason: "contract_without_file" });
+    expect(readiness(state)).toEqual({ ready: false, reason: "rejected_files" });
+  });
+
+  it("test_rejected_file_next_to_accepted_files_is_rejected_files", () => {
+    const a = spec("a.pdf");
+    const b = spec("b.pdf");
+    let state = accept(addFiles(initialUploadState, 0, a), a);
+    state = accept(addFiles(state, 1, b), b);
+    state = addFiles(state, 1, spec("annex.doc"));
+    expect(readiness(state)).toEqual({ ready: false, reason: "rejected_files" });
+  });
+
+  it("test_server_rejected_file_is_rejected_files", () => {
+    const a = spec("a.pdf");
+    const b = spec("b.pdf");
+    let state = accept(addFiles(initialUploadState, 0, a), a);
+    state = addFiles(state, 1, b);
+    state = reduce(state, checked(b.id, { ok: false, code: "unsupported_type" }));
+    expect(readiness(state)).toEqual({ ready: false, reason: "rejected_files" });
+  });
+
+  it("test_checking_comes_before_rejected_files", () => {
+    let state = addFiles(initialUploadState, 0, spec("a.pdf"), spec("a.doc"));
+    state = addFiles(state, 1, spec("b.pdf"));
+    expect(readiness(state)).toEqual({ ready: false, reason: "checking" });
+  });
+
+  it("test_checking_comes_before_contract_without_file", () => {
+    const state = addFiles(initialUploadState, 0, spec("a.pdf"));
+    expect(readiness(state)).toEqual({ ready: false, reason: "checking" });
+  });
+
+  it("test_rejected_files_comes_before_contract_without_file", () => {
+    const state = addFiles(initialUploadState, 0, spec("a.doc"));
+    expect(readiness(state)).toEqual({ ready: false, reason: "rejected_files" });
+  });
+
+  it("test_removing_the_rejected_file_makes_state_ready", () => {
+    const a = spec("a.pdf");
+    const b = spec("b.pdf");
+    const bad = spec("bad.doc");
+    let state = accept(addFiles(initialUploadState, 0, a), a);
+    state = accept(addFiles(state, 1, b, bad), b);
+    state = reduce(state, {
+      type: "fileRemoved",
+      contractId: contractId(state, 1),
+      fileId: bad.id,
+    });
+    expect(readiness(state)).toEqual({ ready: true, contracts: 2 });
   });
 
   it("test_queued_file_in_every_contract_is_checking", () => {

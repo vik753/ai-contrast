@@ -34,11 +34,13 @@ import {
   fileList,
   interpolate,
   jsonResponse,
+  keyContaining,
   makeFile,
   okResponse,
   pluralBase,
   templateRegExp,
 } from "../test/upload-fakes";
+import { MAX_FILE_BYTES, MAX_FILES_PER_CONTRACT, MAX_TOTAL_BYTES } from "./limits";
 import * as UploadFormModule from "./UploadForm";
 
 const EN = flattenLocale(enJson);
@@ -150,10 +152,15 @@ async function flush(ms = 0): Promise<void> {
   });
 }
 
-async function settle(): Promise<void> {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 30));
-  });
+/**
+ * Negative checks ("nothing else happens") run on fake timers: render with
+ * real timers first (Testing Library's async helpers need them), then switch.
+ * QUIET_MS is long but below the 60 s request timeout, so no request ends.
+ */
+const QUIET_MS = 30_000;
+
+function startFakeClock(): void {
+  vi.useFakeTimers();
 }
 
 describe("AC1 — contracts", () => {
@@ -280,8 +287,9 @@ describe("AC3 — client checks before any request", () => {
     ["old.doc", {}, "legacy_office_unsupported"],
   ] as const)("test_%s_is_rejected_without_request", async (name, options, code) => {
     await renderForm();
+    startFakeClock();
     addViaInput("A", makeFile(name, options));
-    await settle();
+    await flush(QUIET_MS);
     expect(server.fetch).not.toHaveBeenCalled();
     const r = row("A", name);
     expectRowShowsCode(r, code);
@@ -348,10 +356,12 @@ describe("AC4 — server check and queue", () => {
 
   it("test_at_most_two_requests_in_flight_rest_waiting", async () => {
     await renderForm();
+    startFakeClock();
     const files = Array.from({ length: 4 }, (_, i) => makeFile(`f${i}.pdf`));
     addViaInput("A", ...files);
-    await waitFor(() => expect(server.calls).toHaveLength(2));
-    await settle();
+    await flush();
+    expect(server.calls).toHaveLength(2);
+    await flush(QUIET_MS);
     expect(server.calls).toHaveLength(2);
     const statuses = files.map((f) => row("A", f.name).textContent);
     expect(statuses.filter((t) => t.includes(CHECKING))).toHaveLength(2);
@@ -360,10 +370,12 @@ describe("AC4 — server check and queue", () => {
 
   it("test_limit_of_two_applies_to_the_whole_form", async () => {
     await renderForm();
+    startFakeClock();
     addViaInput("A", makeFile("a1.pdf"), makeFile("a2.pdf"));
     addViaInput("B", makeFile("b1.pdf"), makeFile("b2.pdf"));
-    await waitFor(() => expect(server.calls).toHaveLength(2));
-    await settle();
+    await flush();
+    expect(server.calls).toHaveLength(2);
+    await flush(QUIET_MS);
     expect(server.calls).toHaveLength(2);
   });
 
@@ -590,10 +602,12 @@ describe("AC8 — removal aborts and moves focus", () => {
 
   it("test_aborted_file_does_not_reappear", async () => {
     await renderForm();
+    startFakeClock();
     addViaInput("A", makeFile("a.pdf"));
-    await waitFor(() => expect(server.calls).toHaveLength(1));
+    await flush();
+    expect(server.calls).toHaveLength(1);
     fireEvent.click(removeFileButton("A", "a.pdf"));
-    await settle();
+    await flush(QUIET_MS);
     expect(screen.queryByText("a.pdf")).toBeNull();
   });
 });
@@ -712,5 +726,234 @@ describe("T1 / T11 — file names render as plain text", () => {
     addViaInput("A", makeFile(name));
     expect(row("A", name)).toBeTruthy();
     expect(document.querySelector('a[href*="evil.example"]')).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* Review round 1 (PR #16)                                                  */
+/* ------------------------------------------------------------------------ */
+
+function liveRegion(): HTMLElement {
+  const element = document.querySelector<HTMLElement>('[aria-live="polite"]');
+  if (element === null) {
+    throw new Error("No polite live region");
+  }
+  return element;
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Finds the rendered message of `code` in `text` and returns the values that
+ * stand in its `{{placeholders}}`. A value is a number with an optional unit.
+ */
+function placeholderValues(text: string, code: string): string[][] {
+  const templates = messagesFor(code).filter((v) => /\{\{\s*\w+\s*\}\}/.test(v));
+  const found: string[][] = [];
+  for (const template of templates) {
+    const pattern = template
+      .trim()
+      .split(/\{\{\s*\w+\s*\}\}/)
+      .map(escapeForRegExp)
+      .join("(\\d[\\d.,]*(?:\\s?[A-Za-zА-Яа-яЁёІіЇїЄєҐґ]+)?)");
+    const match = new RegExp(pattern).exec(text);
+    if (match !== null) {
+      found.push(match.slice(1));
+    }
+  }
+  return found;
+}
+
+function expectMessageLimit(rowEl: HTMLElement, code: string, limit: number): void {
+  const found = placeholderValues(rowEl.textContent, code);
+  expect(found.length).toBeGreaterThan(0);
+  for (const values of found) {
+    expect(values.some((v) => new RegExp(`(^|\\D)${limit}(\\D|$)`).test(v))).toBe(true);
+  }
+}
+
+describe("Review round 1 — i18n options and untrusted file names (T1, T11)", () => {
+  const TRICKY = "$t(upload.title) {{label}}";
+
+  it("test_skip_on_variables_is_true", async () => {
+    await setupI18n();
+    expect(i18next.options.interpolation?.skipOnVariables).toBe(true);
+  });
+
+  it("test_escape_value_stays_false_because_react_escapes", async () => {
+    await setupI18n();
+    expect(i18next.options.interpolation?.escapeValue).toBe(false);
+  });
+
+  it("test_tricky_name_appears_word_for_word_in_the_row", async () => {
+    await renderForm();
+    addViaInput("A", makeFile(TRICKY));
+    expect(row("A", TRICKY).textContent).toContain(TRICKY);
+  });
+
+  it("test_tricky_name_appears_word_for_word_in_the_remove_label", async () => {
+    await renderForm();
+    addViaInput("A", makeFile(TRICKY));
+    const button = within(row("A", TRICKY)).getByRole("button", {
+      name: (accessibleName) => accessibleName.includes(TRICKY),
+    });
+    expect(button).toBeTruthy();
+  });
+
+  it("test_tricky_name_appears_word_for_word_in_the_live_region", async () => {
+    await renderForm();
+    server.autoRespond = acceptAsPdf;
+    addViaInput("A", makeFile(TRICKY));
+    await waitFor(() => expect(within(row("A", TRICKY)).getByText("PDF")).toBeTruthy());
+    await waitFor(() => expect(liveRegion().textContent).toContain(TRICKY));
+  });
+
+  it("test_file_name_is_wrapped_in_bdi", async () => {
+    await renderForm();
+    const name = "договір-عقد-contract.pdf";
+    addViaInput("A", makeFile(name));
+    const bdis = Array.from(row("A", name).querySelectorAll("bdi"));
+    expect(bdis.some((b) => b.textContent === name)).toBe(true);
+  });
+});
+
+describe("Review round 1 — readiness reason rejected_files", () => {
+  it("test_rejected_file_shows_remove_rejected_files_line", async () => {
+    await renderForm();
+    server.autoRespond = acceptAsPdf;
+    addViaInput("A", makeFile("a.pdf"));
+    addViaInput("B", makeFile("b.pdf"), makeFile("annex.doc"));
+    const key = keyContaining(EN, "Remove the files that were not accepted");
+    await waitFor(() => expect(screen.getByText(String(EN[key]))).toBeTruthy());
+    expect(screen.queryByText("Ready to compare: 2 contracts")).toBeNull();
+  });
+
+  it("test_removing_rejected_file_makes_form_ready", async () => {
+    await renderForm();
+    server.autoRespond = acceptAsPdf;
+    addViaInput("A", makeFile("a.pdf"));
+    addViaInput("B", makeFile("b.pdf"), makeFile("annex.doc"));
+    await waitFor(() => expect(within(row("B", "b.pdf")).getByText("PDF")).toBeTruthy());
+    fireEvent.click(removeFileButton("B", "annex.doc"));
+    await waitFor(() => expect(screen.getByText("Ready to compare: 2 contracts")).toBeTruthy());
+  });
+});
+
+describe("Review round 1 — focus after contract changes", () => {
+  it("test_add_contract_moves_focus_to_new_add_files_button", async () => {
+    await renderForm();
+    fireEvent.click(required(addContractButton()));
+    await waitFor(() => expect(document.activeElement).toBe(addFilesButton("C")));
+  });
+
+  it("test_adding_fifth_contract_moves_focus_to_its_add_files_button", async () => {
+    await renderForm();
+    for (const label of ["C", "D", "E"]) {
+      fireEvent.click(required(addContractButton()));
+      await waitFor(() => expect(document.activeElement).toBe(addFilesButton(label)));
+    }
+  });
+
+  it("test_removing_contract_moves_focus_to_add_contract", async () => {
+    await renderForm();
+    fireEvent.click(required(addContractButton()));
+    fireEvent.click(required(removeContractButton("C")));
+    await waitFor(() => expect(document.activeElement).toBe(addContractButton()));
+  });
+
+  it("test_removing_middle_contract_moves_focus_to_add_contract", async () => {
+    await renderForm();
+    fireEvent.click(required(addContractButton()));
+    fireEvent.click(required(addContractButton()));
+    fireEvent.click(required(removeContractButton("B")));
+    await waitFor(() => expect(document.activeElement).toBe(addContractButton()));
+  });
+});
+
+describe("Review round 1 — live region and language change", () => {
+  it("test_language_change_clears_old_announcements", async () => {
+    await renderForm();
+    server.autoRespond = acceptAsPdf;
+    addViaInput("A", makeFile("a.pdf"));
+    await waitFor(() => expect(within(row("A", "a.pdf")).getByText("PDF")).toBeTruthy());
+    await waitFor(() => expect(liveRegion().textContent.trim()).not.toBe(""));
+    const english = liveRegion().textContent;
+    await act(async () => {
+      await i18next.changeLanguage("uk");
+    });
+    const now = liveRegion().textContent;
+    expect(now).not.toContain(english.trim());
+    // Nothing from the English locale is left in the region.
+    const englishValues = Object.values(EN)
+      .map(
+        (v) =>
+          String(v)
+            .split(/\{\{\s*\w+\s*\}\}/)[0]
+            ?.trim() ?? "",
+      )
+      .filter((v) => v.length >= 6 && !Object.values(UK).includes(v));
+    expect(englishValues.filter((v) => now.includes(v))).toEqual([]);
+  });
+
+  it("test_queued_to_checking_step_is_not_announced", async () => {
+    await renderForm();
+    addViaInput("A", makeFile("a.pdf"));
+    await waitFor(() => expect(server.calls).toHaveLength(1));
+    expect(liveRegion().textContent).not.toContain(CHECKING);
+  });
+});
+
+describe("Review round 1 — sizes round up (1 MB = 1024² bytes)", () => {
+  it("test_10485761_bytes_shows_10_1_mb", async () => {
+    await renderForm();
+    addViaInput("A", makeFile("big.pdf", { size: 10_485_761 }));
+    const text = row("A", "big.pdf").textContent;
+    expect(text).toMatch(/10\.1\s?MB/);
+    expect(text).not.toMatch(/(^|[^\d.,])10\s?MB/);
+  });
+
+  it("test_1048575_bytes_shows_1_mb_not_1024_kb", async () => {
+    // Expected: "1 MB" (rounded up; never a value below the real size and
+    // never "1,024 KB").
+    await renderForm();
+    addViaInput("A", makeFile("almost.pdf", { size: 1_048_575 }));
+    const text = row("A", "almost.pdf").textContent;
+    expect(text).toMatch(/(^|[^\d.,])1(\.0)?\s?MB/);
+    expect(text).not.toMatch(/1,?024\s?KB/);
+  });
+
+  it("test_1025_bytes_shows_1_1_kb", async () => {
+    await renderForm();
+    addViaInput("A", makeFile("small.pdf", { size: 1025 }));
+    expect(row("A", "small.pdf").textContent).toMatch(/1\.1\s?KB/);
+  });
+});
+
+describe("Review round 1 — limits in messages come from limits.ts", () => {
+  it("test_file_too_large_message_shows_10", async () => {
+    await renderForm();
+    addViaInput("A", makeFile("big.pdf", { size: MAX_FILE_BYTES + 1 }));
+    expectMessageLimit(row("A", "big.pdf"), "file_too_large", MAX_FILE_BYTES / MIB);
+  });
+
+  it("test_too_many_files_message_shows_5", async () => {
+    await renderForm();
+    startFakeClock();
+    const files = Array.from({ length: 6 }, (_, i) => makeFile(`part-${i}.pdf`));
+    addViaInput("A", ...files);
+    await flush();
+    expectMessageLimit(row("A", "part-5.pdf"), "too_many_files", MAX_FILES_PER_CONTRACT);
+  });
+
+  it("test_total_too_large_message_shows_50", async () => {
+    await renderForm();
+    startFakeClock();
+    const big = Array.from({ length: 5 }, (_, i) => makeFile(`big-${i}.pdf`, { size: 10 * MIB }));
+    addViaInput("A", ...big);
+    addViaInput("B", makeFile("small.txt", { content: "x" }));
+    await flush();
+    expectMessageLimit(row("B", "small.txt"), "total_too_large", MAX_TOTAL_BYTES / MIB);
   });
 });

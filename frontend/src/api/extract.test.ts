@@ -126,7 +126,34 @@ describe("AC6 — error codes from the server are mapped through an allowlist", 
     [422, "pages_unsupported"],
     [422, "archive_rejected"],
     [503, "busy"],
+    // Review round 1 (PR #15 contract).
+    [400, "length_mismatch"],
+    [408, "upload_timeout"],
   ];
+
+  // Review round 1: a server code counts only together with its status.
+  const MISMATCHED: [number, string][] = [
+    [422, "busy"],
+    [503, "empty_file"],
+    [400, "upload_timeout"],
+    [408, "length_mismatch"],
+    [413, "unsupported_type"],
+    [422, "file_too_large"],
+    [500, "busy"],
+    [400, "archive_rejected"],
+    [411, "unsupported_media_type"],
+    [415, "length_required"],
+  ];
+
+  it.each(MISMATCHED)(
+    "test_status_%i_with_mismatched_error_%s_maps_to_unknown_error",
+    async (status, code) => {
+      expectError(
+        await extractWith(jsonResponse(status, { error: code }, { "Retry-After": "5" })),
+        "unknown_error",
+      );
+    },
+  );
 
   it.each(SERVER_ERRORS)("test_status_%i_with_error_%s_maps_to_same_code", async (status, code) => {
     expectError(await extractWith(jsonResponse(status, { error: code })), code);
@@ -379,5 +406,169 @@ describe("AC5 — request privacy (T3, T11)", () => {
     const marker = name.slice(0, name.length - ".pdf".length);
     const bytes = await (call.body as Blob).text();
     expect(bytes).not.toContain(marker);
+  });
+});
+
+/**
+ * Review round 1 — the response body is read up to 4 KiB; a larger declared
+ * or streamed body, or a non-JSON Content-Type, gives `unknown_error`.
+ */
+describe("Review round 1 — response size cap and Content-Type", () => {
+  const CAP = 4 * 1024;
+  const CHUNK = 1024;
+  const encoder = new TextEncoder();
+
+  interface TrackedBody {
+    stream: ReadableStream<Uint8Array>;
+    pulled: () => number;
+    cancelled: () => boolean;
+  }
+
+  /** A lazy stream (highWaterMark 0): bytes are produced only when read. */
+  function trackedBody(text: string): TrackedBody {
+    const bytes = encoder.encode(text);
+    let offset = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          if (offset >= bytes.length) {
+            controller.close();
+            return;
+          }
+          const chunk = bytes.slice(offset, offset + CHUNK);
+          offset += chunk.length;
+          controller.enqueue(chunk);
+        },
+        cancel() {
+          cancelled = true;
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    return { stream, pulled: () => offset, cancelled: () => cancelled };
+  }
+
+  /** Valid JSON for a 5-byte file, padded to `size` bytes. */
+  function paddedOkJson(size: number): string {
+    const head = '{"kind":"pdf","bytes":5,"pad":"';
+    const tail = '"}';
+    return head + "a".repeat(Math.max(0, size - head.length - tail.length)) + tail;
+  }
+
+  const FILE = () => makeFile("a.pdf", { content: "12345" });
+
+  it("test_small_json_body_under_cap_is_accepted", async () => {
+    const body = trackedBody(paddedOkJson(CAP - 100));
+    const response = new Response(body.stream, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(await extractWith(response, FILE())).toEqual({ ok: true, kind: "pdf", bytes: 5 });
+  });
+
+  it("test_content_type_with_charset_is_accepted", async () => {
+    const response = new Response('{"kind":"pdf","bytes":5}', {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
+    expect(await extractWith(response, FILE())).toEqual({ ok: true, kind: "pdf", bytes: 5 });
+  });
+
+  it("test_content_length_above_cap_is_unknown_error_without_reading_body", async () => {
+    const body = trackedBody('{"kind":"pdf","bytes":5}');
+    const response = new Response(body.stream, {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Content-Length": String(CAP + 1) },
+    });
+    expectError(await extractWith(response, FILE()), "unknown_error");
+    expect(body.pulled()).toBe(0);
+  });
+
+  it("test_streamed_body_above_cap_is_unknown_error", async () => {
+    const body = trackedBody(paddedOkJson(1024 * 1024));
+    const response = new Response(body.stream, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+    expectError(await extractWith(response, FILE()), "unknown_error");
+  });
+
+  it("test_streamed_body_above_cap_stops_reading", async () => {
+    const body = trackedBody(paddedOkJson(1024 * 1024));
+    const response = new Response(body.stream, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+    await extractWith(response, FILE());
+    const afterResult = body.pulled();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(afterResult).toBeLessThanOrEqual(CAP + CHUNK);
+    expect(body.pulled()).toBe(afterResult);
+  });
+
+  it("test_streamed_error_body_above_cap_is_unknown_error", async () => {
+    const head = '{"error":"empty_file","pad":"';
+    const body = trackedBody(head + "a".repeat(64 * 1024) + '"}');
+    const response = new Response(body.stream, {
+      status: 422,
+      headers: { "Content-Type": "application/json" },
+    });
+    expectError(await extractWith(response), "unknown_error");
+    expect(body.pulled()).toBeLessThanOrEqual(CAP + CHUNK);
+  });
+
+  it.each([
+    [200, "text/html", '{"kind":"pdf","bytes":5}'],
+    [200, "text/plain", '{"kind":"pdf","bytes":5}'],
+    [502, "text/html", "<html><body>Bad Gateway</body></html>"],
+    [503, "text/html", '{"error":"busy"}'],
+    [422, "application/octet-stream", '{"error":"empty_file"}'],
+  ])("test_status_%i_with_content_type_%s_is_unknown_error", async (status, type, text) => {
+    const response = new Response(text, { status, headers: { "Content-Type": type } });
+    expectError(await extractWith(response, FILE()), "unknown_error");
+  });
+
+  it("test_missing_content_type_is_unknown_error", async () => {
+    // A byte-array body gets no Content-Type header.
+    const response = new Response(encoder.encode('{"kind":"pdf","bytes":5}'), { status: 200 });
+    expect(response.headers.get("Content-Type")).toBeNull();
+    expectError(await extractWith(response, FILE()), "unknown_error");
+  });
+});
+
+describe("Review round 1 — request options are pinned (T3)", () => {
+  async function sentInit(): Promise<RequestInit> {
+    const file = makeFile("a.pdf", { content: "abc" });
+    const fake = fetchReturning(() => okResponse("pdf", file.size));
+    await extractFile(file, { fetchImpl: fake.asFetch() });
+    const init = fake.calls[0]?.init;
+    if (init === undefined) {
+      throw new Error("fetch was called without options");
+    }
+    return init;
+  }
+
+  it("test_credentials_are_omitted", async () => {
+    expect((await sentInit()).credentials).toBe("omit");
+  });
+
+  it("test_redirects_are_errors", async () => {
+    expect((await sentInit()).redirect).toBe("error");
+  });
+
+  it("test_cache_is_no_store", async () => {
+    expect((await sentInit()).cache).toBe("no-store");
+  });
+
+  it("test_keepalive_is_not_set", async () => {
+    const init = await sentInit();
+    expect(init.keepalive ?? false).toBe(false);
+  });
+
+  it("test_referrer_and_referrer_policy_are_not_overridden", async () => {
+    const init = await sentInit();
+    expect("referrer" in init).toBe(false);
+    expect("referrerPolicy" in init).toBe(false);
   });
 });

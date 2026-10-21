@@ -31,6 +31,8 @@ const AC_PHRASES = [
   "Add at least one file to each contract",
   "Checking files…",
   "Ready to compare:",
+  // Review round 1: readiness reason `rejected_files`.
+  "Remove the files that were not accepted",
 ] as const;
 
 /** Every code the form can show: server codes, client-only codes, client checks. */
@@ -45,6 +47,9 @@ const ERROR_CODES = [
   "archive_rejected",
   "busy",
   "request_too_large",
+  // Review round 1 (PR #15 contract).
+  "length_mismatch",
+  "upload_timeout",
   "network_error",
   "timeout",
   "aborted",
@@ -166,5 +171,54 @@ describe("AC11 — home.status", () => {
 
   it.each(["uk", "ru"] as const)("test_%s_home_status_is_translated", (name) => {
     expect(TRANSLATIONS[name]["home.status"]).not.toBe(EN["home.status"]);
+  });
+});
+
+describe("Review round 1 — 'files added' announcement plural forms", () => {
+  function filesAddedBase(): string {
+    const keys = Object.keys(EN).filter(
+      (k) =>
+        PLURAL_SUFFIX.test(k) && /added/i.test(String(EN[k])) && /files?\b/i.test(String(EN[k])),
+    );
+    const bases = [...new Set(keys.map(pluralBase))];
+    expect(bases).toHaveLength(1);
+    return bases[0] ?? "";
+  }
+
+  it("test_en_files_added_has_one_and_other_with_count", () => {
+    const base = filesAddedBase();
+    for (const form of ["one", "other"]) {
+      expect(String(EN[`${base}_${form}`])).toContain("{{count}}");
+    }
+  });
+
+  it.each(["uk", "ru"] as const)("test_%s_files_added_has_four_forms_with_count", (name) => {
+    const base = filesAddedBase();
+    const locale = TRANSLATIONS[name];
+    for (const form of ["one", "few", "many", "other"]) {
+      const value = locale[`${base}_${form}`];
+      expect(typeof value).toBe("string");
+      expect(String(value)).toContain("{{count}}");
+      expect(value).not.toBe(EN[`${base}_other`]);
+    }
+  });
+});
+
+describe("Review round 1 — limits are placeholders in messages", () => {
+  const LIMIT_CODES = [
+    ["file_too_large", "10"],
+    ["too_many_files", "5"],
+    ["total_too_large", "50"],
+  ] as const;
+  const ALL = { en: EN, uk: UK, ru: RU } as const;
+
+  it.each(LIMIT_CODES)("test_%s_messages_use_a_placeholder_for_the_limit", (code, digits) => {
+    for (const locale of Object.values(ALL)) {
+      const values = keysForCode(locale, code).map((k) => String(locale[k]));
+      expect(values.some((v) => /\{\{\s*\w+\s*\}\}/.test(v))).toBe(true);
+      for (const value of values) {
+        expect(value).not.toMatch(new RegExp(`(^|\\D)${digits}(\\D|$)`));
+      }
+    }
   });
 });
