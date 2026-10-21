@@ -46,8 +46,9 @@ def _bodies(canary: str) -> dict[str, tuple[bytes, int]]:
     marker = canary.encode()
     return {
         "text": (b"Synthetic contract. Party: " + marker + b". Pay in 30 days.\n", 200),
-        "pdf": (b"%PDF-1.7\n% " + marker + b"\n%%EOF\n", 200),
-        "docx": (build_zip(docx_entries(stored(f"word/{canary}.xml", marker))), 200),
+        # S3-T1: PDF and DOCX return 501 until S3-T2/S3-T3.
+        "pdf": (b"%PDF-1.7\n% " + marker + b"\n%%EOF\n", 501),
+        "docx": (build_zip(docx_entries(stored(f"word/{canary}.xml", marker))), 501),
         "binary": (b"synthetic\x00" + marker, 422),
         "controls": (b"\x01" * 100 + marker, 422),
         "duplicate-name": (

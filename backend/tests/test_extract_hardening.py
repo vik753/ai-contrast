@@ -173,7 +173,8 @@ def test_extract_slow_body_within_grace_period_accepted(
     run, _ = _timed(app, post_scope(EXTRACT, content_length=1000), receive)
 
     assert run.status == 200
-    assert json.loads(run.body) == {"kind": "text", "bytes": 1000}
+    data = json.loads(run.body)
+    assert (data["kind"], data["bytes"]) == ("text", 1000)
 
 
 def test_extract_body_above_min_rate_after_grace_period_accepted(
@@ -188,7 +189,8 @@ def test_extract_body_above_min_rate_after_grace_period_accepted(
 
     assert elapsed > GRACE_SECONDS
     assert run.status == 200
-    assert json.loads(run.body) == {"kind": "text", "bytes": total}
+    data = json.loads(run.body)
+    assert (data["kind"], data["bytes"]) == ("text", total)
 
 
 # --- 2. Connection: close on early responses --------------------------------------------

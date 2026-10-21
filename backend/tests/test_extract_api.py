@@ -30,13 +30,11 @@ from tests.asgi_stream import (
 from tests.zipbuild import (
     ENGLISH_TEXT,
     OLE2_SAMPLE,
-    PDF_SAMPLE,
     PNG_SAMPLE,
     RTF_SAMPLE,
     UKRAINIAN_TEXT,
     build_zip,
     docx_entries,
-    minimal_docx,
     stored,
     zipfile_archive,
 )
@@ -59,8 +57,7 @@ def _post(client: TestClient, body: Any, headers: dict[str, str] | None = None) 
 @pytest.mark.parametrize(
     ("body", "expected_kind"),
     [
-        pytest.param(PDF_SAMPLE, "pdf", id="pdf"),
-        pytest.param(minimal_docx(), "docx", id="docx"),
+        # S3-T1: PDF and DOCX return 501 until S3-T2/S3-T3 (tests/test_extract_text_api.py).
         pytest.param(TEXT_BODY, "text", id="text-english"),
         pytest.param(UKRAINIAN_TEXT.encode("cp1251"), "text", id="text-cp1251"),
         pytest.param(b"\xff\xfe" + UKRAINIAN_TEXT.encode("utf-16-le"), "text", id="utf16"),
@@ -72,7 +69,8 @@ def test_extract_accepted_file_returns_200_with_kind_and_bytes(
     response = _post(make_client(), body)
 
     assert response.status_code == 200
-    assert response.json() == {"kind": expected_kind, "bytes": len(body)}
+    data = response.json()
+    assert (data["kind"], data["bytes"]) == (expected_kind, len(body))
 
 
 def test_extract_content_type_with_parameters_accepted(
@@ -93,15 +91,17 @@ def test_extract_content_type_case_insensitive_accepted(
     assert response.status_code == 200
 
 
-def test_extract_body_exactly_at_default_limit_returns_200(
+def test_extract_body_exactly_at_default_limit_accepted(
     make_client: Callable[..., TestClient],
 ) -> None:
+    # S3-T1: the upload is accepted; 10 MiB of text is then above the default
+    # text cap (EXTRACT_MAX_TEXT_CHARS), which fails closed.
     body = b"a" * DEFAULT_MAX_FILE_BYTES
 
     response = _post(make_client(), body)
 
-    assert response.status_code == 200
-    assert response.json() == {"kind": "text", "bytes": DEFAULT_MAX_FILE_BYTES}
+    assert response.status_code == 422
+    assert response.json() == {"error": "too_much_text"}
 
 
 def test_extract_body_at_configured_limit_returns_200(
@@ -110,7 +110,7 @@ def test_extract_body_at_configured_limit_returns_200(
     response = _post(make_client(max_file_bytes=100), b"a" * 100)
 
     assert response.status_code == 200
-    assert response.json() == {"kind": "text", "bytes": 100}
+    assert (response.json()["kind"], response.json()["bytes"]) == ("text", 100)
 
 
 def test_extract_body_in_many_chunks_counts_all_bytes(make_app: Callable[..., FastAPI]) -> None:
@@ -120,7 +120,8 @@ def test_extract_body_in_many_chunks_counts_all_bytes(make_app: Callable[..., Fa
     run = run_driven(make_app(), post_scope(EXTRACT, content_length=total), chunks(*parts))
 
     assert run.status == 200
-    assert json.loads(run.body) == {"kind": "text", "bytes": total}
+    data = json.loads(run.body)
+    assert (data["kind"], data["bytes"]) == ("text", total)
 
 
 # --- 411 ---------------------------------------------------------------------------
