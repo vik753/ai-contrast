@@ -5,8 +5,12 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "../App";
 import { isLanguage, setupI18n } from "../i18n";
+import enJson from "../i18n/locales/en.json";
 import { resetBrowserEnv } from "../test/browser-env";
+import { flattenLocale, text } from "../test/locale-utils";
 import { RatingIcon, type Rating } from "./RatingIcon";
+
+const EN = flattenLocale(enJson);
 
 beforeEach(() => {
   resetBrowserEnv();
@@ -49,7 +53,9 @@ describe("App shell", () => {
   it("pairs every rating icon with a visible text label", async () => {
     await setupI18n();
     render(<App />);
-    const list = screen.getByRole("list");
+    // S2-T2: the upload form adds more lists; use the one in the ratings card.
+    const ratingsCard = screen.getByRole("region", { name: text(EN, "home.ratings.title") });
+    const list = within(ratingsCard).getByRole("list");
     const items = within(list).getAllByRole("listitem");
     expect(items).toHaveLength(3);
     for (const item of items) {

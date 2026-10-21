@@ -37,9 +37,24 @@ function sortedKeys(name: LocaleName): string[] {
   return Object.keys(LOCALES[name]).sort();
 }
 
+const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
+
+/**
+ * Keys with i18next plural suffixes folded to their base key. English has
+ * `_one`/`_other`, Ukrainian and Russian also `_few`/`_many` (S2-T2 AC11),
+ * so parity with English is checked on base keys.
+ */
+function baseKeys(name: LocaleName): string[] {
+  return [...new Set(Object.keys(LOCALES[name]).map((k) => k.replace(PLURAL_SUFFIX, "")))].sort();
+}
+
 describe("locale key parity (AC7)", () => {
   it.each(["uk", "ru"] as const)("test_%s_has_same_keys_as_en", (name) => {
-    expect(sortedKeys(name)).toEqual(sortedKeys("en"));
+    expect(baseKeys(name)).toEqual(baseKeys("en"));
+  });
+
+  it("test_uk_and_ru_have_identical_keys_including_plural_forms", () => {
+    expect(sortedKeys("uk")).toEqual(sortedKeys("ru"));
   });
 
   it("test_en_locale_is_not_empty", () => {

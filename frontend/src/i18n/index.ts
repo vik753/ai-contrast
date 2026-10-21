@@ -91,7 +91,9 @@ async function initOrSwitch(lang: Language): Promise<void> {
     load: "currentOnly",
     defaultNS: "translation",
     // React escapes all rendered text; i18next must not escape it twice.
-    interpolation: { escapeValue: false },
+    // Values (file names) are never parsed for `$t(...)` nesting or
+    // `{{...}}` placeholders (threat model T1, T11). Explicit, not a default.
+    interpolation: { escapeValue: false, skipOnVariables: true },
     // Resources are bundled, so nothing loads asynchronously.
     react: { useSuspense: false },
   });

@@ -119,6 +119,15 @@ Detection is a pure function on bytes in memory. It reads only fixed-size header
   11. i18n: every new string in `en`, `uk` and `ru` with the same keys; counts use i18next plural forms (`_one`, `_few`, `_many`, `_other` for `uk` and `ru`). `home.status` says that adding contracts works and comparison comes later.
   12. Accessibility: each contract is a `<section>` with a heading; button names include the contract label ("Add files to Contract A"); status uses icon plus text, never color alone.
   13. No new dependency; no HTML sinks; CSP unchanged (`connect-src 'self'` covers `/api/extract`). lint, typecheck, test, build and format checks are green.
+- Review round 1 (PR #16) added to the AC:
+  - `extractFile` accepts `400 length_mismatch` and `408 upload_timeout` (PR #15 contract); every server code only together with its status; the response body is read up to 4 KiB (`Content-Length` above it, or more streamed bytes → abort and `unknown_error`); a non-JSON `Content-Type` → `unknown_error`; tests pin `credentials: "omit"`, `redirect: "error"`, `cache: "no-store"` and no `keepalive` / `referrer`.
+  - i18n sets `skipOnVariables: true` explicitly; a file name such as `$t(upload.title) {{label}}` appears word for word in the row, the Remove label and the live region. File names are wrapped in `<bdi>`.
+  - Readiness: `readiness()` adds the reason `rejected_files` ("Remove the files that were not accepted"); order: `checking` → `rejected_files` → `contract_without_file` → ready.
+  - Scheduler in a hook `useCheckScheduler(state, dispatch, check)`; when its effect starts again, `checking` files without a request in flight go back to `queued`; files rejected by the client keep no `File` reference.
+  - Focus: after adding a contract, focus moves to the new contract's "Add files" button; after removing a contract, to "Add contract"; a focus target is applied only if the item exists. The queued → checking step is not announced.
+  - Live region is cleared on a language change. "Files added" announcement uses plural forms.
+  - Sizes round up (`10,485,761` bytes shows as "10.1 MB"); "MB" means 1024² (comment in `limits.ts` and `format.ts`); limits in messages are interpolated from `limits.ts`, never written into the strings.
+  - Wording fixes in uk/ru from the code review.
 - Threats: T1 (HTML sinks), T3, T6, T11 (file names).
 
 ### S2-T3 Docs and threat model for stage 2
