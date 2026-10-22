@@ -319,7 +319,9 @@ def test_counter_continues_across_table_cells_in_document_order() -> None:
 
 def test_hidden_paragraph_does_not_count() -> None:
     numbering = numbering_xml(abstract_num(0, lvl(0, "%1.")), num(1, 0))
-    hidden = p(r("Hidden clause text.", "<w:vanish/>"), ppr=num_pr(1))
+    # Round 1 (PR #31): counting follows the paragraph mark, so the mark is hidden too.
+    hidden_mark = "<w:rPr><w:vanish/></w:rPr>"
+    hidden = p(r("Hidden clause text.", "<w:vanish/>"), ppr=num_pr(1) + hidden_mark)
     result = _run(numbering, para("One", ppr=num_pr(1)), hidden, para("Two", ppr=num_pr(1)))
 
     assert "Hidden clause" not in joined(result)
@@ -332,7 +334,9 @@ def test_tracked_deleted_paragraph_does_not_count() -> None:
         '<w:del w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z">'
         '<w:r><w:delText xml:space="preserve">Deleted clause text.</w:delText></w:r></w:del>'
     )
-    deleted = p(deleted_run, ppr=num_pr(1))
+    # Round 1 (PR #31): counting follows the paragraph mark, so the mark is deleted too.
+    deleted_mark = '<w:rPr><w:del w:id="2" w:author="A" w:date="2026-01-01T00:00:00Z"/></w:rPr>'
+    deleted = p(deleted_run, ppr=num_pr(1) + deleted_mark)
     result = _run(numbering, para("One", ppr=num_pr(1)), deleted, para("Two", ppr=num_pr(1)))
 
     assert "Deleted clause" not in joined(result)
@@ -389,13 +393,14 @@ def test_more_than_nine_levels_fails_closed() -> None:
     assert info.value.code == "suspicious_package"
 
 
-def test_paragraph_level_above_eight_fails_closed() -> None:
+def test_paragraph_level_above_eight_uses_level_zero_and_warns() -> None:
+    # Round 1 (PR #31), item 5: a bad paragraph `ilvl` is approximate, not fatal.
     numbering = numbering_xml(abstract_num(0, lvl(0, "%1.")), num(1, 0))
 
-    with pytest.raises(ExtractionError) as info:
-        _run(numbering, para(TEXT, ppr=num_pr(1, 9)))
+    result = _run(numbering, para(TEXT, ppr=num_pr(1, 9)))
 
-    assert info.value.code == "suspicious_package"
+    assert texts(result) == [f"1. {TEXT}"]
+    assert "numbering_approximate" in [w.code for w in result.warnings]
 
 
 def test_too_many_definitions_fails_closed() -> None:
