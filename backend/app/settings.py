@@ -126,6 +126,8 @@ class Settings(BaseSettings):
 
     - ``GOOGLE_FETCH_TIMEOUT_SECONDS``: total deadline of one fetch, redirects included.
     - ``GOOGLE_CONNECT_TIMEOUT_SECONDS``: DNS and connect timeout of one connection.
+    - ``GOOGLE_BODY_TIMEOUT_SECONDS``: deadline to read the small JSON request body of
+      ``POST /api/extract/google-doc`` (under the extraction slot).
     """
 
     model_config = SettingsConfigDict(
@@ -164,6 +166,7 @@ class Settings(BaseSettings):
     max_pdf_prev_chain: PositiveInt = DEFAULT_MAX_PDF_PREV_CHAIN
     google_fetch_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 20.0
     google_connect_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 5.0
+    google_body_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 5.0
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

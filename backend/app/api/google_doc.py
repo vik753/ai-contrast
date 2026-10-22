@@ -4,7 +4,7 @@ Request: ``Content-Type: application/json``, body ``{"document_id": "<ID>"}`` an
 field. The ID is a password for the document: it is never logged, echoed or put in an
 error. Order of checks: media type (``415``, from the header alone), extraction slot
 (``503 busy``, before any body byte is read), body read under the slot within
-``EXTRACT_BODY_TIMEOUT_SECONDS`` (``408 upload_timeout``), body and ID (``422``), fetch
+``GOOGLE_BODY_TIMEOUT_SECONDS`` (``408 upload_timeout``), body and ID (``422``), fetch
 (``422``, ``502``, ``504``), detection by magic bytes (must be DOCX, else
 ``502 google_doc_unavailable``), then the same extraction as ``POST /api/extract``.
 The slot is held from before the body read until the last byte of the response is sent
@@ -90,7 +90,7 @@ def _parse_id(body: bytes) -> str | None:
 async def extract_google_doc(request: Request) -> Response:
     settings, limiter = app_state(request)
     if media_type(request.headers.get("content-type")) != "application/json":
-        return error_response("unsupported_media_type", 415)
+        return early_error("unsupported_media_type", 415)
     return SlotResponse(
         settings,
         limiter,
@@ -103,7 +103,7 @@ async def extract_google_doc(request: Request) -> Response:
 async def _read_body(request: Request, settings: Settings) -> bytes | None:
     """The whole body, or ``None`` if it is not complete within the body deadline."""
     try:
-        async with asyncio.timeout(settings.extract_body_timeout_seconds):
+        async with asyncio.timeout(settings.google_body_timeout_seconds):
             return await request.body()
     except TimeoutError:
         return None

@@ -1,7 +1,7 @@
 """S3-T6a review findings (PR #35), MAJOR: slot first with a body deadline, and DNS failure mapping.
 
 1. ``POST /api/extract/google-doc`` takes the extraction slot BEFORE it reads the body.
-   Under the slot the body read has the deadline ``settings.extract_body_timeout_seconds`` and
+   Under the slot the body read has the deadline ``settings.google_body_timeout_seconds`` and
    fails with ``408 {"error": "upload_timeout"}``, as ``/api/extract`` does. A busy server
    answers ``503 busy`` + ``Retry-After`` before any body byte is read, whatever the body is.
    The ``415`` media-type check (header only) may stay before the slot.
@@ -104,7 +104,7 @@ def _no_network(app: FastAPI) -> list[int]:
 def test_google_doc_stalled_body_returns_408_within_deadline(
     make_app: Callable[..., FastAPI],
 ) -> None:
-    app = make_app(extract_body_timeout_seconds=1)
+    app = make_app(google_body_timeout_seconds=1)
     calls = _no_network(app)
 
     run, elapsed = _timed(app, _json_scope(), _stall_after(b'{"document_id": "'))
@@ -116,7 +116,7 @@ def test_google_doc_stalled_body_returns_408_within_deadline(
 
 
 def test_google_doc_stalled_body_slot_free_after_408(make_app: Callable[..., FastAPI]) -> None:
-    app = make_app(extract_body_timeout_seconds=1, max_concurrent_extractions=1)
+    app = make_app(google_body_timeout_seconds=1, max_concurrent_extractions=1)
     _no_network(app)
 
     run, _ = _timed(app, _json_scope(), _stall_after(b'{"document_id": "'))
@@ -128,7 +128,7 @@ def test_google_doc_stalled_body_slot_free_after_408(make_app: Callable[..., Fas
 def test_google_doc_stalled_body_408_never_echoes_the_partial_input(
     make_app: Callable[..., FastAPI],
 ) -> None:
-    app = make_app(extract_body_timeout_seconds=1)
+    app = make_app(google_body_timeout_seconds=1)
     marker = new_marker("partial")
 
     run, _ = _timed(app, _json_scope(), _stall_after(f'{{"{marker}": "'.encode()))
@@ -204,7 +204,7 @@ def test_google_doc_busy_with_invalid_body_returns_503_not_422(
 def test_google_doc_busy_is_answered_before_reading_the_body(
     make_app: Callable[..., FastAPI],
 ) -> None:
-    app = make_app(extract_body_timeout_seconds=1)
+    app = make_app(google_body_timeout_seconds=1)
     _take_all_slots(app)
 
     run, elapsed = _timed(app, _json_scope(), _stall_after(b'{"document_id": "'))

@@ -7,6 +7,8 @@ import ast
 import asyncio
 import pathlib
 import ssl
+import time
+import typing
 from collections.abc import Callable
 from typing import Any
 
@@ -14,12 +16,15 @@ import httpcore
 import httpx
 import pytest
 from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api import common, extract, google_doc
 from app.net.client import ClientFactory, outbound_client
 from app.net.google_docs import GoogleDocError, fetch_google_doc
 from app.net.guard import BlockedHostError, GuardedNetworkBackend
 from app.settings import Settings
+from tests.asgi_stream import post_scope
 from tests.netfakes import PUBLIC_V4, ResolverSpy, SpyInner, StreamingTransport
 
 DOC_ID = "a1B2c3D4e5F6g7H8i9J0k1L2m3"
@@ -79,8 +84,24 @@ def test_common_media_type_ignores_parameters_and_case() -> None:
 # --- 4. typed client factory ---------------------------------------------------------------
 
 
-def test_client_factory_alias_is_a_callable_returning_an_async_client() -> None:
-    assert ClientFactory == Callable[[], httpx.AsyncClient]
+def test_fetch_google_doc_client_factory_is_annotated_with_the_alias() -> None:
+    hints = typing.get_type_hints(fetch_google_doc)
+
+    assert hints["client_factory"] == ClientFactory
+    assert typing.get_args(ClientFactory) == ([], httpx.AsyncClient)
+
+
+def test_the_alias_matches_what_outbound_client_returns() -> None:
+    def factory() -> httpx.AsyncClient:
+        return _client(SpyInner())
+
+    typed: ClientFactory = factory
+
+    async def go() -> None:
+        async with typed() as client:
+            assert isinstance(client, httpx.AsyncClient)
+
+    asyncio.run(go())
 
 
 def test_google_client_factory_returns_the_factory_of_the_app(
@@ -225,3 +246,69 @@ def test_settings_type_is_used_by_the_app_state(make_app: Callable[..., FastAPI]
     settings, _ = common.app_state(_request(app))
 
     assert isinstance(settings, Settings)
+
+
+# --- GOOGLE_BODY_TIMEOUT_SECONDS and the 415 header -------------------------------------------
+
+
+def test_google_body_timeout_default_is_5_seconds() -> None:
+    assert Settings().google_body_timeout_seconds == 5
+
+
+def test_google_body_timeout_is_read_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GOOGLE_BODY_TIMEOUT_SECONDS", "2.5")
+
+    assert Settings().google_body_timeout_seconds == 2.5
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc", "", "nan", "inf"])
+def test_google_body_timeout_invalid_value_is_refused_without_echo(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.setenv("GOOGLE_BODY_TIMEOUT_SECONDS", value)
+
+    with pytest.raises(ValidationError) as info:
+        Settings()
+
+    if value:
+        assert f"'{value}'" not in str(info.value)
+
+
+def test_google_body_deadline_is_not_the_extract_body_deadline(
+    make_app: Callable[..., FastAPI],
+) -> None:
+    """The deadline is ``google_body_timeout_seconds``; the 60 s upload deadline is not used."""
+    app = make_app(google_body_timeout_seconds=1, extract_body_timeout_seconds=60)
+    stalled = asyncio.Event()
+
+    async def receive() -> dict[str, Any]:
+        await stalled.wait()
+        return {"type": "http.disconnect"}
+
+    sent: list[dict[str, Any]] = []
+
+    async def send(message: dict[str, Any]) -> None:
+        sent.append(message)
+
+    scope = post_scope(
+        "/api/extract/google-doc", content_type="application/json", content_length=100
+    )
+    start = time.monotonic()
+    asyncio.run(asyncio.wait_for(app(scope, receive, send), 10))
+
+    assert time.monotonic() - start < 4
+    assert sent[0]["status"] == 408
+
+
+def test_google_doc_415_closes_the_connection(make_app: Callable[..., FastAPI]) -> None:
+    client = TestClient(make_app(), raise_server_exceptions=False)
+
+    response = client.post(
+        "/api/extract/google-doc", content=b"{}", headers={"Content-Type": "text/plain"}
+    )
+
+    assert response.status_code == 415
+    assert response.json() == {"error": "unsupported_media_type"}
+    assert response.headers.get("connection") == "close"

@@ -351,11 +351,11 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
 6. **Endpoint** `POST /api/extract/google-doc`:
    - `Content-Type` must be `application/json` (else `415 unsupported_media_type`); body limit is the JSON limit (`413 request_too_large`, existing middleware, exact path match);
    - body `{"document_id": "<ID>"}`, no other fields; malformed JSON or other fields → `422 invalid_request`; ID not a full match (`re.fullmatch`) of `[A-Za-z0-9_-]{25,100}` → `422 invalid_google_doc_id`; errors are `{"error": "<code>"}` and never echo the input (no FastAPI default validation body);
-   - takes the extraction slot first (`503 busy` with `Retry-After`, before any body byte is read; only the `415` header check comes before it) and holds it through the body read, the fetch, the extraction and the response; the body read has the deadline `EXTRACT_BODY_TIMEOUT_SECONDS` → `408 upload_timeout`, then the `422` checks above;
+   - takes the extraction slot first (`503 busy` with `Retry-After`, before any body byte is read; only the `415` header check comes before it) and holds it through the body read, the fetch, the extraction and the response; the body read has the deadline `GOOGLE_BODY_TIMEOUT_SECONDS` (5 s, the body is a small JSON) → `408 upload_timeout`, then the `422` checks above;
    - fetch errors: `422 google_doc_not_public`, `422 google_doc_not_found`, `422 google_doc_too_large`, `502 google_doc_unavailable`, `504 google_doc_timeout`;
    - the fetched bytes must be detected as DOCX by magic bytes (else `502 google_doc_unavailable`), then the same `run_extraction` with the same limits; extraction errors and the `200` response are exactly as for `/api/extract`;
    - logging: method, path, status, duration only; never the ID, a URL, a hostname, an address or a response header. Loggers `httpx` and `httpcore` at `WARNING` in `log_config.json` and at application start (`httpx` logs each request URL at `INFO`). Extend the log canary test with an ID canary that goes through a real `httpx.AsyncClient` (guarded backend with a fake resolver and a fake inner backend), so the `httpx` request log is covered.
-7. Settings: `GOOGLE_FETCH_TIMEOUT_SECONDS` (20), `GOOGLE_CONNECT_TIMEOUT_SECONDS` (5); bounds validated like the existing settings.
+7. Settings: `GOOGLE_FETCH_TIMEOUT_SECONDS` (20), `GOOGLE_CONNECT_TIMEOUT_SECONDS` (5), `GOOGLE_BODY_TIMEOUT_SECONDS` (5); bounds validated like the existing settings.
 
 **S3-T6b — frontend**
 
