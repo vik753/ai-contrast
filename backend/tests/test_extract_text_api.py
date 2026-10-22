@@ -1,5 +1,5 @@
 """S3-T1 AC2, AC6, AC7, AC10: ``POST /api/extract`` returns the stage 3
-response contract for text files; PDF gets ``501 not_implemented``
+response contract for text files (PDF and DOCX have their own test modules)
 until S3-T3 (DOCX: S3-T2, tests/test_docx_api.py).
 
 Assumed contract (see the test report): ``app/api/extract.py`` imports
@@ -131,21 +131,7 @@ def test_extract_text_encodings_decoded_to_ukrainian(
     assert data["language"] == "uk"
 
 
-# --- 501 for PDF and DOCX (AC7, temporary) -------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    # S3-T2: DOCX is extracted now (tests/test_docx_api.py); PDF until S3-T3.
-    "body",
-    [pytest.param(PDF_SAMPLE, id="pdf")],
-)
-def test_extract_pdf_and_docx_return_501_not_implemented(
-    make_client: Callable[..., TestClient], body: bytes
-) -> None:
-    response = _post(make_client(), body)
-
-    assert response.status_code == 501
-    assert response.json() == {"error": "not_implemented"}
+# --- PDF and DOCX go through the sandbox since S3-T2/S3-T3 (AC7 501 removed) --------------
 
 
 @pytest.mark.parametrize(
@@ -388,7 +374,7 @@ def test_extract_sandbox_limits_follow_settings(
     "body",
     [pytest.param(PDF_SAMPLE, id="pdf")],
 )
-def test_extract_pdf_and_docx_never_reach_the_sandbox(
+def test_extract_pdf_reaches_the_sandbox(
     make_client: Callable[..., TestClient],
     patch_sandbox: Callable[[FakeSandbox], None],
     body: bytes,
@@ -397,8 +383,9 @@ def test_extract_pdf_and_docx_never_reach_the_sandbox(
     fake.release.set()
     patch_sandbox(fake)
 
-    assert _post(make_client(), body).status_code == 501
-    assert fake.calls == []
+    # S3-T3: PDF extraction exists, so the request reaches the sandbox.
+    _post(make_client(), body)
+    assert len(fake.calls) == 1
 
 
 # --- Logs and privacy (AC10) -------------------------------------------------------------------
@@ -453,7 +440,7 @@ ACCESS_LINE = re.compile(r"^POST /api/extract (?P<status>\d{3}) duration_ms=\d+$
     ("body", "status"),
     [
         pytest.param(EN.encode(), 200, id="200"),
-        pytest.param(PDF_SAMPLE, 501, id="501"),
+        pytest.param(PDF_SAMPLE, 422, id="422-pdf"),
         pytest.param(b"\n \n", 422, id="422"),
     ],
 )

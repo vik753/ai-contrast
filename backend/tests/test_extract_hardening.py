@@ -570,7 +570,7 @@ def _peak_growth_one_byte_chunks(app: FastAPI, size: int) -> int:
         tracemalloc.stop()
     # The body must be read in full and reach extraction.
     assert len(status) == 1
-    assert status[0] == 501  # S3-T3 changes this when PDF extraction exists
+    assert status[0] == 422  # a synthetic '%PDF-' body reaches extraction and is rejected there
     return peak - baseline
 
 

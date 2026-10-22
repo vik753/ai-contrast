@@ -275,6 +275,8 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
   13. List caps as for DOCX; `pages` = page count; shared normalization and Cc rule.
   14. Fixtures: a small PDF builder in tests (raw PDF objects, standard Type1 fonts for Latin text, a Type0/Identity-H font with a ToUnicode CMap for Cyrillic; no new test dependency). Worst case at the caps (100 pages, dense text) inside the child limits.
   15. Docs: threat model T4 (encrypted-PDF rule, pdfminer logging rule), ADR 0004 aligned.
+- Tech lead decisions (implementation round): the `pdfminer` logger stays at ERROR (AC1 wins over AC11's "any parse warning"); `damaged_pdf` comes from our own checks (xref reconstruction, counted ERROR records that are never written, unreadable listed objects → `pdf_damaged`). Thresholds: header/footer band 8 % of the page height; "little text" under 200 characters; an OCR page needs images over at least 1 % of the page. Form XObjects inherit the graphics state; blend modes and soft masks turn white-text removal into `borderline_text`.
+- Stage 13 follow-up: measure the 100-page worst case on Render's CPU (9.3 s CPU here); lower `MAX_PDF_PAGES` or raise the wall limit if it exceeds 30 s.
 - Threats: T4, T5.
 
 ### S3-T2b List numbering labels (before stage 5)
