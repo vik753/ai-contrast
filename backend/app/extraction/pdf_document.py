@@ -20,8 +20,10 @@ Runs inside the parsing child (ADR 0011). ``CheckedDocument`` is a pdfminer
 - **Freed and re-numbered objects.** An object that a newer revision frees but an
   older one still lists, or that has another generation in an older section, is
   read differently by pdfminer (old revision) and by viewers (nothing, or the new
-  object) → ``PdfDamagedError``. Sections of one revision (a hybrid file's table
-  and its ``/XRefStm``) count as one.
+  object). Such numbers are collected as *suspect*; only when extraction actually
+  resolves a suspect number (``getobj``) → ``PdfDamagedError``. A freed object that
+  nothing references (a legitimate deletion) is harmless. Sections of one revision
+  (a hybrid file's table and its ``/XRefStm``) count as one.
 
 Encryption: only the empty **user** password is tried. pdfminer's owner-password
 fallback (R2 to R4: the empty owner password decrypts the user password; R5, R6:
@@ -209,6 +211,7 @@ class CheckedDocument(PDFDocument):
 
     def __init__(self, parser: PDFParser, *, data: bytes, max_prev_chain: int) -> None:
         self.max_prev_chain = max_prev_chain
+        self.suspect: set[int] = set()
         self.revisions = 1
         self._linearized_length = _linearized_length(data)
         self._size = len(data)
@@ -267,7 +270,7 @@ class CheckedDocument(PDFDocument):
                 group.append(stream)
                 if "Prev" in stream.get_trailer() and _offset(stream.get_trailer()["Prev"]) in seen:
                     raise PdfDamagedError
-            self._check_revision(group, freed, generations)
+            self.suspect |= self._check_revision(group, freed, generations)
             if "Prev" not in trailer:
                 break
             links += 1
@@ -281,8 +284,9 @@ class CheckedDocument(PDFDocument):
     @staticmethod
     def _check_revision(
         group: list[PDFBaseXRef], freed: set[int], generations: dict[int, int]
-    ) -> None:
-        """Compare one revision with the newer ones seen before (module doc)."""
+    ) -> set[int]:
+        """Suspect object numbers of one revision, compared with the newer ones."""
+        suspect: set[int] = set()
         used: dict[int, int] = {}
         free_now: set[int] = set()
         for xref in group:
@@ -292,8 +296,14 @@ class CheckedDocument(PDFDocument):
             if objid == 0:
                 continue
             if objid in freed or generations.setdefault(objid, generation) != generation:
-                raise PdfDamagedError
+                suspect.add(objid)
         freed |= {objid for objid in free_now if objid not in used and objid != 0}
+        return suspect
+
+    def getobj(self, objid: int) -> object:
+        if objid in self.suspect:
+            raise PdfDamagedError
+        return super().getobj(objid)
 
     def _count_revisions(self, links: int) -> int:
         # A linearized file that was not updated has two sections and one revision.

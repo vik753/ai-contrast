@@ -9,10 +9,10 @@ from pdfminer.psparser import LIT
 from app.extraction.model import Block
 from app.extraction.pdf_colour import is_white, luminance, parse_colour_space
 from app.extraction.pdf_content import tiling_runs_text
-from app.extraction.pdf_document import CheckedDocument, PdfDamagedError, _TrackedXRef
+from app.extraction.pdf_document import CheckedDocument, _TrackedXRef
 from app.extraction.references import external_reference_warnings, straddles
-from tests.pdfbuild import EXTRA, Page, build_pdf, text, type3_objects
-from tests.pdfrun import extract, reasons, squashed, warnings_of
+from tests.pdfbuild import EXTRA, Obj, Page, build_pdf, incremental_update, text, type3_objects
+from tests.pdfrun import extract, reasons, squashed, texts, warning_codes, warnings_of
 
 SPOT_FN = {"FunctionType": 2, "Domain": [0, 1], "C0": [0, 0, 0, 0], "C1": [0, 0, 0, 1], "N": 1}
 
@@ -160,22 +160,20 @@ def test_hybrid_revision_may_free_what_its_stream_lists() -> None:
     assert freed == set()
 
 
-def test_older_revision_listing_a_freed_object_is_damaged() -> None:
+def test_older_revision_listing_a_freed_object_is_suspect() -> None:
     freed: set[int] = set()
     gens: dict[int, int] = {}
     CheckedDocument._check_revision([_table({}, {7})], freed, gens)
 
-    with pytest.raises(PdfDamagedError):
-        CheckedDocument._check_revision([_table({7: 0}, set())], freed, gens)
+    assert CheckedDocument._check_revision([_table({7: 0}, set())], freed, gens) == {7}
 
 
-def test_generation_change_between_revisions_is_damaged() -> None:
+def test_generation_change_between_revisions_is_suspect() -> None:
     freed: set[int] = set()
     gens: dict[int, int] = {}
     CheckedDocument._check_revision([_table({7: 1}, set())], freed, gens)
 
-    with pytest.raises(PdfDamagedError):
-        CheckedDocument._check_revision([_table({7: 0}, set())], freed, gens)
+    assert CheckedDocument._check_revision([_table({7: 0}, set())], freed, gens) == {7}
 
 
 def test_object_zero_is_ignored() -> None:
@@ -184,3 +182,14 @@ def test_object_zero_is_ignored() -> None:
     CheckedDocument._check_revision([_table({}, {0})], freed, gens)
 
     CheckedDocument._check_revision([_table({0: 0}, set())], freed, gens)
+
+
+def test_update_freeing_an_unreferenced_object_is_harmless() -> None:
+    original = build_pdf(
+        Page(text("Clause 1. Synthetic.")), extra={EXTRA: Obj("<< /Unused true >>")}
+    )
+
+    result = extract(incremental_update(original, {}, free=[EXTRA]))
+
+    assert texts(result) == ["Clause 1. Synthetic."]
+    assert warning_codes(result) == ["pdf_edited"]
