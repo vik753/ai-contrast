@@ -341,6 +341,8 @@ class StyleDef:
     table_shading: ShadeSpec | None = None  # table styles: w:tblPr/w:shd
     conditional: bool = False  # table styles: w:tblStylePr
     conditional_fills: list[ShadeSpec] = field(default_factory=list)
+    num_id: str | None = None  # w:pPr/w:numPr/w:numId
+    num_ilvl: str | None = None  # w:pPr/w:numPr/w:ilvl
 
 
 @dataclass(frozen=True)
@@ -400,6 +402,23 @@ class Styles:
             )
             self._chains[(current_id, kind)] = merged
         return merged
+
+    def numbering(self, style_id: str | None) -> tuple[str | None, str | None]:
+        """``(numId, ilvl)`` of a paragraph style: the nearest style of the
+        ``basedOn`` chain that sets each of them."""
+        num_id: str | None = None
+        ilvl: str | None = None
+        seen: set[str] = set()
+        current = style_id
+        while current is not None and current not in seen:
+            seen.add(current)
+            definition = self.styles.get(current)
+            if definition is None or definition.kind != "paragraph":
+                break
+            num_id = num_id if num_id is not None else definition.num_id
+            ilvl = ilvl if ilvl is not None else definition.num_ilvl
+            current = definition.based_on
+        return num_id, ilvl
 
     def paragraph_style(self, style_id: str | None) -> str | None:
         if style_id is not None:
@@ -470,6 +489,11 @@ def _style_element(style: StyleDef, stack: list[str], tag: str, attrib: dict[str
         style.based_on = attrib.get(VAL)
     elif depth == 4 and parent == _W + "rPr":  # noqa: PLR2004
         read_run_property(tag, attrib, style.rpr)
+    elif depth == 5 and parent == _W + "numPr" and stack[-3] == _W + "pPr":  # noqa: PLR2004
+        if tag == _W + "numId":
+            style.num_id = attrib.get(VAL)
+        elif tag == _W + "ilvl":
+            style.num_ilvl = attrib.get(VAL)
     elif depth == 4 and tag == _W + "shd":  # noqa: PLR2004
         if parent == _W + "pPr":
             style.shading = shade_spec(attrib)

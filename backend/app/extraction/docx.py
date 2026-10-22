@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 from xml.etree.ElementTree import Element
 
+from app.extraction.docx_numbering import Counters, parse_numbering
 from app.extraction.docx_package import (
     R_NS,
     DocSettings,
@@ -162,6 +163,9 @@ TEXT_TAGS: Final = frozenset({T_T, T_MATH_T})
 T_RPR: Final = _W + "rPr"
 T_PPR: Final = _W + "pPr"
 T_PSTYLE: Final = _W + "pStyle"
+T_NUMPR: Final = _W + "numPr"
+T_NUM_ID: Final = _W + "numId"
+T_ILVL: Final = _W + "ilvl"
 T_SHD: Final = _W + "shd"
 T_SDT: Final = _W + "sdt"
 T_SDT_PR: Final = _W + "sdtPr"
@@ -275,6 +279,7 @@ GRAPHIC_URIS: Final = {
 }
 BORDERLINE_TEXT: Final = "borderline_text"
 FIELD_MAY_UPDATE: Final = "field_may_update"
+NUMBERING_APPROXIMATE: Final = "numbering_approximate"
 NOT_DISPLAYED: Final = "not_displayed"
 HIDDEN_OBJECT: Final = "hidden_object"
 PAGE_NUMBER: Final = "page_number"
@@ -447,6 +452,7 @@ class _Document:
         self.sections: list[_Section] = []
         self.note_refs: dict[Part, set[str]] = {"footnote": set(), "endnote": set()}
         self.verdicts: dict[tuple[object, ...], Verdict] = {}
+        self.counters: Counters | None = None
 
     def field_seen(self, *, dirty: bool) -> None:
         if dirty or self.settings.update_fields:
@@ -512,6 +518,10 @@ class _Paragraph:
     verdict: Verdict | None = None
     span: _Span | None = None
     borderline: bool = False
+    num_id: str | None = None  # direct w:numPr
+    num_ilvl: str | None = None
+    uncounted: bool = False  # tracked-deleted content seen
+    removed: bool = False  # hidden or otherwise removed text seen
 
 
 @dataclass
@@ -573,6 +583,7 @@ class _PartWalker:
         self.collect: Collect | None = None
         self.collect_depth = 0
         self.after_collect: Callable[[], None] | None = None
+        self.collect_deep: Collect | None = None  # grandchildren of the collected element
         self.section: _Section | None = None
         self.section_depth = 0
         self.code_fields = 0
@@ -616,6 +627,8 @@ class _PartWalker:
                             self.collect(item.tag, item.attrib)
                     elif self.section is not None and depth == self.section_depth + 1:
                         self._section_child(item.tag, item.attrib)
+                    elif self.collect_deep is not None and depth == self.collect_depth + 2:
+                        self.collect_deep(item.tag, item.attrib)
                     continue
                 tag = item.tag
                 if depth == 1:
@@ -639,6 +652,7 @@ class _PartWalker:
                         self.section_depth = 0
                     if depth == self.collect_depth:
                         self.collect = None
+                        self.collect_deep = None
                         if self.after_collect is not None:
                             after, self.after_collect = self.after_collect, None
                             after()
@@ -833,6 +847,7 @@ class _PartWalker:
             if span is None or span.reason != verdict.reason:
                 self._close_span(paragraph)
                 span = paragraph.span = _Span(verdict.reason)
+                paragraph.removed = True
             span.add(text)
             return
         self._close_span(paragraph)
@@ -887,11 +902,21 @@ class _PartWalker:
             return
 
         def collect(tag: str, attrib: dict[str, str]) -> None:
+            in_num_pr[0] = tag == T_NUMPR
             if tag == T_PSTYLE:
                 paragraph.style = attrib.get(VAL)
             elif tag == T_SHD:
                 paragraph.shading = shade_spec(attrib)
 
+        def deep(tag: str, attrib: dict[str, str]) -> None:
+            if in_num_pr[0]:
+                if tag == T_NUM_ID:
+                    paragraph.num_id = attrib.get(VAL)
+                elif tag == T_ILVL:
+                    paragraph.num_ilvl = attrib.get(VAL)
+
+        in_num_pr = [False]
+        self.collect_deep = deep
         self.collect = collect
         self.collect_depth = depth
 
@@ -1146,6 +1171,8 @@ class _PartWalker:
         self._warn(NOT_READ[item.tag])
 
     def _start_skipped(self, item: Element, depth: int) -> None:
+        if item.tag == T_DEL and self.paragraph is not None:
+            self.paragraph.uncounted = True
         self._skip()
 
     def _start_background(self, item: Element, depth: int) -> None:
@@ -1172,7 +1199,33 @@ class _PartWalker:
         if self.capture is not None:
             self.capture.add("\n")
             return
-        self.collector.paragraph(paragraph.part, "".join(paragraph.pieces))
+        text = "".join(paragraph.pieces)
+        label = self._label(paragraph, text)
+        self.collector.paragraph(paragraph.part, f"{label} {text}" if label else text)
+
+    def _label(self, paragraph: _Paragraph, text: str) -> str:
+        """Count a numbered paragraph and return its label (empty: none). Hidden and
+        tracked-deleted paragraphs do not count; an empty one does."""
+        counters = self.document.counters
+        if counters is None:
+            return ""
+        styles = self.document.styles
+        style_id = styles.paragraph_style(paragraph.style)
+        style_num, style_ilvl = styles.numbering(style_id)
+        num_id = paragraph.num_id if paragraph.num_id is not None else style_num
+        if num_id is None or num_id == "0":
+            return ""
+        if not text.strip() and (paragraph.uncounted or paragraph.removed):
+            return ""
+        ilvl_text = paragraph.num_ilvl if paragraph.num_ilvl is not None else style_ilvl
+        try:
+            ilvl = int(ilvl_text) if ilvl_text is not None else 0
+        except ValueError:
+            raise suspicious() from None
+        label = counters.label(num_id, ilvl) or ""
+        if counters.approximate:
+            self.collector.warn(NUMBERING_APPROXIMATE)
+        return label if text.strip() else ""
 
     def _end_r(self, item: Element, depth: int) -> None:
         paragraph = self.paragraph
@@ -1276,6 +1329,8 @@ def extract_docx(
         theme.present = True
     collector = _Collector(max_chars=max_chars, max_blocks=max_blocks)
     document = _Document(styles, theme, settings, collector)
+    if "numbering" in single:
+        document.counters = Counters(parse_numbering(reader.events(single["numbering"])))
 
     def walk(entry: ZipEntry, part: Part, **kwargs: bool) -> None:
         options = {"main": False, "notes": False, "displayed": True, **kwargs}

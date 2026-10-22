@@ -45,6 +45,7 @@ REL_OFFICE_DOCUMENT_STRICT: Final = (
 REL_STYLES: Final = R_NS + "/styles"
 REL_SETTINGS: Final = R_NS + "/settings"
 REL_THEME: Final = R_NS + "/theme"
+REL_NUMBERING: Final = R_NS + "/numbering"
 REL_FOOTNOTES: Final = R_NS + "/footnotes"
 REL_ENDNOTES: Final = R_NS + "/endnotes"
 REL_HEADER: Final = R_NS + "/header"
@@ -68,12 +69,13 @@ _FOLLOWED: Final[dict[str, str]] = {
     REL_STYLES: "styles",
     REL_SETTINGS: "settings",
     REL_THEME: "theme",
+    REL_NUMBERING: "numbering",
     REL_FOOTNOTES: "footnote",
     REL_ENDNOTES: "endnote",
     REL_HEADER: "header",
     REL_FOOTER: "footer",
 }
-_SINGLE: Final = ("styles", "settings", "theme")
+_SINGLE: Final = ("styles", "settings", "theme", "numbering")
 _PART_LABELS: Final[dict[str, Part]] = {
     "footnote": "footnote",
     "endnote": "endnote",
@@ -100,7 +102,7 @@ class HeaderPart:
 @dataclass
 class Parts:
     main: ZipEntry
-    single: dict[str, ZipEntry] = field(default_factory=dict)  # styles, settings, theme
+    single: dict[str, ZipEntry] = field(default_factory=dict)  # styles, settings, theme, numbering
     notes: list[tuple[Part, ZipEntry]] = field(default_factory=list)
     headers: list[HeaderPart] = field(default_factory=list)
 
