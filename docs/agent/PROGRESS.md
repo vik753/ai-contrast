@@ -9,7 +9,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
 | 2 | File upload | done |
-| 3 | Text extraction | in progress: S3-T1, S3-T2, S3-T4 done; S3-T3 (PDF) next; S3-T2b (numbering), S3-T5 (OCR), S3-T6 (Google Docs link) planned |
+| 3 | Text extraction | in progress: S3-T1, S3-T2, S3-T3, S3-T4 done; S3-T2b (numbering) and S3-T5 (OCR) next; S3-T6 (Google Docs link) planned |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
 | 5b | Pseudonymization | planned |
@@ -68,3 +68,6 @@ How to resume after a break: read this file, then continue with the first unchec
 
 - 2026-10-22 — PR #26 merged (S3-T2: DOCX extraction with `defusedxml`). Three review rounds: toggle properties, displayed parts only, theme colours and table backgrounds (unresolved → kept with `borderline_text`), markup compatibility, hidden objects, data binding. Worst case 6 s CPU, 46 MiB child RSS. 1573 backend tests.
 - 2026-10-22 — New task S3-T2b (list numbering labels) before stage 5: clause numbers in Word are often automatic.
+- 2026-10-22 — PR #28 merged: developers, test-engineer and code-reviewer run on Sonnet; security-reviewer stays on Opus (customer request).
+- 2026-10-22 — PR #29 merged (S3-T3: PDF extraction with `pdfminer.six`). One review round: unrenderable content → material warnings, exact colour resolution in all colour spaces (unresolved → borderline), freed objects rejected only when extraction resolves them, empty-user-password encryption only. Worst case 100 pages: about 10.7 s CPU. 1827 backend tests.
+- Lesson: agent model changes in `.claude/agents/` take effect only in a new session; pass `model` explicitly when starting agents.
