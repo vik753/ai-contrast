@@ -2,10 +2,13 @@
 
 Request: ``Content-Type: application/json``, body ``{"document_id": "<ID>"}`` and no other
 field. The ID is a password for the document: it is never logged, echoed or put in an
-error. Order of checks: media type (``415``), body and ID (``422``), extraction slot
-(``503 busy``), fetch (``422``, ``502``, ``504``), detection by magic bytes (must be DOCX,
-else ``502 google_doc_unavailable``), then the same extraction as ``POST /api/extract``.
-The slot is held from before the fetch until the last byte of the response is sent.
+error. Order of checks: media type (``415``, from the header alone), extraction slot
+(``503 busy``, before any body byte is read), body read under the slot within
+``EXTRACT_BODY_TIMEOUT_SECONDS`` (``408 upload_timeout``), body and ID (``422``), fetch
+(``422``, ``502``, ``504``), detection by magic bytes (must be DOCX, else
+``502 google_doc_unavailable``), then the same extraction as ``POST /api/extract``.
+The slot is held from before the body read until the last byte of the response is sent
+(``SlotResponse``), so a slow upload occupies a slot like an upload to ``/api/extract``.
 """
 
 from __future__ import annotations
@@ -16,11 +19,19 @@ import logging
 from typing import Any, Final
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, Response
-from starlette.types import Receive, Scope, Send
+from fastapi.responses import Response
 
-from app.api.extract import _app_state, _media_type, _sandbox_limits, _send_in_chunks
-from app.extraction.detect import DetectionError, FileKind, ZipLimits, detect_kind
+from app.api.common import (
+    SlotResponse,
+    app_state,
+    early_error,
+    error_response,
+    google_client_factory,
+    media_type,
+    sandbox_limits,
+    zip_limits,
+)
+from app.extraction.detect import DetectionError, FileKind, detect_kind
 from app.extraction.model import ExtractionError
 from app.extraction.sandbox import run_extraction
 from app.net.google_docs import (
@@ -40,7 +51,6 @@ router = APIRouter()
 logger = logging.getLogger("ai_contrast.google_doc")
 
 GOOGLE_DOC_PATH: Final = "/api/extract/google-doc"
-RETRY_AFTER_SECONDS: Final = 5
 _STATUS: Final = {
     INVALID_ID: 422,
     NOT_PUBLIC: 422,
@@ -50,10 +60,6 @@ _STATUS: Final = {
     TIMEOUT: 504,
 }
 _BAD_GATEWAY: Final = 502
-
-
-def _error(code: str, status: int, headers: dict[str, str] | None = None) -> JSONResponse:
-    return JSONResponse({"error": code}, status_code=status, headers=headers)
 
 
 def _parse_id(body: bytes) -> str | None:
@@ -82,63 +88,57 @@ def _parse_id(body: bytes) -> str | None:
     },
 )
 async def extract_google_doc(request: Request) -> Response:
-    _app_state(request)
-    if _media_type(request.headers.get("content-type")) != "application/json":
-        return _error("unsupported_media_type", 415)
-    document_id = _parse_id(await request.body())
+    settings, limiter = app_state(request)
+    if media_type(request.headers.get("content-type")) != "application/json":
+        return error_response("unsupported_media_type", 415)
+    return SlotResponse(
+        settings,
+        limiter,
+        lambda: _read_fetch_and_extract(request, settings),
+        logger=logger,
+        send_timeout_event="google_doc_send_timeout",
+    )
+
+
+async def _read_body(request: Request, settings: Settings) -> bytes | None:
+    """The whole body, or ``None`` if it is not complete within the body deadline."""
+    try:
+        async with asyncio.timeout(settings.extract_body_timeout_seconds):
+            return await request.body()
+    except TimeoutError:
+        return None
+
+
+async def _read_fetch_and_extract(request: Request, settings: Settings) -> Response:
+    body = await _read_body(request, settings)
+    if body is None:
+        return early_error("upload_timeout", 408)
+    document_id = _parse_id(body)
     if document_id is None:
-        return _error("invalid_request", 422)
+        return error_response("invalid_request", 422)
     if not is_valid_document_id(document_id):
-        return _error(INVALID_ID, 422)
-    return _SlotResponse(request, document_id)
-
-
-class _SlotResponse(Response):
-    """Takes the slot, fetches, extracts and sends, all under one slot (like ``/api/extract``)."""
-
-    def __init__(self, request: Request, document_id: str) -> None:
-        super().__init__()
-        self._request = request
-        self._document_id = document_id
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        settings, limiter = _app_state(self._request)
-        slot = limiter.try_slot()
-        if slot is None:
-            busy = _error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
-            await busy(scope, receive, send)
-            return
-        with slot:
-            response = await self._fetch_and_extract(settings)
-            try:
-                async with asyncio.timeout(settings.extract_send_timeout_seconds):
-                    await _send_in_chunks(response, send)
-            except TimeoutError:
-                logger.info("google_doc_send_timeout")
-
-    async def _fetch_and_extract(self, settings: Settings) -> Response:
-        try:
-            data = await fetch_google_doc(
-                self._document_id,
-                max_bytes=settings.max_file_bytes,
-                timeout_seconds=settings.google_fetch_timeout_seconds,
-                client_factory=self._request.app.state.google_client_factory,
-            )
-        except GoogleDocError as error:
-            return _error(error.code, _STATUS.get(error.code, _BAD_GATEWAY))
-        limits = ZipLimits(
-            max_entries=settings.max_zip_entries,
-            max_uncompressed_bytes=settings.max_zip_uncompressed_bytes,
-            max_ratio=settings.max_zip_ratio,
+        return error_response(INVALID_ID, 422)
+    try:
+        data = await fetch_google_doc(
+            document_id,
+            max_bytes=settings.max_file_bytes,
+            timeout_seconds=settings.google_fetch_timeout_seconds,
+            client_factory=google_client_factory(request),
         )
-        try:
-            kind = detect_kind(data, limits=limits)
-        except DetectionError:
-            return _error(UNAVAILABLE, 502)
-        if kind != FileKind.DOCX:
-            return _error(UNAVAILABLE, 502)
-        try:
-            result = await run_extraction(data, kind, limits=_sandbox_limits(settings))
-        except ExtractionError as error:
-            return _error(error.code, 422)
-        return Response(result.model_dump_json(), media_type="application/json")
+    except GoogleDocError as error:
+        return error_response(error.code, _STATUS.get(error.code, _BAD_GATEWAY))
+    return await _extract_docx(data, settings)
+
+
+async def _extract_docx(data: bytes, settings: Settings) -> Response:
+    try:
+        kind = detect_kind(data, limits=zip_limits(settings))
+    except DetectionError:
+        return error_response(UNAVAILABLE, 502)
+    if kind != FileKind.DOCX:
+        return error_response(UNAVAILABLE, 502)
+    try:
+        result = await run_extraction(data, kind, limits=sandbox_limits(settings))
+    except ExtractionError as error:
+        return error_response(error.code, 422)
+    return Response(result.model_dump_json(), media_type="application/json")

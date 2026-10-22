@@ -12,7 +12,7 @@ guard errors pass through unchanged.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterable, AsyncIterator
+from collections.abc import AsyncIterable, AsyncIterator, Callable
 from types import TracebackType
 from typing import Final, cast
 
@@ -20,6 +20,9 @@ import httpcore
 import httpx
 
 from app.net.guard import HTTPS_PORT, BlockedHostError, GuardedNetworkBackend
+
+# Builds one new guarded client per fetch (``outbound_client`` with the settings applied).
+ClientFactory = Callable[[], httpx.AsyncClient]
 
 MAX_CONNECTIONS: Final = 4
 _WRITE_TIMEOUT_SECONDS: Final = 10.0

@@ -34,7 +34,7 @@ carries ``Connection: close``: the server does not drain the rest of the body.
 
 The slot from step 4 is held until the last byte of the response (success or
 error) is sent, or until the send deadline ``EXTRACT_SEND_TIMEOUT_SECONDS`` cuts off
-a client that does not read (``_SlotResponse``). It is released exactly once when
+a client that does not read (``SlotResponse``). It is released exactly once when
 the ``with`` block ends: on success, on every error, on a client disconnect
 (``ClientDisconnect``, which the error catcher swallows), on the send deadline and
 on cancellation.
@@ -52,12 +52,19 @@ from typing import Final
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from starlette.requests import ClientDisconnect
-from starlette.types import Receive, Scope, Send
 
-from app.extraction.detect import DetectionError, ZipLimits, detect_kind
-from app.extraction.limiter import ExtractionLimiter
-from app.extraction.model import MIB, ExtractionError, ExtractionResult
-from app.extraction.sandbox import SandboxLimits, run_extraction
+from app.api.common import (
+    SlotResponse,
+    app_state,
+    early_error,
+    error_response,
+    media_type,
+    sandbox_limits,
+    zip_limits,
+)
+from app.extraction.detect import DetectionError, detect_kind
+from app.extraction.model import ExtractionError, ExtractionResult
+from app.extraction.sandbox import run_extraction
 from app.http_limits import EXTRACT_PATH, declared_length
 from app.settings import Settings
 
@@ -65,12 +72,8 @@ router = APIRouter()
 logger = logging.getLogger("ai_contrast.extract")
 
 ACCEPTED_MEDIA_TYPE: Final = "application/octet-stream"
-RETRY_AFTER_SECONDS: Final = 5
 # How late a stalled stream may be detected after its rate falls below the minimum.
 RATE_TICK_SECONDS: Final = 1.0
-
-CLOSE: Final = {"Connection": "close"}
-SEND_CHUNK_BYTES: Final = 64 * 1024
 
 
 class _BodyRejectedError(Exception):
@@ -82,41 +85,17 @@ class _BodyRejectedError(Exception):
         self.code = code
 
 
-def _error(code: str, status: int, headers: dict[str, str] | None = None) -> JSONResponse:
-    return JSONResponse({"error": code}, status_code=status, headers=headers)
-
-
-def _early_error(code: str, status: int, headers: dict[str, str] | None = None) -> JSONResponse:
-    """An answer sent before the whole body is read: the connection is closed."""
-    return _error(code, status, {**CLOSE, **(headers or {})})
-
-
-def _media_type(content_type: str | None) -> str:
-    if content_type is None:
-        return ""
-    return content_type.split(";", 1)[0].strip().lower()
-
-
-def _app_state(request: Request) -> tuple[Settings, ExtractionLimiter]:
-    settings = request.app.state.settings
-    limiter = request.app.state.extraction_limiter
-    if not isinstance(settings, Settings) or not isinstance(limiter, ExtractionLimiter):
-        msg = "app state is not configured"
-        raise TypeError(msg)
-    return settings, limiter
-
-
 def _check_headers(request: Request, settings: Settings) -> JSONResponse | int:
     """Steps 1 to 3, from the headers alone. Return the declared length or an answer."""
     if "transfer-encoding" in request.headers:
-        return _early_error("length_required", 411)
+        return early_error("length_required", 411)
     length = declared_length(request.headers)
     if length is None:
-        return _early_error("length_required", 411)
+        return early_error("length_required", 411)
     if length > settings.max_file_bytes:
-        return _early_error("file_too_large", 413)
-    if _media_type(request.headers.get("content-type")) != ACCEPTED_MEDIA_TYPE:
-        return _early_error("unsupported_media_type", 415)
+        return early_error("file_too_large", 413)
+    if media_type(request.headers.get("content-type")) != ACCEPTED_MEDIA_TYPE:
+        return early_error("unsupported_media_type", 415)
     return length
 
 
@@ -194,85 +173,16 @@ async def _read_body(request: Request, declared: int, settings: Settings) -> byt
     },
 )
 async def extract(request: Request) -> Response:
-    settings, limiter = _app_state(request)
+    settings, limiter = app_state(request)
     checked = _check_headers(request, settings)
     if isinstance(checked, JSONResponse):
         return checked
-    return _SlotResponse(request, checked, settings, limiter)
-
-
-class _SlotResponse(Response):
-    """Takes the extraction slot, reads, extracts and sends, all under one slot.
-
-    The work runs when the response is called, not in the handler, so the slot is
-    taken and released inside one ``with`` block and covers sending the last byte
-    (threat model T6 control 9). Sending has a deadline
-    (``EXTRACT_SEND_TIMEOUT_SECONDS``); a client that does not read is cut off: the
-    app returns before the response is complete, and the server closes the
-    connection. The body goes out in chunks of ``SEND_CHUNK_BYTES``, so a stalled
-    connection keeps at most about one chunk in the server's write buffer.
-    """
-
-    def __init__(
-        self, request: Request, declared: int, settings: Settings, limiter: ExtractionLimiter
-    ) -> None:
-        super().__init__()
-        self._request = request
-        self._declared = declared
-        self._settings = settings
-        self._limiter = limiter
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        slot = self._limiter.try_slot()
-        if slot is None:
-            busy = _early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
-            await busy(scope, receive, send)
-            return
-        with slot:
-            response = await _receive_and_extract(self._request, self._declared, self._settings)
-            try:
-                async with asyncio.timeout(self._settings.extract_send_timeout_seconds):
-                    await _send_in_chunks(response, send)
-            except TimeoutError:
-                logger.info("extract_send_timeout")
-
-
-async def _send_in_chunks(response: Response, send: Send) -> None:
-    await send(
-        {
-            "type": "http.response.start",
-            "status": response.status_code,
-            "headers": response.raw_headers,
-        }
-    )
-    body = memoryview(response.body)
-    for offset in range(0, len(body), SEND_CHUNK_BYTES):
-        end = offset + SEND_CHUNK_BYTES
-        await send(
-            {
-                "type": "http.response.body",
-                "body": bytes(body[offset:end]),
-                "more_body": end < len(body),
-            }
-        )
-    if not body:
-        await send({"type": "http.response.body", "body": b"", "more_body": False})
-
-
-def _sandbox_limits(settings: Settings) -> SandboxLimits:
-    return SandboxLimits(
-        memory_bytes=settings.extract_worker_memory_mb * MIB,
-        cpu_seconds=settings.extract_worker_cpu_seconds,
-        wall_seconds=settings.extract_worker_wall_seconds,
-        max_result_bytes=settings.extract_max_result_bytes,
-        max_text_chars=settings.extract_max_text_chars,
-        max_blocks=settings.extract_max_blocks,
-        docx_max_part_bytes=settings.max_docx_part_bytes,
-        docx_max_total_bytes=settings.max_zip_uncompressed_bytes,
-        docx_max_xml_depth=settings.max_docx_xml_depth,
-        docx_max_elements=settings.max_docx_elements,
-        pdf_max_pages=settings.max_pdf_pages,
-        pdf_max_prev_chain=settings.max_pdf_prev_chain,
+    return SlotResponse(
+        settings,
+        limiter,
+        lambda: _receive_and_extract(request, checked, settings),
+        logger=logger,
+        send_timeout_event="extract_send_timeout",
     )
 
 
@@ -280,20 +190,15 @@ async def _receive_and_extract(request: Request, declared: int, settings: Settin
     try:
         data = await _read_body(request, declared, settings)
     except _BodyRejectedError as rejected:
-        return _early_error(rejected.code, rejected.status)
+        return early_error(rejected.code, rejected.status)
     if not data:
-        return _error("empty_file", 422)
-    limits = ZipLimits(
-        max_entries=settings.max_zip_entries,
-        max_uncompressed_bytes=settings.max_zip_uncompressed_bytes,
-        max_ratio=settings.max_zip_ratio,
-    )
+        return error_response("empty_file", 422)
     try:
-        kind = detect_kind(data, limits=limits)
+        kind = detect_kind(data, limits=zip_limits(settings))
     except DetectionError as error:
-        return _error(error.code, 422)
+        return error_response(error.code, 422)
     try:
-        result = await run_extraction(data, kind, limits=_sandbox_limits(settings))
+        result = await run_extraction(data, kind, limits=sandbox_limits(settings))
     except ExtractionError as error:
-        return _error(error.code, 422)
+        return error_response(error.code, 422)
     return Response(result.model_dump_json(), media_type="application/json")

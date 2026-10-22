@@ -5,7 +5,8 @@ IP literal in any notation, no single-label name); the name is resolved once, in
 connect timeout; the whole result is refused if any address is not public; the checked IP
 is what is connected to (TLS and SNI use the original host, set by ``httpcore``).
 
-Errors carry fixed texts. They never contain the host, the port or an address.
+Errors carry fixed texts. They never contain the host, the port or an address. A resolver
+``OSError`` (``socket.gaierror`` included) becomes ``httpcore.ConnectError``.
 """
 
 from __future__ import annotations
@@ -130,6 +131,9 @@ class GuardedNetworkBackend(httpcore.AsyncNetworkBackend):
                 resolved = await self._resolver(name, port)
         except TimeoutError:
             raise httpcore.ConnectTimeout("connect timeout") from None  # noqa: TRY003
+        except OSError:
+            # ``socket.gaierror`` is an ``OSError``; its text holds the host name.
+            raise httpcore.ConnectError("name resolution failed") from None  # noqa: TRY003
         addresses = check_addresses(list(resolved))
 
         timed_out = False

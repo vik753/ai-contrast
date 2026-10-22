@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from typing import Final
 
 import httpx
 
+from app.net.client import ClientFactory
 from app.net.guard import BlockedAddressError, BlockedHostError
 
 DOCS_HOST: Final = "docs.google.com"
@@ -142,7 +143,7 @@ async def fetch_google_doc(
     *,
     max_bytes: int,
     timeout_seconds: float,
-    client_factory: Callable[[], httpx.AsyncClient],
+    client_factory: ClientFactory,
 ) -> bytes:
     """Return the raw DOCX bytes or raise ``GoogleDocError`` (fixed ``code``)."""
     if not is_valid_document_id(document_id):
