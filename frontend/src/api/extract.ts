@@ -44,7 +44,15 @@ export type ServerErrorCode =
   | "docx_strict_unsupported"
   | "pdf_damaged"
   // Temporary (501) until PDF and DOCX extraction ship.
-  | "not_implemented";
+  | "not_implemented"
+  // Google Docs by public link (S3-T6): only `POST /api/extract/google-doc`.
+  | "invalid_request"
+  | "invalid_google_doc_id"
+  | "google_doc_not_public"
+  | "google_doc_not_found"
+  | "google_doc_too_large"
+  | "google_doc_unavailable"
+  | "google_doc_timeout";
 
 /** Error codes produced in the browser only. */
 export type ClientErrorCode = "network_error" | "timeout" | "aborted" | "unknown_error";
@@ -126,10 +134,9 @@ const FILE_KINDS: ReadonlySet<string> = new Set<FileKind>(["pdf", "docx", "text"
  * status the API contract gives it. `Map` and `Set` lookups never reach
  * `Object.prototype`, so `__proto__` or `toString` cannot match.
  */
-const SERVER_ERRORS: ReadonlyMap<number, ReadonlySet<string>> = new Map<
-  number,
-  ReadonlySet<ServerErrorCode>
->([
+export type ErrorTable = ReadonlyMap<number, ReadonlySet<string>>;
+
+const UPLOAD_ERRORS: ErrorTable = new Map<number, ReadonlySet<ServerErrorCode>>([
   [411, new Set(["length_required"])],
   [413, new Set(["file_too_large", "request_too_large"])],
   [415, new Set(["unsupported_media_type"])],
@@ -187,8 +194,12 @@ const BLOCK_KEYS = ["text", "part", "page"] as const;
 const REMOVED_KEYS = ["reason", "count", "sample"] as const;
 const WARNING_KEYS = ["code", "page"] as const;
 
-function isServerErrorCode(status: number, code: string): code is ServerErrorCode {
-  return SERVER_ERRORS.get(status)?.has(code) === true;
+function isServerErrorCode(
+  errors: ErrorTable,
+  status: number,
+  code: string,
+): code is ServerErrorCode {
+  return errors.get(status)?.has(code) === true;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -384,7 +395,7 @@ function parseWarnings(value: unknown, pages: number | null): ExtractionWarning[
 }
 
 /** The stage 3 `200` body, validated strictly. `null` when anything is off. */
-function parseSuccess(body: Record<string, unknown>, file: Blob): ExtractResult | null {
+function parseSuccess(body: Record<string, unknown>, rules: ResponseRules): ExtractResult | null {
   if (!hasExactKeys(body, RESULT_KEYS)) {
     return null;
   }
@@ -392,9 +403,10 @@ function parseSuccess(body: Record<string, unknown>, file: Blob): ExtractResult 
   if (
     typeof kind !== "string" ||
     !FILE_KINDS.has(kind) ||
+    !rules.acceptKind(kind as FileKind) ||
     typeof bytes !== "number" ||
     !Number.isSafeInteger(bytes) ||
-    bytes !== file.size ||
+    !rules.acceptBytes(bytes) ||
     typeof language !== "string" ||
     !LANGUAGES.has(language)
   ) {
@@ -428,6 +440,24 @@ function parseSuccess(body: Record<string, unknown>, file: Blob): ExtractResult 
   };
 }
 
+/**
+ * What a `200` body and an error body may contain for one endpoint.
+ * The upload endpoint knows the file, so `bytes` must equal its size; the
+ * Google Docs endpoint has no local file, so it bounds `bytes` instead.
+ */
+export interface ResponseRules {
+  readonly errors: ErrorTable;
+  readonly acceptBytes: (bytes: number) => boolean;
+  readonly acceptKind: (kind: FileKind) => boolean;
+}
+
+/** What to send: the request goes to `url` with exactly these headers and body. */
+export interface ExtractRequest {
+  readonly url: string;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: BodyInit;
+}
+
 /** Marker for a body that is too large or not valid UTF-8. */
 const UNREADABLE = Symbol("unreadable");
 
@@ -439,6 +469,7 @@ const UNREADABLE = Symbol("unreadable");
 async function readCapped(
   response: Response,
   maxBytes: number,
+  signal: AbortSignal,
 ): Promise<string | typeof UNREADABLE> {
   const body = response.body;
   const declared = response.headers.get("Content-Length");
@@ -450,19 +481,29 @@ async function readCapped(
     return "";
   }
   const reader = body.getReader();
+  // A stalled body must not outlive the timeout or an abort: cancelling the
+  // reader ends a pending read. The caller then sees the abort and discards the text.
+  const onAbort = (): void => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal.addEventListener("abort", onAbort, { once: true });
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      total += value.byteLength;
+      if (total > maxBytes) {
+        void reader.cancel().catch(() => undefined);
+        return UNREADABLE;
+      }
+      chunks.push(value);
     }
-    total += value.byteLength;
-    if (total > maxBytes) {
-      void reader.cancel().catch(() => undefined);
-      return UNREADABLE;
-    }
-    chunks.push(value);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
   }
   const bytes = new Uint8Array(total);
   let offset = 0;
@@ -481,15 +522,20 @@ function failure(code: ExtractErrorCode): ExtractResult {
   return { ok: false, code };
 }
 
-function interpret(status: number, body: unknown, file: Blob, headers: Headers): ExtractResult {
+function interpret(
+  status: number,
+  body: unknown,
+  rules: ResponseRules,
+  headers: Headers,
+): ExtractResult {
   if (!isPlainObject(body)) {
     return failure("unknown_error");
   }
   if (status === 200) {
-    return parseSuccess(body, file) ?? failure("unknown_error");
+    return parseSuccess(body, rules) ?? failure("unknown_error");
   }
   const code = ownValue(body, "error");
-  if (typeof code !== "string" || !isServerErrorCode(status, code)) {
+  if (typeof code !== "string" || !isServerErrorCode(rules.errors, status, code)) {
     return failure("unknown_error");
   }
   if (code === "busy") {
@@ -502,12 +548,14 @@ function interpret(status: number, body: unknown, file: Blob, headers: Headers):
 }
 
 /**
- * Sends one file to the server for the type check and text extraction.
- * Never throws. An error result never contains text from the server; an ok
- * result carries the validated extraction (plain text, shown as text only).
+ * Sends one request to an extraction endpoint and validates the answer with
+ * `rules`. Shared by `extractFile` and `extractGoogleDoc`. Never throws. An
+ * error result never contains text from the server; an ok result carries the
+ * validated extraction (plain text, shown as text only).
  */
-export async function extractFile(
-  file: Blob,
+export async function postExtract(
+  request: ExtractRequest,
+  rules: ResponseRules,
   options: ExtractOptions = {},
 ): Promise<ExtractResult> {
   const { signal, fetchImpl, timeoutMs = DEFAULT_EXTRACT_TIMEOUT_MS } = options;
@@ -543,10 +591,10 @@ export async function extractFile(
     try {
       // Read the global at call time, so a replaced `fetch` is used.
       const doFetch = fetchImpl ?? globalThis.fetch;
-      response = await doFetch(EXTRACT_URL, {
+      response = await doFetch(request.url, {
         method: "POST",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: file,
+        headers: { ...request.headers },
+        body: request.body,
         signal: controller.signal,
         credentials: "omit",
         cache: "no-store",
@@ -559,6 +607,7 @@ export async function extractFile(
       text = await readCapped(
         response,
         response.status === 200 ? MAX_SUCCESS_RESPONSE_BYTES : MAX_RESPONSE_BYTES,
+        controller.signal,
       );
     } catch {
       return failure(stopReason("network_error"));
@@ -569,9 +618,29 @@ export async function extractFile(
     if (text === UNREADABLE) {
       return failure("unknown_error");
     }
-    return interpret(response.status, parseJson(text), file, response.headers);
+    return interpret(response.status, parseJson(text), rules, response.headers);
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", onCallerAbort);
   }
+}
+
+/**
+ * Sends one file to the server for the type check and text extraction.
+ * Never throws (see `postExtract`).
+ */
+export function extractFile(file: Blob, options: ExtractOptions = {}): Promise<ExtractResult> {
+  return postExtract(
+    {
+      url: EXTRACT_URL,
+      headers: { "Content-Type": "application/octet-stream" },
+      body: file,
+    },
+    {
+      errors: UPLOAD_ERRORS,
+      acceptBytes: (bytes) => bytes === file.size,
+      acceptKind: () => true,
+    },
+    options,
+  );
 }

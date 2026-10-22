@@ -43,8 +43,15 @@ export type UploadFileStatus = "queued" | "checking" | "accepted" | "rejected";
 
 interface UploadFileBase {
   readonly id: string;
+  /** File name. Empty for a Google document: the UI builds its label from `googleSuffix`. */
   readonly name: string;
+  /** Size in bytes. `0` for a Google document until the server has read it. */
   readonly size: number;
+  /**
+   * Set only for a Google document: the last characters of its ID, shown in the
+   * label. The full ID never enters the state (threat model T7).
+   */
+  readonly googleSuffix?: string;
 }
 
 export type UploadFile =
@@ -93,6 +100,8 @@ export interface FileSpec {
 
 export type UploadAction =
   | { type: "contractAdded" }
+  /** A Google document was added by link. `suffix` is the last characters of its ID. */
+  | { type: "googleDocAdded"; contractId: string; fileId: string; suffix: string }
   | { type: "contractRemoved"; contractId: string }
   | { type: "filesAdded"; contractId: string; files: readonly FileSpec[] }
   | { type: "fileRemoved"; contractId: string; fileId: string }
@@ -216,6 +225,36 @@ function addFiles(state: UploadState, targetId: string, specs: readonly FileSpec
   };
 }
 
+/** A Google document counts like a file; its size is unknown until it is read. */
+function addGoogleDoc(
+  state: UploadState,
+  targetId: string,
+  fileId: string,
+  suffix: string,
+): UploadState {
+  const target = state.contracts.find((c) => c.id === targetId);
+  if (target === undefined) {
+    return state;
+  }
+  const base: UploadFileBase = { id: fileId, name: "", size: 0, googleSuffix: suffix };
+  const file: UploadFile =
+    target.files.filter(isActive).length >= MAX_FILES_PER_CONTRACT
+      ? { ...base, status: "rejected", code: "too_many_files" }
+      : { ...base, status: "queued" };
+  return {
+    ...state,
+    contracts: state.contracts.map((c) =>
+      c.id === targetId ? { ...c, files: [...c.files, file] } : c,
+    ),
+  };
+}
+
+/** The identity of a file without its status data (the label suffix is kept). */
+function baseOf(file: UploadFile): UploadFileBase {
+  const base: UploadFileBase = { id: file.id, name: file.name, size: file.size };
+  return file.googleSuffix === undefined ? base : { ...base, googleSuffix: file.googleSuffix };
+}
+
 /** Replaces one file wherever it is. Returns `state` itself if nothing changed. */
 function updateFile(
   state: UploadState,
@@ -243,7 +282,11 @@ function applyResult(file: UploadFile, result: ExtractResult): UploadFile {
     // Client rejections and earlier results are final.
     return file;
   }
-  const base: UploadFileBase = { id: file.id, name: file.name, size: file.size };
+  // A Google document has no local file: its size is what the server read.
+  const base: UploadFileBase =
+    result.ok && file.googleSuffix !== undefined
+      ? { ...baseOf(file), size: result.bytes }
+      : baseOf(file);
   if (result.ok && result.extraction.ocrPages.length > MAX_OCR_PAGES) {
     return { ...base, status: "rejected", code: "too_many_ocr_pages" };
   }
@@ -268,7 +311,7 @@ function ocrBlocks(page: OcrPage): Block[] {
 }
 
 function rejected(file: UploadFile, code: RejectionCode): UploadFile {
-  return { id: file.id, name: file.name, size: file.size, status: "rejected", code };
+  return { ...baseOf(file), status: "rejected", code };
 }
 
 function applyOcr(file: UploadFile, pages: readonly OcrPage[]): UploadFile {
@@ -308,13 +351,26 @@ function applyOcr(file: UploadFile, pages: readonly OcrPage[]): UploadFile {
       .map((p) => ({ code: "ocr_low_confidence", page: p.page })),
   ];
   return {
-    id: file.id,
-    name: file.name,
-    size: file.size,
+    ...baseOf(file),
     status: "accepted",
     kind: file.kind,
     extraction: { ...file.extraction, blocks, ocrPages: [], warnings },
   };
+}
+
+/**
+ * The size of a Google document is known only after the server read it. If it
+ * pushes the total over the limit, the document is rejected like a file would be.
+ */
+function checkTotal(state: UploadState, fileId: string): UploadState {
+  if (totalActiveBytes(state) <= MAX_TOTAL_BYTES) {
+    return state;
+  }
+  return updateFile(state, fileId, (file) =>
+    file.googleSuffix !== undefined && file.status === "accepted"
+      ? rejected(file, "total_too_large")
+      : file,
+  );
 }
 
 export function uploadReducer(state: UploadState, action: UploadAction): UploadState {
@@ -335,6 +391,8 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
     }
     case "filesAdded":
       return addFiles(state, action.contractId, action.files);
+    case "googleDocAdded":
+      return addGoogleDoc(state, action.contractId, action.fileId, action.suffix);
     case "fileRemoved": {
       const target = state.contracts.find((c) => c.id === action.contractId);
       if (target?.files.some((f) => f.id === action.fileId) !== true) {
@@ -363,7 +421,10 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
       return next;
     }
     case "fileChecked":
-      return updateFile(state, action.fileId, (file) => applyResult(file, action.result));
+      return checkTotal(
+        updateFile(state, action.fileId, (file) => applyResult(file, action.result)),
+        action.fileId,
+      );
     case "ocrProgress":
       return updateFile(state, action.fileId, (file) =>
         file.status === "accepted" && needsOcr(file)

@@ -19,9 +19,16 @@ export type Announcement =
   | { type: "contractAdded"; label: string }
   | { type: "contractRemoved"; label: string }
   | { type: "filesAdded"; label: string; count: number }
-  | { type: "fileRemoved"; name: string }
-  | { type: "fileAccepted"; name: string; kind: FileKind }
-  | { type: "fileRejected"; name: string; code: RejectionCode };
+  | { type: "fileRemoved"; name: string; googleSuffix?: string }
+  | { type: "fileAccepted"; name: string; kind: FileKind; googleSuffix?: string }
+  | { type: "fileRejected"; name: string; code: RejectionCode; googleSuffix?: string };
+
+/** The part of a file that names it: its file name, or the suffix of a Google document. */
+function nameOf(file: UploadFile): { name: string; googleSuffix?: string } {
+  return file.googleSuffix === undefined
+    ? { name: file.name }
+    : { name: file.name, googleSuffix: file.googleSuffix };
+}
 
 /** How many recent announcements stay in the live region. */
 export const MAX_ANNOUNCEMENTS = 5;
@@ -38,10 +45,10 @@ function findFile(state: UploadState, fileId: string): UploadFile | undefined {
 
 function resultOf(file: UploadFile | undefined): Announcement[] {
   if (file?.status === "accepted") {
-    return [{ type: "fileAccepted", name: file.name, kind: file.kind }];
+    return [{ type: "fileAccepted", ...nameOf(file), kind: file.kind }];
   }
   if (file?.status === "rejected") {
-    return [{ type: "fileRejected", name: file.name, code: file.code }];
+    return [{ type: "fileRejected", ...nameOf(file), code: file.code }];
   }
   return [];
 }
@@ -75,9 +82,17 @@ export function describeChange(
       }
       return added;
     }
+    case "googleDocAdded": {
+      const index = next.contracts.findIndex((c) => c.id === action.contractId);
+      const file = findFile(next, action.fileId);
+      return [
+        { type: "filesAdded", label: contractLabel(index), count: 1 },
+        ...(file?.status === "rejected" ? resultOf(file) : []),
+      ];
+    }
     case "fileRemoved": {
       const file = findFile(prev, action.fileId);
-      return file === undefined ? [] : [{ type: "fileRemoved", name: file.name }];
+      return file === undefined ? [] : [{ type: "fileRemoved", ...nameOf(file) }];
     }
     case "fileCheckStarted":
     case "checksRequeued":

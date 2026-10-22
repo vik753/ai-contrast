@@ -45,6 +45,14 @@
     "removeContractNamed": "Remove Contract {{label}}",
     "removeFile": "Remove",
     "removeFileNamed": "Remove {{name}}",
+    "google": {
+      "label": "Google Docs link",
+      "add": "Add",
+      "hint": "Share the document as “Anyone with the link can view”. For a private document, download it as DOCX or PDF and upload the file.",
+      "invalid": "This is not a Google Docs document link.",
+      "duplicate": "This document is already added.",
+      "name": "Google Docs document …{{suffix}}"
+    },
     "size": {
       "bytes": "{{value}} B",
       "kb": "{{value}} KB",
@@ -99,7 +107,14 @@
       "pdf_damaged": "The PDF file is damaged. Open it and save or print it to a new PDF, then add it again.",
       "too_many_ocr_pages": "This scan has too many pages to recognize. Split it into parts and add them as separate files.",
       "ocr_failed": "Text recognition failed. Remove the file and add it again, or add a PDF with selectable text.",
-      "not_implemented": "PDF and Word support is coming. For now, save the contract as a .txt file and add it."
+      "not_implemented": "PDF and Word support is coming. For now, save the contract as a .txt file and add it.",
+      "invalid_request": "The request was not accepted. Reload the page and add the link again.",
+      "invalid_google_doc_id": "The document ID in the link is not valid. Check the link, then remove this row and add the link again.",
+      "google_doc_not_public": "The document is not shared by link. Share it as “Anyone with the link can view”, or download it as DOCX or PDF and upload the file.",
+      "google_doc_not_found": "The document was not found. Check the link, then remove this row and add the link again.",
+      "google_doc_too_large": "The document is too large. Download it as DOCX or PDF, split it into parts and upload the parts as separate files.",
+      "google_doc_unavailable": "Google Docs did not give the document. Try again in a minute, or download it as DOCX or PDF and upload the file.",
+      "google_doc_timeout": "Google Docs took too long to answer. Try again in a minute, or download it as DOCX or PDF and upload the file."
     },
     "preview": {
       "title": "Preview",
