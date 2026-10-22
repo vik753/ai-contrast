@@ -83,7 +83,7 @@ Controls:
 3. No external error tracker in v1. If added later, it must scrub content.
 4. API responses carry `Cache-Control: no-store`.
 5. The UI warns that contract text goes to the provider chosen by the client.
-6. Browser: "Save history" toggle, "Clear all" button, 90-day retention.
+6. Browser (ADR 0013): "Save results in this browser" is off by default; turning it off deletes saved results; "Clear all" removes app keys and databases; 90-day retention; caps fail closed; other tabs stop writing at once (`storage` event, setting re-read before every write); at start-up with history off the database is deleted again. Saved results hold placeholders, never the mapping.
 7. Extracted text is kept in in-memory React state only; never in storage, URLs, logs or announcements; dropped when the file is removed.
 8. CI rejects telemetry SDKs, exporters and distros (`opentelemetry-sdk|distro|exporter-*`, `logfire`, `sentry-sdk`) in `uv.lock` until a security review approves one.
 
@@ -238,7 +238,7 @@ Controls:
 2. Detection runs on de-hyphenated text and a confusable skeleton, inside the limited parsing subprocess, with linear-time patterns and caps; PDF running headers and footers are detected and masked or dropped.
 3. The requisites section is processed line by line: only lines made entirely of identifiers, labels, role words and signature lines are dropped; any line with a condition is kept, masked, analyzed and flagged 🟡. Dropped lines are visible in the preview and counted as "not analyzed".
 4. Mandatory preview; high-precision classes cannot be unmasked by the client. Checksummed codes are high-precision only with a context keyword (or inside the requisites section) and never match a number followed by a currency, `%` or a unit; a masked token next to an amount flags its clause 🟡. Detection caps fail closed (`too_many_identifiers`).
-5. The mapping stays in the browser; it is never sent to AI endpoints or providers and never logged; "Clear all" and retention cover it; exports use placeholders by default.
+5. The mapping stays in the browser memory; it is never sent to AI endpoints or providers, never logged and never stored (ADR 0013 point 9a: a cached result holds placeholders only); exports use placeholders by default.
 6. **Fail-closed safety pass:** a detector version mismatch is rejected (`detector_version_mismatch`); idempotent input cleaning is only a check (`input_not_clean` if it would change anything, offsets never mapped); high-precision hits return `unmasked_identifier` with offsets, the browser pre-masks them and asks for a new confirmation; the server never changes confirmed text silently.
 7. **Type gate:** a frozen dataclass with a runtime sentinel, created only by `safety_pass()`; never a request model; the `AIProvider` port takes no `str`; topics and side text become `PseudonymizedText` or `ConfirmedTopic`; repair never re-sends model output; an AST policy test enforces this, including `__new__` and `object.__setattr__` on gate types.
 8. File names, PDF Info and XMP, DOCX `docProps`, embedded files and Google titles are never parsed into text, never logged, never sent. Uploads are raw bytes (`application/octet-stream`) with no file name in the URL, headers or body (ADR 0010). The browser sends them with `credentials: "omit"`, `redirect: "error"` and `cache: "no-store"`; tests pin these options.
