@@ -2,8 +2,9 @@
 
 Public interface: ``fetch_google_doc(document_id, *, max_bytes, timeout_seconds,
 client_factory) -> bytes``; ``GoogleDocError(code)``; ``is_valid_document_id``.
-The flow is tested with ``httpx.MockTransport`` (no network, no guard: the guard has its own
-tests). The factory builds a plain ``httpx.AsyncClient`` over the mock transport, with
+The flow is tested with ``StreamingTransport`` (a mock transport whose answers stream; no
+network, no guard: the guard has its own tests). The factory builds a plain
+``httpx.AsyncClient`` over the mock transport, with
 ``follow_redirects`` at its default (off), so the fetcher must follow redirects itself.
 Must fail before the implementation exists (module ``app.net.google_docs`` is missing).
 """
@@ -21,6 +22,7 @@ import pytest
 from app.net.google_docs import GoogleDocError, fetch_google_doc, is_valid_document_id
 from app.net.guard import BlockedAddressError, BlockedHostError
 from tests.helpers import new_canary
+from tests.netfakes import StreamingTransport
 
 DOC_ID = "a1B2c3D4e5F6g7H8i9J0k1L2m3"
 DOCX_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -42,7 +44,7 @@ class Harness:
         return self.handler(request)
 
     def factory(self) -> httpx.AsyncClient:
-        client = httpx.AsyncClient(transport=httpx.MockTransport(self._handle))
+        client = httpx.AsyncClient(transport=StreamingTransport(self._handle))
         self.clients.append(client)
         return client
 

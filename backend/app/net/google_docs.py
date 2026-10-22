@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import AsyncIterator
 from typing import Final
 
 import httpx
@@ -94,21 +93,12 @@ def _check_status(response: httpx.Response) -> None:
         raise GoogleDocError(UNAVAILABLE)
 
 
-async def _raw_chunks(response: httpx.Response) -> AsyncIterator[bytes]:
-    if response.is_stream_consumed:
-        # A response built in memory (a test transport) holds its bytes already.
-        yield response.content
-        return
-    async for chunk in response.aiter_raw():
-        yield chunk
-
-
 async def _read_body(response: httpx.Response, max_bytes: int) -> bytes:
     declared = response.headers.get("content-length", "").strip()
     if declared.isascii() and declared.isdigit() and int(declared) > max_bytes:
         raise GoogleDocError(TOO_LARGE)
     body = bytearray()
-    async for chunk in _raw_chunks(response):
+    async for chunk in response.aiter_raw():
         body += chunk
         if len(body) > max_bytes:
             raise GoogleDocError(TOO_LARGE)

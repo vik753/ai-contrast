@@ -8,10 +8,13 @@ returns a fixed address list for any host.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import ssl
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
+from typing import Any
 
 import httpcore
+import httpx
 
 PUBLIC_V4 = "93.184.216.34"
 PUBLIC_V4_2 = "151.101.1.69"
@@ -94,3 +97,28 @@ class SpyInner(httpcore.AsyncNetworkBackend):
 
     async def sleep(self, seconds: float) -> None:
         await asyncio.sleep(seconds)
+
+
+class StreamingTransport(httpx.AsyncBaseTransport):
+    """Like ``httpx.MockTransport``, but every answer is a stream that is not read yet.
+
+    ``httpx.Response(content=<bytes>)`` is read and consumed when it is built. A real
+    transport never returns such a response, and the fetcher reads the raw stream.
+    """
+
+    def __init__(self, handler: Callable[[httpx.Request], Any]) -> None:
+        self._handler = handler
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        await request.aread()
+        answer = self._handler(request)
+        if inspect.isawaitable(answer):
+            answer = await answer
+        assert isinstance(answer, httpx.Response)
+        if not answer.is_stream_consumed:
+            return answer
+        return httpx.Response(
+            answer.status_code,
+            headers=answer.headers,
+            stream=httpx.ByteStream(answer.content),
+        )

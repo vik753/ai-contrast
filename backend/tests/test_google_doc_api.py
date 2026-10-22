@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 
 from tests.docxbuild import CLAUSE, Package, body_docx, build_docx, document_xml, para
 from tests.helpers import new_marker
+from tests.netfakes import StreamingTransport
 
 PATH = "/api/extract/google-doc"
 DOC_ID = "a1B2c3D4e5F6g7H8i9J0k1L2m3"
@@ -47,7 +48,7 @@ class Setup:
 
         def factory() -> httpx.AsyncClient:
             self.factory_calls += 1
-            return httpx.AsyncClient(transport=httpx.MockTransport(handle))
+            return httpx.AsyncClient(transport=StreamingTransport(handle))
 
         self.app.state.google_client_factory = factory
 
