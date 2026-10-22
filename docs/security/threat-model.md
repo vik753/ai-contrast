@@ -130,7 +130,8 @@ DOCX residual risks (S3-T2, review round 1). The rule is: text is removed only w
 - **Field updates on open:** Word can recalculate fields when the file opens or prints (`w:dirty`, `w:updateFields`); we read the stored result and add `field_may_update` (not material). Field codes are never read.
 - **Data binding:** a content control bound to custom XML (`w:dataBinding`) can show a value from the custom XML part instead of the stored text; we read the stored text and add the material warning `not_read_data_binding`.
 - **Markup compatibility:** `mc:Choice` is read only for the namespaces Word supports (others are `suspicious_package`); elements in an unknown ignorable namespace are skipped and must hold no text. Other consumers (for example older Word versions or other editors) may show `mc:Fallback` content that we do not read.
-- **Formatting we do not resolve:** list numbering labels (follow-up S3-T2b), table conditional formatting (kept + `borderline_text`), theme tints and shades that need rounding (kept + `borderline_text`), shading patterns, character borders, emboss and engrave effects, text effects (`w14:textFill`), and fonts whose glyphs are blank.
+- **List numbering labels (S3-T2b):** numbering labels follow the visibility of the level and the paragraph mark; whether a paragraph counts follows its mark. Counters are kept per story; a definition we cannot resolve becomes decimal with `numbering_approximate`.
+- **Formatting we do not resolve:** table conditional formatting (kept + `borderline_text`), theme tints and shades that need rounding (kept + `borderline_text`), shading patterns, character borders, emboss and engrave effects, text effects (`w14:textFill`), and fonts whose glyphs are blank.
 
 ## T6. Server abuse
 

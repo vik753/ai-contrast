@@ -420,6 +420,18 @@ class Styles:
             current = definition.based_on
         return num_id, ilvl
 
+    def chain_ids(self, style_id: str | None) -> list[str]:
+        """The paragraph style and its ``basedOn`` ancestors, nearest first."""
+        out: list[str] = []
+        current = style_id
+        while current is not None and current not in out:
+            definition = self.styles.get(current)
+            if definition is None or definition.kind != "paragraph":
+                break
+            out.append(current)
+            current = definition.based_on
+        return out
+
     def paragraph_style(self, style_id: str | None) -> str | None:
         if style_id is not None:
             definition = self.styles.get(style_id)
