@@ -42,6 +42,7 @@ FONT_CID = 5
 FONT_DESCRIPTOR = 6
 TO_UNICODE = 7
 IMAGE = 8
+EXTRA = 5000  # first number for objects added with ``extra``
 FIRST_PAGE = 9  # page i (0-based) is FIRST_PAGE + 2 * i, its content stream the next number
 
 LETTER = (0.0, 0.0, 612.0, 792.0)
@@ -366,9 +367,21 @@ def _serialize(num: int, obj: Obj, encryption: Encryption | None) -> bytes:
     return head + dictionary.encode("latin-1") + b"\nstream\n" + data + b"\nendstream\nendobj\n"
 
 
-def _xref_table(entries: Mapping[int, int], *, with_free_head: bool) -> bytes:
-    """A classic xref table with one subsection per run of consecutive numbers."""
+def _xref_table(
+    entries: Mapping[int, int],
+    *,
+    with_free_head: bool,
+    free: Sequence[int] = (),
+    generations: Mapping[int, int] | None = None,
+) -> bytes:
+    """A classic xref table with one subsection per run of consecutive numbers.
+
+    ``free`` lists object numbers written as free entries (generation 1);
+    ``generations`` overrides the generation written for in-use entries.
+    """
     out = [b"xref\n"]
+    entries = {**entries, **dict.fromkeys(free, 0)}
+    gens = generations or {}
     nums = sorted(entries)
     if with_free_head:
         nums = [0, *nums]
@@ -383,8 +396,10 @@ def _xref_table(entries: Mapping[int, int], *, with_free_head: bool) -> bytes:
         for num in run:
             if num == 0:
                 out.append(b"0000000000 65535 f\r\n")
+            elif num in free:
+                out.append(b"0000000000 00001 f\r\n")
             else:
-                out.append(f"{entries[num]:010d} 00000 n\r\n".encode())
+                out.append(f"{entries[num]:010d} {gens.get(num, 0):05d} n\r\n".encode())
     return b"".join(out)
 
 
@@ -442,12 +457,18 @@ def incremental_update(  # noqa: PLR0913 - every keyword is one revision fault
     prev: int | None = None,
     self_loop: bool = False,
     raw_entries: Mapping[int, int] | None = None,
+    free: Sequence[int] = (),
+    generations: Mapping[int, int] | None = None,
+    trailer_extra: str = "",
 ) -> bytes:
     """Append one revision: changed objects, an xref section and a trailer.
 
     ``prev`` overrides ``/Prev`` (default: the previous ``startxref``);
     ``self_loop`` makes ``/Prev`` point at this revision's own xref section;
-    ``raw_entries`` adds xref entries (object number -> any byte offset).
+    ``raw_entries`` adds xref entries (object number -> any byte offset);
+    ``free`` marks object numbers free in this section; ``generations`` writes
+    other generations into the xref entries (the objects keep generation 0);
+    ``trailer_extra`` is added to the trailer dictionary.
     """
     out = bytearray(data if data.endswith(b"\n") else data + b"\n")
     offsets: dict[int, int] = {}
@@ -456,13 +477,13 @@ def incremental_update(  # noqa: PLR0913 - every keyword is one revision fault
         out += _serialize(num, objects[num], None)
     offsets.update(raw_entries or {})
     sizes = [int(m) for m in _SIZE.findall(data)]
-    size = max([*sizes, max(offsets) + 1])
+    size = max([*sizes, max([*offsets, *free]) + 1])
     xref_at = len(out)
     prev_value = xref_at if self_loop else (last_startxref(data) if prev is None else prev)
-    out += _xref_table(offsets, with_free_head=False)
+    out += _xref_table(offsets, with_free_head=False, free=free, generations=generations)
     file_id = FILE_ID.hex().upper()
     out += (
-        f"trailer\n<< /Size {size} /Root {root} 0 R /Prev {prev_value} "
+        f"trailer\n<< /Size {size} /Root {root} 0 R /Prev {prev_value}{trailer_extra} "
         f"/ID [<{file_id}> <{file_id}>] >>\n"
     ).encode()
     out += f"startxref\n{xref_at}\n%%EOF\n".encode()
@@ -478,6 +499,7 @@ class Page:
     media_box: tuple[float, float, float, float] = LETTER
     crop_box: tuple[float, float, float, float] | None = None
     annots: Sequence[str] = field(default_factory=tuple)
+    resources: str | None = None  # default: RESOURCES (see ``resources``)
 
 
 def _box(box: tuple[float, float, float, float]) -> str:
@@ -501,21 +523,55 @@ def _to_unicode_cmap() -> bytes:
     ).encode()
 
 
-RESOURCES = (
-    f"<< /Font << /F1 {FONT_HELVETICA} 0 R /F2 {FONT_TYPE0} 0 R >> "
-    f"/XObject << /Im0 {IMAGE} 0 R >> "
-    "/ExtGState << /GS0 << /Type /ExtGState /ca 0 >> /GS1 << /Type /ExtGState /ca 0.5 >> >> "
-    "/Pattern << /P0 << /PatternType 2 /Shading << /ShadingType 2 /ColorSpace /DeviceRGB "
-    "/Coords [0 0 612 0] /Function << /FunctionType 2 /Domain [0 1] /C0 [0 0 0] /C1 [0 0 1] "
-    "/N 1 >> >> >> >> "
-    "/ProcSet [/PDF /Text /ImageB] >>"
+SHADING = (
+    "<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [0 0 612 0] /Function << /FunctionType 2 "
+    "/Domain [0 1] /C0 [0 0 0] /C1 [0 0 1] /N 1 >> >>"
 )
 
 
+def resources(  # noqa: PLR0913 - one keyword per resource category
+    *,
+    font: str = "",
+    xobject: str = "",
+    extgstate: str = "",
+    colorspace: str = "",
+    pattern: str = "",
+    shading: str = "",
+    properties: str = "",
+) -> str:
+    """The shared resources plus extra entries (raw ``/Name value`` pairs) per category."""
+    out = (
+        f"<< /Font << /F1 {FONT_HELVETICA} 0 R /F2 {FONT_TYPE0} 0 R {font}>> "
+        f"/XObject << /Im0 {IMAGE} 0 R {xobject}>> "
+        "/ExtGState << /GS0 << /Type /ExtGState /ca 0 >> /GS1 << /Type /ExtGState /ca 0.5 >> "
+        f"{extgstate}>> "
+        f"/Pattern << /P0 << /PatternType 2 /Shading {SHADING} >> {pattern}>> "
+    )
+    if colorspace:
+        out += f"/ColorSpace << {colorspace} >> "
+    if shading:
+        out += f"/Shading << {shading} >> "
+    if properties:
+        out += f"/Properties << {properties} >> "
+    return out + "/ProcSet [/PDF /Text /ImageB] >>"
+
+
+RESOURCES = resources()
+
+
 def pdf_objects(
-    pages: Sequence[Page], *, xfa: bytes | None = None, acroform: bool = False
+    pages: Sequence[Page],
+    *,
+    xfa: bytes | None = None,
+    acroform: bool = False,
+    extra: Mapping[int, Obj] | None = None,
+    catalog_extra: str = "",
 ) -> dict[int, Obj]:
-    """The numbered objects of a document (before serialization)."""
+    """The numbered objects of a document (before serialization).
+
+    ``extra`` adds objects (numbers from ``EXTRA`` up); ``catalog_extra`` is added
+    to the catalog dictionary.
+    """
     objects: dict[int, Obj] = {}
     kids = " ".join(f"{page_obj(i)} 0 R" for i in range(len(pages)))
     objects[PAGES] = Obj(f"<< /Type /Pages /Kids [{kids}] /Count {len(pages)} >>")
@@ -555,7 +611,7 @@ def pdf_objects(
         annots = f" /Annots [{' '.join(annot_refs)}]" if annot_refs else ""
         objects[page_obj(i)] = Obj(
             f"<< /Type /Page /Parent {PAGES} 0 R /MediaBox {_box(page.media_box)}{crop} "
-            f"/Resources {RESOURCES} /Contents {content_obj(i)} 0 R{annots} >>"
+            f"/Resources {page.resources or RESOURCES} /Contents {content_obj(i)} 0 R{annots} >>"
         )
         objects[content_obj(i)] = Obj("<< >>", page.content.encode("latin-1"))
     form = ""
@@ -565,24 +621,32 @@ def pdf_objects(
         next_num += 1
     elif acroform:
         form = " /AcroForm << /Fields [] >>"
-    objects[CATALOG] = Obj(f"<< /Type /Catalog /Pages {PAGES} 0 R{form} >>")
+    objects[CATALOG] = Obj(f"<< /Type /Catalog /Pages {PAGES} 0 R{form}{catalog_extra} >>")
+    for num, obj in (extra or {}).items():
+        if num < EXTRA or num in objects:
+            raise FixtureError(num)
+        objects[num] = obj
     return objects
 
 
-def build_pdf(
+def build_pdf(  # noqa: PLR0913 - every keyword is one document property
     pages: Sequence[Page] | Page | str,
     *,
     encryption: Encryption | None = None,
     xfa: bytes | None = None,
     acroform: bool = False,
     startxref: int | None = None,
+    extra: Mapping[int, Obj] | None = None,
+    catalog_extra: str = "",
 ) -> bytes:
     """A complete PDF. A ``str`` is the content of a single page."""
     if isinstance(pages, str):
         pages = [Page(pages)]
     elif isinstance(pages, Page):
         pages = [pages]
-    objects = pdf_objects(pages, xfa=xfa, acroform=acroform)
+    objects = pdf_objects(
+        pages, xfa=xfa, acroform=acroform, extra=extra, catalog_extra=catalog_extra
+    )
     return write_pdf(objects, encryption=encryption, startxref=startxref)
 
 
@@ -603,3 +667,158 @@ XFA_PACKET = (
     b'<field name="clause"><value><text>Synthetic XFA clause.</text></value></field>'
     b"</subform></template></xdp:xdp>\n"
 )
+
+
+# --- Round 1 (PR #29) fixtures -------------------------------------------------------------------
+
+
+def stream_obj(content: str, dictionary: str = "<< >>") -> Obj:
+    return Obj(dictionary, content.encode("latin-1"))
+
+
+def form_xobject(content: str, *, bbox: str | None = "0 0 612 792") -> Obj:
+    """A Form XObject with the shared resources; ``bbox=None`` omits ``/BBox``."""
+    box = f" /BBox [{bbox}]" if bbox is not None else ""
+    return stream_obj(content, f"<< /Type /XObject /Subtype /Form{box} /Resources {RESOURCES} >>")
+
+
+def tiling_pattern(content: str) -> Obj:
+    """A coloured tiling pattern whose cell runs ``content``."""
+    return stream_obj(
+        content,
+        "<< /Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 612 792] "
+        f"/XStep 612 /YStep 792 /Resources {RESOURCES} >>",
+    )
+
+
+def latin_to_unicode_cmap() -> bytes:
+    """A 1-byte ToUnicode CMap: codes 0x20-0x7E map to themselves."""
+    entries = "\n".join(f"<{c:02X}> <{c:04X}>" for c in range(0x20, 0x7F))
+    return (
+        "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n"
+        "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n"
+        "/CMapName /Synthetic-Latin def\n/CMapType 2 def\n"
+        "1 begincodespacerange\n<00> <FF>\nendcodespacerange\n"
+        f"95 beginbfchar\n{entries}\nendbfchar\n"
+        "endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n"
+    ).encode()
+
+
+def type3_objects(
+    base: int, *, font_matrix: float = 0.001, to_unicode: bool = False
+) -> dict[int, Obj]:
+    """A Type3 font at ``base`` (glyph: a 1000 x 1000 unit box for codes 0x20-0x7E).
+
+    ``base + 1`` is the glyph procedure, ``base + 2`` the optional ToUnicode CMap.
+    """
+    differences = " ".join(["32", *["/box"] * 95])
+    widths = " ".join(["1000"] * 95)
+    cmap = f" /ToUnicode {base + 2} 0 R" if to_unicode else ""
+    m = _fmt(font_matrix)
+    objects = {
+        base: Obj(
+            f"<< /Type /Font /Subtype /Type3 /FontBBox [0 0 1000 1000] "
+            f"/FontMatrix [{m} 0 0 {m} 0 0] /CharProcs << /box {base + 1} 0 R >> "
+            f"/Encoding << /Type /Encoding /Differences [{differences}] >> "
+            f"/FirstChar 32 /LastChar 126 /Widths [{widths}] /Resources << >>{cmap} >>"
+        ),
+        base + 1: stream_obj("1000 0 0 0 1000 1000 d1\n100 0 800 1000 re f\n"),
+    }
+    if to_unicode:
+        objects[base + 2] = Obj("<< >>", latin_to_unicode_cmap())
+    return objects
+
+
+def annot_with_ap(subtype: str, ap: int, *, flags: int = 0, extra: str = "") -> str:
+    """An annotation with a normal appearance stream (object ``ap``)."""
+    return (
+        f"<< /Type /Annot /Subtype /{subtype} /Rect [72 300 400 340] /F {flags} "
+        f"/AP << /N {ap} 0 R >>{extra} >>"
+    )
+
+
+def appearance(words: str) -> Obj:
+    """An appearance stream (Form XObject) that shows ``words``."""
+    return form_xobject(f"BT /F1 12 Tf 4 14 Td {latin_string(words)} Tj ET\n", bbox="0 0 328 40")
+
+
+def drop_trailer(data: bytes) -> bytes:
+    """Remove the trailer dictionary and ``startxref`` (a lost trailer)."""
+    cut = data.rindex(b"trailer")
+    return data[:cut] + b"%%EOF\n"
+
+
+def xrefstm_loop(data: bytes) -> bytes:
+    """Append a hybrid revision whose ``/XRefStm`` stream has ``/Prev`` back to itself.
+
+    The classic section's trailer names an xref stream with ``/XRefStm``; the
+    stream's ``/Prev`` points at that classic section again.
+    """
+    out = bytearray(data if data.endswith(b"\n") else data + b"\n")
+    sizes = [int(m) for m in _SIZE.findall(data)]
+    num = max(sizes)
+    stm_at = len(out)
+    entries = bytes([1]) + struct.pack(">I", 0) + bytes(2)  # W [1 4 2], one dummy entry
+    placeholder = "0" * 10
+
+    def stream(prev: str) -> bytes:
+        head = (
+            f"{num} 0 obj\n<< /Type /XRef /Size {num + 1} /Index [{num} 1] /W [1 4 2] "
+            f"/Prev {prev} /Length {len(entries)} >>\nstream\n"
+        ).encode()
+        return head + entries + b"\nendstream\nendobj\n"
+
+    xref_at = stm_at + len(stream(placeholder))
+    out += stream(f"{xref_at:010d}")
+    out += b"xref\n0 0\n"
+    out += (
+        f"trailer\n<< /Size {num + 1} /Root {CATALOG} 0 R /Prev {last_startxref(data)} "
+        f"/XRefStm {stm_at} >>\nstartxref\n{xref_at}\n%%EOF\n"
+    ).encode()
+    return bytes(out)
+
+
+def linearized_pdf(page_text: str) -> bytes:
+    """A one-page PDF laid out like a linearized file: one revision, two xref sections.
+
+    Layout: header, linearization dictionary, first-page xref section (with
+    ``/Prev`` to the main section), the objects, the main xref section and the
+    final ``startxref`` that points at the first-page section. Numbers that refer
+    forward are zero-padded, so a second pass with the real offsets keeps every
+    length.
+    """
+    objects = pdf_objects([Page(text(page_text))])
+    lin = max(objects) + 1
+    first_nums = [lin, CATALOG, page_obj(0), content_obj(0)]
+    main_nums = [n for n in sorted(objects) if n not in first_nums]
+    file_id = FILE_ID.hex().upper()
+
+    def layout(total: int, main_xref: int, offsets: Mapping[int, int]) -> tuple[bytes, int]:
+        out = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
+        lin_at = len(out)
+        out += (
+            f"{lin} 0 obj\n<< /Linearized 1 /L {total:010d} /H [0 0] /O {page_obj(0)} "
+            f"/E {total:010d} /N 1 /T {main_xref:010d} >>\nendobj\n"
+        ).encode()
+        first_xref = len(out)
+        entries = {n: offsets.get(n, 0) for n in first_nums}
+        entries[lin] = lin_at
+        out += _xref_table(entries, with_free_head=False)
+        out += (
+            f"trailer\n<< /Size {lin + 1} /Root {CATALOG} 0 R /Prev {main_xref:010d} "
+            f"/ID [<{file_id}> <{file_id}>] >>\nstartxref\n0\n%%EOF\n"
+        ).encode()
+        for n in sorted(objects):
+            offsets_out[n] = len(out)
+            out += _serialize(n, objects[n], None)
+        main_at = len(out)
+        out += _xref_table({n: offsets_out[n] for n in main_nums}, with_free_head=True)
+        out += f"trailer\n<< /Size {lin + 1} >>\nstartxref\n{first_xref}\n%%EOF\n".encode()
+        return bytes(out), main_at
+
+    offsets_out: dict[int, int] = {}
+    draft, main_at = layout(0, 0, {})
+    final, _ = layout(len(draft), main_at, dict(offsets_out))
+    if len(final) != len(draft):
+        raise FixtureError(len(final))
+    return final
