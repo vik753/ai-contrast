@@ -728,3 +728,70 @@ def test_shading_pattern_same_colour_kept_borderline() -> None:
 
     assert HIDDEN in texts(result)
     assert "borderline_text" in warning_codes(result)
+
+
+# --- Review round 2 (developer tests) ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "shd",
+    [
+        '<w:shd w:val="pct90" w:color="000000" w:fill="FFFFFF"/>',
+        '<w:shd w:val="pct50" w:color="auto" w:fill="FFFFFF"/>',
+        '<w:shd w:val="horzStripe" w:color="000000" w:fill="000000"/>',
+    ],
+    ids=["pct90-black", "pct50-auto", "stripes-same"],
+)
+def test_shading_pattern_with_coloured_text_kept_borderline(shd: str) -> None:
+    result = extract(body_docx(para(CLAUSE), para(HIDDEN, '<w:color w:val="000000"/>' + shd)))
+
+    assert HIDDEN in texts(result)
+    assert result.removed == []
+    assert "borderline_text" in warning_codes(result)
+
+
+def _system_theme(window_last: str) -> bytes:
+    xml = theme_xml()
+    return xml.replace(
+        b'<a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>',
+        f'<a:lt1><a:sysClr val="window" lastClr="{window_last}"/></a:lt1>'.encode(),
+    )
+
+
+def test_system_colour_window_disagreeing_cache_kept_borderline() -> None:
+    pkg = Package(
+        body=para(CLAUSE) + para(HIDDEN, '<w:color w:val="000000" w:themeColor="background1"/>'),
+        theme=_system_theme("000000"),
+        settings=settings_xml(STANDARD_MAPPING),
+    )
+    result = extract(build_docx(pkg))
+
+    assert HIDDEN in texts(result)
+    assert "borderline_text" in warning_codes(result)
+
+
+def test_system_colour_window_matching_cache_removed() -> None:
+    pkg = Package(
+        body=para(CLAUSE) + para(HIDDEN, '<w:color w:val="000000" w:themeColor="background1"/>'),
+        theme=_system_theme("FFFFFF"),
+        settings=settings_xml(STANDARD_MAPPING),
+    )
+
+    assert reasons(extract(build_docx(pkg))) == {"same_color": len(HIDDEN)}
+
+
+@pytest.mark.parametrize("size", ["1.5", "22.0"])
+def test_decimal_size_without_unit_kept_borderline(size: str) -> None:
+    result = extract(body_docx(para(CLAUSE), para(HIDDEN, f'<w:sz w:val="{size}"/>')))
+
+    assert HIDDEN in texts(result)
+    assert result.removed == []
+    assert "borderline_text" in warning_codes(result)
+
+
+def test_line_repeated_inside_one_header_part_kept_once() -> None:
+    line = "Agreement No. 0000/TEST (synthetic)"
+    result = extract(build_docx(Package(body=para(CLAUSE), headers=[para(line) + para(line)])))
+
+    assert texts(result, "header") == [line]
+    assert [x.reason for x in result.removed] == ["repeated_header_footer"]

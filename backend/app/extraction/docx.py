@@ -21,10 +21,11 @@
    ``warnings`` hold at most ``MAX_LIST_ITEMS`` items each.
 
 Header and footer filter: a line that holds only a page number is dropped
-(``page_number``); a line repeated in another header part (or another footer part)
-is kept once, at its first occurrence (``repeated_header_footer``). Headers and
-footers are filtered separately: the same line in a header and in a footer is
-kept in both.
+(``page_number``). There is one set of seen lines per kind (headers, footers),
+over all displayed parts of that kind: a line already seen in any header (also in
+the same header part) is dropped and only its first occurrence is kept
+(``repeated_header_footer``); the same for footers. The same line in a header and
+in a footer is kept in both.
 
 Errors carry a code only, never text, names or offsets.
 """
@@ -51,6 +52,7 @@ from app.extraction.docx_styles import (
     WHITE,
     Background,
     Color,
+    ShadeSpec,
     Styles,
     Theme,
     Verdict,
@@ -462,13 +464,11 @@ class _Span:
     count: int = 0
     head: list[str] = field(default_factory=list)
     head_size: int = 0
-    # Leading and trailing whitespace, not counted.
-    lead: int = 0
+    # Trailing whitespace, not counted (leading whitespace is never added).
     tail: int = 0
 
     def add(self, text: str) -> None:
         if not self.head_size and text.isspace():
-            self.lead += len(text)
             return
         self.count += len(text)
         stripped = len(text.rstrip())
@@ -494,7 +494,7 @@ class _Capture(_Span):
 class _Table:
     depth: int
     style: str | None = None
-    shading: Any = None  # w:tblPr/w:shd
+    shading: ShadeSpec | None = None  # w:tblPr/w:shd
 
 
 @dataclass
@@ -502,11 +502,11 @@ class _Paragraph:
     depth: int
     part: Part
     table: _Table | None = None
-    cell_shading: Any = None
+    cell_shading: ShadeSpec | None = None
     pieces: list[str] = field(default_factory=list)
     size: int = 0
     style: str | None = None
-    shading: Any = None
+    shading: ShadeSpec | None = None
     run_depth: int = -1
     run_props: dict[str, object] = field(default_factory=dict)
     verdict: Verdict | None = None
@@ -580,7 +580,7 @@ class _PartWalker:
         self.sdts: list[_Sdt] = []
         self.checkbox: _Sdt | None = None
         self.tables: list[_Table] = []
-        self.cell_shadings: list[tuple[int, Any]] = []
+        self.cell_shadings: list[tuple[int, ShadeSpec | None]] = []
         self.alternates: list[bool] = []
         self.namespaces: dict[str, list[str]] = {}
         self.declared: dict[int, list[str]] = {}

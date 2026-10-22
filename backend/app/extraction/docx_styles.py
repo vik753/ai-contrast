@@ -34,6 +34,7 @@ Rules (first match):
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -141,6 +142,9 @@ def measure(value: str | None, *, half_points: bool = False) -> float | None:
         return None
     number = float(match.group(1))
     unit = match.group(2)
+    if unit is None and half_points and "." in match.group(1):
+        # A size without a unit is an integer number of half-points: unresolved.
+        return math.nan
     if unit is None or unit == "%":
         return number
     if not half_points:
@@ -234,7 +238,7 @@ UNRESOLVED: Final = Color(None, exact=False)
 
 @dataclass
 class Theme:
-    scheme: dict[str, str] = field(default_factory=dict)  # "dk1" → RRGGBB
+    scheme: dict[str, Color] = field(default_factory=dict)  # "dk1" → colour
     mapping: dict[str, str] = field(default_factory=lambda: dict(STANDARD_MAPPING))
     present: bool = False
 
@@ -252,10 +256,9 @@ class Theme:
         mapped = (
             self.mapping.get(_MAPPED[name]) if name in _MAPPED else self.mapping.get(name, name)
         )
-        base = self.scheme.get(_SCHEME.get(mapped or "", ""))
-        if base is None:
+        color = self.scheme.get(_SCHEME.get(mapped or "", ""))
+        if color is None:
             return UNRESOLVED
-        color = Color(base)
         for value, toward in ((tint, WHITE), (shade, BLACK)):
             color = _modulate(color, value, toward)
         return color
@@ -282,9 +285,26 @@ def _modulate(color: Color, value: str | None, toward: str) -> Color:
     return Color("".join(f"{c:02X}" for c in mixed), exact=False)
 
 
-def parse_theme(events: Iterator[tuple[str, Any]]) -> dict[str, str]:
-    """The colour scheme of a theme part: ``dk1`` … ``folHlink`` → ``RRGGBB``."""
-    scheme: dict[str, str] = {}
+_SYSTEM_COLORS: Final = {"window": WHITE, "windowtext": BLACK}
+
+
+def _scheme_color(tag: str, item: Element) -> Color | None:
+    """``a:srgbClr`` (exact) or ``a:sysClr``: ``window`` and ``windowText`` are white
+    and black; a ``lastClr`` that disagrees, or another system colour (only its
+    ``lastClr`` cache is known), is not exact."""
+    if tag.endswith("}srgbClr"):
+        value = hex_color(item.get("val"))
+        return Color(value) if value is not None and value != AUTO else None
+    last = hex_color(item.get("lastClr"))
+    system = _SYSTEM_COLORS.get((item.get("val") or "").strip().casefold())
+    if system is not None:
+        return Color(system, exact=last in (None, system))
+    return Color(last, exact=False) if last is not None and last != AUTO else UNRESOLVED
+
+
+def parse_theme(events: Iterator[tuple[str, Any]]) -> dict[str, Color]:
+    """The colour scheme of a theme part: ``dk1`` … ``folHlink`` → a colour."""
+    scheme: dict[str, Color] = {}
     current: str | None = None
     in_scheme = False
     a = "{" + A_NS + "}"
@@ -296,8 +316,8 @@ def parse_theme(events: Iterator[tuple[str, Any]]) -> dict[str, str]:
             elif in_scheme and current is None and tag.startswith(a):
                 current = tag.removeprefix(a)
             elif current is not None and tag in (a + "srgbClr", a + "sysClr"):
-                value = hex_color(item.get("val") if tag == a + "srgbClr" else item.get("lastClr"))
-                if value is not None and value != AUTO:
+                value = _scheme_color(tag, item)
+                if value is not None:
                     scheme.setdefault(current, value)
         elif event == END:
             tag = item.tag
@@ -490,6 +510,10 @@ def _shade_color(spec: ShadeSpec, theme: Theme) -> Color | None:
     pattern, pattern_color, fill = spec
     if pattern == "nil":
         return None
+    if pattern not in ("clear", "solid"):
+        # A pattern mixes the pattern colour (``w:color``, ``auto`` included) and the
+        # fill: not resolved.
+        return UNRESOLVED
     if pattern == "solid":
         solid = theme.resolve(pattern_color)
         if solid is not None and solid.hex != AUTO:
@@ -497,9 +521,6 @@ def _shade_color(spec: ShadeSpec, theme: Theme) -> Color | None:
     painted = theme.resolve(fill)
     if painted is None or painted.hex == AUTO:
         return None
-    if pattern not in ("clear", "solid"):
-        # A pattern mixes two colours: not resolved exactly.
-        return Color(painted.hex, exact=False)
     return painted
 
 
@@ -533,12 +554,12 @@ def _color_rule(
         painted is not None and (painted.hex is None or _near(text, painted.hex))
         for painted in (_shade_color(fill, theme) for fill in background.conditional_fills)
     )
-    under = _background(props, background, theme, page).hex
+    painted_under = _background(props, background, theme, page)
+    under = painted_under.hex
     if under is None:
         return False, True
     if text == under:
-        exact = color.exact and _background(props, background, theme, page).exact
-        if exact and not background.conditional:
+        if color.exact and painted_under.exact and not background.conditional:
             return True, False
         return False, True
     return False, borderline or _near(text, under)
@@ -555,6 +576,8 @@ def judge(props: Props, background: Background, theme: Theme, page: Color) -> Ve
         return Verdict(SAME_COLOR, borderline=False, font=font)
     complex_script = bool(props.get("cs") or props.get("rtl"))
     size = props.get("szCs" if complex_script else "sz")
+    if isinstance(size, float) and math.isnan(size):
+        borderline = True  # an unresolved size: kept
     scale = props.get("w")
     if (isinstance(size, float) and size <= MAX_TINY_SIZE) or (
         isinstance(scale, float) and scale < MIN_SCALE_PERCENT
