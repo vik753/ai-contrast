@@ -1,4 +1,5 @@
 dist/
+public/ocr/
 coverage/
 node_modules/
 package-lock.json

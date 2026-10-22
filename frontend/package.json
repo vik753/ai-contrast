@@ -9,8 +9,8 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node scripts/copy-ocr-assets.mjs && vite",
+    "build": "node scripts/copy-ocr-assets.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint --max-warnings=0 .",
     "typecheck": "tsc -b --noEmit",
@@ -19,10 +19,16 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/rus": "1.0.0",
+    "@tesseract.js-data/ukr": "1.0.0",
     "i18next": "26.4.4",
+    "pdfjs-dist": "6.4.299",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-i18next": "17.0.16"
+    "react-i18next": "17.0.16",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0"
   },
   "devDependencies": {
     "@testing-library/dom": "10.4.2",

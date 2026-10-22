@@ -141,7 +141,7 @@ const JS_SOURCES = "**/*.{js,mjs,cjs,jsx}";
 
 export default defineConfig(
   {
-    ignores: ["dist/", "coverage/", "node_modules/"],
+    ignores: ["dist/", "public/ocr/", "coverage/", "node_modules/"],
   },
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
