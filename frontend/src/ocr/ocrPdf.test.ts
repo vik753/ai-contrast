@@ -47,6 +47,8 @@ interface Hoisted {
   getAnnotations: ReturnType<typeof import("vitest").vi.fn>;
   createWorkerSpy: ReturnType<typeof import("vitest").vi.fn>;
   lastRendered: number;
+  failGetPage: boolean;
+  holdEngineStart: boolean;
 }
 
 const h = vi.hoisted((): Hoisted => {
@@ -70,6 +72,8 @@ const h = vi.hoisted((): Hoisted => {
     getAnnotations: undefined as never,
     createWorkerSpy: undefined as never,
     lastRendered: 0,
+    failGetPage: false,
+    holdEngineStart: false,
   };
 });
 
@@ -113,7 +117,10 @@ vi.mock("pdfjs-dist/legacy/build/pdf.mjs", () => {
       h.docParams.push(params);
       const doc = {
         numPages: h.numPages,
-        getPage: (n: number) => Promise.resolve(makePage(n)),
+        getPage: (n: number) =>
+          h.failGetPage
+            ? Promise.reject(new Error("synthetic getPage"))
+            : Promise.resolve(makePage(n)),
         destroy: h.destroyDoc,
       };
       return { promise: Promise.resolve(doc), destroy: h.destroyDoc };
@@ -125,6 +132,9 @@ vi.mock("tesseract.js", () => {
   h.terminate = vi.fn(() => Promise.resolve());
   h.createWorkerSpy = vi.fn((...args: unknown[]) => {
     h.createWorkerArgs.push(args);
+    if (h.holdEngineStart) {
+      return new Promise(() => undefined);
+    }
     return Promise.resolve({
       recognize: (image: unknown) => {
         const n = h.lastRendered;
@@ -150,7 +160,7 @@ vi.mock("tesseract.js", () => {
   return { createWorker: h.createWorkerSpy, OEM: { LSTM_ONLY: 1 }, default: {} };
 });
 
-import { PAGE_TIMEOUT_MS, recognizePages } from "./ocrPdf";
+import { PAGE_TIMEOUT_MS, SETUP_TIMEOUT_MS, recognizePages } from "./ocrPdf";
 
 class FakeWorker {
   static urls: string[] = [];
@@ -181,6 +191,8 @@ function resetHoisted(): void {
   h.workerOptions.workerPort = null;
   h.workerOptions.workerSrc = "";
   h.lastRendered = 0;
+  h.failGetPage = false;
+  h.holdEngineStart = false;
   h.terminate.mockClear();
   h.destroyDoc.mockClear();
   h.getTextContent.mockClear();
@@ -426,6 +438,39 @@ describe("flow (AC5)", () => {
       expect(h.terminate).toHaveBeenCalled();
       expect(h.destroyDoc).toHaveBeenCalled();
       expect(h.log).not.toContain("render 2");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("test_get_page_rejection_leaves_no_pending_timer", async () => {
+    vi.useFakeTimers();
+    try {
+      h.failGetPage = true;
+      await expect(recognizePages(file(), [1], opts())).rejects.toThrow("synthetic getPage");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("test_setup_timeout_rejects_and_ends_the_workers", async () => {
+    vi.useFakeTimers();
+    try {
+      h.holdEngineStart = true;
+      const settled = recognizePages(file(), [1], opts()).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      await vi.waitFor(() => {
+        expect(h.createWorkerSpy).toHaveBeenCalled();
+      });
+      await vi.advanceTimersByTimeAsync(SETUP_TIMEOUT_MS + 1);
+      const error = await settled;
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).name).not.toBe("AbortError");
+      expect(h.destroyDoc).toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }

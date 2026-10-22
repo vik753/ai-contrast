@@ -39,6 +39,8 @@ const tesseract =
 const LANGUAGES = "ukr+rus+eng";
 /** Time limit for render plus recognition of one page. */
 export const PAGE_TIMEOUT_MS = 60_000;
+/** Time limit for file read, document load and engine start (before the first page). */
+export const SETUP_TIMEOUT_MS = 60_000;
 
 export interface RecognizedPage {
   readonly page: number;
@@ -92,6 +94,15 @@ export async function recognizePages(
   aborted.catch(() => undefined);
   const isAborted = (): boolean => signal.aborted;
   const guard = <T>(work: Promise<T>): Promise<T> => Promise.race([work, aborted]);
+  let setupTimer: ReturnType<typeof setTimeout> | undefined;
+  const setupTimedOut = new Promise<never>((_, reject) => {
+    setupTimer = setTimeout(() => {
+      reject(new Error("OCR setup timed out."));
+    }, SETUP_TIMEOUT_MS);
+  });
+  setupTimedOut.catch(() => undefined);
+  const setupGuard = <T>(work: Promise<T>): Promise<T> =>
+    guard(Promise.race([work, setupTimedOut]));
 
   let pdfWorker: Worker | undefined;
   let loadingTask: { destroy(): Promise<void> } | undefined;
@@ -100,7 +111,7 @@ export async function recognizePages(
 
   try {
     installTrustedTypesPolicy();
-    const bytes = new Uint8Array(await guard(file.arrayBuffer()));
+    const bytes = new Uint8Array(await setupGuard(file.arrayBuffer()));
     pdfWorker = new Worker(PDF_WORKER_URL, { type: "module" });
     pdfjs.GlobalWorkerOptions.workerPort = pdfWorker;
     const task = pdfjs.getDocument({
@@ -117,7 +128,7 @@ export async function recognizePages(
       verbosity: pdfjs.VerbosityLevel.ERRORS,
     });
     loadingTask = task;
-    const doc = await guard(task.promise);
+    const doc = await setupGuard(task.promise);
 
     enginePromise = tesseract.createWorker(LANGUAGES, tesseract.OEM.LSTM_ONLY, {
       workerPath: TESSERACT_WORKER_URL,
@@ -126,7 +137,8 @@ export async function recognizePages(
       workerBlobURL: false,
       cacheMethod: "none",
     });
-    engine = await guard(enginePromise);
+    engine = await setupGuard(enginePromise);
+    clearTimeout(setupTimer);
 
     const results: RecognizedPage[] = [];
     for (const [index, pageNumber] of pages.entries()) {
@@ -141,13 +153,15 @@ export async function recognizePages(
       const pageGuard = <T>(work: Promise<T>): Promise<T> => guard(Promise.race([work, timedOut]));
       let render: { promise: Promise<unknown>; cancel(): void } | undefined;
       let onPageAbort: (() => void) | undefined;
-      const page = await pageGuard(doc.getPage(pageNumber));
-      const base = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({ scale: scaleFor(base.width, base.height) });
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.floor(viewport.width));
-      canvas.height = Math.max(1, Math.floor(viewport.height));
+      let canvas: HTMLCanvasElement | undefined;
+      let page: Awaited<ReturnType<typeof doc.getPage>> | undefined;
       try {
+        page = await pageGuard(doc.getPage(pageNumber));
+        const base = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: scaleFor(base.width, base.height) });
+        canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.floor(viewport.width));
+        canvas.height = Math.max(1, Math.floor(viewport.height));
         render = page.render({
           canvas,
           viewport,
@@ -171,9 +185,11 @@ export async function recognizePages(
           signal.removeEventListener("abort", onPageAbort);
         }
         // Free the bitmap now, not when the garbage collector runs.
-        canvas.width = 0;
-        canvas.height = 0;
-        page.cleanup();
+        if (canvas !== undefined) {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+        page?.cleanup();
       }
     }
     return results;
@@ -183,6 +199,7 @@ export async function recognizePages(
     }
     throw error;
   } finally {
+    clearTimeout(setupTimer);
     if (onAbort !== undefined) {
       signal.removeEventListener("abort", onAbort);
     }
