@@ -2,7 +2,7 @@
 name: test-engineer
 description: Test engineer for AI Contrast. Writes tests from acceptance criteria without reading the implementation — integration, end-to-end (Playwright) and security tests (SSRF address list, log canary, malicious files). Use at the start of every implementation task and when coverage of a requirement is missing.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: opus
+model: sonnet
 effort: medium
 ---
 

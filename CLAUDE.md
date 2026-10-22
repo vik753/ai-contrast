@@ -79,7 +79,7 @@ People and roles:
 Rules:
 
 - The author never reviews their own work.
-- **Escalation:** if an agent fails the same task twice, the tech lead reruns it with `effort: high`. This file explicitly authorizes that.
+- **Escalation:** if an agent fails the same task twice, the tech lead reruns it with `effort: high`, and a Sonnet agent on Opus. This file explicitly authorizes that.
 - Models and effort per agent are set in each agent file (see `docs/adr/0006-agent-team.md`).
 
 Token economy (customer request, 2026-10-21):
