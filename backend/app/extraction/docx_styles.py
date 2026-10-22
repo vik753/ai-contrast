@@ -1,42 +1,58 @@
-"""Effective run formatting and hidden-text rules for DOCX (S3-T2 AC5; ADR 0009 Layer 1).
+"""Effective run formatting and hidden-text rules for DOCX (S3-T2 AC5, review rounds 0
+and 1; ADR 0009 Layer 1).
 
-Effective formatting of a run, later layers override earlier ones:
-docDefaults ``w:rPr`` → paragraph style (its ``basedOn`` chain, root first; the
-default paragraph style when ``w:pStyle`` is missing or unknown) → character style
-(its ``basedOn`` chain) → direct ``w:rPr``. A ``basedOn`` cycle stops at the first
-style seen twice. Properties: ``w:vanish``, ``w:specVanish``, ``w:webHidden``,
-``w:color``, ``w:shd``, ``w:highlight``, ``w:sz``, ``w:w``, ``w:spacing``,
-``w:position``, ``w:rFonts``.
+Principle: text is removed only when its invisibility is resolved exactly. When an
+input cannot be resolved (a theme colour without a theme part, an unknown colour
+name, a tint or shade that needs rounding, a shading pattern, a table style with
+conditional formatting), the text is kept and flagged ``borderline_text``.
 
-The background of a run: its highlight, else its shading, else the paragraph
-shading (style chain, then direct), else the page background (``w:background``),
-else white.
+Effective formatting of a run, later layers override earlier ones: docDefaults →
+table style → paragraph style (the default paragraph style when ``w:pStyle`` is
+missing or unknown) → character style → direct ``w:rPr``. Each style is resolved
+through its ``basedOn`` chain (root first; a cycle stops at the first style seen
+twice). ``w:vanish`` is a toggle property (ECMA-376 17.7.3): the style layers are
+XORed, direct formatting sets the value.
+
+Text colour: ``w:themeColor`` (through the theme part, ``w:clrSchemeMapping``,
+``w:themeTint`` and ``w:themeShade``) wins over ``w:val``; ``auto`` never matches.
+Background, first layer that paints: highlight → run shading → paragraph shading
+→ table cell shading → table shading → table style → page background (only with
+``w:displayBackgroundShape``) → white.
 
 Rules (first match):
 
-- ``hidden_formatting``: vanish, specVanish or webHidden on → removed;
-- ``same_color``: the text colour equals the background (white text on no shading
-  included; ``auto`` never matches) → removed;
-- ``tiny_text``: ``w:sz`` at most 2 half-points, or ``w:w`` below 20 % → removed;
-- borderline (kept, warning ``borderline_text``): ``w:sz`` at most 8 half-points,
-  a colour within ``NEAR_COLOR_DELTA`` of the background in every channel, negative
-  ``w:spacing`` or ``w:position``.
+- ``hidden_formatting``: ``w:vanish`` or ``w:specVanish`` → removed (``w:webHidden``
+  is visible in print layout and is not removed);
+- ``same_color``: the text colour equals the background, both resolved exactly →
+  removed;
+- ``tiny_text``: the font size (``w:szCs`` for runs with ``w:cs`` or ``w:rtl``,
+  else ``w:sz``) at most 2 half-points, or ``w:w`` below 20 % → removed;
+- borderline (kept, warning ``borderline_text``): size at most 8 half-points, a
+  colour within ``NEAR_COLOR_DELTA`` of the background in every channel, negative
+  ``w:spacing`` or ``w:position``, or any unresolved input above.
 """
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Final
+from typing import Any, Final
+from xml.etree.ElementTree import Element
+
+from app.extraction.docx_xml import END, START
 
 W: Final = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _W: Final = "{" + W + "}"
 VAL: Final = _W + "val"
+A_NS: Final = "http://schemas.openxmlformats.org/drawingml/2006/main"
 
 HIDDEN_FORMATTING: Final = "hidden_formatting"
 SAME_COLOR: Final = "same_color"
 TINY_TEXT: Final = "tiny_text"
 
 WHITE: Final = "FFFFFF"
+BLACK: Final = "000000"
 AUTO: Final = "AUTO"
 NONE: Final = "NONE"
 MAX_TINY_SIZE: Final = 2  # half-points
@@ -44,6 +60,7 @@ MAX_BORDERLINE_SIZE: Final = 8  # half-points
 MIN_SCALE_PERCENT: Final = 20
 NEAR_COLOR_DELTA: Final = 32
 _HEX_COLOR_LENGTH: Final = 6
+_FULL: Final = 0xFF
 
 _HIGHLIGHTS: Final = {
     "black": "000000",
@@ -65,13 +82,42 @@ _HIGHLIGHTS: Final = {
 }
 _ON: Final = frozenset({"1", "true", "on"})
 _OFF: Final = frozenset({"0", "false", "off"})
-_TOGGLES: Final = {
+_FLAGS: Final = {
     _W + "vanish": "vanish",
     _W + "specVanish": "vanish_spec",
-    _W + "webHidden": "web_hidden",
+    _W + "cs": "cs",
+    _W + "rtl": "rtl",
+}
+# Half-points per unit (ST_HpsMeasure and the universal measure).
+_HALF_POINTS: Final = {"pt": 2.0, "in": 144.0, "cm": 144 / 2.54, "mm": 14.4 / 2.54, "pc": 24.0}
+_MEASURE: Final = re.compile(r"\s*([-+]?\d+(?:\.\d+)?)\s*(pt|in|cm|mm|pc|pi|%)?\s*")
+
+# Theme colour names (ST_ThemeColor) → colour scheme elements, through the mapping.
+_MAPPED: Final = {"background1": "bg1", "text1": "t1", "background2": "bg2", "text2": "t2"}
+_SCHEME: Final = {
+    "dark1": "dk1",
+    "light1": "lt1",
+    "dark2": "dk2",
+    "light2": "lt2",
+    **{f"accent{i}": f"accent{i}" for i in range(1, 7)},
+    "hyperlink": "hlink",
+    "followedHyperlink": "folHlink",
+}
+STANDARD_MAPPING: Final = {
+    "bg1": "light1",
+    "t1": "dark1",
+    "bg2": "light2",
+    "t2": "dark2",
+    **{f"accent{i}": f"accent{i}" for i in range(1, 7)},
+    "hyperlink": "hyperlink",
+    "followedHyperlink": "followedHyperlink",
 }
 
 Props = dict[str, object]
+# Raw colour attributes: (value, theme colour, tint, shade).
+ColorSpec = tuple[str | None, str | None, str | None, str | None]
+# Raw shading attributes: (pattern, colour spec of the pattern, fill spec).
+ShadeSpec = tuple[str, ColorSpec, ColorSpec]
 
 
 def on_off(attrib: dict[str, str]) -> bool | None:
@@ -86,17 +132,24 @@ def on_off(attrib: dict[str, str]) -> bool | None:
     return None
 
 
-def _int(value: str | None) -> int | None:
+def measure(value: str | None, *, half_points: bool = False) -> float | None:
+    """A number with an optional unit. ``half_points``: converted to half-points."""
     if value is None:
         return None
-    value = value.strip().removesuffix("%")
-    try:
-        return int(value)
-    except ValueError:
+    match = _MEASURE.fullmatch(value)
+    if match is None:
         return None
+    number = float(match.group(1))
+    unit = match.group(2)
+    if unit is None or unit == "%":
+        return number
+    if not half_points:
+        return number
+    return number * _HALF_POINTS["pc" if unit == "pi" else unit]
 
 
-def _color(value: str | None) -> str | None:
+def hex_color(value: str | None) -> str | None:
+    """``RRGGBB`` upper case, ``AUTO``, or ``None`` for anything else."""
     if value is None:
         return None
     value = value.strip().upper()
@@ -107,40 +160,50 @@ def _color(value: str | None) -> str | None:
     return None
 
 
-def shading_fill(attrib: dict[str, str]) -> str | None:
-    """The colour that a ``w:shd`` paints, or ``AUTO`` for none."""
-    pattern = (attrib.get(VAL) or "").strip().casefold()
-    if pattern == "nil":
-        return AUTO
-    if pattern == "solid":
-        solid = _color(attrib.get(_W + "color"))
-        if solid is not None and solid != AUTO:
-            return solid
-    return _color(attrib.get(_W + "fill"))
+def color_spec(attrib: dict[str, str], prefix: str = "") -> ColorSpec:
+    """``w:color`` attributes, or the ``w:themeFill*`` group of ``w:shd``."""
+    if prefix == "fill":
+        return (
+            attrib.get(_W + "fill"),
+            attrib.get(_W + "themeFill"),
+            attrib.get(_W + "themeFillTint"),
+            attrib.get(_W + "themeFillShade"),
+        )
+    return (
+        attrib.get(VAL if not prefix else _W + "color"),
+        attrib.get(_W + "themeColor"),
+        attrib.get(_W + "themeTint"),
+        attrib.get(_W + "themeShade"),
+    )
+
+
+def shade_spec(attrib: dict[str, str]) -> ShadeSpec:
+    pattern = (attrib.get(VAL) or "clear").strip().casefold()
+    return pattern, color_spec(attrib, "pattern"), color_spec(attrib, "fill")
 
 
 def read_run_property(tag: str, attrib: dict[str, str], props: Props) -> None:  # noqa: PLR0912
     """Record one child of ``w:rPr`` in ``props`` (unknown or invalid: ignored)."""
-    toggle = _TOGGLES.get(tag)
-    if toggle is not None:
+    flag = _FLAGS.get(tag)
+    if flag is not None:
         value = on_off(attrib)
         if value is not None:
-            props[toggle] = value
+            props[flag] = value
         return
     local = tag.removeprefix(_W)
     if local == "color":
-        color = _color(attrib.get(VAL))
-        if color is not None:
-            props["color"] = color
+        props["color"] = color_spec(attrib)
     elif local == "shd":
-        fill = shading_fill(attrib)
-        if fill is not None:
-            props["shd"] = fill
+        props["shd"] = shade_spec(attrib)
     elif local == "highlight":
         name = (attrib.get(VAL) or "").strip().casefold()
         props["highlight"] = _HIGHLIGHTS.get(name, NONE)
-    elif local in ("sz", "w", "spacing", "position"):
-        number = _int(attrib.get(VAL))
+    elif local in ("sz", "szCs"):
+        size = measure(attrib.get(VAL), half_points=True)
+        if size is not None:
+            props[local] = size
+    elif local in ("w", "spacing", "position"):
+        number = measure(attrib.get(VAL))
         if number is not None:
             props[local] = number
     elif local == "rFonts":
@@ -154,32 +217,145 @@ def read_run_property(tag: str, attrib: dict[str, str], props: Props) -> None:  
             props["rstyle"] = style_id
 
 
+# --- Theme ----------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Color:
+    """A resolved colour: ``hex`` is ``RRGGBB``, ``AUTO`` or ``None`` (unresolved);
+    ``exact`` is false when rounding was needed."""
+
+    hex: str | None
+    exact: bool = True
+
+
+UNRESOLVED: Final = Color(None, exact=False)
+
+
+@dataclass
+class Theme:
+    scheme: dict[str, str] = field(default_factory=dict)  # "dk1" → RRGGBB
+    mapping: dict[str, str] = field(default_factory=lambda: dict(STANDARD_MAPPING))
+    present: bool = False
+
+    def resolve(self, spec: ColorSpec) -> Color | None:
+        """The colour of a spec; ``None`` when the spec sets no colour."""
+        value, theme_name, tint, shade = spec
+        if theme_name is not None and theme_name.strip() not in ("", "none"):
+            return self._theme_color(theme_name.strip(), tint, shade)
+        color = hex_color(value)
+        return None if color is None else Color(color)
+
+    def _theme_color(self, name: str, tint: str | None, shade: str | None) -> Color:
+        if not self.present:
+            return UNRESOLVED
+        mapped = (
+            self.mapping.get(_MAPPED[name]) if name in _MAPPED else self.mapping.get(name, name)
+        )
+        base = self.scheme.get(_SCHEME.get(mapped or "", ""))
+        if base is None:
+            return UNRESOLVED
+        color = Color(base)
+        for value, toward in ((tint, WHITE), (shade, BLACK)):
+            color = _modulate(color, value, toward)
+        return color
+
+
+def _modulate(color: Color, value: str | None, toward: str) -> Color:
+    """Tint (toward white) or shade (toward black). ``00`` and ``FF`` are exact;
+    other values approximate Word's rounding."""
+    if value is None or color.hex is None:
+        return color
+    try:
+        amount = int(value, 16)
+    except ValueError:
+        return UNRESOLVED
+    if amount == _FULL:
+        return color
+    if amount == 0:
+        return Color(toward, exact=color.exact)
+    channels = [int(color.hex[i : i + 2], 16) for i in range(0, 6, 2)]
+    if toward == WHITE:
+        mixed = [round(_FULL - (_FULL - c) * amount / _FULL) for c in channels]
+    else:
+        mixed = [round(c * amount / _FULL) for c in channels]
+    return Color("".join(f"{c:02X}" for c in mixed), exact=False)
+
+
+def parse_theme(events: Iterator[tuple[str, Any]]) -> dict[str, str]:
+    """The colour scheme of a theme part: ``dk1`` … ``folHlink`` → ``RRGGBB``."""
+    scheme: dict[str, str] = {}
+    current: str | None = None
+    in_scheme = False
+    a = "{" + A_NS + "}"
+    for event, item in events:
+        if event == START:
+            tag = item.tag
+            if tag == a + "clrScheme":
+                in_scheme = True
+            elif in_scheme and current is None and tag.startswith(a):
+                current = tag.removeprefix(a)
+            elif current is not None and tag in (a + "srgbClr", a + "sysClr"):
+                value = hex_color(item.get("val") if tag == a + "srgbClr" else item.get("lastClr"))
+                if value is not None and value != AUTO:
+                    scheme.setdefault(current, value)
+        elif event == END:
+            tag = item.tag
+            if tag == a + "clrScheme":
+                in_scheme = False
+            elif current is not None and tag == a + current:
+                current = None
+    return scheme
+
+
+# --- Styles ---------------------------------------------------------------------------------
+
+
 @dataclass
 class StyleDef:
     kind: str
     based_on: str | None = None
     rpr: Props = field(default_factory=dict)
-    shading: str | None = None  # w:pPr/w:shd
+    shading: ShadeSpec | None = None  # w:pPr/w:shd
+    cell_shading: ShadeSpec | None = None  # table styles: w:tcPr/w:shd
+    table_shading: ShadeSpec | None = None  # table styles: w:tblPr/w:shd
+    conditional: bool = False  # table styles: w:tblStylePr
+    conditional_fills: list[ShadeSpec] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Resolved:
+    """A style chain merged root first."""
+
+    rpr: Props
+    shading: ShadeSpec | None = None
+    cell_shading: ShadeSpec | None = None
+    table_shading: ShadeSpec | None = None
+    conditional: bool = False
+    conditional_fills: tuple[ShadeSpec, ...] = ()
+
+
+EMPTY: Final = Resolved({})
 
 
 @dataclass
 class Styles:
     defaults: Props = field(default_factory=dict)
-    default_shading: str | None = None
+    default_shading: ShadeSpec | None = None
     default_paragraph: str | None = None
+    default_table: str | None = None
     styles: dict[str, StyleDef] = field(default_factory=dict)
-    _chains: dict[tuple[str, str], tuple[Props, str | None]] = field(default_factory=dict)
+    _chains: dict[tuple[str, str], Resolved] = field(default_factory=dict)
 
-    def _chain(self, style_id: str, kind: str) -> tuple[Props, str | None]:
-        """Merged run properties and paragraph shading of a style chain, root first.
-
-        Every style on the way is cached, so each style is merged once. The walk
-        stops at a missing style, a style of another kind, a cached style, or the
-        first style seen twice (a ``basedOn`` cycle).
-        """
+    def chain(self, style_id: str | None, kind: str) -> Resolved:
+        """A style chain merged root first. Every style on the way is cached, so each
+        style is merged once. The walk stops at a missing style, a style of another
+        kind, a cached style, or the first style seen twice (a ``basedOn`` cycle)."""
+        if style_id is None:
+            return EMPTY
         path: list[tuple[str, StyleDef]] = []
         seen: set[str] = set()
-        base: tuple[Props, str | None] = ({}, None)
+        base = EMPTY
         current: str | None = style_id
         while current is not None and current not in seen:
             cached = self._chains.get((current, kind))
@@ -192,13 +368,18 @@ class Styles:
             seen.add(current)
             path.append((current, definition))
             current = definition.based_on
-        props, shading = base
+        merged = base
         for current_id, definition in reversed(path):
-            props = {**props, **definition.rpr}
-            if definition.shading is not None:
-                shading = definition.shading
-            self._chains[(current_id, kind)] = (props, shading)
-        return props, shading
+            merged = Resolved(
+                rpr={**merged.rpr, **definition.rpr},
+                shading=definition.shading or merged.shading,
+                cell_shading=definition.cell_shading or merged.cell_shading,
+                table_shading=definition.table_shading or merged.table_shading,
+                conditional=merged.conditional or definition.conditional,
+                conditional_fills=merged.conditional_fills + tuple(definition.conditional_fills),
+            )
+            self._chains[(current_id, kind)] = merged
+        return merged
 
     def paragraph_style(self, style_id: str | None) -> str | None:
         if style_id is not None:
@@ -207,28 +388,94 @@ class Styles:
                 return style_id
         return self.default_paragraph
 
-    def paragraph(self, style_id: str | None) -> tuple[Props, str | None]:
-        """Run properties and shading of the (resolved) paragraph style."""
-        if style_id is None:
-            return {}, None
-        return self._chain(style_id, "paragraph")
+    def table_style(self, style_id: str | None) -> str | None:
+        if style_id is not None:
+            definition = self.styles.get(style_id)
+            if definition is not None and definition.kind == "table":
+                return style_id
+        return self.default_table
 
-    def table(self, style_id: str | None) -> Props:
-        if style_id is None:
-            return {}
-        return self._chain(style_id, "table")[0]
 
-    def character(self, style_id: str | None) -> Props:
-        if style_id is None:
-            return {}
-        return self._chain(style_id, "character")[0]
+def _default_flag(item: Element) -> bool:
+    value = item.get(_W + "default")
+    return value is not None and bool(on_off({VAL: value}))
+
+
+def parse_styles(events: Iterator[tuple[str, Any]]) -> Styles:  # noqa: PLR0912 - one branch per element
+    """``styles.xml``: docDefaults, styles with ``basedOn``, ``rPr``, ``pPr/shd`` and,
+    for table styles, ``tcPr/shd``, ``tblPr/shd`` and conditional formatting."""
+    styles = Styles()
+    stack: list[str] = []
+    current: StyleDef | None = None
+    current_id: str | None = None
+    for event, item in events:
+        if event == START:
+            stack.append(item.tag)
+            depth = len(stack)
+            tag = item.tag
+            parent = stack[-2] if depth > 1 else ""
+            if depth == 2 and tag == _W + "style":  # noqa: PLR2004 - w:styles/w:style
+                current = StyleDef(kind=item.get(_W + "type") or "paragraph")
+                current_id = item.get(_W + "styleId")
+                if current_id is not None and _default_flag(item):
+                    if current.kind == "paragraph" and styles.default_paragraph is None:
+                        styles.default_paragraph = current_id
+                    elif current.kind == "table" and styles.default_table is None:
+                        styles.default_table = current_id
+            elif current is not None and depth >= 3:  # noqa: PLR2004 - inside w:style
+                _style_element(current, stack, tag, item.attrib)
+            elif depth == 5 and stack[1] == _W + "docDefaults":  # noqa: PLR2004 - */rPr/*
+                if parent == _W + "rPr":
+                    read_run_property(tag, item.attrib, styles.defaults)
+                elif parent == _W + "pPr" and tag == _W + "shd":
+                    styles.default_shading = shade_spec(item.attrib)
+        elif event == END:
+            if len(stack) == 2 and current is not None:  # noqa: PLR2004
+                if current_id is not None:
+                    styles.styles.setdefault(current_id, current)
+                current = None
+            stack.pop()
+    return styles
+
+
+def _style_element(style: StyleDef, stack: list[str], tag: str, attrib: dict[str, str]) -> None:
+    depth = len(stack)
+    parent = stack[-2]
+    if _W + "tblStylePr" in stack:
+        style.conditional = True
+        if tag == _W + "shd":
+            style.conditional_fills.append(shade_spec(attrib))
+        return
+    if depth == 3 and tag == _W + "basedOn":  # noqa: PLR2004
+        style.based_on = attrib.get(VAL)
+    elif depth == 4 and parent == _W + "rPr":  # noqa: PLR2004
+        read_run_property(tag, attrib, style.rpr)
+    elif depth == 4 and tag == _W + "shd":  # noqa: PLR2004
+        if parent == _W + "pPr":
+            style.shading = shade_spec(attrib)
+        elif parent == _W + "tcPr":
+            style.cell_shading = shade_spec(attrib)
+        elif parent == _W + "tblPr":
+            style.table_shading = shade_spec(attrib)
+
+
+# --- Verdict ----------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class Verdict:
     reason: str | None
     borderline: bool
-    wingdings: bool
+    font: str  # "wingdings", "symbol" or ""
+
+
+@dataclass(frozen=True)
+class Background:
+    """The layers under a run, top first, as raw shading specs (``None``: unset)."""
+
+    layers: tuple[ShadeSpec | None, ...]
+    conditional: bool
+    conditional_fills: tuple[ShadeSpec, ...]
 
 
 def _near(first: str, second: str) -> bool:
@@ -238,39 +485,87 @@ def _near(first: str, second: str) -> bool:
     )
 
 
-def _background(props: Props, paragraph_shading: str | None, page: str) -> str:
+def _shade_color(spec: ShadeSpec, theme: Theme) -> Color | None:
+    """The colour a shading paints; ``None`` when it paints nothing."""
+    pattern, pattern_color, fill = spec
+    if pattern == "nil":
+        return None
+    if pattern == "solid":
+        solid = theme.resolve(pattern_color)
+        if solid is not None and solid.hex != AUTO:
+            return solid
+    painted = theme.resolve(fill)
+    if painted is None or painted.hex == AUTO:
+        return None
+    if pattern not in ("clear", "solid"):
+        # A pattern mixes two colours: not resolved exactly.
+        return Color(painted.hex, exact=False)
+    return painted
+
+
+def _background(props: Props, background: Background, theme: Theme, page: Color) -> Color:
     highlight = props.get("highlight")
     if isinstance(highlight, str) and highlight != NONE:
-        return highlight
-    for fill in (props.get("shd"), paragraph_shading):
-        if isinstance(fill, str) and fill != AUTO:
-            return fill
+        return Color(highlight)
+    run_shading = props.get("shd")
+    layers = (run_shading if isinstance(run_shading, tuple) else None, *background.layers)
+    for layer in layers:
+        if layer is None:
+            continue
+        color = _shade_color(layer, theme)
+        if color is not None:
+            return color
     return page
 
 
-def judge(props: Props, paragraph_shading: str | None, page: str) -> Verdict:
+def _color_rule(
+    props: Props, background: Background, theme: Theme, page: Color
+) -> tuple[bool, bool]:
+    """(same colour resolved exactly, borderline)."""
+    spec = props.get("color")
+    color = theme.resolve(spec) if isinstance(spec, tuple) else None
+    if color is None or color.hex == AUTO:
+        return False, False
+    text = color.hex
+    if text is None:
+        return False, True  # an unresolved text colour: kept
+    borderline = any(
+        painted is not None and (painted.hex is None or _near(text, painted.hex))
+        for painted in (_shade_color(fill, theme) for fill in background.conditional_fills)
+    )
+    under = _background(props, background, theme, page).hex
+    if under is None:
+        return False, True
+    if text == under:
+        exact = color.exact and _background(props, background, theme, page).exact
+        if exact and not background.conditional:
+            return True, False
+        return False, True
+    return False, borderline or _near(text, under)
+
+
+def judge(props: Props, background: Background, theme: Theme, page: Color) -> Verdict:
     """Apply the rules of this module to effective run properties."""
     fonts = (props.get("font_ascii"), props.get("font_hAnsi"))
-    wingdings = "wingdings" in fonts
-    if props.get("vanish") or props.get("vanish_spec") or props.get("web_hidden"):
-        return Verdict(HIDDEN_FORMATTING, borderline=False, wingdings=wingdings)
-    color = props.get("color")
-    background = _background(props, paragraph_shading, page)
-    has_color = isinstance(color, str) and color != AUTO
-    if has_color and color == background:
-        return Verdict(SAME_COLOR, borderline=False, wingdings=wingdings)
-    size = props.get("sz")
+    font = "wingdings" if "wingdings" in fonts else "symbol" if "symbol" in fonts else ""
+    if props.get("vanish") or props.get("vanish_spec"):
+        return Verdict(HIDDEN_FORMATTING, borderline=False, font=font)
+    same, borderline = _color_rule(props, background, theme, page)
+    if same:
+        return Verdict(SAME_COLOR, borderline=False, font=font)
+    complex_script = bool(props.get("cs") or props.get("rtl"))
+    size = props.get("szCs" if complex_script else "sz")
     scale = props.get("w")
-    if (isinstance(size, int) and size <= MAX_TINY_SIZE) or (
-        isinstance(scale, int) and scale < MIN_SCALE_PERCENT
+    if (isinstance(size, float) and size <= MAX_TINY_SIZE) or (
+        isinstance(scale, float) and scale < MIN_SCALE_PERCENT
     ):
-        return Verdict(TINY_TEXT, borderline=False, wingdings=wingdings)
+        return Verdict(TINY_TEXT, borderline=False, font=font)
     spacing = props.get("spacing")
     position = props.get("position")
     borderline = (
-        (isinstance(size, int) and size <= MAX_BORDERLINE_SIZE)
-        or (isinstance(color, str) and has_color and _near(color, background))
-        or (isinstance(spacing, int) and spacing < 0)
-        or (isinstance(position, int) and position < 0)
+        borderline
+        or (isinstance(size, float) and size <= MAX_BORDERLINE_SIZE)
+        or (isinstance(spacing, float) and spacing < 0)
+        or (isinstance(position, float) and position < 0)
     )
-    return Verdict(None, borderline=borderline, wingdings=wingdings)
+    return Verdict(None, borderline=borderline, font=font)

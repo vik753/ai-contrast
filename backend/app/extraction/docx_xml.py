@@ -67,11 +67,13 @@ def iter_xml(stream: PartStream, budget: XmlBudget) -> Iterator[tuple[str, Any]]
                 yield event, item
                 stack.pop()
                 item.clear()
-                # The element is the last child of its parent: detach it.
+                # Earlier siblings are already detached, so the element is the first
+                # child of its parent (later siblings may already be parsed: the
+                # parser reads ahead). Detach it.
                 if stack:
                     parent = stack[-1]
-                    if len(parent) and parent[-1] is item:
-                        del parent[-1]
+                    if len(parent) and parent[0] is item:
+                        del parent[0]
             else:
                 yield event, item
     except (defusedxml.DefusedXmlException, ParseError):

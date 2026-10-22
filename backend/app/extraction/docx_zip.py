@@ -284,10 +284,6 @@ class DocxArchive:
             data_start=data_start,
         )
 
-    def names(self) -> list[str]:
-        """The part keys (see ``part_key``)."""
-        return list(self._entries)
-
     def get(self, key: str) -> ZipEntry | None:
         return self._entries.get(key)
 
@@ -345,8 +341,9 @@ class PartStream:
         self._done = False
 
     def read(self, size: int = -1) -> bytes:
+        """At most ``size`` bytes; ``size < 0``: everything that is left."""
         if size < 0:
-            size = OUT_CHUNK
+            return b"".join([self._buffer, *self._chunks_left()])
         while not self._buffer and not self._done:
             chunk = next(self._chunks, None)
             if chunk is None:
@@ -355,6 +352,12 @@ class PartStream:
                 self._buffer = chunk
         out, self._buffer = self._buffer[:size], self._buffer[size:]
         return out
+
+    def _chunks_left(self) -> Iterator[bytes]:
+        self._buffer = b""
+        if not self._done:
+            yield from self._chunks
+            self._done = True
 
     def drain(self) -> None:
         """Read to the end, so that the size and CRC checks run."""

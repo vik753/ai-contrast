@@ -121,6 +121,15 @@ Controls:
 
 **Residual risk:** a wrong yellow or red finding on any document — including a false red on a competing contract — or a missed difference remains possible. A green always needs a verbatim, expanded, exception-checked quote, but a verified quote can still mislead because the attacker writes the text. PDF clipping, optional content, soft masks, ToUnicode mismatches, text drawn as images, text covered by a shape or image painted later, and text in the same colour as a coloured box under it are not handled in v1.
 
+DOCX residual risks (S3-T2, review round 1). The rule is: text is removed only when its invisibility is resolved exactly; anything we cannot resolve is kept and flagged `borderline_text`.
+
+- **Layout-dependent headers and footers:** we read the headers and footers that sections reference (first-page ones with `w:titlePg`, even-page ones with `w:evenAndOddHeaders`), but we do not lay out pages. A section that never starts a page, or a one-page section with an even-page header, can make us read a header the person never sees; the opposite cannot happen.
+- **Text boxes:** text-box text is read in full; text that overflows a fixed-size box, boxes anchored off the page, and boxes behind other shapes or images are not detected.
+- **Field updates on open:** Word can recalculate fields when the file opens or prints (`w:dirty`, `w:updateFields`); we read the stored result and add `field_may_update` (not material). Field codes are never read.
+- **Data binding:** a content control bound to custom XML (`w:dataBinding`) can show a value from the custom XML part instead of the stored text; we read the stored text and add the material warning `not_read_data_binding`.
+- **Markup compatibility:** `mc:Choice` is read only for the namespaces Word supports (others are `suspicious_package`); elements in an unknown ignorable namespace are skipped and must hold no text. Other consumers (for example older Word versions or other editors) may show `mc:Fallback` content that we do not read.
+- **Formatting we do not resolve:** list numbering labels (follow-up S3-T2b), table conditional formatting (kept + `borderline_text`), theme tints and shades that need rounding (kept + `borderline_text`), shading patterns, character borders, emboss and engrave effects, text effects (`w14:textFill`), and fonts whose glyphs are blank.
+
 ## T6. Server abuse
 
 Threats: DoS, oversized uploads, request floods, use as a free AI proxy.
