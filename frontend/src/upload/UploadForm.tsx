@@ -11,6 +11,9 @@
  *   only our messages for allowlisted error codes.
  * - Scanned PDF pages (`ocr_pages`) are recognized in the browser, one job at
  *   a time in the whole form (`useOcrScheduler`); removing the file cancels it.
+ * - A Google document is added by link (S3-T6): the browser keeps only the ID,
+ *   in memory, and sends it to `POST /api/extract/google-doc` through the same
+ *   scheduler. The row is shown as "Google Docs document …<last 6 of the ID>".
  * - Accepted files keep their extracted text in memory only; the per-contract
  *   `Preview` shows it as plain text (S3-T4).
  */
@@ -27,9 +30,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { extractFile } from "../api/extract";
+import { extractGoogleDoc, parseGoogleDocLink } from "../api/googleDoc";
 import { formReducer, initialFormState, type Announcement } from "./announcements";
 import { FileStatusIcon } from "./FileStatusIcon";
 import { displaySize, limitText } from "./format";
+import { fileDisplayName } from "./names";
 import { MAX_FILE_BYTES, MAX_FILES_PER_CONTRACT, MAX_TOTAL_BYTES } from "./limits";
 import { Preview, type PreviewFile } from "./Preview";
 import {
@@ -53,6 +58,12 @@ type FocusTarget =
   | { type: "addFiles"; contractId: string }
   | { type: "newContract"; count: number }
   | { type: "addContract" };
+
+/** Why a pasted Google Docs link was not added. */
+type GoogleLinkProblem = "invalid" | "duplicate";
+
+/** Characters of the ID shown in the label of a Google document. */
+const GOOGLE_SUFFIX_LENGTH = 6;
 
 function hasFiles(event: DragEvent<HTMLElement>): boolean {
   return Array.from(event.dataTransfer.types).includes("Files");
@@ -97,15 +108,15 @@ function announcementText(t: TFunction, announcement: Announcement, locale: stri
         count: announcement.count,
       });
     case "fileRemoved":
-      return t("upload.announce.fileRemoved", { name: announcement.name });
+      return t("upload.announce.fileRemoved", { name: fileDisplayName(t, announcement) });
     case "fileAccepted":
       return t("upload.announce.fileAccepted", {
-        name: announcement.name,
+        name: fileDisplayName(t, announcement),
         kind: t(`upload.kind.${announcement.kind}`),
       });
     case "fileRejected":
       return t("upload.announce.fileRejected", {
-        name: announcement.name,
+        name: fileDisplayName(t, announcement),
         reason: errorText(t, announcement.code, locale),
       });
   }
@@ -146,11 +157,14 @@ interface FileRowProps {
 function FileRow({ file, onRemove }: FileRowProps) {
   const { t } = useTranslation();
   const locale = useLocale();
+  const name = fileDisplayName(t, file);
+  // A Google document has no size until the server has read it.
+  const sizeKnown = file.googleSuffix === undefined || file.size > 0;
   return (
     <li className={`file-row file-row--${file.status}`}>
       <span className="file-row__main">
-        <bdi className="file-row__name">{file.name}</bdi>
-        <span className="file-row__size">{sizeText(t, file.size, locale)}</span>
+        <bdi className="file-row__name">{name}</bdi>
+        {sizeKnown && <span className="file-row__size">{sizeText(t, file.size, locale)}</span>}
       </span>
       <span className="file-row__status">
         <FileStatusIcon status={needsOcr(file) ? "checking" : file.status} />
@@ -159,7 +173,7 @@ function FileRow({ file, onRemove }: FileRowProps) {
       <button
         type="button"
         className="button button--small file-row__remove"
-        aria-label={t("upload.removeFileNamed", { name: file.name })}
+        aria-label={t("upload.removeFileNamed", { name })}
         onClick={onRemove}
       >
         {t("upload.removeFile")}
@@ -173,6 +187,7 @@ interface ContractCardProps {
   index: number;
   removable: boolean;
   onAddFiles: (contractId: string, files: File[]) => void;
+  onAddGoogleDoc: (contractId: string, link: string) => GoogleLinkProblem | null;
   onRemoveFile: (contractId: string, fileId: string) => void;
   onRemoveContract: (contractId: string) => void;
   addButtonRef: (contractId: string, element: HTMLButtonElement | null) => void;
@@ -183,6 +198,7 @@ function ContractCard({
   index,
   removable,
   onAddFiles,
+  onAddGoogleDoc,
   onRemoveFile,
   onRemoveContract,
   addButtonRef,
@@ -191,7 +207,11 @@ function ContractCard({
   const locale = useLocale();
   const headingId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const linkId = useId();
   const [dragging, setDragging] = useState(false);
+  /** The pasted text lives only here, until "Add" turns it into an ID. */
+  const [link, setLink] = useState("");
+  const [linkProblem, setLinkProblem] = useState<GoogleLinkProblem | null>(null);
   const label = contractLabel(index);
   const previewFiles = useMemo(() => contract.files.filter(isPreviewFile), [contract.files]);
 
@@ -219,6 +239,14 @@ function ContractCard({
     const files = Array.from(event.dataTransfer.files);
     if (files.length > 0) {
       onAddFiles(contract.id, files);
+    }
+  };
+
+  const addLink = (): void => {
+    const problem = onAddGoogleDoc(contract.id, link);
+    setLinkProblem(problem);
+    if (problem === null) {
+      setLink("");
     }
   };
 
@@ -287,6 +315,47 @@ function ContractCard({
         </p>
       </div>
 
+      <div className="google-link">
+        <label className="google-link__label" htmlFor={`${linkId}-input`}>
+          {t("upload.google.label")}
+        </label>
+        <div className="google-link__row">
+          <input
+            id={`${linkId}-input`}
+            type="text"
+            className="google-link__input"
+            value={link}
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            inputMode="url"
+            aria-invalid={linkProblem !== null}
+            aria-describedby={`${linkId}-hint${linkProblem === null ? "" : ` ${linkId}-error`}`}
+            onChange={(event) => {
+              setLink(event.currentTarget.value);
+              setLinkProblem(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                addLink();
+              }
+            }}
+          />
+          <button type="button" className="button" onClick={addLink}>
+            {t("upload.google.add")}
+          </button>
+        </div>
+        <p id={`${linkId}-hint`} className="contract__hint">
+          {t("upload.google.hint")}
+        </p>
+        {linkProblem !== null && (
+          <p id={`${linkId}-error`} className="google-link__error" role="alert">
+            {t(linkProblem === "invalid" ? "upload.google.invalid" : "upload.google.duplicate")}
+          </p>
+        )}
+      </div>
+
       {previewFiles.length > 0 && <Preview files={previewFiles} />}
 
       {/* Opened by the button above; hidden from the tab order and from assistive technology. */}
@@ -321,12 +390,22 @@ export function UploadForm() {
 
   /** `File` objects of files still waiting or accepted, by id. Only in this tab. */
   const filesRef = useRef(new Map<string, File>());
+  /**
+   * Google document IDs by row id. Memory only (threat model T7): never written
+   * to storage, the URL or the console. An entry is dropped with its row. It is
+   * needed to send the request and to refuse the same document twice.
+   */
+  const googleIdsRef = useRef(new Map<string, string>());
   const addButtonsRef = useRef(new Map<string, HTMLButtonElement>());
   const addContractRef = useRef<HTMLButtonElement>(null);
   const focusRef = useRef<FocusTarget | null>(null);
   const nextFileNumberRef = useRef(1);
 
   const check = useCallback<CheckFile>((file, signal) => {
+    const documentId = googleIdsRef.current.get(file.id);
+    if (documentId !== undefined) {
+      return extractGoogleDoc(documentId, { signal });
+    }
     const blob = filesRef.current.get(file.id);
     if (blob === undefined) {
       return Promise.resolve({ ok: false, code: "unknown_error" });
@@ -347,6 +426,16 @@ export function UploadForm() {
     for (const id of filesRef.current.keys()) {
       if (!keep.has(id)) {
         filesRef.current.delete(id);
+      }
+    }
+  }, [state]);
+
+  // Forget the ID of a row that left the state (row or contract removed).
+  useEffect(() => {
+    const present = new Set(state.contracts.flatMap((c) => c.files.map((f) => f.id)));
+    for (const id of googleIdsRef.current.keys()) {
+      if (!present.has(id)) {
+        googleIdsRef.current.delete(id);
       }
     }
   }, [state]);
@@ -407,6 +496,34 @@ export function UploadForm() {
     dispatch({ type: "filesAdded", contractId, files: specs });
   };
 
+  /** Adds a row for a Google document, or says why not. The link itself is never kept. */
+  const addGoogleDoc = (contractId: string, link: string): GoogleLinkProblem | null => {
+    const documentId = parseGoogleDocLink(link);
+    if (documentId === null) {
+      return "invalid";
+    }
+    const contract = state.contracts.find((c) => c.id === contractId);
+    if (contract === undefined) {
+      return "invalid";
+    }
+    const isDuplicate = contract.files.some(
+      (file) => file.status !== "rejected" && googleIdsRef.current.get(file.id) === documentId,
+    );
+    if (isDuplicate) {
+      return "duplicate";
+    }
+    const fileId = `file-${nextFileNumberRef.current}`;
+    nextFileNumberRef.current += 1;
+    googleIdsRef.current.set(fileId, documentId);
+    dispatch({
+      type: "googleDocAdded",
+      contractId,
+      fileId,
+      suffix: documentId.slice(-GOOGLE_SUFFIX_LENGTH),
+    });
+    return null;
+  };
+
   const removeFile = (contractId: string, fileId: string): void => {
     focusRef.current = { type: "addFiles", contractId };
     dispatch({ type: "fileRemoved", contractId, fileId });
@@ -448,6 +565,7 @@ export function UploadForm() {
             index={index}
             removable={removable}
             onAddFiles={addFiles}
+            onAddGoogleDoc={addGoogleDoc}
             onRemoveFile={removeFile}
             onRemoveContract={removeContract}
             addButtonRef={registerAddButton}

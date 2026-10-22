@@ -8,7 +8,7 @@
  * Largest file in bytes (10 MiB). The server has the same limit.
  * Sizes in the UI are 1024-based: "1 MB" means 1024² bytes (see `format.ts`).
  */
-export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+export { MAX_FILE_BYTES } from "../api/fileLimits";
 
 /** Files per contract: main text plus annexes. */
 export const MAX_FILES_PER_CONTRACT = 5;

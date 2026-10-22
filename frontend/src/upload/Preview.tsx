@@ -15,6 +15,7 @@
 import { memo, useEffect, useId, useMemo, useRef, useState, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 import type { Block, BlockPart, Extraction, ExtractionWarning, RemovedText } from "../api/extract";
+import { fileDisplayName, type NamedFile } from "./names";
 
 /** Blocks rendered per file before "Show all". */
 export const PREVIEW_BLOCK_LIMIT = 200;
@@ -73,9 +74,8 @@ export function defaultView(
   return { shown, complete };
 }
 
-export interface PreviewFile {
+export interface PreviewFile extends NamedFile {
   readonly id: string;
-  readonly name: string;
   readonly extraction: Extraction;
 }
 
@@ -272,7 +272,7 @@ const FilePreview = memo(function FilePreview({ file }: { file: PreviewFile }) {
   return (
     <div className="preview-file" role="group" aria-labelledby={headingId}>
       <h5 id={headingId} className="preview-file__title">
-        <bdi>{file.name}</bdi>
+        <bdi>{fileDisplayName(t, file)}</bdi>
       </h5>
       <p className="preview-file__language">
         {t("upload.preview.languageLabel")}{" "}
