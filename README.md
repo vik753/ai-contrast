@@ -46,10 +46,10 @@ No secrets and no `.env` file are needed.
 
 ### Start with Docker Compose
 
-On Linux, create the `node_modules` directory first. Then Docker does not create it as root:
+On Linux, create the `node_modules` and `public/ocr` directories first. Then Docker does not create them as root (`public/ocr` is the volume for the generated OCR assets):
 
 ```bash
-mkdir -p frontend/node_modules
+mkdir -p frontend/node_modules frontend/public/ocr
 ```
 
 Build and start the stack:
@@ -74,7 +74,7 @@ docker compose down
 ### Notes
 
 - **Backend changes.** The backend runs from its image and has no hot reload. After you change backend code, run `docker compose up --build backend`.
-- **Linux, `node_modules` owned by root.** If you skipped `mkdir -p frontend/node_modules`, a later `npm ci` on the host can fail. Fix it with `sudo rm -rf frontend/node_modules`.
+- **Linux, `node_modules` or `public/ocr` owned by root.** If you skipped `mkdir -p frontend/node_modules frontend/public/ocr`, a later `npm ci` or `npm run dev` on the host can fail. Fix it with `sudo rm -rf frontend/node_modules frontend/public/ocr`.
 - **Linux, write access to `./frontend`.** The frontend container runs as `node` (uid 1000) and the `./frontend` bind mount is read-write. If your user id is also 1000, the container can change files in `./frontend`. Review `git diff` before you commit.
 - **WSL2 hot reload.** If the code is on the Windows file system, file events do not reach the container. Enable polling (Vite `server.watch.usePolling: true`) or keep the code in the Linux file system.
 

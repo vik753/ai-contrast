@@ -79,10 +79,14 @@ services:
       # (ownership comes from Dockerfile.dev). Their contents stay in Docker, but on a
       # Linux host Docker creates the mount point ./frontend/node_modules on the host
       # as an empty directory owned by root. That breaks a later `npm ci` on the host.
-      # Fix: run `mkdir -p frontend/node_modules` before the first `docker compose up`
-      # (the directory is then yours), or remove it later with
-      # `sudo rm -rf frontend/node_modules`.
+      # Fix: run `mkdir -p frontend/node_modules frontend/public/ocr` before the first
+      # `docker compose up` (the directories are then yours), or remove them later with
+      # `sudo rm -rf frontend/node_modules frontend/public/ocr`.
       - frontend-node-modules:/app/node_modules
+      # `npm run dev` copies the OCR assets into public/ocr. The bind mount may not be
+      # writable for `node` (CI), so this directory is a volume too (also needs
+      # `mkdir -p frontend/public/ocr` on Linux, like node_modules).
+      - frontend-ocr-assets:/app/public/ocr
       - npm-cache:/home/node/.npm
     read_only: true
     tmpfs:
@@ -108,4 +112,5 @@ services:
 
 volumes:
   frontend-node-modules:
+  frontend-ocr-assets:
   npm-cache:

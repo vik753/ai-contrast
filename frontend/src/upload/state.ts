@@ -5,13 +5,25 @@
  * (ADR 0010, threat model T11). The `File` objects themselves live outside
  * the state (see `UploadForm`), so the state stays serializable.
  */
-import type { ExtractErrorCode, ExtractResult, Extraction, FileKind } from "../api/extract";
+import {
+  MAX_BLOCKS,
+  MAX_TEXT_CHARS,
+  withinCharCap,
+  type Block,
+  type ExtractErrorCode,
+  type ExtractResult,
+  type Extraction,
+  type ExtractionWarning,
+  type FileKind,
+} from "../api/extract";
 import {
   MAX_CONTRACTS,
   MAX_FILE_BYTES,
   MAX_FILES_PER_CONTRACT,
+  MAX_OCR_PAGES,
   MAX_TOTAL_BYTES,
   MIN_CONTRACTS,
+  OCR_LOW_CONFIDENCE,
 } from "./limits";
 
 /** Codes of checks made in the browser before any request. */
@@ -21,7 +33,9 @@ export type ClientRejectionCode =
   | "total_too_large"
   | "empty_file"
   | "pages_unsupported"
-  | "legacy_office_unsupported";
+  | "legacy_office_unsupported"
+  | "too_many_ocr_pages"
+  | "ocr_failed";
 
 export type RejectionCode = ExtractErrorCode | ClientRejectionCode;
 
@@ -40,8 +54,25 @@ export type UploadFile =
       readonly kind: FileKind;
       /** Extracted text, in memory only (never written to storage). */
       readonly extraction: Extraction;
+      /** Set while OCR runs: the page being recognized (1-based) of the total. */
+      readonly ocr?: OcrProgress;
     })
   | (UploadFileBase & { readonly status: "rejected"; readonly code: RejectionCode });
+
+export type AcceptedFile = Extract<UploadFile, { status: "accepted" }>;
+
+export interface OcrProgress {
+  readonly current: number;
+  readonly total: number;
+}
+
+/** Text of one page recognized in the browser. */
+export interface OcrPage {
+  readonly page: number;
+  readonly text: string;
+  /** Mean confidence of the engine, 0-100. */
+  readonly confidence: number;
+}
 
 export interface Contract {
   readonly id: string;
@@ -69,7 +100,13 @@ export type UploadAction =
   | { type: "fileCheckStarted"; fileId: string }
   /** Internal: `checking` files without a request in flight go back to `queued`. */
   | { type: "checksRequeued"; fileIds: readonly string[] }
-  | { type: "fileChecked"; fileId: string; result: ExtractResult };
+  | { type: "fileChecked"; fileId: string; result: ExtractResult }
+  /** OCR started a page of this file. */
+  | { type: "ocrProgress"; fileId: string; current: number; total: number }
+  /** OCR recognized every page of `ocrPages`: merge the text into the extraction. */
+  | { type: "ocrFinished"; fileId: string; pages: readonly OcrPage[] }
+  /** OCR failed. The reason is never shown (it may contain document data). */
+  | { type: "ocrFailed"; fileId: string };
 
 export type Readiness =
   | { ready: true; contracts: number }
@@ -109,6 +146,11 @@ export function isActive(file: UploadFile): boolean {
 
 export function isPending(file: UploadFile): boolean {
   return file.status === "queued" || file.status === "checking";
+}
+
+/** An accepted file with scanned pages that the browser still has to recognize. */
+export function needsOcr(file: UploadFile): boolean {
+  return file.status === "accepted" && file.extraction.ocrPages.length > 0;
 }
 
 function totalActiveBytes(state: UploadState): number {
@@ -202,9 +244,77 @@ function applyResult(file: UploadFile, result: ExtractResult): UploadFile {
     return file;
   }
   const base: UploadFileBase = { id: file.id, name: file.name, size: file.size };
+  if (result.ok && result.extraction.ocrPages.length > MAX_OCR_PAGES) {
+    return { ...base, status: "rejected", code: "too_many_ocr_pages" };
+  }
   return result.ok
     ? { ...base, status: "accepted", kind: result.kind, extraction: result.extraction }
     : { ...base, status: "rejected", code: result.code };
+}
+
+/** Paragraphs of OCR text: split on blank lines, cleaned, trimmed, no empty ones. */
+function ocrBlocks(page: OcrPage): Block[] {
+  return page.text
+    .split(/\n\s*\n/)
+    .map((paragraph) =>
+      // Same idea as the server: no control or format characters in the text.
+      paragraph
+        .normalize("NFC")
+        .replace(/[^\P{Cc}\n\t]|\p{Cf}|\p{Default_Ignorable_Code_Point}/gu, "")
+        .trim(),
+    )
+    .filter((text) => text !== "")
+    .map((text) => ({ text, part: "body", page: page.page }));
+}
+
+function rejected(file: UploadFile, code: RejectionCode): UploadFile {
+  return { id: file.id, name: file.name, size: file.size, status: "rejected", code };
+}
+
+function applyOcr(file: UploadFile, pages: readonly OcrPage[]): UploadFile {
+  if (file.status !== "accepted" || !needsOcr(file)) {
+    return file;
+  }
+  const expected = file.extraction.ocrPages;
+  const got = pages.map((p) => p.page).sort((a, b) => a - b);
+  if (got.length !== expected.length || got.some((page, i) => page !== expected[i])) {
+    return rejected(file, "ocr_failed");
+  }
+  const added = pages.flatMap(ocrBlocks);
+  // Stable sort by page keeps the order of server blocks and of paragraphs.
+  const blocks = [...file.extraction.blocks, ...added].sort(
+    (a, b) => (a.page ?? 0) - (b.page ?? 0),
+  );
+  if (
+    blocks.length > MAX_BLOCKS ||
+    !withinCharCap(
+      blocks.map((b) => b.text),
+      MAX_TEXT_CHARS,
+    )
+  ) {
+    return rejected(file, "too_much_text");
+  }
+  if (blocks.length === 0) {
+    return rejected(file, "no_text_extracted");
+  }
+  const byPage = [...pages].sort((a, b) => a.page - b.page);
+  // A page with no text is a visible gap, not a silent one.
+  const emptyPages = new Set(byPage.filter((p) => ocrBlocks(p).length === 0).map((p) => p.page));
+  const warnings: ExtractionWarning[] = [
+    ...file.extraction.warnings,
+    ...byPage.map((p) => ({ code: "ocr_used", page: p.page })),
+    ...byPage
+      .filter((p) => p.confidence < OCR_LOW_CONFIDENCE || emptyPages.has(p.page))
+      .map((p) => ({ code: "ocr_low_confidence", page: p.page })),
+  ];
+  return {
+    id: file.id,
+    name: file.name,
+    size: file.size,
+    status: "accepted",
+    kind: file.kind,
+    extraction: { ...file.extraction, blocks, ocrPages: [], warnings },
+  };
 }
 
 export function uploadReducer(state: UploadState, action: UploadAction): UploadState {
@@ -254,7 +364,31 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
     }
     case "fileChecked":
       return updateFile(state, action.fileId, (file) => applyResult(file, action.result));
+    case "ocrProgress":
+      return updateFile(state, action.fileId, (file) =>
+        file.status === "accepted" && needsOcr(file)
+          ? { ...file, ocr: { current: action.current, total: action.total } }
+          : file,
+      );
+    case "ocrFinished":
+      return updateFile(state, action.fileId, (file) => applyOcr(file, action.pages));
+    case "ocrFailed":
+      return updateFile(state, action.fileId, (file) =>
+        needsOcr(file) ? rejected(file, "ocr_failed") : file,
+      );
   }
+}
+
+/**
+ * Ids of files whose original `File` is still needed: a check (queued or
+ * checking, also after a requeue) or OCR. Every other `File` can be dropped.
+ */
+export function fileIdsToKeep(state: UploadState): Set<string> {
+  return new Set(
+    state.contracts.flatMap((c) =>
+      c.files.filter((f) => isPending(f) || needsOcr(f)).map((f) => f.id),
+    ),
+  );
 }
 
 /** Every file with `status`, in display order. */
@@ -264,13 +398,13 @@ export function filesWithStatus(state: UploadState, status: UploadFileStatus): U
 
 /**
  * Whether the contracts can be compared. The first unmet condition wins:
- * 1. every check is finished (`checking`);
+ * 1. every check and every OCR job is finished (`checking`);
  * 2. no file was rejected: rejected files must be removed (`rejected_files`);
  * 3. every contract has an accepted file (`contract_without_file`).
  */
 export function readiness(state: UploadState): Readiness {
   const files = state.contracts.flatMap((c) => c.files);
-  if (files.some(isPending)) {
+  if (files.some((f) => isPending(f) || needsOcr(f))) {
     return { ready: false, reason: "checking" };
   }
   if (files.some((f) => f.status === "rejected")) {

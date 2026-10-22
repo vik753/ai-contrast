@@ -36,3 +36,9 @@ export const DEFAULT_RETRY_DELAY_MS = 5_000;
 
 /** Lower bound for the retry delay, so that a `Retry-After: 0` never spins. */
 export const MIN_RETRY_DELAY_MS = 1_000;
+
+/** Pages of one PDF that the browser recognizes with OCR (S3-T5). More: the file is rejected. */
+export const MAX_OCR_PAGES = 30;
+
+/** Below this confidence (0-100) an OCR page gets the `ocr_low_confidence` warning. */
+export const OCR_LOW_CONFIDENCE = 60;

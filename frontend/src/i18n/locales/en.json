@@ -97,6 +97,8 @@
       "suspicious_package": "The file has an unsafe structure. Open it in Word and save it as a new .docx file, or export it to PDF, then add it again.",
       "docx_strict_unsupported": "This .docx file uses the Strict Open XML format. In Word, save it again in the standard .docx format, then add it again.",
       "pdf_damaged": "The PDF file is damaged. Open it and save or print it to a new PDF, then add it again.",
+      "too_many_ocr_pages": "This scan has too many pages to recognize. Split it into parts and add them as separate files.",
+      "ocr_failed": "Text recognition failed. Remove the file and add it again, or add a PDF with selectable text.",
       "not_implemented": "PDF and Word support is coming. For now, save the contract as a .txt file and add it."
     },
     "preview": {
@@ -140,10 +142,16 @@
         "borderline_text": "Some text is very small or very light. Check it in the original file.",
         "pdf_edited": "The PDF was changed after it was first saved. Make sure this is the final version.",
         "external_reference": "The file refers to outside content that was not read. Check it in the original file.",
+        "ocr_used": "Some pages are scans. The text was recognized automatically and can contain mistakes. Check it in the original file.",
+        "ocr_low_confidence": "Text recognition was uncertain on some pages. Check them in the original file.",
         "unknown": "Some content could not be read. Check it in the original file."
       },
       "warningPages": "(pages: {{pages}})",
       "ocrPages": "Pages that need text recognition: {{pages}}."
+    },
+    "ocr": {
+      "progress": "Recognizing page {{current}} of {{total}}…",
+      "waiting": "Queued for text recognition…"
     },
     "readiness": {
       "contract_without_file": "Add at least one file to each contract",

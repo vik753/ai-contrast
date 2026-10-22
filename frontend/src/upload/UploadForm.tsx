@@ -9,6 +9,8 @@
  * - File names are rendered as plain text only, inside `<bdi>`, and never
  *   leave the browser (threat model T1, T11). Server text is never shown:
  *   only our messages for allowlisted error codes.
+ * - Scanned PDF pages (`ocr_pages`) are recognized in the browser, one job at
+ *   a time in the whole form (`useOcrScheduler`); removing the file cancels it.
  * - Accepted files keep their extracted text in memory only; the per-contract
  *   `Preview` shows it as plain text (S3-T4).
  */
@@ -34,13 +36,16 @@ import {
   canAddContract,
   canRemoveContract,
   contractLabel,
+  fileIdsToKeep,
   initialUploadState,
+  needsOcr,
   readiness,
   type Contract,
   type RejectionCode,
   type UploadFile,
 } from "./state";
 import { useCheckScheduler, type CheckFile } from "./useCheckScheduler";
+import { useOcrScheduler } from "./useOcrScheduler";
 
 const ACCEPT = ".pdf,.docx,.txt";
 
@@ -113,6 +118,11 @@ function statusText(t: TFunction, file: UploadFile, locale: string): string {
     case "checking":
       return t("upload.status.checking");
     case "accepted":
+      if (needsOcr(file)) {
+        return file.ocr === undefined
+          ? t("upload.ocr.waiting")
+          : t("upload.ocr.progress", { current: file.ocr.current, total: file.ocr.total });
+      }
       return t(`upload.kind.${file.kind}`);
     case "rejected":
       return errorText(t, file.code, locale);
@@ -143,7 +153,7 @@ function FileRow({ file, onRemove }: FileRowProps) {
         <span className="file-row__size">{sizeText(t, file.size, locale)}</span>
       </span>
       <span className="file-row__status">
-        <FileStatusIcon status={file.status} />
+        <FileStatusIcon status={needsOcr(file) ? "checking" : file.status} />
         <span className="file-row__status-text">{statusText(t, file, locale)}</span>
       </span>
       <button
@@ -326,13 +336,14 @@ export function UploadForm() {
 
   useCheckScheduler(state, dispatch, check);
 
-  // Drop `File` references of rejected and removed files.
+  const fileById = useCallback((fileId: string) => filesRef.current.get(fileId), []);
+  useOcrScheduler(state, dispatch, fileById);
+
+  // Keep a `File` only while it can still be needed: a check (queued or checking,
+  // also after a requeue) or OCR. Accepted files without OCR, rejected and removed
+  // files lose their reference.
   useEffect(() => {
-    const keep = new Set(
-      state.contracts.flatMap((c) =>
-        c.files.filter((f) => f.status !== "rejected").map((f) => f.id),
-      ),
-    );
+    const keep = fileIdsToKeep(state);
     for (const id of filesRef.current.keys()) {
       if (!keep.has(id)) {
         filesRef.current.delete(id);
