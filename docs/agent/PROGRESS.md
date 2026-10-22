@@ -9,7 +9,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
 | 2 | File upload | done |
-| 3 | Text extraction | in progress: S3-T1 and S3-T4 done; S3-T2 (DOCX) in development; S3-T3, T5, T6 planned |
+| 3 | Text extraction | in progress: S3-T1, S3-T2, S3-T4 done; S3-T3 (PDF) next; S3-T2b (numbering), S3-T5 (OCR), S3-T6 (Google Docs link) planned |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
 | 5b | Pseudonymization | planned |
@@ -65,3 +65,4 @@ How to resume after a break: read this file, then continue with the first unchec
 - Lesson: GitHub can lag in syncing a PR head after a push; if CI does not start within minutes, push to a new branch and open a new PR.
 - Lesson: start a new agent for a new task (fresh context is cheaper); resume the same agent only for its own review rounds.
 - 2026-10-21 — PR #23 merged (S3-T4: preview of extracted text). Both reviews approved; fixes: preview caps (200 blocks or 50,000 characters per file), strict list caps in the client, focus after "Show all". 969 frontend tests.
+\n- 2026-10-22 — PR #26 merged (S3-T2: DOCX extraction with `defusedxml`). Three review rounds: toggle properties, displayed parts only, theme colours and table backgrounds (unresolved → kept with `borderline_text`), markup compatibility, hidden objects, data binding. Worst case 6 s CPU, 46 MiB child RSS. 1573 backend tests.\n- 2026-10-22 — New task S3-T2b (list numbering labels) before stage 5: clause numbers in Word are often automatic.\n
