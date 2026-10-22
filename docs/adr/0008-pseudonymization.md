@@ -69,7 +69,7 @@ A defined term that equals a masked name ("(далі — «Іваненко»)")
 
 - Model output and quotes use placeholders. Quotes are verified against the masked text.
 - The browser restores names only at offsets it created, and in model free text only for tokens issued for that document. Toggle "show placeholders".
-- Cache key = SHA-256 of the final masked text (client edits included) plus prompt and model versions. The mapping is stored with the result in IndexedDB only if history is on; "Clear all" and the 90-day retention cover it.
+- Cache key = SHA-256 of the final masked text (client edits included) plus prompt and model versions (full key parts: ADR 0013 point 8). The mapping is **never stored** (ADR 0013 point 9a): a cached result holds placeholders only, and on a hit the browser restores names with the mapping of the current session.
 - Exports (PDF, JSON) use placeholders by default; restored names only after an explicit choice with a warning.
 - SSE events and error bodies carry codes only.
 
