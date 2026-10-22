@@ -346,7 +346,7 @@ def test_empty_numbered_paragraph_adds_no_label_only_block() -> None:
     assert texts(result) == ["1. One"]
 
 
-# --- Approximation and fail-closed caps ----------------------------------------------------------------
+# --- Approximation and fail-closed caps ------------------------
 
 
 def test_unknown_format_falls_back_to_decimal_with_warning() -> None:
