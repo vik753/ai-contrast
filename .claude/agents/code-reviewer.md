@@ -2,7 +2,7 @@
 name: code-reviewer
 description: Code reviewer for AI Contrast. Reviews a diff for correctness, readability, architecture (ports and adapters), error handling, tests and compliance with the task. Read-only; reports findings, never edits. Use after every implementation, before merge.
 tools: Read, Glob, Grep, Bash
-model: opus
+model: sonnet
 effort: medium
 ---
 

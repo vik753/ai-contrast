@@ -2,7 +2,7 @@
 name: frontend-dev
 description: Frontend developer for AI Contrast. Implements React/TypeScript UI, i18n (en/uk/ru), Tesseract.js OCR, IndexedDB storage behind CacheStore, the result table and accessibility. Use for any frontend implementation task assigned by the tech lead.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: opus
+model: sonnet
 effort: medium
 ---
 

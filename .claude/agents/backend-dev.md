@@ -2,7 +2,7 @@
 name: backend-dev
 description: Backend developer for AI Contrast. Implements Python/FastAPI code, text extraction, clause splitting, the AI layer (AIProvider adapters), Docker and CI workflows. Use for any backend or infrastructure implementation task assigned by the tech lead.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: opus
+model: sonnet
 effort: medium
 ---
 
