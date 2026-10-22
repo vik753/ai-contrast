@@ -275,6 +275,17 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
   13. List caps as for DOCX; `pages` = page count; shared normalization and Cc rule.
   14. Fixtures: a small PDF builder in tests (raw PDF objects, standard Type1 fonts for Latin text, a Type0/Identity-H font with a ToUnicode CMap for Cyrillic; no new test dependency). Worst case at the caps (100 pages, dense text) inside the child limits.
   15. Docs: threat model T4 (encrypted-PDF rule, pdfminer logging rule), ADR 0004 aligned.
+- Tech lead decisions (implementation round): the `pdfminer` logger stays at ERROR (AC1 wins over AC11's "any parse warning"); `damaged_pdf` comes from our own checks (xref reconstruction, counted ERROR records that are never written, unreadable listed objects → `pdf_damaged`). Thresholds: header/footer band 8 % of the page height; "little text" under 200 characters; an OCR page needs images over at least 1 % of the page. Form XObjects inherit the graphics state; blend modes and soft masks turn white-text removal into `borderline_text`.
+- Review round 1 (PR #29) added to the AC. Principle: remove only when invisibility is exact; otherwise keep + `borderline_text`; content we cannot render → material warning.
+  1. **Content pdfminer does not run:** any visible annotation (not Link or Popup, not Hidden or NoView) with an `/AP /N` appearance → material `not_read_annotation`; tiling patterns with text operators → material `not_read_pattern`; Type3 fonts without ToUnicode → material `not_read_type3`; Form XObjects without `BBox` are run without a clip; `/Font` set through ExtGState is honoured.
+  2. **Colour spaces:** CalGray, CalRGB, Lab and ICCBased (by component count) resolved where exact; Indexed through its lookup table; Separation and DeviceN with tint 0 = no ink (white); any other unresolved colour (Pattern included) → borderline. Alpha below 0.2 (but above 0) → borderline. A render mode outside 0–7 → borderline.
+  3. **Revisions:** an object that is free in a newer cross-reference section but in use in an older one, or a generation mismatch → `pdf_damaged`.
+  4. **Encryption:** only the empty user password is tried; the owner-password fallback is disabled (test: non-empty user + empty owner → `encrypted_unsupported`).
+  5. **Backgrounds and sizes:** stroked paths and `sh` shadings count as possible backgrounds; light text on a known fill with a small luminance difference → borderline; Type3 glyph size measured through `FontMatrix`.
+  6. Text behind a zero-area clip, outside a form `BBox`, or in an optional content group that is OFF → borderline.
+  7. Code review: tests for every tech-lead decision and cap (Form XObject graphics state, blend/soft mask, counted ERROR records, lost-trailer repair, `/XRefStm` loop guard, linearized revision count, hidden/NoView annotations, widget value from a parent field, `MAX_FILLS`, `MAX_CELL_GLYPHS`, `MAX_FLOW_BOXES`, `MAX_ANNOTATIONS`, every UK/RU/EN reference phrase); OCR decision after header/footer removal; result model checks `pages` ≤ 100 and `block.page` ≤ `pages`; references found across two adjacent blocks; small dataclass instead of `list[str | int]` records; NITs.
+  8. Threat model: T4 (free-entry rule, owner-password rule); T5 residual risks (Type3 CharProcs, transfer functions, overprint).
+- Stage 13 follow-up: measure the 100-page worst case on Render's CPU (9.3 s CPU here); lower `MAX_PDF_PAGES` or raise the wall limit if it exceeds 30 s.
 - Threats: T4, T5.
 
 ### S3-T2b List numbering labels (before stage 5)

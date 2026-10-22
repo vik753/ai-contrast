@@ -10,9 +10,9 @@ or text, so it is safe to log and to return.
 
 from __future__ import annotations
 
-from typing import Annotated, Final, Literal
+from typing import Annotated, Final, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt, model_validator
 
 MIB: Final = 1024 * 1024
 
@@ -24,6 +24,11 @@ DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES: Final = 100 * MIB
 DEFAULT_MAX_DOCX_PART_BYTES: Final = 32 * MIB
 DEFAULT_MAX_DOCX_XML_DEPTH: Final = 256
 DEFAULT_MAX_DOCX_ELEMENTS: Final = 2_000_000
+DEFAULT_MAX_PDF_PAGES: Final = 100
+DEFAULT_MAX_PDF_PREV_CHAIN: Final = 32
+
+# Items in ``removed`` and in ``warnings`` (the browser applies the same caps).
+MAX_LIST_ITEMS: Final = 1000
 
 MAX_SAMPLE_CHARS: Final = 200
 
@@ -94,8 +99,29 @@ class ExtractionResult(_Strict):
     kind: Kind
     bytes: NonNegativeInt
     language: Language
+    # The upper bound is the extractor's configured limit (``too_many_pages``).
     pages: PositiveInt | None
     blocks: list[Block]
     ocr_pages: list[PositiveInt]
-    removed: list[Removed]
-    warnings: list[Warning]
+    removed: Annotated[list[Removed], Field(max_length=MAX_LIST_ITEMS)]
+    warnings: Annotated[list[Warning], Field(max_length=MAX_LIST_ITEMS)]
+
+    @model_validator(mode="after")
+    def _ordered_pages(self) -> Self:
+        """Page numbers stay inside ``pages``; ``ocr_pages`` and warning pages increase."""
+        for block in self.blocks:
+            if block.page is not None and (self.pages is None or block.page > self.pages):
+                msg = "block page outside the document"
+                raise ValueError(msg)
+        if any(a >= b for a, b in zip(self.ocr_pages, self.ocr_pages[1:], strict=False)):
+            msg = "ocr_pages must strictly increase"
+            raise ValueError(msg)
+        last: dict[str, int] = {}
+        for warning in self.warnings:
+            if warning.page is None:
+                continue
+            if last.get(warning.code, 0) >= warning.page:
+                msg = "warning pages must strictly increase per code"
+                raise ValueError(msg)
+            last[warning.code] = warning.page
+        return self

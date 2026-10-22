@@ -18,6 +18,8 @@ from app.extraction.model import (
     DEFAULT_MAX_DOCX_ELEMENTS,
     DEFAULT_MAX_DOCX_PART_BYTES,
     DEFAULT_MAX_DOCX_XML_DEPTH,
+    DEFAULT_MAX_PDF_PAGES,
+    DEFAULT_MAX_PDF_PREV_CHAIN,
     DEFAULT_MAX_TEXT_CHARS,
     DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES,
     MIB,
@@ -114,6 +116,11 @@ class Settings(BaseSettings):
       total of all parts is capped by ``MAX_ZIP_UNCOMPRESSED_BYTES``.
     - ``MAX_DOCX_XML_DEPTH``: element nesting depth of one XML part.
     - ``MAX_DOCX_ELEMENTS``: XML elements of all parts of one document.
+
+    PDF extraction (positive integers, threat model T4 and T5, S3-T3):
+
+    - ``MAX_PDF_PAGES``: pages of one PDF, checked before extraction.
+    - ``MAX_PDF_PREV_CHAIN``: ``/Prev`` links of the cross-reference chain.
     """
 
     model_config = SettingsConfigDict(
@@ -148,6 +155,8 @@ class Settings(BaseSettings):
     max_docx_part_bytes: PositiveInt = DEFAULT_MAX_DOCX_PART_BYTES
     max_docx_xml_depth: PositiveInt = DEFAULT_MAX_DOCX_XML_DEPTH
     max_docx_elements: PositiveInt = DEFAULT_MAX_DOCX_ELEMENTS
+    max_pdf_pages: PositiveInt = DEFAULT_MAX_PDF_PAGES
+    max_pdf_prev_chain: PositiveInt = DEFAULT_MAX_PDF_PREV_CHAIN
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
