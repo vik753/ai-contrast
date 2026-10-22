@@ -4,6 +4,8 @@
  * Run explicitly from the `dev` and `build` scripts (npm lifecycle hooks do
  * not run because of `ignore-scripts`). Threat model T8, T9.
  *
+ * - pdf.js comes from the `legacy` build (the modern build needs newer browser
+ *   APIs such as `Map.prototype.getOrInsertComputed`).
  * - Only an exact list of files is copied. No `quickjs-eval.*`, no
  *   `pdf.sandbox.*`, no legacy (non-LSTM) Tesseract core.
  * - Language data comes from `4.0.0_best_int` only. Each file is checked
@@ -26,7 +28,7 @@ const LANG_DIR = "4.0.0_best_int";
 
 /** Files that must exist: [source under node_modules, target under outDir]. */
 const REQUIRED_FILES = [
-  ["pdfjs-dist/build/pdf.worker.min.mjs", "pdf.worker.min.mjs"],
+  ["pdfjs-dist/legacy/build/pdf.worker.min.mjs", "pdf.worker.min.mjs"],
   ["tesseract.js/dist/worker.min.js", "worker.min.js"],
 ];
 
@@ -74,8 +76,12 @@ export async function copyOcrAssets({ nodeModulesDir, outDir, languageSha256 = L
     languages.push([source, join(outDir, "lang", `${lang}.traineddata.gz`)]);
   }
 
-  // 2. Fresh output, then copy the exact list.
-  await rm(outDir, { recursive: true, force: true });
+  // 2. Fresh output, then copy the exact list. The directory itself is kept:
+  // in Compose it is a volume mount point, and removing it fails with EBUSY.
+  await mkdir(outDir, { recursive: true });
+  for (const entry of await readdir(outDir)) {
+    await rm(join(outDir, entry), { recursive: true, force: true });
+  }
   for (const [source, target] of languages) {
     await copyTo(source, target);
   }

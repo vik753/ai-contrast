@@ -111,8 +111,8 @@ No secrets and no `.env` file are needed.
 Needs Docker Engine 28.0 or later, or Docker Desktop.
 
 ```bash
-# Linux only, before the first `up`: you own frontend/node_modules, not root.
-mkdir -p frontend/node_modules
+# Linux only, before the first `up`: you own these directories, not root.
+mkdir -p frontend/node_modules frontend/public/ocr
 
 # Build and start backend and frontend.
 docker compose up --build
@@ -130,7 +130,7 @@ docker compose down
 ```
 
 Expected: `docker compose down` stops and removes the containers.
-Add `-v` to also delete the `node_modules` and npm cache volumes.
+Add `-v` to also delete the `node_modules`, OCR assets (`public/ocr`) and npm cache volumes.
 
 ### Backend (local, without Docker)
 
