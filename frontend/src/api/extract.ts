@@ -194,6 +194,10 @@ const BLOCK_KEYS = ["text", "part", "page"] as const;
 const REMOVED_KEYS = ["reason", "count", "sample"] as const;
 const WARNING_KEYS = ["code", "page"] as const;
 
+function isFileKind(kind: string): kind is FileKind {
+  return FILE_KINDS.has(kind);
+}
+
 function isServerErrorCode(
   errors: ErrorTable,
   status: number,
@@ -402,8 +406,8 @@ function parseSuccess(body: Record<string, unknown>, rules: ResponseRules): Extr
   const { kind, bytes, language, pages } = body;
   if (
     typeof kind !== "string" ||
-    !FILE_KINDS.has(kind) ||
-    !rules.acceptKind(kind as FileKind) ||
+    !isFileKind(kind) ||
+    !rules.acceptKind(kind) ||
     typeof bytes !== "number" ||
     !Number.isSafeInteger(bytes) ||
     !rules.acceptBytes(bytes) ||
@@ -427,7 +431,7 @@ function parseSuccess(body: Record<string, unknown>, rules: ResponseRules): Extr
   }
   return {
     ok: true,
-    kind: kind as FileKind,
+    kind,
     bytes,
     extraction: {
       language: language as Language,
@@ -479,6 +483,12 @@ async function readCapped(
   }
   if (body === null) {
     return "";
+  }
+  if (signal.aborted) {
+    // Stopped already (timeout or caller abort) while the headers were read:
+    // do not read the body at all.
+    void body.cancel().catch(() => undefined);
+    return UNREADABLE;
   }
   const reader = body.getReader();
   // A stalled body must not outlive the timeout or an abort: cancelling the

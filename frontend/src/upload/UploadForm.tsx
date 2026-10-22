@@ -336,7 +336,7 @@ function ContractCard({
               setLinkProblem(null);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (event.key === "Enter" && !event.nativeEvent.isComposing) {
                 event.preventDefault();
                 addLink();
               }

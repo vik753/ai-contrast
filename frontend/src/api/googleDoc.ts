@@ -16,7 +16,7 @@ import {
   type ResponseRules,
   type ServerErrorCode,
 } from "./extract";
-import { MAX_FILE_BYTES } from "../upload/limits";
+import { MAX_FILE_BYTES } from "./fileLimits";
 
 export const GOOGLE_DOC_URL = "/api/extract/google-doc";
 
@@ -31,6 +31,11 @@ const PATH_PATTERN = /^\/document\/d\/([A-Za-z0-9_-]+)(?:\/(?:edit|view|preview|
  * such a link. Leading and trailing whitespace is trimmed; whitespace or a line
  * break inside the text is refused (`new URL()` would silently drop tabs and
  * line breaks). Query and fragment are ignored.
+ *
+ * The WHATWG normalization of `new URL()` is kept on purpose: `:443` (the default
+ * port), backslashes (`https:\\docs.google.com\document\d\<ID>`) and dot segments
+ * (`/document/./d/<ID>`) all resolve to the same canonical URL. Only the ID is
+ * taken from it, and the server builds its own export URL from that ID.
  */
 export function parseGoogleDocLink(text: string): string | null {
   const link = text.trim();

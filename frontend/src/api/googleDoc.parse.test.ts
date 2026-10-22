@@ -31,6 +31,10 @@ describe("valid links return the ID", () => {
     [`${BASE}${ID}?usp=sharing`],
     [`${BASE}${ID}#bookmark=id.xyz`],
     [`${BASE}${ID}/`.replace("https://docs", "https://DOCS")],
+    // WHATWG normalization is accepted on purpose (S3-T6b item 2): the result is the same canonical URL.
+    [`https://docs.google.com:443/document/d/${ID}`],
+    ["https:\\\\docs.google.com\\document\\d\\" + ID],
+    [`https://docs.google.com/document/./d/${ID}/edit`],
   ])("test_parse_valid_link_%s_returns_id", (link) => {
     expect(parseGoogleDocLink(link)).toBe(ID);
   });
