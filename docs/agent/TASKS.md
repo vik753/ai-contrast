@@ -293,6 +293,14 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-numbering`.
 - AC: paragraphs with `w:numPr` (direct or from the style) get their label from `numbering.xml`: `w:abstractNum` levels with `lvlText` (`%1.%2.`), `numFmt` (decimal, lowerLetter, upperLetter, lowerRoman, upperRoman, bullet, `decimalZero`, Cyrillic `russianLower`/`russianUpper` and Ukrainian equivalents where defined), `start`, `lvlRestart`, `isLgl`, `w:num` overrides (`lvlOverride`, `startOverride`); counters per `numId` in document order, hidden and deleted paragraphs do not count; the label is prefixed to the block text with one space. Unknown formats → decimal plus warning `numbering_approximate`. Caps on levels (9) and definitions.
 - Threats: T5 (labels are what the person reads; clause references depend on them).
+- Review round 1 (PR #31) added to the AC:
+  1. **Label visibility:** the label goes through the same visibility check as text, with run properties merged in this order: paragraph style, paragraph mark (`w:pPr/w:rPr`), level (`w:lvl/w:rPr`). A hidden label is not emitted; its text goes to `removed`.
+  2. **Counting follows the paragraph mark:** a numbered paragraph counts unless its mark is hidden or deleted (`w:pPr/w:rPr/w:vanish` by effective formatting, `w:pPr/w:rPr/w:del`), whatever its runs contain.
+  3. **Level from the style:** a paragraph whose style gives `numId` without `ilvl` takes the level whose `w:lvl/w:pStyle` names that style (legal templates link headings this way).
+  4. **Caps:** `lvlText` at most 255 characters and an expanded label at most 256 characters; above → `suspicious_package`. Duplicate `abstractNumId` or `numId` → `suspicious_package`.
+  5. **Approximate cases** (label kept as decimal, warning `numbering_approximate`): `w:numStyleLink`/`w:styleLink` that cannot be resolved through one style; roman numerals above 3999; `ilvl` above 8 or not an integer (level 0 used).
+  6. **Sequences:** separate counters per story (body with its text boxes; each header or footer part; footnotes; endnotes). A `w:num` whose `lvlOverride` has its own `w:lvl` or start begins its own sequence.
+  7. NITs: escaped private-use bullet characters, explicit set of upper-case formats, `nonlocal` instead of the list closure. Threat model T5: "numbering labels follow the visibility of the level and the paragraph mark; whether a paragraph counts follows its mark".
 
 ### S3-T4 Preview in the browser
 

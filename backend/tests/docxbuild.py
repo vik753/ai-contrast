@@ -50,6 +50,7 @@ REL_OLE = R + "/oleObject"
 REL_HYPERLINK = R + "/hyperlink"
 REL_SETTINGS = R + "/settings"
 REL_THEME = R + "/theme"
+REL_NUMBERING = R + "/numbering"
 
 CT_MAIN = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 CT_TEMPLATE = "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"
@@ -62,6 +63,7 @@ CT_HEADER = "application/vnd.openxmlformats-officedocument.wordprocessingml.head
 CT_FOOTER = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
 CT_SETTINGS = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
 CT_THEME = "application/vnd.openxmlformats-officedocument.theme+xml"
+CT_NUMBERING = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"
 CT_RELS = "application/vnd.openxmlformats-package.relationships+xml"
 
 NS_DECL = (
@@ -172,6 +174,47 @@ def settings_xml(inner: str = "") -> bytes:
     return f"{XML_DECL}<w:settings {NS_DECL}>{inner}</w:settings>".encode()
 
 
+def numbering_xml(*definitions: str) -> bytes:
+    """A ``numbering.xml`` part: ``w:abstractNum`` and ``w:num`` snippets in order."""
+    return f"{XML_DECL}<w:numbering {NS_DECL}>{''.join(definitions)}</w:numbering>".encode()
+
+
+def lvl(  # noqa: PLR0913 - every keyword is one w:lvl child
+    ilvl: int,
+    text: str,
+    fmt: str = "decimal",
+    *,
+    start: int | None = None,
+    restart: int | None = None,
+    is_lgl: bool = False,
+    rpr: str = "",
+    pstyle: str | None = None,
+) -> str:
+    """One ``w:lvl`` of an abstract numbering definition."""
+    parts = f'<w:start w:val="{start}"/>' if start is not None else ""
+    parts += f'<w:numFmt w:val="{fmt}"/>'
+    parts += f'<w:lvlRestart w:val="{restart}"/>' if restart is not None else ""
+    parts += f'<w:pStyle w:val="{pstyle}"/>' if pstyle else ""
+    parts += "<w:isLgl/>" if is_lgl else ""
+    parts += f'<w:lvlText w:val="{escape(text, {chr(34): "&quot;"})}"/>'
+    parts += f"<w:rPr>{rpr}</w:rPr>" if rpr else ""
+    return f'<w:lvl w:ilvl="{ilvl}">{parts}</w:lvl>'
+
+
+def abstract_num(abstract_id: int, *levels: str) -> str:
+    return f'<w:abstractNum w:abstractNumId="{abstract_id}">{"".join(levels)}</w:abstractNum>'
+
+
+def num(num_id: int, abstract_id: int, overrides: str = "") -> str:
+    """A ``w:num``; ``overrides`` holds ``w:lvlOverride`` snippets."""
+    return f'<w:num w:numId="{num_id}"><w:abstractNumId w:val="{abstract_id}"/>{overrides}</w:num>'
+
+
+def num_pr(num_id: int, ilvl: int = 0) -> str:
+    """The ``w:numPr`` for ``p(..., ppr=...)``."""
+    return f'<w:numPr><w:ilvl w:val="{ilvl}"/><w:numId w:val="{num_id}"/></w:numPr>'
+
+
 def style(
     style_id: str,
     *,
@@ -259,6 +302,7 @@ class Package:
     note_refs: bool = True
     settings: bytes | None = None
     theme: bytes | None = None
+    numbering: bytes | None = None
 
     def _sections(self) -> list[str]:
         if self.sections is not None:
@@ -335,6 +379,8 @@ class Package:
             add("rIdSettings", REL_SETTINGS, "settings.xml", self.settings, CT_SETTINGS)
         if self.theme is not None:
             add("rIdTheme", REL_THEME, "theme/theme1.xml", self.theme, CT_THEME)
+        if self.numbering is not None:
+            add("rIdNumbering", REL_NUMBERING, "numbering.xml", self.numbering, CT_NUMBERING)
         overrides.extend(self.extra_overrides)
 
         main = self.document if self.document is not None else document_xml(self._main_body())

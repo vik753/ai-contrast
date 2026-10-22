@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 from xml.etree.ElementTree import Element
 
+from app.extraction.docx_numbering import MAX_LEVELS, Counters, Numbering, parse_numbering
 from app.extraction.docx_package import (
     R_NS,
     DocSettings,
@@ -48,6 +49,7 @@ from app.extraction.docx_package import (
 )
 from app.extraction.docx_styles import (
     AUTO,
+    HIDDEN_FORMATTING,
     VAL,
     WHITE,
     Background,
@@ -162,6 +164,10 @@ TEXT_TAGS: Final = frozenset({T_T, T_MATH_T})
 T_RPR: Final = _W + "rPr"
 T_PPR: Final = _W + "pPr"
 T_PSTYLE: Final = _W + "pStyle"
+T_NUMPR: Final = _W + "numPr"
+T_MOVE_FROM: Final = _W + "moveFrom"
+T_NUM_ID: Final = _W + "numId"
+T_ILVL: Final = _W + "ilvl"
 T_SHD: Final = _W + "shd"
 T_SDT: Final = _W + "sdt"
 T_SDT_PR: Final = _W + "sdtPr"
@@ -275,6 +281,7 @@ GRAPHIC_URIS: Final = {
 }
 BORDERLINE_TEXT: Final = "borderline_text"
 FIELD_MAY_UPDATE: Final = "field_may_update"
+NUMBERING_APPROXIMATE: Final = "numbering_approximate"
 NOT_DISPLAYED: Final = "not_displayed"
 HIDDEN_OBJECT: Final = "hidden_object"
 PAGE_NUMBER: Final = "page_number"
@@ -447,6 +454,7 @@ class _Document:
         self.sections: list[_Section] = []
         self.note_refs: dict[Part, set[str]] = {"footnote": set(), "endnote": set()}
         self.verdicts: dict[tuple[object, ...], Verdict] = {}
+        self.numbering: Numbering | None = None
 
     def field_seen(self, *, dirty: bool) -> None:
         if dirty or self.settings.update_fields:
@@ -512,6 +520,10 @@ class _Paragraph:
     verdict: Verdict | None = None
     span: _Span | None = None
     borderline: bool = False
+    num_id: str | None = None  # direct w:numPr
+    num_ilvl: str | None = None
+    mark_props: dict[str, object] = field(default_factory=dict)  # w:pPr/w:rPr
+    mark_deleted: bool = False  # w:pPr/w:rPr/w:del
 
 
 @dataclass
@@ -573,6 +585,11 @@ class _PartWalker:
         self.collect: Collect | None = None
         self.collect_depth = 0
         self.after_collect: Callable[[], None] | None = None
+        self.collect_deep: Collect | None = None  # grandchildren of the collected element
+        numbering = document.numbering
+        self.counters = (
+            None if numbering is None else Counters(numbering, document.styles)
+        )  # one story, one set of counters
         self.section: _Section | None = None
         self.section_depth = 0
         self.code_fields = 0
@@ -616,6 +633,8 @@ class _PartWalker:
                             self.collect(item.tag, item.attrib)
                     elif self.section is not None and depth == self.section_depth + 1:
                         self._section_child(item.tag, item.attrib)
+                    elif self.collect_deep is not None and depth == self.collect_depth + 2:
+                        self.collect_deep(item.tag, item.attrib)
                     continue
                 tag = item.tag
                 if depth == 1:
@@ -639,6 +658,7 @@ class _PartWalker:
                         self.section_depth = 0
                     if depth == self.collect_depth:
                         self.collect = None
+                        self.collect_deep = None
                         if self.after_collect is not None:
                             after, self.after_collect = self.after_collect, None
                             after()
@@ -753,8 +773,12 @@ class _PartWalker:
         verdict = paragraph.verdict
         if verdict is not None:
             return verdict
+        verdict = self._verdict_for(paragraph, paragraph.run_props)
+        paragraph.verdict = verdict
+        return verdict
+
+    def _verdict_for(self, paragraph: _Paragraph, direct: dict[str, object]) -> Verdict:
         table = paragraph.table
-        direct = paragraph.run_props
         key = (
             paragraph.style,
             paragraph.shading,
@@ -769,7 +793,6 @@ class _PartWalker:
             if len(cache) >= MAX_CACHED_VERDICTS:
                 cache.clear()
             cache[key] = verdict
-        paragraph.verdict = verdict
         return verdict
 
     def _judge(self, paragraph: _Paragraph, direct: dict[str, object]) -> Verdict:
@@ -886,12 +909,29 @@ class _PartWalker:
             self._skip()
             return
 
+        parent = ""
+
         def collect(tag: str, attrib: dict[str, str]) -> None:
+            nonlocal parent
+            parent = tag
             if tag == T_PSTYLE:
                 paragraph.style = attrib.get(VAL)
             elif tag == T_SHD:
                 paragraph.shading = shade_spec(attrib)
 
+        def deep(tag: str, attrib: dict[str, str]) -> None:
+            if parent == T_NUMPR:
+                if tag == T_NUM_ID:
+                    paragraph.num_id = attrib.get(VAL)
+                elif tag == T_ILVL:
+                    paragraph.num_ilvl = attrib.get(VAL)
+            elif parent == T_RPR:
+                if tag in (T_DEL, T_MOVE_FROM):
+                    paragraph.mark_deleted = True
+                else:
+                    read_run_property(tag, attrib, paragraph.mark_props)
+
+        self.collect_deep = deep
         self.collect = collect
         self.collect_depth = depth
 
@@ -1172,7 +1212,62 @@ class _PartWalker:
         if self.capture is not None:
             self.capture.add("\n")
             return
-        self.collector.paragraph(paragraph.part, "".join(paragraph.pieces))
+        text = "".join(paragraph.pieces)
+        label = self._label(paragraph, bool(text.strip()))
+        self.collector.paragraph(paragraph.part, f"{label} {text}" if label else text)
+
+    def _label(self, paragraph: _Paragraph, has_text: bool) -> str:
+        """Count a numbered paragraph and return its label (empty: none or hidden).
+
+        A paragraph counts unless its mark is hidden or deleted, whatever its runs
+        contain. The label is read like text: paragraph style, paragraph mark, then
+        the level (``w:lvl/w:rPr``); a hidden label is reported as removed."""
+        counters = self.counters
+        if counters is None:
+            return ""
+        styles = self.document.styles
+        style_num, style_ilvl = styles.numbering(styles.paragraph_style(paragraph.style))
+        num_id = paragraph.num_id if paragraph.num_id is not None else style_num
+        if num_id is None or num_id == "0" or paragraph.mark_deleted:
+            return ""
+        mark = self._verdict_for(paragraph, paragraph.mark_props)
+        if mark.reason == HIDDEN_FORMATTING:
+            return ""
+        ilvl = self._level(paragraph, style_ilvl, num_id)
+        counted = counters.label(num_id, ilvl)
+        if counters.approximate:
+            self.collector.warn(NUMBERING_APPROXIMATE)
+        if counted is None or not has_text or not counted[0]:
+            return ""
+        label, level = counted
+        verdict = self._verdict_for(paragraph, {**paragraph.mark_props, **level.rpr})
+        if verdict.reason is None:
+            return label
+        self.collector.remove(verdict.reason, label, len(label))
+        return ""
+
+    def _level(self, paragraph: _Paragraph, style_ilvl: str | None, num_id: str) -> int:
+        """``w:ilvl``: direct, then the style, then the level linked to the style by
+        ``w:lvl/w:pStyle``. A bad value is level 0 (approximate)."""
+        text = paragraph.num_ilvl if paragraph.num_ilvl is not None else style_ilvl
+        if text is None:
+            numbering = self.document.numbering
+            num = None if numbering is None else numbering.nums.get(num_id)
+            if numbering is not None and num is not None:
+                styles = self.document.styles
+                for style_id in styles.chain_ids(styles.paragraph_style(paragraph.style)):
+                    linked = numbering.style_level(num, style_id)
+                    if linked is not None:
+                        return linked
+            return 0
+        try:
+            value = int(text)
+        except ValueError:
+            value = -1
+        if 0 <= value < MAX_LEVELS:
+            return value
+        self.collector.warn(NUMBERING_APPROXIMATE)
+        return 0
 
     def _end_r(self, item: Element, depth: int) -> None:
         paragraph = self.paragraph
@@ -1276,6 +1371,8 @@ def extract_docx(
         theme.present = True
     collector = _Collector(max_chars=max_chars, max_blocks=max_blocks)
     document = _Document(styles, theme, settings, collector)
+    if "numbering" in single:
+        document.numbering = parse_numbering(reader.events(single["numbering"]))
 
     def walk(entry: ZipEntry, part: Part, **kwargs: bool) -> None:
         options = {"main": False, "notes": False, "displayed": True, **kwargs}
