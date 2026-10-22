@@ -76,8 +76,11 @@ class _ResponseStream(httpx.AsyncByteStream):
 
 class _GuardedTransport(httpx.AsyncBaseTransport):
     def __init__(self, network_backend: httpcore.AsyncNetworkBackend) -> None:
+        ssl_context = httpx.create_ssl_context(verify=True, trust_env=False)
+        # The TLS secrets of a fetch never go to a file, whatever ``SSLKEYLOGFILE`` says.
+        ssl_context.keylog_filename = None  # type: ignore[assignment]  # typeshed: str
         self._pool = httpcore.AsyncConnectionPool(
-            ssl_context=httpx.create_ssl_context(verify=True, trust_env=False),
+            ssl_context=ssl_context,
             max_connections=MAX_CONNECTIONS,
             http1=True,
             http2=False,
@@ -89,6 +92,9 @@ class _GuardedTransport(httpx.AsyncBaseTransport):
         url = request.url
         if url.scheme != "https":
             raise BlockedHostError("scheme is not allowed")  # noqa: TRY003
+        if "sni_hostname" in request.extensions:
+            # It would send another TLS server name than the checked host (ADR 0012).
+            raise BlockedHostError("extension is not allowed")  # noqa: TRY003
         core_request = httpcore.Request(
             method=request.method,
             url=httpcore.URL(
