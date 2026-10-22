@@ -50,7 +50,8 @@ def _outcome(data: bytes) -> Any:
 # --- Hidden formatting -----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("element", ["<w:vanish/>", "<w:specVanish/>", "<w:webHidden/>"])
+# w:webHidden is visible in print layout (review round 1, item 6).
+@pytest.mark.parametrize("element", ["<w:vanish/>", "<w:specVanish/>"])
 def test_hidden_direct_formatting_removed(element: str) -> None:
     text, _ = _with(element)
 
@@ -58,7 +59,8 @@ def test_hidden_direct_formatting_removed(element: str) -> None:
     assert VISIBLE in text
 
 
-@pytest.mark.parametrize("element", ["<w:vanish/>", "<w:specVanish/>", "<w:webHidden/>"])
+# w:webHidden is visible in print layout (review round 1, item 6).
+@pytest.mark.parametrize("element", ["<w:vanish/>", "<w:specVanish/>"])
 def test_hidden_direct_formatting_reported(element: str) -> None:
     assert _removed(element) == {"hidden_formatting"}
 

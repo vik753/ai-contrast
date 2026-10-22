@@ -272,10 +272,11 @@ def test_walker_textbox_known_choice_used() -> None:
     assert texts(result, "textbox") == ["Choice copy."]
 
 
-def test_walker_textbox_unknown_requires_uses_fallback() -> None:
-    result = extract(body_docx(para(CLAUSE), _textbox("Choice copy.", "Fallback copy.", "xu")))
+def test_walker_textbox_unknown_requires_suspicious() -> None:
+    # Review round 1 (PR #26): an unknown ``Requires`` fails closed.
+    data = body_docx(para(CLAUSE), _textbox("Choice copy.", "Fallback copy.", "xu"))
 
-    assert texts(result, "textbox") == ["Fallback copy."]
+    assert code(data) == "suspicious_package"
 
 
 def test_walker_body_text_part_is_body() -> None:

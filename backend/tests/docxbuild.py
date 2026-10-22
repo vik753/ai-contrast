@@ -49,6 +49,7 @@ REL_SUBDOCUMENT = R + "/subDocument"
 REL_OLE = R + "/oleObject"
 REL_HYPERLINK = R + "/hyperlink"
 REL_SETTINGS = R + "/settings"
+REL_THEME = R + "/theme"
 
 CT_MAIN = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 CT_TEMPLATE = "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"
@@ -60,6 +61,7 @@ CT_ENDNOTES = "application/vnd.openxmlformats-officedocument.wordprocessingml.en
 CT_HEADER = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"
 CT_FOOTER = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"
 CT_SETTINGS = "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"
+CT_THEME = "application/vnd.openxmlformats-officedocument.theme+xml"
 CT_RELS = "application/vnd.openxmlformats-package.relationships+xml"
 
 NS_DECL = (
@@ -103,8 +105,12 @@ def para(text: str, rpr: str = "", *, ppr: str = "") -> str:
     return p(r(text, rpr), ppr=ppr)
 
 
-def document_xml(body: str, *, decl: str = NS_DECL, prolog: str = XML_DECL) -> bytes:
-    return f"{prolog}<w:document {decl}><w:body>{body}</w:body></w:document>".encode()
+def document_xml(
+    body: str, *, decl: str = NS_DECL, prolog: str = XML_DECL, before_body: str = ""
+) -> bytes:
+    return (
+        f"{prolog}<w:document {decl}>{before_body}<w:body>{body}</w:body></w:document>"
+    ).encode()
 
 
 def notes_xml(tag: str, notes: Sequence[str]) -> bytes:
@@ -121,6 +127,45 @@ def notes_xml(tag: str, notes: Sequence[str]) -> bytes:
 
 def hdr_xml(body: str, tag: str = "hdr") -> bytes:
     return f"{XML_DECL}<w:{tag} {NS_DECL}>{body}</w:{tag}>".encode()
+
+
+A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+THEME_COLOURS = {
+    "dk1": "000000",
+    "lt1": "FFFFFF",
+    "dk2": "1F3864",
+    "lt2": "E7E6E6",
+    "accent1": "00B050",
+    "accent2": "1F3864",
+    "accent3": "A5A5A5",
+    "accent4": "FFC000",
+    "accent5": "5B9BD5",
+    "accent6": "70AD47",
+    "hlink": "0563C1",
+    "folHlink": "954F72",
+}
+
+
+def theme_xml(**colours: str) -> bytes:
+    """A theme part whose colour scheme is ``THEME_COLOURS`` updated by ``colours``."""
+    scheme = {**THEME_COLOURS, **colours}
+    items = "".join(f'<a:{k}><a:srgbClr val="{v}"/></a:{k}>' for k, v in scheme.items())
+    font = '<a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/>'
+    return (
+        f'{XML_DECL}<a:theme xmlns:a="{A_NS}" name="Synthetic"><a:themeElements>'
+        f'<a:clrScheme name="Synthetic">{items}</a:clrScheme>'
+        f'<a:fontScheme name="Synthetic"><a:majorFont>{font}</a:majorFont>'
+        f"<a:minorFont>{font}</a:minorFont></a:fontScheme>"
+        '<a:fmtScheme name="Synthetic"/></a:themeElements></a:theme>'
+    ).encode()
+
+
+STANDARD_MAPPING = (
+    '<w:clrSchemeMapping w:bg1="light1" w:t1="dark1" w:bg2="light2" w:t2="dark2" '
+    'w:accent1="accent1" w:accent2="accent2" w:accent3="accent3" w:accent4="accent4" '
+    'w:accent5="accent5" w:accent6="accent6" w:hyperlink="hyperlink" '
+    'w:followedHyperlink="followedHyperlink"/>'
+)
 
 
 def settings_xml(inner: str = "") -> bytes:
@@ -213,6 +258,7 @@ class Package:
     # A paragraph with a reference to every footnote and endnote (default on).
     note_refs: bool = True
     settings: bytes | None = None
+    theme: bytes | None = None
 
     def _sections(self) -> list[str]:
         if self.sections is not None:
@@ -287,6 +333,8 @@ class Package:
             add(f"rIdF{i}", REL_FOOTER, f"footer{i}.xml", hdr_xml(body, "ftr"), CT_FOOTER)
         if self.settings is not None:
             add("rIdSettings", REL_SETTINGS, "settings.xml", self.settings, CT_SETTINGS)
+        if self.theme is not None:
+            add("rIdTheme", REL_THEME, "theme/theme1.xml", self.theme, CT_THEME)
         overrides.extend(self.extra_overrides)
 
         main = self.document if self.document is not None else document_xml(self._main_body())
