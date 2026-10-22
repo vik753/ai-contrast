@@ -165,6 +165,7 @@ T_RPR: Final = _W + "rPr"
 T_PPR: Final = _W + "pPr"
 T_PSTYLE: Final = _W + "pStyle"
 T_NUMPR: Final = _W + "numPr"
+T_MOVE_FROM: Final = _W + "moveFrom"
 T_NUM_ID: Final = _W + "numId"
 T_ILVL: Final = _W + "ilvl"
 T_SHD: Final = _W + "shd"
@@ -925,7 +926,7 @@ class _PartWalker:
                 elif tag == T_ILVL:
                     paragraph.num_ilvl = attrib.get(VAL)
             elif parent == T_RPR:
-                if tag == T_DEL:
+                if tag in (T_DEL, T_MOVE_FROM):
                     paragraph.mark_deleted = True
                 else:
                     read_run_property(tag, attrib, paragraph.mark_props)

@@ -68,3 +68,16 @@ def test_unresolvable_num_style_link_is_decimal_with_warning() -> None:
 
     assert texts(result) == ["1. T"]
     assert "numbering_approximate" in warning_codes(result)
+
+
+def test_moved_away_paragraph_mark_does_not_count() -> None:
+    numbering = numbering_xml(abstract_num(0, lvl(0, "%1.")), num(1, 0))
+    moved = (
+        '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'
+        '<w:rPr><w:moveFrom w:id="1" w:author="A"/></w:rPr></w:pPr>'
+        '<w:moveFrom w:id="2" w:author="A"><w:r><w:t>Moved</w:t></w:r></w:moveFrom></w:p>'
+    )
+    body = para("One", ppr=num_pr(1)) + moved + para("Two", ppr=num_pr(1))
+    result = extract(build_docx(Package(body=body, numbering=numbering)))
+
+    assert texts(result)[-1] == "2. Two"
