@@ -31,8 +31,16 @@ FORBIDDEN_ATTRIBUTES = {"form", "UploadFile", "SpooledTemporaryFile"}
 
 # defusedxml: approved for S3-T2 (DOCX walker); pdfminer.six: approved for S3-T3 (PDF);
 # see docs/agent/TASKS.md "Stage 3 dependencies".
-RUNTIME_DEPENDENCIES = {"defusedxml", "fastapi", "pdfminer-six", "pydantic-settings", "uvicorn"}
-DEV_DEPENDENCIES = {"httpx", "mypy", "pip-audit", "pytest", "ruff"}
+# S3-T6 (ADR 0012): httpx moved from dev to runtime (outbound HTTP through the guard).
+RUNTIME_DEPENDENCIES = {
+    "defusedxml",
+    "fastapi",
+    "httpx",
+    "pdfminer-six",
+    "pydantic-settings",
+    "uvicorn",
+}
+DEV_DEPENDENCIES = {"mypy", "pip-audit", "pytest", "ruff"}
 
 
 def _violations(source: str) -> list[str]:  # noqa: PLR0912 - one branch per rule

@@ -8,13 +8,15 @@ Run (from ``backend/``, as in the ``Dockerfile``)::
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.telemetry import TelemetryConfig
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import extract, health
+from app.api import extract, google_doc, health
 from app.api.validation_errors import validation_error_handler
 from app.extraction.limiter import ExtractionLimiter
 from app.middleware import (
@@ -23,6 +25,7 @@ from app.middleware import (
     ErrorCatcherMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.net.client import outbound_client
 from app.settings import Settings
 
 CORS_ALLOWED_METHODS = ["GET", "POST"]
@@ -39,6 +42,11 @@ TELEMETRY_DISABLED: TelemetryConfig = {
     "operation_spans": False,
     "auto_configure": False,
 }
+
+# `httpx` logs every request URL at INFO. The Google Docs ID is a password for the
+# document, so both loggers stay at WARNING (ADR 0012 point 5).
+NET_LOGGERS = ("httpx", "httpcore")
+GOOGLE_READ_TIMEOUT_SECONDS = 10.0
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -58,9 +66,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(health.router)
     app.include_router(extract.router)
+    app.include_router(google_doc.router)
+    for name in NET_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
     app.state.settings = settings
     # One limiter per app: extractions in progress on this server (T6, ADR 0010).
     app.state.extraction_limiter = ExtractionLimiter(settings.max_concurrent_extractions)
+
+    # A new guarded client per fetch; tests replace this attribute.
+    app.state.google_client_factory = lambda: outbound_client(
+        connect_timeout=settings.google_connect_timeout_seconds,
+        read_timeout=GOOGLE_READ_TIMEOUT_SECONDS,
+    )
 
     # `add_middleware` puts each new middleware outside the previous ones,
     # so they are added from the innermost to the outermost.

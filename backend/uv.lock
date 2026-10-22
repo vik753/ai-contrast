@@ -13,6 +13,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "defusedxml" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "pdfminer-six" },
     { name = "pydantic-settings" },
     { name = "uvicorn" },
@@ -20,7 +21,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "mypy" },
     { name = "pip-audit" },
     { name = "pytest" },
@@ -31,6 +31,7 @@ dev = [
 requires-dist = [
     { name = "defusedxml", specifier = "==0.7.1" },
     { name = "fastapi", specifier = ">=0.143.0" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "pdfminer-six", specifier = "==20260107" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "uvicorn", specifier = ">=0.54.0" },
@@ -38,7 +39,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "pip-audit", specifier = ">=2.10.1" },
     { name = "pytest", specifier = ">=9.1.1" },

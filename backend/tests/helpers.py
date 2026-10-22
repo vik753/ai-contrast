@@ -35,6 +35,9 @@ SETTINGS_ENV_VARS = (
     # Stage 3 (S3-T3) PDF limits.
     "MAX_PDF_PAGES",
     "MAX_PDF_PREV_CHAIN",
+    # Stage 3 (S3-T6a) Google Docs fetch.
+    "GOOGLE_FETCH_TIMEOUT_SECONDS",
+    "GOOGLE_CONNECT_TIMEOUT_SECONDS",
     # S3-T1 test-only worker hook: never set in the server environment.
     "AI_CONTRAST_WORKER_TEST_HOOK",
 )
