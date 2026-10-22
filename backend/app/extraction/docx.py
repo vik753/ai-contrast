@@ -76,6 +76,7 @@ from app.extraction.model import (
     DEFAULT_MAX_TEXT_CHARS,
     DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES,
     DOCX_STRICT_UNSUPPORTED,
+    MAX_LIST_ITEMS,
     MAX_SAMPLE_CHARS,
     NO_TEXT_EXTRACTED,
     TOO_MUCH_TEXT,
@@ -86,7 +87,8 @@ from app.extraction.model import (
     Removed,
     Warning,
 )
-from app.extraction.normalize import ControlCleaner
+from app.extraction.normalize import PAGE_NUMBER_LINE, ControlCleaner
+from app.extraction.references import external_reference_warnings
 
 __all__ = ["DocxLimits", "extract_docx"]
 
@@ -278,8 +280,6 @@ HIDDEN_OBJECT: Final = "hidden_object"
 PAGE_NUMBER: Final = "page_number"
 REPEATED_HEADER_FOOTER: Final = "repeated_header_footer"
 
-# Items in ``removed`` and in ``warnings`` (the browser applies the same caps).
-MAX_LIST_ITEMS: Final = 1000
 # Verdicts of distinct run formats kept at once (the cache is cleared when full).
 MAX_CACHED_VERDICTS: Final = 4096
 # Characters of removed text kept for the sample; the rest is only counted.
@@ -325,12 +325,6 @@ _FONT_TABLES: Final = {
 }
 _FONT_SYMBOLS: Final = {"wingdings": WINGDINGS, "symbol": SYMBOL}
 
-# A header or footer line that holds only a page number ("7", "- 3 -", "Page 2 of 5").
-_PAGE_NUMBER_LINE: Final = re.compile(
-    r"[\s\-–—]*(?:(?:page|p\.|pg\.?|сторінка|стор\.?|страница|стр\.?)\s*)?\d{1,5}"
-    r"(?:\s*(?:of|/|з|із|из)\s*\d{1,5})?[\s\-–—]*",
-    re.IGNORECASE,
-)
 _SPACES: Final = re.compile(r"\s+")
 
 
@@ -381,7 +375,7 @@ class _Collector:
             return
         lines = self.lines.get(part)
         if lines is not None:
-            if _PAGE_NUMBER_LINE.fullmatch(text):
+            if PAGE_NUMBER_LINE.fullmatch(text):
                 self.remove(PAGE_NUMBER, text, len(text))
                 return
             key = _SPACES.sub(" ", text).casefold()
@@ -393,6 +387,12 @@ class _Collector:
         if self.chars > self.max_chars or len(self.blocks) >= self.max_blocks:
             raise ExtractionError(TOO_MUCH_TEXT)
         self.blocks.append(Block(text=text, part=part, page=None))
+
+    def warnings_list(self) -> list[Warning]:
+        out = self.warnings + external_reference_warnings(self.blocks, per_page=False)
+        if len(out) > MAX_LIST_ITEMS:
+            raise ExtractionError(TOO_MUCH_TEXT)
+        return out
 
     def removed_list(self) -> list[Removed]:
         out = self.removed + self.cleaner.removed()
@@ -1299,5 +1299,5 @@ def extract_docx(
         blocks=collector.blocks,
         ocr_pages=[],
         removed=collector.removed_list(),
-        warnings=collector.warnings,
+        warnings=collector.warnings_list(),
     )

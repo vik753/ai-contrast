@@ -5,7 +5,8 @@ Started by ``app.extraction.sandbox`` only, never by hand. Protocol:
 - argv: ``memory_bytes cpu_seconds`` (set by the parent, never from input).
 - stdin: one JSON header line ``{"kind", "size", "max_text_chars", "max_blocks",
   "docx_max_part_bytes", "docx_max_total_bytes", "docx_max_xml_depth",
-  "docx_max_elements"}``, then exactly ``size`` bytes of the file.
+  "docx_max_elements", "pdf_max_pages", "pdf_max_prev_chain"}``, then exactly
+  ``size`` bytes of the file.
 - stdout: one JSON object, ``{"result": <ExtractionResult>}`` or
   ``{"error": "<code>"}``; exit status 0.
 - Any other failure: exit status 1 and nothing on stdout. stderr is drained and
@@ -146,6 +147,16 @@ def _extract(kind: str, data: bytes, header: dict[str, object]) -> bytes:
                 max_elements=_non_negative(header, "docx_max_elements"),
             )
             result = extract_docx(data, max_chars=max_chars, max_blocks=max_blocks, limits=limits)
+        elif kind == "pdf":
+            from app.extraction.pdf import PdfLimits, extract_pdf  # noqa: PLC0415
+
+            pdf_limits = PdfLimits(
+                max_pages=_non_negative(header, "pdf_max_pages"),
+                max_prev_chain=_non_negative(header, "pdf_max_prev_chain"),
+            )
+            result = extract_pdf(
+                data, max_chars=max_chars, max_blocks=max_blocks, limits=pdf_limits
+            )
         else:
             raise ValueError
     except ExtractionError as error:

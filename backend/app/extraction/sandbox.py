@@ -46,6 +46,8 @@ from app.extraction.model import (
     DEFAULT_MAX_DOCX_ELEMENTS,
     DEFAULT_MAX_DOCX_PART_BYTES,
     DEFAULT_MAX_DOCX_XML_DEPTH,
+    DEFAULT_MAX_PDF_PAGES,
+    DEFAULT_MAX_PDF_PREV_CHAIN,
     DEFAULT_MAX_TEXT_CHARS,
     DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES,
     EXTRACTION_FAILED,
@@ -83,6 +85,9 @@ class SandboxLimits:
     docx_max_total_bytes: int = DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES
     docx_max_xml_depth: int = DEFAULT_MAX_DOCX_XML_DEPTH
     docx_max_elements: int = DEFAULT_MAX_DOCX_ELEMENTS
+    # PDF caps (S3-T3); the defaults are the settings defaults.
+    pdf_max_pages: int = DEFAULT_MAX_PDF_PAGES
+    pdf_max_prev_chain: int = DEFAULT_MAX_PDF_PREV_CHAIN
 
 
 class _ChildReply(BaseModel):
@@ -210,6 +215,8 @@ async def _run(
             "docx_max_total_bytes": limits.docx_max_total_bytes,
             "docx_max_xml_depth": limits.docx_max_xml_depth,
             "docx_max_elements": limits.docx_max_elements,
+            "pdf_max_pages": limits.pdf_max_pages,
+            "pdf_max_prev_chain": limits.pdf_max_prev_chain,
         }
     ).encode()
     try:

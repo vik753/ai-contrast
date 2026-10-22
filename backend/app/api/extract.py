@@ -26,8 +26,7 @@ Order of checks (each answers before the next step):
    ``408 upload_timeout``;
 6. zero bytes → ``422 empty_file``;
 7. detection → ``422`` with the detection code;
-8. ``pdf`` → ``501 not_implemented`` (until S3-T3);
-9. extraction in the sandbox, with the slot still held → ``200`` with the stage 3
+8. extraction in the sandbox, with the slot still held → ``200`` with the stage 3
    contract, or ``422`` with the extraction code.
 
 Every response sent before the whole body is read (400, 408, 411, 413, 415, 503)
@@ -55,7 +54,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.requests import ClientDisconnect
 from starlette.types import Receive, Scope, Send
 
-from app.extraction.detect import DetectionError, FileKind, ZipLimits, detect_kind
+from app.extraction.detect import DetectionError, ZipLimits, detect_kind
 from app.extraction.limiter import ExtractionLimiter
 from app.extraction.model import MIB, ExtractionError, ExtractionResult
 from app.extraction.sandbox import SandboxLimits, run_extraction
@@ -188,10 +187,9 @@ async def _read_body(request: Request, declared: int, settings: Settings) -> byt
         422: {
             "description": "empty_file, unsupported_type, legacy_office_unsupported, "
             "pages_unsupported, archive_rejected, extraction_failed, extraction_timeout, "
-            "too_much_text, no_text_extracted, text_decoding_failed, suspicious_package "
-            "or docx_strict_unsupported"
+            "too_many_pages, too_much_text, encrypted_unsupported, no_text_extracted, "
+            "text_decoding_failed, suspicious_package, docx_strict_unsupported or pdf_damaged"
         },
-        501: {"description": "not_implemented (PDF until S3-T3)"},
         503: {"description": "busy"},
     },
 )
@@ -273,6 +271,8 @@ def _sandbox_limits(settings: Settings) -> SandboxLimits:
         docx_max_total_bytes=settings.max_zip_uncompressed_bytes,
         docx_max_xml_depth=settings.max_docx_xml_depth,
         docx_max_elements=settings.max_docx_elements,
+        pdf_max_pages=settings.max_pdf_pages,
+        pdf_max_prev_chain=settings.max_pdf_prev_chain,
     )
 
 
@@ -292,8 +292,6 @@ async def _receive_and_extract(request: Request, declared: int, settings: Settin
         kind = detect_kind(data, limits=limits)
     except DetectionError as error:
         return _error(error.code, 422)
-    if kind is FileKind.PDF:
-        return _error("not_implemented", 501)
     try:
         result = await run_extraction(data, kind, limits=_sandbox_limits(settings))
     except ExtractionError as error:

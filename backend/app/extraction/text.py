@@ -17,6 +17,8 @@
 5. Blocks are split at blank lines (lines with
    only whitespace) and trimmed; empty blocks are dropped. More blocks than
    ``max_blocks`` → ``too_much_text``; no block → ``no_text_extracted``.
+6. References to documents not provided → warning ``external_reference``
+   (``app.extraction.references``).
 
 Errors carry codes only, never text.
 """
@@ -38,6 +40,7 @@ from app.extraction.model import (
     ExtractionResult,
 )
 from app.extraction.normalize import ControlCleaner
+from app.extraction.references import external_reference_warnings
 
 UTF8_BOM: Final = b"\xef\xbb\xbf"
 UTF16_LE_BOM: Final = b"\xff\xfe"
@@ -120,5 +123,5 @@ def extract_text_file(
         blocks=blocks,
         ocr_pages=[],
         removed=cleaner.removed(),
-        warnings=[],
+        warnings=external_reference_warnings(blocks, per_page=False),
     )
