@@ -47,7 +47,7 @@ Browser controls:
 2. Opt-in "Remember on this device": `localStorage`, with a warning.
 3. "Forget key" button.
 4. Strict CSP (see T9). No third-party scripts, analytics or CDNs.
-5. React escaping only. Raw HTML sinks are banned by lint (`no-restricted-syntax` with T1 messages): `dangerouslySetInnerHTML`, `__html`, `innerHTML`/`outerHTML` writes, `insertAdjacentHTML`, `createContextualFragment`, `setHTMLUnsafe`, `parseHTMLUnsafe`, `document.write`, `DOMParser`, `srcDoc`. Inline `eslint-disable` has no effect (`noInlineConfig`). Runtime backstop: Trusted Types (`require-trusted-types-for 'script'; trusted-types 'none'`). Untrusted text is never passed through i18n `<Trans>` and never used as a translation key. Untrusted text such as file names reaches i18next `t()` only as interpolation values. `escapeValue: false` relies on React escaping. `skipOnVariables: true` is set explicitly. File names render inside `<bdi>`.
+5. React escaping only. Raw HTML sinks are banned by lint (`no-restricted-syntax` with T1 messages): `dangerouslySetInnerHTML`, `__html`, `innerHTML`/`outerHTML` writes, `insertAdjacentHTML`, `createContextualFragment`, `setHTMLUnsafe`, `parseHTMLUnsafe`, `document.write`, `DOMParser`, `srcDoc`. Inline `eslint-disable` has no effect (`noInlineConfig`). Runtime backstop: Trusted Types (`require-trusted-types-for 'script'; trusted-types default`). The only policy is our `default` policy (`src/ocr/trustedTypes.ts`, installed at startup in `main.tsx`): `createScriptURL` accepts an exact list of our own URLs under `/ocr/`; there is no `createHTML` and no `createScript`, so those sinks still throw. Untrusted text is never passed through i18n `<Trans>` and never used as a translation key. Untrusted text such as file names reaches i18next `t()` only as interpolation values. `escapeValue: false` relies on React escaping. `skipOnVariables: true` is set explicitly. File names render inside `<bdi>`.
 6. UI tip: create a separate provider key for AI Contrast with a spending limit.
 
 Out of our control: malicious browser extensions and compromised client devices. The privacy policy says so.
@@ -171,7 +171,7 @@ Controls:
 5. CI: pip-audit, npm audit, CodeQL (Python and TypeScript). CodeQL languages: `python`, `javascript-typescript`, `actions`; query suite `security-extended`.
 6. GitHub Actions pinned by full commit SHA; minimal `permissions:`. Workflow triggers are limited to `push`, `pull_request`, `schedule`, `workflow_dispatch`. No `pull_request_target`, no `workflow_run`. Every `actions/checkout` has `persist-credentials: false`. No `${{ }}` inside `run:`, comment lines included; pass values through `env:`. Job-level permissions are only `read`/`none`, except `security-events: write` for CodeQL. These rules are enforced by `backend/tests/test_repo_policy.py`.
 7. GitHub secret scanning and push protection enabled.
-8. Tesseract language data and fonts are committed or built into the bundle, not loaded from a CDN.
+8. Tesseract language data and fonts are built into the bundle, not loaded from a CDN. `scripts/copy-ocr-assets.mjs` checks every language file (`4.0.0_best_int`) against a SHA-256 manifest before it copies anything; a mismatch fails the build. `pdfjs-dist` has the optional dependency `@napi-rs/canvas`: it installs native binaries in dev and CI only and is never shipped to the browser.
 9. `frontend/.npmrc` sets `ignore-scripts=true` (do not remove it without security review); npm is pinned with `packageManager`. The Vite dev server is never exposed beyond localhost. The Compose frontend dev container runs as `node` (uid 1000) with a read-only root filesystem, no capabilities, `no-new-privileges` and `npm ci --ignore-scripts`. Residual risk: the `./frontend` bind mount is read-write, so on a Linux host where the developer is uid 1000, dev-server code can change the source tree. Planned mitigation: Compose Watch `sync`.
 10. **Eval secrets (ADR 0009 Layer 6):** the eval never runs on `pull_request`. The GitHub `eval` environment has required reviewers and a deployment branch policy limited to `main` (`workflow_dispatch` runs the workflow file of the dispatched branch). PR-head evals run locally with a separate eval key with a low spending limit, never the production free-model token.
 
@@ -188,13 +188,12 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 Cross-Origin-Opener-Policy: same-origin
 ```
 
-Deployed policy (stage 1) adds: `frame-src 'none'`, `font-src 'self'`, `manifest-src 'self'`, `require-trusted-types-for 'script'; trusted-types 'none'`, `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`. The exact policy lives in `frontend/public/_headers` and is pinned by `headers.test.ts`.
+Deployed policy (stage 1) adds: `frame-src 'none'`, `font-src 'self'`, `manifest-src 'self'`, `require-trusted-types-for 'script'; trusted-types default` (stage 3), `worker-src 'self'` (no `blob:`), `Cross-Origin-Resource-Policy: same-origin`, `X-Frame-Options: DENY`. The exact policy lives in `frontend/public/_headers` and is pinned by `headers.test.ts`.
 
-Stage 3 plan (OCR and Google Picker):
+Stage 3 (OCR), as deployed:
 
-- `new Worker(url)` and `importScripts()` are Trusted Types sinks. Tesseract.js and PDF.js create workers, so add a reviewed `default` policy (`trusted-types default`) whose `createScriptURL` accepts only same-origin `/assets/` URLs; no `createHTML`/`createScript`. Workers need their own default policy from a small worker entry of ours, or a path-specific header rule.
-- Self-host Tesseract `workerPath`, `corePath`, `langPath` and PDF.js `workerSrc`, `cMapUrl`, `standardFontDataUrl`, `wasmUrl`. PDF.js `isEvalSupported: false`. Prefer `workerBlobURL: false`, then remove `blob:` from `worker-src`.
-- Google Picker needs Google hosts in `script-src`, `frame-src` and `connect-src`, and COOP `same-origin-allow-popups` for the Google Identity Services popup — a documented exception to the header tests.
+- `new Worker(url)` and `importScripts()` are Trusted Types sinks. The CSP has `trusted-types default` and `worker-src 'self'`. The `default` policy (`createScriptURL` only) allows an exact URL list under `/ocr/` (pdf.js worker, Tesseract wrapper and worker, LSTM core files), not `/assets/`. Our classic Tesseract wrapper (`/ocr/tesseract-worker.js`) installs the same policy in the worker scope; a test keeps both lists equal.
+- Everything is self-hosted: Tesseract `workerPath`, `corePath`, `langPath`, `workerBlobURL: false`, and pdf.js `workerPort`, `cMapUrl`, `standardFontDataUrl`, `wasmUrl`, `iccUrl`. pdf.js is the `legacy` build (the modern build needs newer browser APIs). No `quickjs-eval.*` and no `pdf.sandbox`. pdf.js 6 has no `isEvalSupported` option; a test checks that the copied pdf.js files contain no `eval(` and no `new Function(`. pdf.js `verbosity` is `ERRORS` (warnings can contain document data). Each page has a 60 s limit.
 - Turnstile (ADR 0007) needs `https://challenges.cloudflare.com` in `script-src` and `frame-src` — also a documented exception.
 - An automated Playwright CSP smoke test (no `securitypolicyviolation`) runs in CI at the e2e stage.
 
