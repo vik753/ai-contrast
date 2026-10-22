@@ -194,8 +194,16 @@ describe("exact CSP directives (S1-T2b AC4)", () => {
     expect(sorted(directive("script-src"))).toEqual(sorted(["'self'", "'wasm-unsafe-eval'"]));
   });
 
-  it("test_csp_worker_src_is_exactly_self_and_blob", () => {
-    expect(sorted(directive("worker-src"))).toEqual(sorted(["'self'", "blob:"]));
+  it("test_csp_worker_src_is_exactly_self", () => {
+    expect(directive("worker-src")).toEqual(["'self'"]);
+  });
+
+  it("test_csp_worker_src_has_no_blob", () => {
+    expect(directive("worker-src").join(" ")).not.toContain("blob:");
+  });
+
+  it("test_csp_script_src_has_no_unsafe_eval", () => {
+    expect(directive("script-src")).not.toContain("'unsafe-eval'");
   });
 
   it("test_csp_frame_src_is_none", () => {
@@ -222,7 +230,14 @@ describe("Trusted Types (S1-T2b AC5)", () => {
     expect(directive("require-trusted-types-for")).toEqual(["'script'"]);
   });
 
-  it("test_csp_trusted_types_is_none", () => {
-    expect(directive("trusted-types")).toEqual(["'none'"]);
+  it("test_csp_trusted_types_is_exactly_default", () => {
+    expect(directive("trusted-types")).toEqual(["default"]);
+  });
+
+  it("test_csp_trusted_types_has_no_allow_duplicates_or_wildcard", () => {
+    const sources = directive("trusted-types");
+    expect(sources).not.toContain("'allow-duplicates'");
+    expect(sources).not.toContain("*");
+    expect(sources).not.toContain("'none'");
   });
 });
