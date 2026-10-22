@@ -36,6 +36,7 @@ import {
   canAddContract,
   canRemoveContract,
   contractLabel,
+  fileIdsToKeep,
   initialUploadState,
   needsOcr,
   readiness,
@@ -338,13 +339,11 @@ export function UploadForm() {
   const fileById = useCallback((fileId: string) => filesRef.current.get(fileId), []);
   useOcrScheduler(state, dispatch, fileById);
 
-  // Drop `File` references of rejected and removed files.
+  // Keep a `File` only while it can still be needed: a check (queued or checking,
+  // also after a requeue) or OCR. Accepted files without OCR, rejected and removed
+  // files lose their reference.
   useEffect(() => {
-    const keep = new Set(
-      state.contracts.flatMap((c) =>
-        c.files.filter((f) => f.status !== "rejected").map((f) => f.id),
-      ),
-    );
+    const keep = fileIdsToKeep(state);
     for (const id of filesRef.current.keys()) {
       if (!keep.has(id)) {
         filesRef.current.delete(id);

@@ -13,7 +13,7 @@
  *   worker, no cache. The input is always a canvas, never a URL string.
  * - One page at a time. Aborting terminates both workers and frees the canvas.
  */
-import * as pdfjs from "pdfjs-dist";
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import * as tesseractNamespace from "tesseract.js";
 import {
   CMAP_URL,
@@ -37,6 +37,8 @@ const tesseract =
     ? tesseractNamespace
     : (tesseractNamespace as { default: typeof tesseractNamespace }).default;
 const LANGUAGES = "ukr+rus+eng";
+/** Time limit for render plus recognition of one page. */
+export const PAGE_TIMEOUT_MS = 60_000;
 
 export interface RecognizedPage {
   readonly page: number;
@@ -111,6 +113,8 @@ export async function recognizePages(
       standardFontDataUrl: STANDARD_FONT_URL,
       wasmUrl: WASM_URL,
       iccUrl: ICC_URL,
+      // Warnings can contain document data; keep errors only.
+      verbosity: pdfjs.VerbosityLevel.ERRORS,
     });
     loadingTask = task;
     const doc = await guard(task.promise);
@@ -127,30 +131,45 @@ export async function recognizePages(
     const results: RecognizedPage[] = [];
     for (const [index, pageNumber] of pages.entries()) {
       onProgress({ current: index + 1, total: pages.length, page: pageNumber });
-      const page = await guard(doc.getPage(pageNumber));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error("OCR of one page timed out."));
+        }, PAGE_TIMEOUT_MS);
+      });
+      timedOut.catch(() => undefined);
+      const pageGuard = <T>(work: Promise<T>): Promise<T> => guard(Promise.race([work, timedOut]));
+      let render: { promise: Promise<unknown>; cancel(): void } | undefined;
+      let onPageAbort: (() => void) | undefined;
+      const page = await pageGuard(doc.getPage(pageNumber));
       const base = page.getViewport({ scale: 1 });
       const viewport = page.getViewport({ scale: scaleFor(base.width, base.height) });
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.floor(viewport.width));
       canvas.height = Math.max(1, Math.floor(viewport.height));
       try {
-        const render = page.render({
+        render = page.render({
           canvas,
           viewport,
           background: "white",
           annotationMode: pdfjs.AnnotationMode.ENABLE,
         });
-        signal.addEventListener(
-          "abort",
-          () => {
-            render.cancel();
-          },
-          { once: true },
-        );
-        await guard(render.promise);
-        const { data } = await guard(engine.recognize(canvas));
+        onPageAbort = () => {
+          render?.cancel();
+        };
+        signal.addEventListener("abort", onPageAbort, { once: true });
+        await pageGuard(render.promise);
+        const { data } = await pageGuard(engine.recognize(canvas));
         results.push({ page: pageNumber, text: data.text, confidence: data.confidence });
+      } catch (error) {
+        // A timeout stops the render; the outer `finally` ends the workers.
+        render?.cancel();
+        throw error;
       } finally {
+        clearTimeout(timer);
+        if (onPageAbort !== undefined) {
+          signal.removeEventListener("abort", onPageAbort);
+        }
         // Free the bitmap now, not when the garbage collector runs.
         canvas.width = 0;
         canvas.height = 0;

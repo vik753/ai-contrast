@@ -231,7 +231,7 @@ function BlockItem({
         {block.page !== null && (
           <>
             {" · "}
-            <span>{t("upload.preview.page", { page: block.page })}</span>
+            {t("upload.preview.page", { page: block.page })}
           </>
         )}
       </span>

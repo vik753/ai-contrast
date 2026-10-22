@@ -19,7 +19,15 @@
  * Output layout is free: tests look at base names anywhere under `outDir`.
  */
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -55,7 +63,8 @@ function put(relative: string, content = `synthetic ${relative}`): void {
 const LANGS = ["eng", "ukr", "rus"] as const;
 
 function seed(): void {
-  put("pdfjs-dist/build/pdf.worker.min.mjs");
+  put("pdfjs-dist/legacy/build/pdf.worker.min.mjs");
+  put("pdfjs-dist/build/pdf.worker.min.mjs", "modern worker");
   put("pdfjs-dist/build/pdf.sandbox.min.mjs");
   put("pdfjs-dist/build/pdf.mjs");
   put("pdfjs-dist/cmaps/Adobe-Japan1-0.bcmap");
@@ -184,7 +193,7 @@ describe("copy-ocr-assets copy", () => {
     await run();
     const target = walk(out).find((p) => p.endsWith("pdf.worker.min.mjs"));
     expect(readFileSync(join(out, target ?? "missing"), "utf8")).toBe(
-      "synthetic pdfjs-dist/build/pdf.worker.min.mjs",
+      "synthetic pdfjs-dist/legacy/build/pdf.worker.min.mjs",
     );
   });
 });
@@ -228,5 +237,47 @@ describe("copy-ocr-assets hash check", () => {
         languageSha256: goodManifest(),
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("copy-ocr-assets output directory", () => {
+  it("test_keeps_the_output_directory_and_removes_only_its_contents", async () => {
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, "stale.txt"), "old");
+    mkdirSync(join(out, "old-dir"));
+    writeFileSync(join(out, "old-dir", "x"), "old");
+    const before = statSync(out).ino;
+    const script = await loadScript();
+    await script.copyOcrAssets({
+      nodeModulesDir: modules,
+      outDir: out,
+      languageSha256: goodManifest(),
+    });
+    expect(statSync(out).ino).toBe(before);
+    expect(names()).not.toContain("stale.txt");
+    expect(names()).not.toContain("x");
+    expect(names()).toContain("pdf.worker.min.mjs");
+  });
+
+  it("test_copies_the_legacy_pdfjs_worker_not_the_modern_one", async () => {
+    const script = await loadScript();
+    await script.copyOcrAssets({
+      nodeModulesDir: modules,
+      outDir: out,
+      languageSha256: goodManifest(),
+    });
+    expect(readFileSync(join(out, "pdf.worker.min.mjs"), "utf8")).toContain("legacy");
+  });
+});
+
+describe("pdf.js legacy build in node_modules", () => {
+  const real = fileURLToPath(
+    new URL("../../node_modules/pdfjs-dist/legacy/build/", import.meta.url),
+  );
+
+  it.each(["pdf.worker.min.mjs", "pdf.mjs"])("test_%s_has_no_eval_and_no_new_function", (name) => {
+    const code = readFileSync(join(real, name), "utf8");
+    expect(code).not.toMatch(/\beval\s*\(/);
+    expect(code).not.toMatch(/new\s+Function\s*\(/);
   });
 });

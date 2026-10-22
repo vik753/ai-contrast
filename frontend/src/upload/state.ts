@@ -260,7 +260,7 @@ function ocrBlocks(page: OcrPage): Block[] {
       // Same idea as the server: no control or format characters in the text.
       paragraph
         .normalize("NFC")
-        .replace(/[^\P{Cc}\n\t]|\p{Cf}/gu, "")
+        .replace(/[^\P{Cc}\n\t]|\p{Cf}|\p{Default_Ignorable_Code_Point}/gu, "")
         .trim(),
     )
     .filter((text) => text !== "")
@@ -298,11 +298,13 @@ function applyOcr(file: UploadFile, pages: readonly OcrPage[]): UploadFile {
     return rejected(file, "no_text_extracted");
   }
   const byPage = [...pages].sort((a, b) => a.page - b.page);
+  // A page with no text is a visible gap, not a silent one.
+  const emptyPages = new Set(byPage.filter((p) => ocrBlocks(p).length === 0).map((p) => p.page));
   const warnings: ExtractionWarning[] = [
     ...file.extraction.warnings,
     ...byPage.map((p) => ({ code: "ocr_used", page: p.page })),
     ...byPage
-      .filter((p) => p.confidence < OCR_LOW_CONFIDENCE)
+      .filter((p) => p.confidence < OCR_LOW_CONFIDENCE || emptyPages.has(p.page))
       .map((p) => ({ code: "ocr_low_confidence", page: p.page })),
   ];
   return {
@@ -375,6 +377,18 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
         needsOcr(file) ? rejected(file, "ocr_failed") : file,
       );
   }
+}
+
+/**
+ * Ids of files whose original `File` is still needed: a check (queued or
+ * checking, also after a requeue) or OCR. Every other `File` can be dropped.
+ */
+export function fileIdsToKeep(state: UploadState): Set<string> {
+  return new Set(
+    state.contracts.flatMap((c) =>
+      c.files.filter((f) => isPending(f) || needsOcr(f)).map((f) => f.id),
+    ),
+  );
 }
 
 /** Every file with `status`, in display order. */

@@ -73,7 +73,7 @@ const h = vi.hoisted((): Hoisted => {
   };
 });
 
-vi.mock("pdfjs-dist", () => {
+vi.mock("pdfjs-dist/legacy/build/pdf.mjs", () => {
   h.destroyDoc = vi.fn(() => Promise.resolve());
   h.getTextContent = vi.fn();
   h.getAnnotations = vi.fn();
@@ -106,6 +106,7 @@ vi.mock("pdfjs-dist", () => {
     getAnnotations: h.getAnnotations,
   });
   return {
+    VerbosityLevel: { ERRORS: 0, WARNINGS: 1, INFOS: 5 },
     AnnotationMode: { DISABLE: 0, ENABLE: 1, ENABLE_FORMS: 2, ENABLE_STORAGE: 3 },
     GlobalWorkerOptions: h.workerOptions,
     getDocument: (params: Record<string, unknown>) => {
@@ -149,7 +150,7 @@ vi.mock("tesseract.js", () => {
   return { createWorker: h.createWorkerSpy, OEM: { LSTM_ONLY: 1 }, default: {} };
 });
 
-import { recognizePages } from "./ocrPdf";
+import { PAGE_TIMEOUT_MS, recognizePages } from "./ocrPdf";
 
 class FakeWorker {
   static urls: string[] = [];
@@ -248,6 +249,11 @@ describe("pdf.js settings (AC3)", () => {
   it("test_get_document_does_not_enable_eval", async () => {
     await recognizePages(file(), [1], opts());
     expect(first(h.docParams).isEvalSupported).not.toBe(true);
+  });
+
+  it("test_get_document_limits_pdfjs_logging_to_errors", async () => {
+    await recognizePages(file(), [1], opts());
+    expect(first(h.docParams).verbosity).toBe(0);
   });
 
   it("test_pdf_worker_port_is_a_worker_with_our_same_origin_url", async () => {
@@ -399,6 +405,40 @@ describe("flow (AC5)", () => {
     expect(h.terminate).toHaveBeenCalled();
     expect(h.destroyDoc).toHaveBeenCalled();
     expect(h.log).not.toContain("render 2");
+  });
+
+  it("test_page_timeout_rejects_and_terminates_the_workers", async () => {
+    vi.useFakeTimers();
+    try {
+      h.holdRecognize = true;
+      const promise = recognizePages(file(), [1, 2], opts());
+      const settled = promise.then(
+        () => null,
+        (error: unknown) => error,
+      );
+      await vi.waitFor(() => {
+        expect(h.pendingRecognize).not.toBeNull();
+      });
+      await vi.advanceTimersByTimeAsync(PAGE_TIMEOUT_MS + 1);
+      const error = await settled;
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).name).not.toBe("AbortError");
+      expect(h.terminate).toHaveBeenCalled();
+      expect(h.destroyDoc).toHaveBeenCalled();
+      expect(h.log).not.toContain("render 2");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("test_abort_listeners_are_removed_after_the_run", async () => {
+    const signal = new AbortController().signal;
+    const added = vi.spyOn(signal, "addEventListener");
+    const removed = vi.spyOn(signal, "removeEventListener");
+    await recognizePages(file(), [1, 2, 3], { signal, onProgress: vi.fn() });
+    const count = (calls: unknown[][]): number => calls.filter((c) => c[0] === "abort").length;
+    expect(count(added.mock.calls)).toBeGreaterThan(0);
+    expect(count(removed.mock.calls)).toBe(count(added.mock.calls));
   });
 
   it("test_abort_before_start_loads_no_engine", async () => {

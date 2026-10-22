@@ -385,6 +385,21 @@ describe("AC3 — files, language labels and blocks", () => {
     expect(blockItem(container, "Third page clause.").textContent).toContain(page);
   });
 
+  it("test_page_label_has_no_extra_span_inside_the_meta_line", async () => {
+    await renderForm();
+    await addAccepted(
+      "A",
+      file("main.pdf", "pdf", {
+        pages: 3,
+        blocks: [{ text: "Third page clause.", part: "body", page: 3 }],
+      }),
+    );
+    const container = await openPreview("A");
+    const meta = blockItem(container, "Third page clause.").querySelector(".preview-block__meta");
+    expect(meta?.textContent).toContain("Page 3");
+    expect(meta?.querySelector("span")).toBeNull();
+  });
+
   it("test_block_without_page_shows_no_page_label", async () => {
     await renderForm();
     await addAccepted("A", file("main.txt", "text", blocks("No number clause.")));

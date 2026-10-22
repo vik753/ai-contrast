@@ -310,7 +310,7 @@ describe("merge and warnings (AC5, AC6)", () => {
   it("test_recognized_text_appears_in_the_preview_as_page_blocks", async () => {
     const region = await finishScan([{ page: 2, text: "Recognized clause.", confidence: 90 }]);
     expect(within(region).getByText("Recognized clause.")).toBeTruthy();
-    expect(within(region).getByText("Page 2")).toBeTruthy();
+    expect(within(region).getByText(/Page 2/)).toBeTruthy();
   });
 
   it("test_need_recognition_note_is_gone_after_ocr", async () => {
