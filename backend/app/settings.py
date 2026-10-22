@@ -13,11 +13,18 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from app.extraction.model import DEFAULT_MAX_BLOCKS, DEFAULT_MAX_TEXT_CHARS
+from app.extraction.model import (
+    DEFAULT_MAX_BLOCKS,
+    DEFAULT_MAX_DOCX_ELEMENTS,
+    DEFAULT_MAX_DOCX_PART_BYTES,
+    DEFAULT_MAX_DOCX_XML_DEPTH,
+    DEFAULT_MAX_TEXT_CHARS,
+    DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES,
+    MIB,
+)
 
 DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173"]
 
-MIB = 1024 * 1024
 
 # An origin is exactly `scheme://host[:port]` (lowercase after normalization).
 # Host: a DNS name or IPv4 address, or an IPv6 address in brackets. No userinfo,
@@ -126,7 +133,7 @@ class Settings(BaseSettings):
     max_json_body_bytes: PositiveInt = 64 * 1024
     max_concurrent_extractions: PositiveInt = 2
     max_zip_entries: PositiveInt = 2000
-    max_zip_uncompressed_bytes: PositiveInt = 100 * MIB
+    max_zip_uncompressed_bytes: PositiveInt = DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES
     max_zip_ratio: PositiveInt = 200
     extract_body_timeout_seconds: PositiveInt = 60
     extract_min_rate_bytes_per_second: PositiveInt = 32 * 1024
@@ -138,9 +145,9 @@ class Settings(BaseSettings):
     extract_max_text_chars: PositiveInt = DEFAULT_MAX_TEXT_CHARS
     extract_max_blocks: PositiveInt = DEFAULT_MAX_BLOCKS
     extract_send_timeout_seconds: PositiveInt = 30
-    max_docx_part_bytes: PositiveInt = 32 * MIB
-    max_docx_xml_depth: PositiveInt = 256
-    max_docx_elements: PositiveInt = 2_000_000
+    max_docx_part_bytes: PositiveInt = DEFAULT_MAX_DOCX_PART_BYTES
+    max_docx_xml_depth: PositiveInt = DEFAULT_MAX_DOCX_XML_DEPTH
+    max_docx_elements: PositiveInt = DEFAULT_MAX_DOCX_ELEMENTS
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

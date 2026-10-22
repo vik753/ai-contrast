@@ -43,7 +43,11 @@ import app
 from app.extraction.detect import FileKind
 from app.extraction.model import (
     DEFAULT_MAX_BLOCKS,
+    DEFAULT_MAX_DOCX_ELEMENTS,
+    DEFAULT_MAX_DOCX_PART_BYTES,
+    DEFAULT_MAX_DOCX_XML_DEPTH,
     DEFAULT_MAX_TEXT_CHARS,
+    DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES,
     EXTRACTION_FAILED,
     EXTRACTION_TIMEOUT,
     TOO_MUCH_TEXT,
@@ -57,7 +61,6 @@ logger = logging.getLogger("ai_contrast.extraction")
 WORKER_CWD: Final = "/tmp"  # noqa: S108 - the child writes no files (RLIMIT_FSIZE = 0)
 HOOK_ENV: Final = "AI_CONTRAST_WORKER_TEST_HOOK"
 READ_CHUNK: Final = 64 * 1024
-MIB: Final = 1024 * 1024
 # After the kill, the rest of the pipes is read and thrown away within this time.
 DISCARD_SECONDS: Final = 5
 # The app root: the directory that holds the `app` package of this server.
@@ -76,10 +79,10 @@ class SandboxLimits:
     max_text_chars: int = DEFAULT_MAX_TEXT_CHARS
     max_blocks: int = DEFAULT_MAX_BLOCKS
     # DOCX caps (S3-T2); the defaults are the settings defaults.
-    docx_max_part_bytes: int = 32 * MIB
-    docx_max_total_bytes: int = 100 * MIB
-    docx_max_xml_depth: int = 256
-    docx_max_elements: int = 2_000_000
+    docx_max_part_bytes: int = DEFAULT_MAX_DOCX_PART_BYTES
+    docx_max_total_bytes: int = DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES
+    docx_max_xml_depth: int = DEFAULT_MAX_DOCX_XML_DEPTH
+    docx_max_elements: int = DEFAULT_MAX_DOCX_ELEMENTS
 
 
 class _ChildReply(BaseModel):

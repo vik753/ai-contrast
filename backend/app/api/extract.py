@@ -57,7 +57,7 @@ from starlette.types import Receive, Scope, Send
 
 from app.extraction.detect import DetectionError, FileKind, ZipLimits, detect_kind
 from app.extraction.limiter import ExtractionLimiter
-from app.extraction.model import ExtractionError, ExtractionResult
+from app.extraction.model import MIB, ExtractionError, ExtractionResult
 from app.extraction.sandbox import SandboxLimits, run_extraction
 from app.http_limits import EXTRACT_PATH, declared_length
 from app.settings import Settings
@@ -71,7 +71,6 @@ RETRY_AFTER_SECONDS: Final = 5
 RATE_TICK_SECONDS: Final = 1.0
 
 CLOSE: Final = {"Connection": "close"}
-MIB: Final = 1024 * 1024
 SEND_CHUNK_BYTES: Final = 64 * 1024
 
 
