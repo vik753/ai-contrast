@@ -85,6 +85,14 @@ export function describeChange(
       return [];
     case "fileChecked":
       return resultOf(findFile(next, action.fileId));
+    case "ocrProgress":
+      return [];
+    case "ocrFinished":
+    case "ocrFailed": {
+      // The file was announced as accepted before OCR; only a rejection is news.
+      const file = findFile(next, action.fileId);
+      return file?.status === "rejected" ? resultOf(file) : [];
+    }
   }
 }
 

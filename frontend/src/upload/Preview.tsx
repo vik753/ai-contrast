@@ -86,6 +86,8 @@ type WarningKey =
   | "upload.preview.warning.borderline_text"
   | "upload.preview.warning.pdf_edited"
   | "upload.preview.warning.external_reference"
+  | "upload.preview.warning.ocr_used"
+  | "upload.preview.warning.ocr_low_confidence"
   | "upload.preview.warning.unknown";
 
 /** Known warning codes. `Map` lookups never reach `Object.prototype`. */
@@ -96,6 +98,8 @@ const WARNING_KEYS: ReadonlyMap<string, WarningKey> = new Map<string, WarningKey
   ["borderline_text", "upload.preview.warning.borderline_text"],
   ["pdf_edited", "upload.preview.warning.pdf_edited"],
   ["external_reference", "upload.preview.warning.external_reference"],
+  ["ocr_used", "upload.preview.warning.ocr_used"],
+  ["ocr_low_confidence", "upload.preview.warning.ocr_low_confidence"],
 ]);
 
 type ReasonKey =
@@ -224,7 +228,12 @@ function BlockItem({
     <li className="preview-block" ref={focusRef} tabIndex={focusRef === undefined ? undefined : -1}>
       <span className="preview-block__meta">
         {partLabel(t, block.part)}
-        {block.page !== null && ` · ${t("upload.preview.page", { page: block.page })}`}
+        {block.page !== null && (
+          <>
+            {" · "}
+            <span>{t("upload.preview.page", { page: block.page })}</span>
+          </>
+        )}
       </span>
       <bdi className="preview-block__text preview-text">{item.text}</bdi>
       {item.shortened && (

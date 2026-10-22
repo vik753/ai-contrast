@@ -233,7 +233,7 @@ function codePointsUpTo(text: string, limit: number): number {
 }
 
 /** At most `limit` characters (code points) in total. */
-function withinCharCap(texts: readonly string[], limit: number): boolean {
+export function withinCharCap(texts: readonly string[], limit: number): boolean {
   let units = 0;
   for (const text of texts) {
     units += text.length;
