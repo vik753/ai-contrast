@@ -1,6 +1,6 @@
 # ADR 0013 — Browser cache and history
 
-- Status: proposed (tech lead, 2026-10-22; `security-reviewer` design review round 1 applied)
+- Status: proposed (tech lead, 2026-10-22; `security-reviewer` approved the design after round 2; accepted when stage 4 is merged)
 - Date: 2026-10-22
 - Related: ADR 0001 (stateless, `CacheStore` port), ADR 0008 point 4 (cache key, mapping), threat model T3, T11
 
@@ -16,7 +16,7 @@ Stage 4 builds the storage, the hashing and the user controls. Stage 9 and stage
 
 1. **History is off by default** (customer decision, 2026-10-22). With history off, nothing is written to IndexedDB, and the cache always misses. The client turns history on in the settings panel. The setting is stored in `localStorage` under `aic.history` (`"on"`; any other value or no value means off).
 2. **Turning history off deletes every saved entry** after a confirmation. "Off" means "nothing is stored", never "stored but hidden". Order: remove `aic.history` first, then delete the database, so no tab can re-create it.
-2a. **Other tabs and start-up (fail closed).** Every tab re-reads `aic.history` before it opens the database and before every `put`. On the `storage` event for `aic.history` (or for a cleared storage) a tab switches to `DisabledCacheStore` at once. A connection closed by `onversionchange` is never reopened by that store instance. At start-up with history off, the app calls `indexedDB.deleteDatabase("aic-cache")`, so a deletion that was blocked or failed earlier is finished later.
+2a. **Other tabs and start-up (fail closed).** Every tab re-reads `aic.history` before it opens the database and before every `put`. On the `storage` event for `aic.history` (or for a cleared storage) a tab switches to `DisabledCacheStore` at once. A connection closed by `onversionchange` is never reopened by that store instance. In `onupgradeneeded` the store re-reads the setting; if it is off, it aborts the upgrade transaction, so a late `open` in another tab cannot re-create the database. At start-up with history off, the app calls `indexedDB.deleteDatabase("aic-cache")`, so a deletion that was blocked or failed earlier is finished later.
 3. **`CacheStore` port** (`frontend/src/storage/`). Application code depends only on the port. Adapters:
    - `IndexedDbCacheStore`: one database `aic-cache`, one object store `entries`, key path `key`, an index on `lastUsedAt`;
    - `MemoryCacheStore`: tests;
