@@ -9,8 +9,8 @@ How to resume after a break: read this file, then continue with the first unchec
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
 | 2 | File upload | done |
-| 3 | Text extraction | in progress: S3-T1, S3-T2, S3-T2b, S3-T3, S3-T4, S3-T5 done; S3-T6 (Google Docs link) in progress |
-| 4 | Browser hash and cache | planned |
+| 3 | Text extraction | done |
+| 4 | Browser hash and cache | next |
 | 5 | Clause splitting | planned |
 | 5b | Pseudonymization | planned |
 | 6 | Model connection | planned |
@@ -75,3 +75,8 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-22 — S3-T6 written (Google Docs by public link): ID-only API, server-built export URL, SSRF guard as an `httpcore` network backend (ADR 0012), `httpx` 0.28.1 as a runtime dependency. Security reviewer approved the dependency and, after changes, the design (strict hostname rule, IPv6 rule beyond `is_global`, no proxy or Unix socket paths, `httpx` request log off, narrow `googleusercontent` host). Google Picker is not in v1.
 - 2026-10-22 — PR #33 merged (docs): S3-T6 task, ADR 0012 (outbound HTTP through a guarded `httpx` client), threat model T2 and T7.
 - 2026-10-22 — PR #32 merged (S3-T5: browser OCR of scanned PDF pages). Self-hosted pdf.js (legacy build: the modern build needs `Map.prototype.getOrInsertComputed`, which Chromium 141 lacks) and Tesseract.js with `ukr+rus+eng` LSTM data checked by SHA-256. CSP `worker-src 'self'` and a `trusted-types default` policy installed at startup that allows only our worker URLs. One OCR job at a time, 30 pages per file, 60 s limits for setup and per page, confidence warnings. Security reviewer ran a real-browser test (Chromium 141): OCR works with no CSP or Trusted Types violations. Compose: `public/ocr` is a named volume. 1123 frontend tests.
+- 2026-10-22 — PR #35 merged (S3-T6a: Google Docs by public link, backend). Review round 1: code — the slot is taken before the body read, with its own short deadline `GOOGLE_BODY_TIMEOUT_SECONDS` (5 s), shared `app/api/common.py`, typed client factory; security — resolver `OSError` → `google_doc_unavailable` (was 500), `sni_hostname` refused in the transport, `SSLKEYLOGFILE` ignored. Every `httpx` timeout → `google_doc_timeout` (AC amended). 2351 backend tests. Merged by the customer.
+- 2026-10-22 — PR #36 merged (S3-T6b: Google Docs link field in the upload form). Shared `postExtract` core; strict link parsing (WHATWG normalization pinned by tests); the full ID is kept only in component memory while its row exists; `readCapped` cancels the body on abort, also when aborted before reading. 1470 frontend tests. Merged by the customer.
+- 2026-10-22 — Stage 3 done. Finished stages 2 and 3 moved to `docs/agent/TASKS-archive.md`; open follow-ups stay in `docs/agent/TASKS.md`.
+- Lesson: in this session the tech lead cannot merge (permission classifier, "Merge Without Review"). The customer merges approved PRs. A local trial merge is blocked too. Rebase the second PR after the first is merged.
+- Lesson: CI jobs `docker` and `compose` can fail transiently on the image build. Rerun failed jobs before you investigate.
