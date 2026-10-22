@@ -17,9 +17,9 @@ from typing import Any
 
 import httpx
 import pytest
+
 from app.net.google_docs import GoogleDocError, fetch_google_doc, is_valid_document_id
 from app.net.guard import BlockedAddressError, BlockedHostError
-
 from tests.helpers import new_canary
 
 DOC_ID = "a1B2c3D4e5F6g7H8i9J0k1L2m3"

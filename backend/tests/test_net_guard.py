@@ -14,6 +14,7 @@ import asyncio
 
 import httpcore
 import pytest
+
 from app.net.guard import (
     BlockedAddressError,
     BlockedHostError,
@@ -21,7 +22,6 @@ from app.net.guard import (
     check_addresses,
     check_hostname,
 )
-
 from tests.netfakes import PUBLIC_V4, PUBLIC_V4_2, PUBLIC_V6, ResolverSpy, SpyInner
 
 REFUSED_HOSTS = [

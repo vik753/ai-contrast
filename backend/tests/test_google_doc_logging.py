@@ -21,12 +21,12 @@ from pathlib import Path
 
 import httpx
 import pytest
-from app.net.client import outbound_client
-from app.net.google_docs import GoogleDocError, fetch_google_doc
-from app.net.guard import GuardedNetworkBackend
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.net.client import outbound_client
+from app.net.google_docs import GoogleDocError, fetch_google_doc
+from app.net.guard import GuardedNetworkBackend
 from tests.helpers import access_lines, all_log_text, new_canary
 from tests.netfakes import PUBLIC_V4, ResolverSpy, SpyInner
 

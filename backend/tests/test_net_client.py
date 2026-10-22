@@ -19,9 +19,9 @@ from typing import Any
 import httpcore
 import httpx
 import pytest
+
 from app.net.client import outbound_client
 from app.net.guard import BlockedAddressError, GuardedNetworkBackend
-
 from tests.netfakes import PUBLIC_V4, ResolverSpy, SpyInner
 
 
@@ -63,7 +63,9 @@ def test_outbound_client_ignores_proxy_environment(monkeypatch: pytest.MonkeyPat
     inner = SpyInner()
 
     async def go() -> None:
-        async with _client(inner) as client, pytest.raises(httpx.HTTPError):
+        # The canned answer is a normal 404 response; what matters is where the
+        # connection went.
+        async with _client(inner) as client:
             await client.get("https://docs.google.com/x")
 
     asyncio.run(go())
