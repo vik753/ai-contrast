@@ -13,7 +13,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -78,6 +78,16 @@ export async function copyOcrAssets({ nodeModulesDir, outDir, languageSha256 = L
 
   // 2. Fresh output, then copy the exact list. The directory itself is kept:
   // in Compose it is a volume mount point, and removing it fails with EBUSY.
+  // Never delete or write through a symlink or a non-directory.
+  const existing = await lstat(outDir).catch((error) => {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  });
+  if (existing !== null && (existing.isSymbolicLink() || !existing.isDirectory())) {
+    throw new Error(`Output path "${outDir}" must be a real directory, not a symlink or a file.`);
+  }
   await mkdir(outDir, { recursive: true });
   for (const entry of await readdir(outDir)) {
     await rm(join(outDir, entry), { recursive: true, force: true });

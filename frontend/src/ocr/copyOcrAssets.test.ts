@@ -22,6 +22,7 @@ import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
+  symlinkSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -259,6 +260,37 @@ describe("copy-ocr-assets output directory", () => {
     expect(names()).toContain("pdf.worker.min.mjs");
   });
 
+  it("test_fails_when_the_output_path_is_a_symlink_and_leaves_the_target_alone", async () => {
+    const target = join(root, "elsewhere");
+    mkdirSync(target);
+    writeFileSync(join(target, "keep.txt"), "keep");
+    mkdirSync(dirname(out), { recursive: true });
+    symlinkSync(target, out);
+    const script = await loadScript();
+    await expect(
+      script.copyOcrAssets({
+        nodeModulesDir: modules,
+        outDir: out,
+        languageSha256: goodManifest(),
+      }),
+    ).rejects.toThrow(/symlink/);
+    expect(readdirSync(target)).toEqual(["keep.txt"]);
+  });
+
+  it("test_fails_when_the_output_path_is_a_file", async () => {
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, "not a directory");
+    const script = await loadScript();
+    await expect(
+      script.copyOcrAssets({
+        nodeModulesDir: modules,
+        outDir: out,
+        languageSha256: goodManifest(),
+      }),
+    ).rejects.toThrow(/real directory/);
+    expect(readFileSync(out, "utf8")).toBe("not a directory");
+  });
+
   it("test_copies_the_legacy_pdfjs_worker_not_the_modern_one", async () => {
     const script = await loadScript();
     await script.copyOcrAssets({
@@ -278,6 +310,11 @@ describe("pdf.js legacy build in node_modules", () => {
   it.each(["pdf.worker.min.mjs", "pdf.mjs"])("test_%s_has_no_eval_and_no_new_function", (name) => {
     const code = readFileSync(join(real, name), "utf8");
     expect(code).not.toMatch(/\beval\s*\(/);
-    expect(code).not.toMatch(/new\s+Function\s*\(/);
+    // Only the core-js `globalThis` fallback may call `Function(`; CSP and the
+    // Trusted Types policy block it too.
+    const calls = code.match(/\bFunction\s*\(.{0,20}/g) ?? [];
+    for (const call of calls) {
+      expect(call).toMatch(/^Function\((["'])return this\1\)\(\)/);
+    }
   });
 });
