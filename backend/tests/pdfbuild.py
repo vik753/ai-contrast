@@ -78,7 +78,8 @@ def content_obj(index: int) -> int:
 
 
 def _fmt(value: float) -> str:
-    text = f"{value:.4f}".rstrip("0").rstrip(".")
+    # Enough precision for tiny FontMatrix values (for example 0.00005).
+    text = f"{value:.6f}".rstrip("0").rstrip(".")
     return text or "0"
 
 
