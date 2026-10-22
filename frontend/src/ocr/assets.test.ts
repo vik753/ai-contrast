@@ -28,7 +28,7 @@ describe("OCR asset URLs", () => {
   it("test_allowed_script_urls_exclude_sandbox_quickjs_and_non_lstm_cores", () => {
     for (const url of assets.ALLOWED_SCRIPT_URLS) {
       expect(url).not.toMatch(/quickjs|sandbox/i);
-      if (/tesseract-core/.test(url)) {
+      if (url.includes("tesseract-core")) {
         expect(url).toMatch(/-lstm\.wasm\.js$/);
       }
     }

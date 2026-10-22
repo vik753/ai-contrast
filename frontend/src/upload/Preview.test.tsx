@@ -44,6 +44,12 @@ import {
 } from "../test/upload-fakes";
 import * as UploadFormModule from "./UploadForm";
 
+// S3-T5: a file with `ocr_pages` now starts OCR. Keep it pending here, so the
+// preview still shows which pages need text recognition.
+vi.mock("../ocr/ocrPdf", () => ({
+  recognizePages: () => new Promise<never>(() => undefined),
+}));
+
 const EN = flattenLocale(enJson);
 const UK = flattenLocale(ukJson);
 const RU = flattenLocale(ruJson);
@@ -124,6 +130,25 @@ async function addAccepted(label: string, ...files: File[]): Promise<void> {
       expect(row?.textContent).toContain(KIND_LABEL[kind]);
     });
   }
+}
+
+// S3-T5: a PDF with `ocr_pages` is accepted and then waits for OCR, so its row
+// shows the OCR status instead of the kind label.
+async function addAwaitingOcr(label: string, f: File): Promise<void> {
+  const input = region(label).querySelector<HTMLInputElement>('input[type="file"]');
+  if (input === null) {
+    throw new Error(`No file input in Contract ${label}`);
+  }
+  act(() => {
+    fireEvent.change(input, { target: { files: fileList([f]) } });
+  });
+  await waitFor(() => {
+    const row = within(region(label))
+      .getAllByText(f.name)
+      .map((el) => el.closest("li"))
+      .find((li) => li !== null);
+    expect(row?.textContent).toMatch(/text recognition|Recognizing page/);
+  });
 }
 
 function previewButton(label: string): HTMLElement {
@@ -459,7 +484,7 @@ describe("AC4 — warnings and OCR pages", () => {
 
   it("test_ocr_pages_show_need_text_recognition_message", async () => {
     await renderForm();
-    await addAccepted(
+    await addAwaitingOcr(
       "A",
       file("scan.pdf", "pdf", {
         pages: 4,

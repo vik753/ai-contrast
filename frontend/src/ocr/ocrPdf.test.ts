@@ -363,7 +363,7 @@ describe("flow (AC5)", () => {
   it("test_progress_is_reported_before_each_page", async () => {
     const onProgress = vi.fn();
     await recognizePages(file(), [3, 5], { signal: new AbortController().signal, onProgress });
-    expect(onProgress.mock.calls.map((c) => c[0])).toEqual([
+    expect(onProgress.mock.calls.map((c: unknown[]) => c[0])).toEqual([
       { current: 1, total: 2, page: 3 },
       { current: 2, total: 2, page: 5 },
     ]);
