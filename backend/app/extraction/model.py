@@ -99,7 +99,8 @@ class ExtractionResult(_Strict):
     kind: Kind
     bytes: NonNegativeInt
     language: Language
-    pages: Annotated[int, Field(gt=0, le=DEFAULT_MAX_PDF_PAGES)] | None
+    # The upper bound is the extractor's configured limit (``too_many_pages``).
+    pages: PositiveInt | None
     blocks: list[Block]
     ocr_pages: list[PositiveInt]
     removed: Annotated[list[Removed], Field(max_length=MAX_LIST_ITEMS)]

@@ -14,9 +14,10 @@ from the resources and every colour is resolved to a device colour
 - Lab: white only for L = 100 with a = b = 0; other colours are compared by
   their lightness ``L / 100`` (never exact white when a or b is not 0);
 - Indexed: through its lookup table into the resolved base space;
-- Separation and DeviceN: all tints 0 = no ink (white, tech-lead rule of round 1);
-  other tints through a Type 2 (exponential) tint transform with one input,
-  else ``None``. The ``None`` colorant → ``None``.
+- Separation and DeviceN: every tint (also 0) goes through a Type 2 (exponential)
+  tint transform with one input into the alternate space; tint 0 is white only
+  when the alternate colour at 0 is exact white. Else ``None``. The ``None``
+  colorant → ``None``.
 - Pattern and anything else → ``None``.
 
 ``None`` is never treated as white: text in such a colour is kept with
@@ -180,8 +181,8 @@ class ColourSpace:
     def _tinted(self, tints: tuple[float, ...]) -> Colour | None:
         if self.no_colorant:
             return None
-        if all(t == 0.0 for t in tints):
-            return ("DeviceGray", (1.0,))  # no ink
+        # Tint 0 is "no ink" only when the tint transform maps it to the alternate
+        # colour; the result is white only if that colour is exact white.
         if self.tint is None or self.base is None or len(tints) != 1:
             return None
         out = self.tint(tints[0])

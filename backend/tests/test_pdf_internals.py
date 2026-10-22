@@ -11,7 +11,16 @@ from app.extraction.pdf_colour import is_white, luminance, parse_colour_space
 from app.extraction.pdf_content import tiling_runs_text
 from app.extraction.pdf_document import CheckedDocument, _TrackedXRef
 from app.extraction.references import external_reference_warnings, straddles
-from tests.pdfbuild import EXTRA, Obj, Page, build_pdf, incremental_update, text, type3_objects
+from tests.pdfbuild import (
+    EXTRA,
+    Obj,
+    Page,
+    build_pdf,
+    incremental_update,
+    text,
+    text_pdf,
+    type3_objects,
+)
 from tests.pdfrun import extract, reasons, squashed, texts, warning_codes, warnings_of
 
 SPOT_FN = {"FunctionType": 2, "Domain": [0, 1], "C0": [0, 0, 0, 0], "C1": [0, 0, 0, 1], "N": 1}
@@ -19,6 +28,15 @@ SPOT_FN = {"FunctionType": 2, "Domain": [0, 1], "C0": [0, 0, 0, 0], "C1": [0, 0,
 
 def lit(name: str) -> object:
     return LIT(name)
+
+
+def test_raised_page_limit_extracts_a_120_page_pdf() -> None:
+    data = text_pdf(*(f"Clause {n} of the agreement." for n in range(1, 121)))
+
+    result = extract(data, max_pages=150)
+
+    assert result.pages == 120
+    assert {b.page for b in result.blocks} <= set(range(1, 121))
 
 
 def test_lab_with_chroma_is_never_exact_white() -> None:
@@ -69,14 +87,25 @@ def test_separation_none_colorant_is_unresolved() -> None:
     assert space.resolve((1,)) is None
 
 
-def test_devicen_tint_functions_not_evaluated_beyond_zero() -> None:
+def test_devicen_unknown_tint_function_is_unresolved_even_at_zero() -> None:
     space = parse_colour_space(
         [lit("DeviceN"), [lit("A"), lit("B")], lit("DeviceCMYK"), {"FunctionType": 4}]
     )
     assert space is not None
 
-    assert space.resolve((0, 0)) == ("DeviceGray", (1.0,))
+    assert space.resolve((0, 0)) is None
     assert space.resolve((0, 1)) is None
+
+
+def test_separation_zero_tint_to_black_is_not_white() -> None:
+    fn = {"FunctionType": 2, "Domain": [0, 1], "C0": [0, 0, 0, 1], "C1": [0, 0, 0, 0], "N": 1}
+    space = parse_colour_space([lit("Separation"), lit("Spot"), lit("DeviceCMYK"), fn])
+    assert space is not None
+
+    zero = space.resolve((0,))
+
+    assert zero == ("DeviceCMYK", (0.0, 0.0, 0.0, 1.0))
+    assert not is_white(zero)
 
 
 @pytest.mark.parametrize("spec", [[lit("ICCBased")], [lit("Unknown")], [], 5, [lit("Indexed")]])

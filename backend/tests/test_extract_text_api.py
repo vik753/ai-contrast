@@ -384,7 +384,8 @@ def test_extract_pdf_reaches_the_sandbox(
     patch_sandbox(fake)
 
     # S3-T3: PDF extraction exists, so the request reaches the sandbox.
-    _post(make_client(), body)
+    response = _post(make_client(), body)
+    assert response.status_code == 200  # the fake returns extract_text_file(body)
     assert len(fake.calls) == 1
 
 

@@ -242,11 +242,8 @@ WHITE_SPACES = {
     "icc4": (f"/Cs0 [/ICCBased {EXTRA + 4} 0 R]", "/Cs0 cs 0 0 0 0 sc"),
     "indexed": ("/Cs0 [/Indexed /DeviceRGB 1 <000000FFFFFF>]", "/Cs0 cs 1 sc"),
     "separation": (f"/Cs0 [/Separation /Spot1 /DeviceCMYK {SEPARATION_FN}]", "/Cs0 cs 0 scn"),
-    "devicen": (
-        f"/Cs0 [/DeviceN [/Spot1 /Spot2] /DeviceCMYK {DEVICE_N_FN} 0 R]",
-        "/Cs0 cs 0 0 scn",
-    ),
 }
+DEVICE_N_SPACE = f"/Cs0 [/DeviceN [/Spot1 /Spot2] /DeviceCMYK {DEVICE_N_FN} 0 R]"
 COLOUR_EXTRA = {
     **ICC,
     DEVICE_N_FN: stream_obj(
@@ -271,6 +268,30 @@ def test_separation_full_tint_kept_without_flags() -> None:
     colorspace = f"/Cs0 [/Separation /Spot1 /DeviceCMYK {SEPARATION_FN}]"
 
     assert_clean(colour_page(colorspace, "/Cs0 cs 1 scn"))
+
+
+def test_separation_zero_tint_to_black_kept_without_flags() -> None:
+    # Tint 0 maps to black in the alternate space: it is ink, not "no ink".
+    fn = "<< /FunctionType 2 /Domain [0 1] /C0 [0 0 0 1] /C1 [0 0 0 0] /N 1 >>"
+    colorspace = f"/Cs0 [/Separation /Spot1 /DeviceCMYK {fn}]"
+
+    assert_clean(colour_page(colorspace, "/Cs0 cs 0 scn"))
+
+
+def test_separation_zero_tint_to_white_removed() -> None:
+    colorspace = f"/Cs0 [/Separation /Spot1 /DeviceCMYK {SEPARATION_FN}]"
+
+    assert_removed(colour_page(colorspace, "/Cs0 cs 0 scn"), "same_color")
+
+
+def test_devicen_unknown_tint_function_kept_borderline() -> None:
+    assert_borderline(colour_page(DEVICE_N_SPACE, "/Cs0 cs 0 0 scn", COLOUR_EXTRA))
+
+
+def test_separation_unknown_tint_function_kept_borderline() -> None:
+    colorspace = f"/Cs0 [/Separation /Spot1 /DeviceCMYK {DEVICE_N_FN} 0 R]"
+
+    assert_borderline(colour_page(colorspace, "/Cs0 cs 0 scn", COLOUR_EXTRA))
 
 
 def test_pattern_colour_text_kept_borderline() -> None:
@@ -522,9 +543,8 @@ def result_model(pages: int | None, blocks: list[Block]) -> ExtractionResult:
     )
 
 
-def test_model_pages_above_100_rejected() -> None:
-    with pytest.raises(ValidationError):
-        result_model(101, [])
+def test_model_pages_above_100_accepted_limit_is_the_extractors() -> None:
+    assert result_model(120, []).pages == 120
 
 
 def test_model_pages_at_100_accepted() -> None:
