@@ -26,7 +26,7 @@ Order of checks (each answers before the next step):
    ``408 upload_timeout``;
 6. zero bytes → ``422 empty_file``;
 7. detection → ``422`` with the detection code;
-8. ``pdf`` and ``docx`` → ``501 not_implemented`` (until S3-T2 and S3-T3);
+8. ``pdf`` → ``501 not_implemented`` (until S3-T3);
 9. extraction in the sandbox, with the slot still held → ``200`` with the stage 3
    contract, or ``422`` with the extraction code.
 
@@ -57,7 +57,7 @@ from starlette.types import Receive, Scope, Send
 
 from app.extraction.detect import DetectionError, FileKind, ZipLimits, detect_kind
 from app.extraction.limiter import ExtractionLimiter
-from app.extraction.model import ExtractionError, ExtractionResult
+from app.extraction.model import MIB, ExtractionError, ExtractionResult
 from app.extraction.sandbox import SandboxLimits, run_extraction
 from app.http_limits import EXTRACT_PATH, declared_length
 from app.settings import Settings
@@ -71,7 +71,6 @@ RETRY_AFTER_SECONDS: Final = 5
 RATE_TICK_SECONDS: Final = 1.0
 
 CLOSE: Final = {"Connection": "close"}
-MIB: Final = 1024 * 1024
 SEND_CHUNK_BYTES: Final = 64 * 1024
 
 
@@ -189,9 +188,10 @@ async def _read_body(request: Request, declared: int, settings: Settings) -> byt
         422: {
             "description": "empty_file, unsupported_type, legacy_office_unsupported, "
             "pages_unsupported, archive_rejected, extraction_failed, extraction_timeout, "
-            "too_much_text, no_text_extracted or text_decoding_failed"
+            "too_much_text, no_text_extracted, text_decoding_failed, suspicious_package "
+            "or docx_strict_unsupported"
         },
-        501: {"description": "not_implemented (PDF and DOCX until S3-T2 and S3-T3)"},
+        501: {"description": "not_implemented (PDF until S3-T3)"},
         503: {"description": "busy"},
     },
 )
@@ -269,6 +269,10 @@ def _sandbox_limits(settings: Settings) -> SandboxLimits:
         max_result_bytes=settings.extract_max_result_bytes,
         max_text_chars=settings.extract_max_text_chars,
         max_blocks=settings.extract_max_blocks,
+        docx_max_part_bytes=settings.max_docx_part_bytes,
+        docx_max_total_bytes=settings.max_zip_uncompressed_bytes,
+        docx_max_xml_depth=settings.max_docx_xml_depth,
+        docx_max_elements=settings.max_docx_elements,
     )
 
 
@@ -288,7 +292,7 @@ async def _receive_and_extract(request: Request, declared: int, settings: Settin
         kind = detect_kind(data, limits=limits)
     except DetectionError as error:
         return _error(error.code, 422)
-    if kind is not FileKind.TEXT:
+    if kind is FileKind.PDF:
         return _error("not_implemented", 501)
     try:
         result = await run_extraction(data, kind, limits=_sandbox_limits(settings))

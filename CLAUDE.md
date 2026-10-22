@@ -40,7 +40,7 @@ People and roles:
 | OCR | Tesseract.js + PDF.js in the browser, language data self-hosted (`eng`, `ukr`, `rus`) |
 | Browser storage | IndexedDB behind the `CacheStore` port; SHA-256 via Web Crypto API |
 | `backend/` | Python 3.13, FastAPI, stateless; progress and results via SSE |
-| Text extraction | pdfplumber with a render-mode pdfminer device; own DOCX walker over relationship-resolved parts (ADR 0004 revision, ADR 0009) |
+| Text extraction | One sandboxed subprocess per file (ADR 0011); own DOCX walker over relationship-resolved parts with `defusedxml`; `pdfminer.six` with a render-mode device (no pdfplumber, no python-docx; ADR 0004 revision, ADR 0009) |
 | AI layer | `AIProvider` port; adapters on the official `anthropic` and `openai` SDKs. **No LiteLLM.** |
 | Validation | Pydantic v2 |
 | Rate limiting | slowapi (in memory) |

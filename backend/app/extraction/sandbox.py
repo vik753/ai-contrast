@@ -43,7 +43,11 @@ import app
 from app.extraction.detect import FileKind
 from app.extraction.model import (
     DEFAULT_MAX_BLOCKS,
+    DEFAULT_MAX_DOCX_ELEMENTS,
+    DEFAULT_MAX_DOCX_PART_BYTES,
+    DEFAULT_MAX_DOCX_XML_DEPTH,
     DEFAULT_MAX_TEXT_CHARS,
+    DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES,
     EXTRACTION_FAILED,
     EXTRACTION_TIMEOUT,
     TOO_MUCH_TEXT,
@@ -74,6 +78,11 @@ class SandboxLimits:
     max_result_bytes: int
     max_text_chars: int = DEFAULT_MAX_TEXT_CHARS
     max_blocks: int = DEFAULT_MAX_BLOCKS
+    # DOCX caps (S3-T2); the defaults are the settings defaults.
+    docx_max_part_bytes: int = DEFAULT_MAX_DOCX_PART_BYTES
+    docx_max_total_bytes: int = DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES
+    docx_max_xml_depth: int = DEFAULT_MAX_DOCX_XML_DEPTH
+    docx_max_elements: int = DEFAULT_MAX_DOCX_ELEMENTS
 
 
 class _ChildReply(BaseModel):
@@ -197,6 +206,10 @@ async def _run(
             "size": len(data),
             "max_text_chars": limits.max_text_chars,
             "max_blocks": limits.max_blocks,
+            "docx_max_part_bytes": limits.docx_max_part_bytes,
+            "docx_max_total_bytes": limits.docx_max_total_bytes,
+            "docx_max_xml_depth": limits.docx_max_xml_depth,
+            "docx_max_elements": limits.docx_max_elements,
         }
     ).encode()
     try:

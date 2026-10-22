@@ -32,7 +32,8 @@ def test_control_character_removed_and_counted() -> None:
     ]
 
 
-@pytest.mark.parametrize("char", ["\x0b", "\x0c", "\x1b", "\x7f", "\x80", "\x9f"])
+# FF and VT become line feeds since S3-T2 (tests/test_docx_text_normalization.py).
+@pytest.mark.parametrize("char", ["\x1b", "\x7f", "\x80", "\x9f"])
 def test_other_cc_characters_removed(char: str) -> None:
     result = _extract(CLAUSE + char + "end")
 

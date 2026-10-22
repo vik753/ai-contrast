@@ -5,6 +5,7 @@ description = "AI Contrast backend: stateless API that compares contracts clause
 requires-python = ">=3.13"
 license = "AGPL-3.0-only"
 dependencies = [
+    "defusedxml==0.7.1",
     "fastapi>=0.143.0",
     "pydantic-settings>=2.15.0",
     "uvicorn>=0.54.0",
@@ -65,6 +66,12 @@ strict = true
 python_version = "3.13"
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# defusedxml ships no type hints (no stub dependency added); app/extraction/docx_xml.py
+# is the only importer and types its results itself.
+module = ["defusedxml", "defusedxml.*"]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

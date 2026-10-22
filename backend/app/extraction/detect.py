@@ -356,3 +356,22 @@ def _classify_zip(names: list[str]) -> FileKind:
     ):
         return FileKind.DOCX
     raise DetectionError(UNSUPPORTED_TYPE)
+
+
+# --- Shared with the DOCX reader (S3-T2) -----------------------------------------------
+
+
+def zip_central_directory(data: bytes, *, max_entries: int) -> tuple[int, int, int]:
+    """Rules 3.1 and 3.2 for the stage 3 ZIP reader: the same EOCD and central
+    directory as detection. Return the entry count and the central directory bounds
+    (start, end). Raises ``DetectionError(archive_rejected)``."""
+    limits = ZipLimits(max_entries=max_entries, max_uncompressed_bytes=0, max_ratio=0)
+    return _central_directory(data, limits)
+
+
+def zip_entry_name(raw: bytes, *, is_empty: bool) -> str:
+    """Rule 3.3 for one entry name, as in detection. Raises
+    ``DetectionError(archive_rejected)``."""
+    name = _entry_name(raw)
+    _check_name(name, is_empty=is_empty)
+    return name

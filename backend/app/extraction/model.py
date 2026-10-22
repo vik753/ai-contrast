@@ -14,9 +14,16 @@ from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt
 
-# Defaults of the text caps; the settings use the same values.
+MIB: Final = 1024 * 1024
+
+# Defaults of the caps: the one source for the settings, the sandbox limits and the
+# DOCX limits.
 DEFAULT_MAX_TEXT_CHARS: Final = 1_000_000
 DEFAULT_MAX_BLOCKS: Final = 20_000
+DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES: Final = 100 * MIB
+DEFAULT_MAX_DOCX_PART_BYTES: Final = 32 * MIB
+DEFAULT_MAX_DOCX_XML_DEPTH: Final = 256
+DEFAULT_MAX_DOCX_ELEMENTS: Final = 2_000_000
 
 MAX_SAMPLE_CHARS: Final = 200
 
@@ -41,6 +48,8 @@ PDF_DAMAGED: Final = "pdf_damaged"
 # Codes that the parsing child may report. The parent's own codes (timeout and
 # failure) are not in this list: a child cannot claim them.
 ChildErrorCode = Literal[
+    "archive_rejected",
+    "unsupported_type",
     "too_many_pages",
     "too_much_text",
     "encrypted_unsupported",
