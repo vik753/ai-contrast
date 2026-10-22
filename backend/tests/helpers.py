@@ -32,6 +32,9 @@ SETTINGS_ENV_VARS = (
     "EXTRACT_MAX_TEXT_CHARS",
     "EXTRACT_MAX_BLOCKS",
     "EXTRACT_SEND_TIMEOUT_SECONDS",
+    # Stage 3 (S3-T3) PDF limits.
+    "MAX_PDF_PAGES",
+    "MAX_PDF_PREV_CHAIN",
     # S3-T1 test-only worker hook: never set in the server environment.
     "AI_CONTRAST_WORKER_TEST_HOOK",
 )
