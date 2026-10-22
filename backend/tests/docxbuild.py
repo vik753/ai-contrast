@@ -187,13 +187,17 @@ def lvl(  # noqa: PLR0913 - every keyword is one w:lvl child
     start: int | None = None,
     restart: int | None = None,
     is_lgl: bool = False,
+    rpr: str = "",
+    pstyle: str | None = None,
 ) -> str:
     """One ``w:lvl`` of an abstract numbering definition."""
     parts = f'<w:start w:val="{start}"/>' if start is not None else ""
     parts += f'<w:numFmt w:val="{fmt}"/>'
     parts += f'<w:lvlRestart w:val="{restart}"/>' if restart is not None else ""
+    parts += f'<w:pStyle w:val="{pstyle}"/>' if pstyle else ""
     parts += "<w:isLgl/>" if is_lgl else ""
     parts += f'<w:lvlText w:val="{escape(text, {chr(34): "&quot;"})}"/>'
+    parts += f"<w:rPr>{rpr}</w:rPr>" if rpr else ""
     return f'<w:lvl w:ilvl="{ilvl}">{parts}</w:lvl>'
 
 
