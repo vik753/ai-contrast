@@ -255,9 +255,33 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
   9. Threat model T5 residual risks for DOCX: layout-dependent headers and footers, text-box overflow and off-page anchors, field updates on open, data binding, markup compatibility.
 - Threats: T4, T5, T11.
 
-### S3-T3 PDF extraction (outline)
+### S3-T3 PDF extraction
 
-`pdfminer.six` with a custom device (render mode), provably invisible text dropped and reported, borderline text flagged, overlapping glyphs, page cap, `ocr_pages` for pages without text, encrypted PDFs rejected, xref fallback / parse warnings / long or looping `Prev` chain → `pdf_damaged` or a material warning, incremental updates warning, annotations with values → "Not read".
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-pdf` (worktree `/home/claude/wt/s3-pdf`). New dependency: `pdfminer.six==20260107` (approved, conditions in "Stage 3 dependencies"; it adds `cryptography`, `cffi`, `pycparser`). No pdfplumber.
+- Public interface: `app/extraction/pdf.py`: `extract_pdf(data: bytes, *, max_chars: int, max_blocks: int, limits: PdfLimits) -> ExtractionResult` (runs inside the child); `@dataclass(frozen=True) class PdfLimits` (`max_pages`, `max_prev_chain`). Settings: `MAX_PDF_PAGES` (100), `MAX_PDF_PREV_CHAIN` (32).
+- AC:
+  1. In the child: the `pdfminer` logger at ERROR (its messages contain PDF data); `CMAP_PATH` unset; logs never contain PDF content.
+  2. Encrypted PDF: opened only when the empty user password works; otherwise `encrypted_unsupported`.
+  3. Page count checked before extraction: above `MAX_PDF_PAGES` → `too_many_pages`.
+  4. A custom pdfminer device records per glyph: text, size, render mode (`Tr`), fill colour with its colour space, alpha (`ca` from ExtGState when present), box, and the page crop box.
+  5. **Provably invisible text removed** and reported in `removed`: render mode 3 or 7 (`invisible_render_mode`); fully outside the crop box (`outside_page`); glyph height or width under 1 pt (`tiny_text`); exact white fill on a page without filled shapes behind the text (Gray 1, RGB 1/1/1, CMYK 0/0/0/0) (`same_color`); alpha 0 (`transparent`).
+  6. **Borderline kept** with `borderline_text`: near-white colours (luminance above 0.9), size 1–4 pt, text over a filled shape whose colour we cannot compare.
+  7. **Overlap:** NFC first, combining marks (Mn) excluded; identical glyphs at the same position merged (fake bold); different characters overlapping by more than half → kept, warning `overlapping_text`.
+  8. **Blocks:** lines grouped into paragraphs per page (pdfminer layout), `part` = `body`, `page` = 1-based. Running headers and footers: a line repeated at the top or bottom of at least half of the pages is kept once (`removed` reason `repeated_header_footer` for the rest); page-number-only lines dropped (`page_number`).
+  9. **Scans:** a page with no text and with images → in `ocr_pages`; a document where every page is like this returns `200` with all pages in `ocr_pages` (not `no_text_extracted`). A page with little text and a large image area → material warning `not_read_image_page`, except the signature page rule (each image under 15 % of the page area and together under 30 %).
+  10. **Annotations and forms:** FreeText, Text and Widget annotations with a non-empty value → material warning `not_read_annotation` (Link ignored); XFA forms → `not_read_xfa`.
+  11. **Damage and revisions:** cross-reference reconstruction (pdfminer fallback) or any pdfminer parse warning → material warning `damaged_pdf`; more than one revision → warning `pdf_edited` (not material); a `Prev` chain longer than `MAX_PDF_PREV_CHAIN`, a loop, or a `RecursionError` → `pdf_damaged`; the latest revision unreadable → `pdf_damaged`.
+  12. **References to documents not provided** (all kinds: text, DOCX, PDF; shared post-processing): EN/UK/RU patterns ("згідно з Правилами страхування", "відповідно до Правил", "согласно Правилам", "General Terms and Conditions", "incorporated by reference", "є невід'ємною частиною", "является неотъемлемой частью") → warning `external_reference` with the page (null for DOCX and text).
+  13. List caps as for DOCX; `pages` = page count; shared normalization and Cc rule.
+  14. Fixtures: a small PDF builder in tests (raw PDF objects, standard Type1 fonts for Latin text, a Type0/Identity-H font with a ToUnicode CMap for Cyrillic; no new test dependency). Worst case at the caps (100 pages, dense text) inside the child limits.
+  15. Docs: threat model T4 (encrypted-PDF rule, pdfminer logging rule), ADR 0004 aligned.
+- Threats: T4, T5.
+
+### S3-T2b List numbering labels (before stage 5)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-numbering`.
+- AC: paragraphs with `w:numPr` (direct or from the style) get their label from `numbering.xml`: `w:abstractNum` levels with `lvlText` (`%1.%2.`), `numFmt` (decimal, lowerLetter, upperLetter, lowerRoman, upperRoman, bullet, `decimalZero`, Cyrillic `russianLower`/`russianUpper` and Ukrainian equivalents where defined), `start`, `lvlRestart`, `isLgl`, `w:num` overrides (`lvlOverride`, `startOverride`); counters per `numId` in document order, hidden and deleted paragraphs do not count; the label is prefixed to the block text with one space. Unknown formats → decimal plus warning `numbering_approximate`. Caps on levels (9) and definitions.
+- Threats: T5 (labels are what the person reads; clause references depend on them).
 
 ### S3-T4 Preview in the browser
 
