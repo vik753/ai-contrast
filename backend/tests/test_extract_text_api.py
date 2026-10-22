@@ -1,6 +1,6 @@
 """S3-T1 AC2, AC6, AC7, AC10: ``POST /api/extract`` returns the stage 3
-response contract for text files (PDF and DOCX have their own test modules)
-until S3-T3 (DOCX: S3-T2, tests/test_docx_api.py).
+response contract for text files (DOCX: tests/test_docx_api.py, PDF:
+tests/test_pdf_api.py).
 
 Assumed contract (see the test report): ``app/api/extract.py`` imports
 ``run_extraction`` by name and calls it as

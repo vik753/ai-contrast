@@ -31,12 +31,17 @@ Steps:
      exact-white fills → ``same_color``.
 
    Kept glyphs get ``borderline_text`` (per page) when: em size at most
-   ``SMALL_TEXT_PT``; any fill whose colour cannot be compared (patterns,
-   shadings, spot colours) lies behind the glyph; or the glyph is light
-   (luminance above ``NEAR_WHITE``) and lies on the white page, on an image, or
-   in an exotic graphics state (blend mode, soft mask). Light text on a fill of
-   a known colour is not flagged (residual in ADR 0009: same colour as a
-   coloured box).
+   ``SMALL_TEXT_PT``; a render mode outside 0-7; a paint colour that cannot be
+   resolved (patterns, unknown spaces); alpha above 0 and below ``LOW_ALPHA``;
+   any fill or stroke whose colour cannot be compared (patterns, shadings, ``sh``,
+   stroked paths) lies behind the glyph; the glyph is clipped away (zero-area clip,
+   outside a form ``BBox``) or in an optional content group that is OFF; the text
+   luminance is within ``MIN_CONTRAST`` of a known fill behind it; or the glyph is
+   light (luminance above ``NEAR_WHITE``) and lies on the white page, on an image,
+   or in an exotic graphics state (blend mode, soft mask). Colour spaces are
+   resolved by ``pdf_colour``; clips, optional content and content that pdfminer
+   does not run (``not_read_pattern``, ``not_read_type3``) by ``pdf_device`` and
+   ``pdf_content``. Residual: text covered by a shape painted later (ADR 0009).
    Whitespace glyphs follow the removal rules but never raise ``borderline_text``,
    and removed whitespace is not counted (it appears in the sample).
 4. Overlap (NFC; marks Mn, Me and Sk excluded): identical glyphs at the same
@@ -49,13 +54,15 @@ Steps:
    (``EDGE_BAND`` of the page height) whose text repeats in that band on at least
    half of the pages (and at least two) is kept once (``repeated_header_footer``
    for the rest); page-number-only lines in the bands → ``page_number``.
-7. Scans: a page with no kept text and images over at least ``OCR_MIN_IMAGE_SHARE``
-   of the page → ``ocr_pages``. A page with fewer than ``LITTLE_TEXT_CHARS``
-   characters and an image of at least 15 % of the page or images of at least 30 %
-   together → material warning ``not_read_image_page`` (signature-page rule).
-8. Annotations: FreeText and Text with non-empty ``Contents``, Widget with a
-   non-empty value (``V`` of the widget or its parent fields) → material warning
-   ``not_read_annotation``; hidden annotations and Link are ignored. An AcroForm
+7. Scans: a page with no body text (header, footer and page-number lines do not
+   count) and images over at least ``OCR_MIN_IMAGE_SHARE`` of the page →
+   ``ocr_pages``. A page with fewer than ``LITTLE_TEXT_CHARS`` characters and an
+   image of at least 15 % of the page or images of at least 30 % together →
+   material warning ``not_read_image_page`` (signature-page rule).
+8. Annotations: any visible annotation with a normal appearance (``/AP /N``) other
+   than Link and Popup, FreeText and Text with non-empty ``Contents``, Widget with
+   a non-empty value (``V`` of the widget or its parent fields) → material warning
+   ``not_read_annotation``; Hidden and NoView annotations are ignored. An AcroForm
    with ``XFA`` → ``not_read_xfa``.
 9. Shared post-processing: NFC, control characters (``ControlCleaner``), external
    references (``app.extraction.references``), language, caps (characters, blocks,
@@ -79,6 +86,7 @@ from io import BytesIO
 from typing import Final
 
 from pdfminer.layout import (
+    IndexAssigner,
     LAParams,
     LTChar,
     LTPage,
@@ -113,15 +121,15 @@ from app.extraction.model import (
     Warning,
 )
 from app.extraction.normalize import PAGE_NUMBER_LINE, ControlCleaner
+from app.extraction.pdf_colour import Colour, is_white, luminance
+from app.extraction.pdf_content import OptionalContent
 from app.extraction.pdf_device import (
-    Colour,
     Glyph,
     PageRecord,
     RecordingDevice,
     StateInterpreter,
+    clip_hides,
     intersect,
-    is_white,
-    luminance,
     resolved_list,
 )
 from app.extraction.pdf_document import CheckedDocument, PdfDamagedError
@@ -178,6 +186,14 @@ STROKE_MODES: Final = frozenset({1, 2, 5, 6})
 MIN_EM_PT: Final = 1.0
 SMALL_TEXT_PT: Final = 4.0
 NEAR_WHITE: Final = 0.9
+# Alpha below this (but above 0) and a luminance difference below this to a known
+# fill are borderline.
+LOW_ALPHA: Final = 0.2
+MIN_CONTRAST: Final = 0.2
+# Render modes 0-7 are defined (ISO 32000-1, 9.3.6).
+MAX_RENDER_MODE: Final = 7
+# Distinct known fill colours kept per glyph before the background is unknown.
+MAX_FILL_COLOURS: Final = 16
 # Overlap: more than half of the smaller box; fake bold: offset within a quarter
 # of the glyph box.
 OVERLAP_SHARE: Final = 0.5
@@ -201,6 +217,7 @@ MAX_ANNOTATIONS: Final = 1000
 MAX_FIELD_DEPTH: Final = 32
 ANNOT_HIDDEN_FLAGS: Final = 0b10_0010  # Hidden (bit 2) or NoView (bit 6)
 VALUE_ANNOTS: Final = frozenset({"FreeText", "Text"})
+QUIET_ANNOTS: Final = frozenset({"Link", "Popup"})
 HEAD_CHARS: Final = 2 * MAX_SAMPLE_CHARS
 # Glyphs rendered in the whole document, visible or not, per allowed character.
 GLYPHS_PER_CHAR: Final = 2
@@ -238,6 +255,9 @@ def _area(box: Rect) -> float:
     return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
 
 
+_Cell = tuple[int, int]
+
+
 class _Grid:
     """A uniform grid over the crop box: item indices per cell."""
 
@@ -245,9 +265,9 @@ class _Grid:
         self.crop = crop
         side = max(crop[2] - crop[0], crop[3] - crop[1], 1.0)
         self.cell = max(MIN_GRID_CELL_PT, side / GRID_CELLS_PER_SIDE)
-        self.cells: dict[tuple[int, int], list[int]] = {}
+        self.cells: dict[_Cell, list[int]] = {}
 
-    def keys(self, box: Rect) -> list[tuple[int, int]]:
+    def keys(self, box: Rect) -> list[_Cell]:
         """The cells of ``box`` clipped to the crop box (at most 65 x 65)."""
         cx0, cy0, cx1, cy1 = self.crop
         x0, y0 = max(box[0], cx0), max(box[1], cy0)
@@ -265,7 +285,7 @@ class _Grid:
         for key in self.keys(box):
             self.cells.setdefault(key, []).append(index)
 
-    def near(self, keys: list[tuple[int, int]]) -> set[int]:
+    def near(self, keys: list[_Cell]) -> set[int]:
         out: set[int] = set()
         for key in keys:
             out.update(self.cells.get(key, ()))
@@ -280,14 +300,22 @@ class _Line:
 
 
 @dataclass
+class _Removal:
+    """Removed text of one reason: characters and the head of the sample."""
+
+    count: int = 0
+    head: str = ""
+
+
+@dataclass
 class _PageText:
     number: int
     height: float
     bottom: float
     boxes: list[list[_Line]]
-    removed: dict[str, list[str | int]]  # reason → [count, head]
+    removed: dict[str, _Removal]
     warnings: set[str]
-    ocr: bool
+    image_shares: list[float]  # visible share of the page per image
 
 
 @dataclass
@@ -297,6 +325,7 @@ class _Background:
     white_only: bool = True  # nothing but exact-white fills (or nothing)
     image: bool = False
     unknown_fill: bool = False
+    lums: list[float] = field(default_factory=list)  # luminance of known fills
 
 
 _PLAIN_PAGE: Final = _Background()
@@ -318,11 +347,17 @@ def _background(glyph: Glyph, record: PageRecord, fills: _Grid, images: _Grid) -
         item = record.fills[index]
         if item.seq > glyph.seq or intersect(item.bbox, box) is None:
             continue
-        if item.colour is None:
+        if item.colour is None or item.stroke:
+            # A stroke box is only an upper bound of the paint: not comparable.
             found.unknown_fill = True
             found.white_only = False
-        elif not is_white(item.colour):
+            continue
+        if not is_white(item.colour):
             found.white_only = False
+        if len(found.lums) < MAX_FILL_COLOURS:
+            found.lums.append(luminance(item.colour))
+        else:
+            found.unknown_fill = True
     for index in images.near(keys):
         image = record.images[index]
         if image.seq < glyph.seq and intersect(image.bbox, box) is not None:
@@ -350,30 +385,34 @@ class _Paint:
     """What the paint of one style and render mode says, before the background."""
 
     transparent: bool  # alpha 0 for every paint the render mode uses
-    plain_white: bool  # exact white for every paint, in a plain graphics state
-    white: bool  # white for every paint (exact or ICC-based)
+    plain_white: bool  # white for every paint, in a plain graphics state
     light: bool  # luminance above NEAR_WHITE for every known paint
+    unresolved: bool  # a paint colour we cannot resolve (patterns, unknown spaces)
+    low_alpha: bool  # alpha above 0 and below LOW_ALPHA for some paint
+    lums: tuple[float, ...]  # luminance of the known paints
     exotic: bool
 
 
 def _paint(glyph: Glyph) -> _Paint:
     style = glyph.style
     alphas: list[float] = []
-    colours: list[tuple[Colour | None, bool]] = []
+    colours: list[Colour | None] = []
     if glyph.render in FILL_MODES:
         alphas.append(style.fill_alpha)
-        colours.append((style.fill, style.fill_exact))
+        colours.append(style.fill)
     if glyph.render in STROKE_MODES:
         alphas.append(style.stroke_alpha)
-        colours.append((style.stroke, style.stroke_exact))
-    known = [colour for colour, _ in colours if colour is not None]
+        colours.append(style.stroke)
+    known = [colour for colour in colours if colour is not None]
     white = bool(colours) and len(known) == len(colours) and all(is_white(c) for c in known)
-    exact = all(is_exact for _, is_exact in colours)
+    lums = tuple(luminance(c) for c in known)
     return _Paint(
         transparent=bool(alphas) and all(alpha == 0.0 for alpha in alphas),
-        plain_white=white and exact and not style.exotic,
-        white=white,
-        light=bool(known) and all(luminance(c) > NEAR_WHITE for c in known),
+        plain_white=white and not style.exotic,
+        light=bool(known) and all(lum > NEAR_WHITE for lum in lums),
+        unresolved=len(known) != len(colours),
+        low_alpha=any(0.0 < alpha < LOW_ALPHA for alpha in alphas),
+        lums=lums,
         exotic=style.exotic,
     )
 
@@ -418,8 +457,15 @@ class _Judge:
             return SAME_COLOR, False
         borderline = (
             em <= SMALL_TEXT_PT
+            or glyph.render > MAX_RENDER_MODE
+            or glyph.render < 0
+            or paint.unresolved
+            or paint.low_alpha
             or behind.unknown_fill
+            or glyph.style.layer_off
+            or clip_hides(glyph.style.clip, glyph.bbox)
             or (paint.light and (behind.white_only or behind.image or paint.exotic))
+            or any(abs(lum - fill) < MIN_CONTRAST for lum in paint.lums for fill in behind.lums)
         )
         return None, borderline
 
@@ -437,6 +483,8 @@ def _merge_overlaps(glyphs: list[Glyph], crop: Rect) -> tuple[list[Glyph], bool]
     entries: list[tuple[float, float, float, float, float, str]] = []
     kept: list[Glyph] = []
     overlapping = False
+    # Glyphs per cell, merged duplicates included: a cap on the work per cell.
+    visits: dict[_Cell, int] = {}
     skips: dict[str, bool] = {}
     for glyph in glyphs:
         text = glyph.text if glyph.text.isascii() else unicodedata.normalize("NFC", glyph.text)
@@ -449,6 +497,15 @@ def _merge_overlaps(glyphs: list[Glyph], crop: Rect) -> tuple[list[Glyph], bool]
             kept.append(glyph)
             continue
         keys = grid.keys(glyph.bbox)
+        crowded = False
+        for key in keys:
+            visits[key] = visits.get(key, 0) + 1
+            crowded = crowded or visits[key] > MAX_CELL_GLYPHS
+        if crowded:
+            # Too many glyphs in one cell to compare them all: fail closed.
+            overlapping = True
+            kept.append(glyph)
+            continue
         candidates: Iterable[int] = cells.get(keys[0], ()) if len(keys) == 1 else grid.near(keys)
         duplicate = False
         for index in candidates:
@@ -476,11 +533,7 @@ def _merge_overlaps(glyphs: list[Glyph], crop: Rect) -> tuple[list[Glyph], bool]
         index = len(entries)
         entries.append((x0, y0, x1, y1, area, text))
         for key in keys:
-            cell = cells.setdefault(key, [])
-            if len(cell) >= MAX_CELL_GLYPHS:
-                overlapping = True
-            else:
-                cell.append(index)
+            cells.setdefault(key, []).append(index)
         kept.append(glyph)
     return kept, overlapping
 
@@ -494,7 +547,7 @@ def _layout(glyphs: list[Glyph], crop: Rect, number: int) -> list[LTTextBox]:
         return []
     lines = [line for line in page.group_objects(laparams, chars) if not line.is_empty()]
     boxes = list(page.group_textlines(laparams, lines))
-    if laparams.boxes_flow is None or len(boxes) > MAX_FLOW_BOXES:
+    if len(boxes) > MAX_FLOW_BOXES:
         for box in boxes:
             box.analyze(laparams)
 
@@ -505,8 +558,6 @@ def _layout(glyphs: list[Glyph], crop: Rect, number: int) -> list[LTTextBox]:
 
         boxes.sort(key=key)
         return boxes
-    from pdfminer.layout import IndexAssigner  # noqa: PLC0415 - only for the flow order
-
     assigner = IndexAssigner()
     for group in page.group_textboxes(laparams, boxes):
         group.analyze(laparams)
@@ -519,18 +570,17 @@ class _Removals:
     """Removed text of one page: per reason a character count and the sample head."""
 
     def __init__(self) -> None:
-        self.items: dict[str, list[str | int]] = {}
+        self.items: dict[str, _Removal] = {}
         self._runs: dict[str, int] = {}
 
     def add(self, reason: str, glyph: Glyph) -> None:
-        item = self.items.setdefault(reason, [0, ""])
+        item = self.items.setdefault(reason, _Removal())
         if not glyph.text.isspace():
-            item[0] = int(item[0]) + len(glyph.text)
-        head = str(item[1])
-        if len(head) < HEAD_CHARS:
+            item.count += len(glyph.text)
+        if len(item.head) < HEAD_CHARS:
             if self._runs.get(reason, glyph.run) != glyph.run:
-                head += " "
-            item[1] = head + glyph.text
+                item.head += " "
+            item.head += glyph.text
         self._runs[reason] = glyph.run
 
 
@@ -563,23 +613,16 @@ def analyze_page(record: PageRecord) -> _PageText:
     if overlapping:
         warnings.add(OVERLAPPING_TEXT)
     boxes: list[list[_Line]] = []
-    chars = 0
     for box in _layout(kept, record.crop, record.number):
         lines = []
         for line in box:
             if isinstance(line, LTTextLine):
                 text = line.get_text().rstrip()
                 if text.strip():
-                    chars += len("".join(text.split()))
                     lines.append(_Line(text=text, y0=line.y0, y1=line.y1))
         if lines:
             boxes.append(lines)
-    shares = _image_shares(record)
-    total_share = min(1.0, sum(shares))
-    ocr = chars == 0 and total_share >= OCR_MIN_IMAGE_SHARE
-    stamps_only = all(s < STAMP_MAX_SHARE for s in shares) and total_share < STAMPS_MAX_SHARE
-    if not ocr and chars < LITTLE_TEXT_CHARS and shares and not stamps_only:
-        warnings.add(NOT_READ_IMAGE_PAGE)
+    warnings |= record.flags
     return _PageText(
         number=record.number,
         height=record.crop[3] - record.crop[1],
@@ -587,7 +630,7 @@ def analyze_page(record: PageRecord) -> _PageText:
         boxes=boxes,
         removed=removals.items,
         warnings=warnings,
-        ocr=ocr,
+        image_shares=_image_shares(record),
     )
 
 
@@ -618,6 +661,12 @@ def _field_value(annot: dict[object, object]) -> object:
     return None
 
 
+def _has_appearance(annot: dict[object, object]) -> bool:
+    """The annotation has a normal appearance stream (``/AP /N``) that viewers draw."""
+    appearance = resolve1(annot.get("AP"))
+    return isinstance(appearance, dict) and resolve1(appearance.get("N")) is not None
+
+
 def _annotation_warning(page: PDFPage) -> bool:
     annots = resolved_list(page.annots) if page.annots is not None else []
     for item in annots[:MAX_ANNOTATIONS]:
@@ -629,6 +678,8 @@ def _annotation_warning(page: PDFPage) -> bool:
             continue
         subtype = resolve1(annot.get("Subtype"))
         name = literal_name(subtype) if isinstance(subtype, PSLiteral) else ""
+        if name not in QUIET_ANNOTS and _has_appearance(annot):
+            return True
         if name in VALUE_ANNOTS and _non_empty(annot.get("Contents")):
             return True
         if name == "Widget" and _non_empty(_field_value(annot)):
@@ -694,20 +745,23 @@ def _repeated_keys(pages: list[_PageText]) -> set[str]:
     return {key for key, count in seen.items() if count >= MIN_REPEATS and 2 * count >= len(pages)}
 
 
-def _blocks(
+def _blocks(  # noqa: PLR0912 - one pass over lines, removals and warnings
     pages: list[_PageText],
     report: _Report,
     cleaner: ControlCleaner,
     *,
     max_chars: int,
     max_blocks: int,
-) -> list[Block]:
+) -> tuple[list[Block], list[int]]:
+    """Blocks and OCR pages. Header, footer and page-number lines do not count as text."""
     repeated = _repeated_keys(pages)
+    ocr_pages: list[int] = []
     shown: set[str] = set()
     blocks: list[Block] = []
     chars = 0
     for page in pages:
         dropped: dict[str, list[str]] = {}
+        body_chars = 0
         for box in page.boxes:
             kept: list[str] = []
             for line in box:
@@ -720,6 +774,8 @@ def _blocks(
                         dropped.setdefault(REPEATED_HEADER_FOOTER, []).append(line.text)
                         continue
                     shown.add(key)
+                else:
+                    body_chars += len("".join(line.text.split()))
                 kept.append(line.text)
             text = cleaner.clean(unicodedata.normalize("NFC", "\n".join(kept))).strip()
             if not text:
@@ -728,14 +784,25 @@ def _blocks(
             if chars > max_chars or len(blocks) >= max_blocks:
                 raise ExtractionError(TOO_MUCH_TEXT)
             blocks.append(Block(text=text, part="body", page=page.number))
+        total_share = min(1.0, sum(page.image_shares))
+        if body_chars == 0 and total_share >= OCR_MIN_IMAGE_SHARE:
+            ocr_pages.append(page.number)
+        elif body_chars < LITTLE_TEXT_CHARS and page.image_shares and not _stamps_only(page):
+            page.warnings.add(NOT_READ_IMAGE_PAGE)
         for reason, removed in page.removed.items():
-            report.remove(reason, int(removed[0]), str(removed[1]))
+            report.remove(reason, removed.count, removed.head)
         for reason, texts in dropped.items():
             joined = "\n".join(texts)
             report.remove(reason, len("".join(joined.split())), joined)
         for code in sorted(page.warnings):
             report.warn(code, page.number)
-    return blocks
+    return blocks, ocr_pages
+
+
+def _stamps_only(page: _PageText) -> bool:
+    """The signature-page rule: small images only (each under 15 %, together under 30 %)."""
+    shares = page.image_shares
+    return all(s < STAMP_MAX_SHARE for s in shares) and min(1.0, sum(shares)) < STAMPS_MAX_SHARE
 
 
 def _open(data: bytes, limits: PdfLimits) -> tuple[CheckedDocument, list[PDFPage]]:
@@ -773,7 +840,7 @@ def _extract(
         max_glyphs=GLYPHS_PER_CHAR * max_chars,
         on_page=lambda record: texts.append(analyze_page(record)),
     )
-    interpreter = StateInterpreter(rsrcmgr, device)
+    interpreter = StateInterpreter(rsrcmgr, device, OptionalContent(document.catalog))
     for number, page in enumerate(pages, start=1):
         interpreter.process_page(page)
         if _annotation_warning(page):
@@ -782,8 +849,7 @@ def _extract(
         report.warn(DAMAGED_PDF)
 
     cleaner = ControlCleaner()
-    blocks = _blocks(texts, report, cleaner, max_chars=max_chars, max_blocks=max_blocks)
-    ocr_pages = [page.number for page in texts if page.ocr]
+    blocks, ocr_pages = _blocks(texts, report, cleaner, max_chars=max_chars, max_blocks=max_blocks)
     if not blocks and not ocr_pages:
         raise ExtractionError(NO_TEXT_EXTRACTED)
     removed = report.removed + cleaner.removed()

@@ -99,7 +99,7 @@ class ExtractionResult(_Strict):
     kind: Kind
     bytes: NonNegativeInt
     language: Language
-    pages: PositiveInt | None
+    pages: Annotated[int, Field(gt=0, le=DEFAULT_MAX_PDF_PAGES)] | None
     blocks: list[Block]
     ocr_pages: list[PositiveInt]
     removed: Annotated[list[Removed], Field(max_length=MAX_LIST_ITEMS)]
@@ -107,7 +107,11 @@ class ExtractionResult(_Strict):
 
     @model_validator(mode="after")
     def _ordered_pages(self) -> Self:
-        """``ocr_pages`` and the pages of each warning code strictly increase."""
+        """Page numbers stay inside ``pages``; ``ocr_pages`` and warning pages increase."""
+        for block in self.blocks:
+            if block.page is not None and (self.pages is None or block.page > self.pages):
+                msg = "block page outside the document"
+                raise ValueError(msg)
         if any(a >= b for a, b in zip(self.ocr_pages, self.ocr_pages[1:], strict=False)):
             msg = "ocr_pages must strictly increase"
             raise ValueError(msg)

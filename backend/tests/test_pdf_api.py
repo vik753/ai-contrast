@@ -1,10 +1,9 @@
 """S3-T3 through ``POST /api/extract``: the full path (detection, sandbox child,
 ``extract_pdf``, contract validation in the parent). AC1 (logging), AC2, AC3, AC9,
 AC11, AC14 (worst case at the caps) and the settings ``MAX_PDF_PAGES`` /
-``MAX_PDF_PREV_CHAIN``. Must fail before the implementation exists (today PDF
-returns ``501 not_implemented``).
+``MAX_PDF_PREV_CHAIN``.
 
-Assumed beyond the public interface (see the test report): PDF extraction errors
+Assumed beyond the public interface: PDF extraction errors
 are ``422 {"error": <code>}``; the settings fields are ``max_pdf_pages`` and
 ``max_pdf_prev_chain``; the ``pdfminer`` logger level is set by ``app.extraction.pdf``
 (on import or in ``extract_pdf``), so it also holds in the test process.
