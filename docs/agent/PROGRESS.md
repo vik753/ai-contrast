@@ -9,7 +9,7 @@ How to resume after a break: read this file, then continue with the first unchec
 | 0 | Project rules | done |
 | 1 | Scaffold | done |
 | 2 | File upload | done |
-| 3 | Text extraction | in progress: S3-T1, S3-T2, S3-T3, S3-T4 done; S3-T2b (numbering) and S3-T5 (OCR) next; S3-T6 (Google Docs link) planned |
+| 3 | Text extraction | in progress: S3-T1, S3-T2, S3-T2b, S3-T3, S3-T4 done; S3-T5 (OCR) in review (PR #32); S3-T6 (Google Docs link) next |
 | 4 | Browser hash and cache | planned |
 | 5 | Clause splitting | planned |
 | 5b | Pseudonymization | planned |
@@ -71,3 +71,5 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-22 — PR #28 merged: developers, test-engineer and code-reviewer run on Sonnet; security-reviewer stays on Opus (customer request).
 - 2026-10-22 — PR #29 merged (S3-T3: PDF extraction with `pdfminer.six`). One review round: unrenderable content → material warnings, exact colour resolution in all colour spaces (unresolved → borderline), freed objects rejected only when extraction resolves them, empty-user-password encryption only. Worst case 100 pages: about 10.7 s CPU. 1827 backend tests.
 - Lesson: agent model changes in `.claude/agents/` take effect only in a new session; pass `model` explicitly when starting agents.
+- 2026-10-22 — PR #31 merged (S3-T2b: DOCX list numbering labels). Word sequence rules, per-story counters, `w:lvl/w:pStyle`; a label passes the same visibility check as text; a paragraph counts by its paragraph mark (hidden, deleted or moved-from marks do not count). Unknown formats → decimal plus `numbering_approximate`.
+- 2026-10-22 — S3-T6 written (Google Docs by public link): ID-only API, server-built export URL, SSRF guard as an `httpcore` network backend (ADR 0012), `httpx` 0.28.1 as a runtime dependency. Security reviewer approved the dependency and, after changes, the design (strict hostname rule, IPv6 rule beyond `is_global`, no proxy or Unix socket paths, `httpx` request log off, narrow `googleusercontent` host). Google Picker is not in v1.

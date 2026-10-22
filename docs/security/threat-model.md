@@ -18,7 +18,7 @@ Owner: `security-reviewer`. Updated at every stage. Fully reviewed at stage 12 (
 | Client API key | Browser. Server: memory, one request only. | Spending on the client's account; account access at the provider. |
 | Contract text | Browser. Server: memory. The client's AI provider. | Personal and commercial data exposure. |
 | Analysis results | Browser IndexedDB | Contain contract quotes. |
-| Google access token | Browser only | Access to the selected file. |
+| Google Docs document ID (public link) | Browser; server: memory, one request only | Read access to that document for anyone who has it. |
 | Our free-tier credentials (`CF_ACCOUNT_ID`, `CF_AI_TOKEN`, Turnstile secret) | Render secret env vars only | Free quota theft; abuse of our Cloudflare account in our name. |
 | Our backend | Render | Resource abuse; attacks on others through us. |
 | Repository and CI | GitHub | Code or dependency tampering. |
@@ -61,14 +61,16 @@ Controls:
 1. **Presets:** known providers have hard-coded base URLs (allowlist).
 2. **Custom base URL** (advanced setting) passes the SSRF guard:
    - scheme `https` only, port 443 only;
-   - hostname only, IP literals rejected;
-   - resolve DNS once, reject if any address is private, loopback, link-local, multicast, reserved, unspecified or IPv6 ULA;
-   - connect to the checked IP (DNS rebinding defense);
+   - hostname only: lower case, one trailing dot stripped, at least two labels, final label `[a-z]{2,63}` or `xn--…`; IP literals in any notation and single-label names rejected;
+   - resolve DNS once (non-blocking, inside the connect timeout); reject the whole result if any address is not public. IPv4: `is_global` and not multicast. IPv6: inside `2000::/3` and `is_global`; IPv4-mapped (`::ffff:0:0/96`) and NAT64 (`64:ff9b::/96`) addresses are checked by their IPv4 address;
+   - connect to the checked IPs one by one (DNS rebinding defense); TLS SNI and certificate check use the hostname; no `sni_hostname` override; Unix sockets refused;
+   - no proxy (`trust_env=False`, no SOCKS, no `proxy`, `uds`, `mounts` or `local_address`), `retries=0`;
    - redirects are not followed;
    - the backend appends the endpoint path; the client sets only the base URL;
    - timeouts and a response size limit.
 3. Local models (Ollama and others) only in local development: `ALLOW_PRIVATE_PROVIDER_URLS=true`. Off in production. The Docker image defaults to `ENVIRONMENT=production`, so this refusal fails closed.
-4. Tests cover at least: `127.0.0.1`, `127.1`, `0.0.0.0`, `[::1]`, `2130706433`, `0x7f000001`, `169.254.169.254`, `10.0.0.1`, `192.168.0.1`, `[fd00::1]`, and hostnames that resolve to loopback.
+4. Tests cover at least: `127.0.0.1`, `127.1`, `0.0.0.0`, `[::1]`, `2130706433`, `0x7f000001`, `169.254.169.254`, `10.0.0.1`, `192.168.0.1`, `[fd00::1]`, `::7f00:1`, `fec0::1`, `ff02::1`, `::ffff:224.0.0.1`, `64:ff9b::a00:1`, and hostnames that resolve to loopback.
+5. The loggers `httpx` and `httpcore` stay at `WARNING` (they log request URLs at `INFO`). Outbound errors are mapped to our codes; their text (URL, IP address) is never logged or returned. Implementation: `app/net/` (ADR 0012).
 
 ## T3. Contract data leak
 
@@ -156,8 +158,19 @@ Browser controls:
 
 ## T7. Google Docs import
 
-1. **Public link:** accept only `https://docs.google.com/document/d/<ID>/...`. Validate the ID with a strict regex. Build the export URL ourselves. Follow redirects only to an allowlist of Google domains. Size limit and timeout.
-2. **Private document:** Google Picker and Drive API run in the browser with scope `drive.file`. The Google token never reaches our server.
+Threat: the import makes our server fetch a URL (SSRF, open proxy), leaks the document link, or brings a different or oversized file into the pipeline.
+
+Controls (S3-T6, ADR 0012):
+
+1. **Public link only.** The browser accepts only `https://docs.google.com/document/d/<ID>/...` and sends only the ID, in a JSON body, to `POST /api/extract/google-doc`. The server validates the ID with `^[A-Za-z0-9_-]{25,100}$` and builds the export URL `https://docs.google.com/document/d/<ID>/export?format=docx` itself. No URL from the client is ever fetched.
+2. **SSRF guard** (T2 controls, ADR 0012) on every hop: DNS resolved once, public addresses only, connection to the checked IP, TLS verified for the hostname, no proxy from the environment.
+3. **Redirects:** at most 3, each checked: `https`, port 443, no user info, host `docs.google.com` or matching `^doc-[a-z0-9-]{1,60}-docs\.googleusercontent\.com$` (not other user-content hosts). The cookie jar is cleared before each hop. A redirect to `accounts.google.com` means the document is not public. Any other target is refused.
+4. **Request:** fixed headers only (`User-Agent`, `Accept`, `Accept-Encoding: identity`). No cookies, no header from the incoming request. A response with any `Content-Encoding` is refused (no decompression bomb).
+5. **Limits:** body streamed with the file limit (10 MiB), connect timeout 5 s, total 20 s. The extraction slot is held for the whole request. The body must be a DOCX by magic bytes; then the same sandbox extraction as an upload.
+6. **The ID works like a password** for that document: never logged (the `httpx` request log is off, T2 point 5), never in a URL of our API, never in an error message, never stored in the browser. The ID is validated with a full match (Python `$` also accepts a trailing newline).
+7. **Metadata:** the Google title (`Content-Disposition`, `docProps`) is never read (ADR 0008 point 8).
+8. **Private documents (Google Picker) are not in v1:** the Picker needs third-party scripts (CLAUDE.md rule 8). The person exports the document as DOCX or PDF and uploads it.
+9. **Stage 13 deployment blocker:** a per-IP rate limit for this endpoint, because it makes outbound requests.
 
 ## T8. Supply chain
 
