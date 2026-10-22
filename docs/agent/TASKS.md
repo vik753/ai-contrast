@@ -305,9 +305,19 @@ Doc updates with S3-T2/T3/T5: T9 (no `isEvalSupported`, exact-URL policy, no `bl
   5. All text is plain text (no HTML sinks), inside `<bdi>` where it is untrusted; i18n en/uk/ru; accessible headings and disclosure buttons.
 - Threats: T1, T3, T5.
 
-### S3-T5 OCR of scans in the browser (outline)
+### S3-T5 OCR of scans in the browser
 
-`tesseract.js` and `pdfjs-dist` self-hosted (worker, wasm, language data from our origin), `ocr_pages` and image-only PDFs, confidence per page, low confidence warning; CSP unchanged or changed with security review.
+- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s3-ocr` (worktree `/home/claude/wt/s3-ocr`). New dependencies (approved, exact pins and conditions in "Stage 3 dependencies"): `pdfjs-dist@6.4.299`, `tesseract.js@7.0.0`, `tesseract.js-core@7.0.0`, `@tesseract.js-data/eng@1.0.0`, `@tesseract.js-data/ukr@1.0.0`, `@tesseract.js-data/rus@1.0.0`.
+- AC:
+  1. **Self-hosted assets:** a script `frontend/scripts/copy-ocr-assets.mjs` copies the pdf.js worker, the Tesseract worker, the LSTM-only wasm core files and the `4.0.0_best_int` language data into `frontend/public/ocr/` (git-ignored) and verifies each language file against the SHA-256 manifest (fails the build on a mismatch). It runs explicitly from the `build` and `dev` scripts (npm lifecycle hooks do not run because of `ignore-scripts`). No CDN, no `blob:` workers, no `quickjs-eval.*`, no `pdf.sandbox`.
+  2. **CSP and Trusted Types** (`frontend/public/_headers`, security review required): `worker-src 'self'` (no `blob:`); `trusted-types default`; a `default` policy with `createScriptURL` only, allowing an exact list of our worker URLs; every other sink still throws. The OCR worker is our classic wrapper that installs the same policy before `importScripts`.
+  3. **pdf.js settings:** same-origin `workerPort`; `enableXfa: false`, `disableFontFace: true`, `useSystemFonts: false`; self-hosted cMap, font, wasm and ICC URLs; no text or annotation layer; render with `AnnotationMode.ENABLE`. Canvas size capped (longest side 4,000 px; scale about 2× for OCR).
+  4. **Tesseract settings:** `workerBlobURL: false`, `cacheMethod: 'none'`, LSTM only, languages `ukr+rus+eng`; input only a canvas or `ImageData`.
+  5. **Flow:** an accepted PDF keeps its `File` in memory until its `ocr_pages` are done. The form renders only those pages, recognizes them one at a time (at most one OCR job in the whole form), shows "Recognizing page N of M…", and can be cancelled by removing the file. Recognized text becomes blocks (`part` = `body`, `page` = N) merged into the file's extraction in page order; `ocr_pages` is then empty. At most 30 OCR pages per file; more → the file is rejected with `too_many_ocr_pages`.
+  6. **Confidence:** per page; below 60 → material warning `ocr_low_confidence` (shown with icon and text); every OCR page gets warning `ocr_used` (not material).
+  7. Assets load lazily (only when a file needs OCR). The OCR text goes through the same caps as server text (characters, blocks).
+  8. Tests (Vitest): orchestration with mocked pdf.js and Tesseract modules (order, one job at a time, cancel, caps, confidence warnings, merge into extraction); the asset script (copies only allowed files, hash check fails on mismatch); `_headers` policy test updated; a Trusted Types policy test (allowed URLs pass, any other URL throws).
+- Threats: T1, T5, T8, T9.
 
 ### S3-T6 Google Docs by public link (outline)
 
