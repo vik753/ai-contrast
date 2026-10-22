@@ -27,6 +27,12 @@
     },
     "uvicorn.access": {
       "level": "WARNING"
+    },
+    "httpx": {
+      "level": "WARNING"
+    },
+    "httpcore": {
+      "level": "WARNING"
     }
   },
   "root": {
