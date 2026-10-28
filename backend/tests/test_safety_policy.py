@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0912
+# ruff: noqa: E501, PLR0911, PLR0912
 """S5b-T2 AC3: AST policy for the type gate (ADR 0008 point 3, ADR 0015 point 5).
 
 Outside ``app/pseudo/gate.py``, in a module that uses a gate type: no constructor
