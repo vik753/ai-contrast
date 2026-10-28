@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.textclean import clean_text
 from tests.pseudo_helpers import detect_blocks
 
 CORPUS_DIR = Path(__file__).resolve().parent / "fixtures" / "pseudo"
@@ -50,7 +51,8 @@ def test_corpus_fixture_spans_are_value_forms_in_the_input(path: Path) -> None:
     fixture = _load(path)
     for entity in fixture["expected"]["entities"]:
         for b, s, e in entity["spans"]:
-            assert fixture["blocks"][b]["text"][s:e] in entity["value_forms"], (entity, b, s, e)
+            cleaned = clean_text(fixture["blocks"][b]["text"]).text
+            assert cleaned[s:e] in entity["value_forms"], (entity, b, s, e)
 
 
 @pytest.mark.parametrize("path", PATHS, ids=IDS)
