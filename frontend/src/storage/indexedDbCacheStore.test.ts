@@ -235,7 +235,9 @@ describe("two tabs on one IDBFactory (AC6a)", () => {
             return request;
           };
         }
-        return typeof value === "function" ? value.bind(target) : value;
+        return typeof value === "function"
+          ? (value as (...a: unknown[]) => unknown).bind(target)
+          : value;
       },
     });
     const store = new IndexedDbCacheStore({ factory: racing, clock: () => T0, storage });

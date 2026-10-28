@@ -69,7 +69,15 @@ function confirmButton(dialog: HTMLElement): HTMLElement {
 }
 
 const cancelButton = (d: HTMLElement) => within(d).getByRole("button", { name: /cancel/i });
-const count = (n: number) => screen.getByText(new RegExp(`(^|\\D)${n}(\\D|$)`));
+// The footer text ("AGPL-3.0 license") also contains digits, so ignore the footer.
+const count = (n: number): HTMLElement => {
+  const found = screen
+    .getAllByText(new RegExp(`(^|\\D)${n}(\\D|$)`))
+    .filter((el) => el.closest("footer") === null);
+  const first = found[0];
+  if (!first) throw new Error(`no count line with ${n}`);
+  return first;
+};
 
 let factory: IDBFactory;
 beforeEach(() => {

@@ -52,7 +52,9 @@ function spyFactory(factory: IDBFactory, log: string[]): IDBFactory {
           return target.deleteDatabase(name);
         };
       }
-      return typeof value === "function" ? value.bind(target) : value;
+      return typeof value === "function"
+        ? (value as (...a: unknown[]) => unknown).bind(target)
+        : value;
     },
   });
 }
@@ -157,7 +159,9 @@ describe("createCacheStore (AC6)", () => {
             };
           }
           const value: unknown = Reflect.get(target, prop, target);
-          return typeof value === "function" ? value.bind(target) : value;
+          return typeof value === "function"
+            ? (value as (...a: unknown[]) => unknown).bind(target)
+            : value;
         },
       }),
     );
@@ -185,7 +189,9 @@ describe("createCacheStore (AC6)", () => {
             };
           }
           const value: unknown = Reflect.get(target, prop, target);
-          return typeof value === "function" ? value.bind(target) : value;
+          return typeof value === "function"
+            ? (value as (...a: unknown[]) => unknown).bind(target)
+            : value;
         },
       }),
     );
@@ -318,7 +324,9 @@ describe("clearAllData (AC7)", () => {
           return undefined;
         }
         const value: unknown = Reflect.get(target, prop, target);
-        return typeof value === "function" ? value.bind(target) : value;
+        return typeof value === "function"
+          ? (value as (...a: unknown[]) => unknown).bind(target)
+          : value;
       },
     });
     vi.stubGlobal("indexedDB", noList);
@@ -357,7 +365,9 @@ describe("clearAllData (AC7)", () => {
             };
           }
           const value: unknown = Reflect.get(target, prop, target);
-          return typeof value === "function" ? value.bind(target) : value;
+          return typeof value === "function"
+            ? (value as (...a: unknown[]) => unknown).bind(target)
+            : value;
         },
       }),
     );
