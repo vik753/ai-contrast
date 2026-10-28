@@ -36,10 +36,11 @@ from app.pseudo.lexicon import (
     is_obligation,
     is_role,
 )
+from app.pseudo.lines import amount_or_date_follows
 from app.pseudo.matching import View, build_view, fold
 from app.pseudo.names import Names
 from app.pseudo.tables import CURRENCY_SIGNS
-from app.segment.model import Clause
+from app.segment.model import Clause, LineAction
 
 __all__ = ["DetectedEntity", "Detection", "TooManyIdentifiersError", "detect"]
 
@@ -68,7 +69,7 @@ class DetectedEntity:
 class Detection:
     texts: list[str]
     entities: list[DetectedEntity] = field(default_factory=list)
-    requisites: list[tuple[str, list[tuple[tuple[int, int, int], str]]]] = field(
+    requisites: list[tuple[str, list[tuple[tuple[int, int, int], LineAction]]]] = field(
         default_factory=list
     )
     neutralized: list[tuple[int, int, int]] = field(default_factory=list)
@@ -107,7 +108,7 @@ def detect(texts: Sequence[str], clauses: Sequence[Clause]) -> Detection:
     requisites = _requisites_ranges(view, clauses)
     hits = Hits()
     contacts.scan_all(view.low, hits)
-    lines.scan_lines(view, hits, _in_ranges(view, requisites))
+    lines.scan_lines(view, hits, _in_ranges(view, requisites), _same_clause(view, index))
     names = Names(view, hits)
     names.pass_one()
     names.pass_two()
@@ -194,6 +195,19 @@ def _in_ranges(view: View, ranges: tuple[list[int], list[int]]) -> Callable[[int
         return index >= 0 and g < ends[index]
 
     return inside
+
+
+def _same_clause(view: View, index: _ClauseIndex) -> Callable[[int, int], bool]:
+    def clause_at(position: int) -> str | None:
+        g = view.g_start(position)
+        block = bisect_right(view.bases, g) - 1
+        return index.find(block, g - view.bases[block])
+
+    def same(first: int, second: int) -> bool:
+        clause = clause_at(first)
+        return clause is not None and clause == clause_at(second)
+
+    return same
 
 
 # --------------------------------------------------------------------- resolve
@@ -356,7 +370,7 @@ def _decide_requisites(
             base = view.bases[block]
             mask[base + start : base + end] = b"\x01" * (end - start)
     for clause in targets:
-        decided: list[tuple[tuple[int, int, int], str]] = []
+        decided: list[tuple[tuple[int, int, int], LineAction]] = []
         for block, start, end in clause.spans:
             decided.extend(_decide_span(view, clause, block, start, end, mask))
         result.requisites.append((clause.id, decided))
@@ -366,10 +380,10 @@ def _decide_requisites(
 
 def _decide_span(  # noqa: PLR0913, PLR0917
     view: View, clause: Clause, block: int, start: int, end: int, mask: bytearray
-) -> list[tuple[tuple[int, int, int], str]]:
+) -> list[tuple[tuple[int, int, int], LineAction]]:
     text = view.g
     base = view.bases[block]
-    decided: list[tuple[tuple[int, int, int], str]] = []
+    decided: list[tuple[tuple[int, int, int], LineAction]] = []
     position = start
     while position <= end:
         newline = text.find("\n", base + position, base + end)
@@ -380,7 +394,9 @@ def _decide_span(  # noqa: PLR0913, PLR0917
         while last > first and text[base + last - 1].isspace():
             last -= 1
         if first < last and not _is_heading(clause, block, first, last):
-            action = "drop" if _droppable(text, base + first, base + last, mask) else "keep"
+            action: LineAction = (
+                "drop" if _droppable(text, base + first, base + last, mask) else "keep"
+            )
             decided.append(((block, first, last), action))
         position = line_end + 1
     return decided
@@ -393,8 +409,36 @@ def _is_heading(clause: Clause, block: int, first: int, last: int) -> bool:
     )
 
 
+def _has_condition(line: str) -> bool:
+    """An amount, a percent, a date, a unit or an obligation marker is in the line.
+
+    ``line`` is the folded text of the whole line; masked characters count too, so a mask
+    cannot hide a condition from the check.
+    """
+    position = 0
+    size = len(line)
+    while position < size:
+        if line[position] in CURRENCY_SIGNS:
+            return True
+        matched = _WORD.match(line, position)
+        if matched is None:
+            position += 1
+            continue
+        end = matched.end()
+        word = line[position:end]
+        if word.isdigit():
+            if amount_or_date_follows(line, position, end, size):
+                return True
+        elif is_obligation(word) and word not in REQUISITES_LABELS:
+            return True
+        position = end
+    return False
+
+
 def _droppable(text: str, first: int, last: int, mask: bytearray) -> bool:
-    """Every letter and digit of the line is in an entity, a label or a role word."""
+    """No condition in the line; every letter and digit is in an entity, a label or a role."""
+    if _has_condition(fold(text[first:last])):
+        return False
     position = first
     while position < last:
         char = text[position]

@@ -37,7 +37,10 @@ from app.pseudo.lexicon import (
     AMOUNT_WORDS,
     CONTEXT_KINDS,
     DEFINITION_OPENERS,
+    STRONG_AMOUNT_WORDS,
     is_document_word,
+    is_obligation,
+    is_role,
 )
 from app.pseudo.matching import View, fold
 from app.pseudo.tables import CURRENCY_SIGNS, IBAN_LENGTHS
@@ -45,6 +48,19 @@ from app.pseudo.tables import CURRENCY_SIGNS, IBAN_LENGTHS
 _RUN: Final = re.compile(r"[^\W_]+")
 _GAP: Final = re.compile(r"[\W_]+")
 _DOC_VALUE: Final = re.compile(r"[^\W_](?:[^\W_]|[/\-.](?=[^\W_])){0,39}")
+_DATE: Final = re.compile(r"[0-9]{1,2}[./][0-9]{1,2}[./][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2}")
+_MAX_TOKEN: Final = 40
+_MAX_TAIL: Final = 80
+_TAX_LENGTHS: Final = frozenset({8, 10, 12, 13, 15})
+_MAX_TAX: Final = 15
+_MAX_GROUPS: Final = 8
+_IBAN_GAPS: Final = (" ", "-")
+_UA_MOBILE: Final = frozenset(
+    (
+        *("039", "050", "063", "066", "067", "068", "073"),
+        *("091", "092", "093", "094", "095", "096", "097", "098", "099"),
+    )
+)
 _PLATE_UA: Final = re.compile(r"[abcehkmoptxyавекмнопстух]{2}[0-9]{4}[abcehkmoptxyавекмнопстух]{2}")
 _PLATE_RU: Final = re.compile(
     r"[abcehkmoptxyавекмнопстух][0-9]{3}[abcehkmoptxyавекмнопстух]{2}(?:[0-9]{2,3})?"
@@ -96,6 +112,24 @@ _DAY_MAX: Final = 31
 _MONTH_MAX: Final = 12
 
 
+def amount_or_date_follows(low: str, start: int, end: int, limit: int) -> bool:
+    """The number ``low[start:end]`` starts a date or is followed by a percent, a currency
+    sign or a money, time or weight word."""
+    if _DATE.match(low, start, limit) is not None:
+        return True
+    after = end
+    if after < limit and low[after] == " ":
+        after += 1
+    if after >= limit:
+        return False
+    if low[after] in CURRENCY_SIGNS:
+        return True
+    stop = after
+    while stop < limit and stop - after < _MAX_TOKEN and low[stop].isalnum():
+        stop += 1
+    return low[after:stop] in STRONG_AMOUNT_WORDS
+
+
 def runs_of(text: str, start: int, end: int) -> tuple[array[int], array[int]]:
     """Starts and ends of the letter/digit runs of ``text[start:end]``."""
     starts: array[int] = array("i")
@@ -113,7 +147,12 @@ def runs_of(text: str, start: int, end: int) -> tuple[array[int], array[int]]:
     return starts, ends
 
 
-def scan_lines(view: View, hits: Hits, in_requisites: Callable[[int], bool]) -> None:
+def scan_lines(
+    view: View,
+    hits: Hits,
+    in_requisites: Callable[[int], bool],
+    same_clause: Callable[[int, int], bool],
+) -> None:
     low = view.low
     size = len(low)
     position = 0
@@ -121,22 +160,24 @@ def scan_lines(view: View, hits: Hits, in_requisites: Callable[[int], bool]) -> 
         newline = low.find("\n", position)
         end = size if newline < 0 else newline
         if end > position:
-            _Line(view, hits, in_requisites, position, end).run()
+            _Line(view, hits, in_requisites, same_clause, position, end).run()
         position = end + 1
 
 
 class _Line:
-    def __init__(
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         view: View,
         hits: Hits,
         in_requisites: Callable[[int], bool],
+        same_clause: Callable[[int, int], bool],
         start: int,
         end: int,
     ) -> None:
         self.low = view.low
         self.hits = hits
         self.in_requisites = in_requisites
+        self.same_clause = same_clause
         self.ls = start
         self.le = end
         self.st, self.en = runs_of(self.low, start, end)
@@ -251,6 +292,8 @@ class _Line:
             return 0
         if length == 3 and index + 3 < n and self._lens(index, (3, 3, 3, 2)):  # noqa: PLR2004
             return self._snils(index)
+        if length == 3 and index + 3 < n and self._lens(index, (3, 3, 2, 2)):  # noqa: PLR2004
+            return self._domestic_phone(index, word)
         if length == 2 and index + 2 < n and self._lens(index, (2, 2, 4), "."):  # noqa: PLR2004
             if self.near("dob", index, 8):
                 return self._add_range(PERSONAL_DOC, NORMAL, index, index + 2)
@@ -280,6 +323,19 @@ class _Line:
         key = "".join(c for c in self.low[start:end] if c.isalnum())
         self.hits.add(cls, precision, start, end, key)
         return last + 1
+
+    def _domestic_phone(self, index: int, word: str) -> int:
+        """``050 123 45 67``: a local mobile number written in groups."""
+        near = self.near("phone", index)
+        if word[0] != "0" or not (near or word in _UA_MOBILE or self.in_requisites(self.st[index])):
+            return 0
+        if self.is_amount(index, index + 3):
+            return 0
+        digits = "".join(self.text(index + k) for k in range(4))
+        self.hits.add(
+            PHONE, HIGH if near else NORMAL, self.st[index], self.en[index + 3], digits[-9:]
+        )
+        return index + 4
 
     def _snils(self, index: int) -> int:
         digits = "".join(self.text(index + k) for k in range(4))
@@ -430,12 +486,20 @@ class _Line:
             return False
         compact = word
         last = index
-        while len(compact) < expected and last + 1 < self.n and self.gap(last) == " ":
+        while len(compact) < expected and last + 1 < self.n and self.gap(last) in _IBAN_GAPS:
             following = self.text(last + 1)
             if len(compact) + len(following) > expected or not following.isalnum():
                 break
             compact += following
             last += 1
+        end = self.en[last]
+        crossed = False
+        if len(compact) < expected and last + 1 >= self.n:
+            more = self._next_line_tail(last, expected - len(compact))
+            if more is not None:
+                compact += more[0]
+                end = more[1]
+                crossed = True
         if len(compact) != expected:
             return False
         upper = compact.upper()
@@ -445,13 +509,40 @@ class _Line:
             if checksums.iban_valid(substituted):
                 upper, valid = substituted, True
         if valid:
-            self._add(ACCOUNT, HIGH, index, last, upper)
+            self.hits.add(ACCOUNT, HIGH, self.st[index], end, upper)
         elif self.near("iban", index, 3):
-            self._add(ACCOUNT, NORMAL, index, last, upper)
+            self.hits.add(ACCOUNT, NORMAL, self.st[index], end, upper)
         else:
             return False
-        self.skip_to = last
+        self.skip_to = self.n if crossed else last
         return True
+
+    def _next_line_tail(self, last: int, need: int) -> tuple[str, int] | None:
+        """The rest of an IBAN on the next line of the same clause: its text and end."""
+        low = self.low
+        if self.low[self.en[last] : self.le].strip(" ") or self.le + 1 >= len(low):
+            return None
+        start = self.le + 1
+        if not self.same_clause(self.en[last] - 1, start):
+            return None
+        line_end = low.find("\n", start)
+        line_end = len(low) if line_end < 0 else line_end
+        starts, ends = runs_of(low, start, min(line_end, start + _MAX_TAIL))
+        if not starts or starts[0] - start > 2:  # noqa: PLR2004
+            return None
+        text = ""
+        end = start
+        for k, (run_start, run_end) in enumerate(zip(starts, ends, strict=True)):
+            if k and low[ends[k - 1] : run_start] not in _IBAN_GAPS:
+                break
+            piece = low[run_start:run_end]
+            if len(text) + len(piece) > need or not piece.isalnum():
+                break
+            text += piece
+            end = run_end
+            if len(text) == need:
+                return text, end
+        return None
 
     # ---------------------------------------------------------- document number
 
@@ -592,9 +683,23 @@ class _Line:
     def _address_end(self, start: int) -> int:
         limit = min(self.le, start + _MAX_ADDRESS)
         for index in range(start, limit):
-            if self._address_stops_at(index, start):
+            if self._address_stops_at(index, start) or self._token_stops_at(index, start):
                 return index
         return limit
+
+    def _token_stops_at(self, index: int, start: int) -> bool:
+        """An obligation marker, a role word, an amount, a percent or a date ends the address."""
+        low = self.low
+        if not low[index].isalnum() or (index > start and low[index - 1].isalnum()):
+            return False
+        end = index
+        limit = min(self.le, index + _MAX_TOKEN)
+        while end < limit and low[end].isalnum():
+            end += 1
+        word = low[index:end]
+        if word.isdigit():
+            return amount_or_date_follows(low, index, end, self.le)
+        return is_obligation(word) or is_role(word)
 
     def _address_stops_at(self, index: int, start: int) -> bool:
         low = self.low
@@ -652,6 +757,47 @@ class _Line:
         )
         self.skip_to = max(self.skip_to, bisect_left(self.st, end) - 1)
 
+    def _tax_groups(self, index: int) -> None:
+        """A tax code in digit groups after its keyword: ``34 12 34 56``, ``31234-56789``."""
+        first = index + 1
+        while first < self.n and self.text(first) in _FILL_NUMBER:
+            first += 1
+        if first + 1 >= self.n or not self.text(first).isdigit():
+            return
+        if len(self.text(first)) in _TAX_LENGTHS:
+            return
+        digits = ""
+        best = -1
+        last = first
+        while last < self.n and last < first + _MAX_GROUPS:
+            piece = self.text(last)
+            if not piece.isdigit() or (last > first and self.gap(last - 1) not in (" ", "-")):
+                break
+            digits += piece
+            if len(digits) > _MAX_TAX:
+                break
+            if last > first and len(digits) in _TAX_LENGTHS:
+                best = last
+                if self._tax_valid(digits):
+                    break
+            last += 1
+        if best < 0:
+            return
+        value = "".join(self.text(k) for k in range(first, best + 1))
+        precision = HIGH if self._tax_valid(value) else NORMAL
+        self.hits.add(TAX_ID, precision, self.st[first], self.en[best], value)
+        self.skip_to = max(self.skip_to, best)
+
+    @staticmethod
+    def _tax_valid(digits: str) -> bool:
+        return {
+            8: checksums.edrpou_valid,
+            10: lambda value: checksums.rnokpp_valid(value) or checksums.inn10_valid(value),
+            12: checksums.inn12_valid,
+            13: checksums.ogrn_valid,
+            15: checksums.ogrnip_valid,
+        }[len(digits)](digits)
+
     def _serial(self, index: int) -> None:
         following = index + 1
         if following >= self.n:
@@ -674,4 +820,5 @@ _LABELS: Final[dict[str, Callable[[_Line, int], None]]] = {
     "address": _Line._address,
     "health": _Line._health,
     "serial": _Line._serial,
+    "tax": _Line._tax_groups,
 }

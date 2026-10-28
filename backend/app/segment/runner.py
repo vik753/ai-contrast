@@ -12,12 +12,13 @@ from __future__ import annotations
 import logging
 import time
 from collections import Counter
-from typing import Final, Self
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from app.extraction.model import EXTRACTION_TIMEOUT, ExtractionError
 from app.extraction.sandbox import SandboxLimits, run_child
+from app.pseudo.hits import MAX_ENTITIES, MAX_SPANS
 from app.segment.model import (
     SEGMENT_FAILED,
     SEGMENT_TIMEOUT,
@@ -29,9 +30,6 @@ from app.segment.model import (
 from app.segment.segmenter import SegmentError, SegmentLimits
 
 logger = logging.getLogger("ai_contrast.segment")
-
-MAX_ENTITIES: Final = 5_000
-MAX_SPANS: Final = 50_000
 
 
 class _ChildReply(BaseModel):

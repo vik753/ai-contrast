@@ -78,7 +78,7 @@ def _detected(core: SegmentCore) -> SegmentResult:
         requisites=[
             RequisitesClause(
                 clause=clause,
-                lines=[RequisitesLine(span=span, action=action) for span, action in lines],  # type: ignore[arg-type]
+                lines=[RequisitesLine(span=span, action=action) for span, action in lines],
             )
             for clause, lines in detection.requisites
         ],

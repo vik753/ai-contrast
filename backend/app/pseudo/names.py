@@ -27,6 +27,7 @@ from app.pseudo.lexicon import (
     PERSON_TRIGGERS,
     SOLE_TRADER,
     is_not_name,
+    is_obligation,
     is_patronymic,
     is_role,
     is_title,
@@ -72,6 +73,7 @@ class Names:
         self.org_phrase: dict[str, str] = {}
         self.org_first: dict[str, str] = {}
         self.org_multi: dict[str, list[tuple[tuple[str, ...], str]]] = {}
+        self.org_single: dict[str, str] = {}
         self._fold: dict[str, str] = {}
         self._stem: dict[str, str] = {}
 
@@ -129,6 +131,8 @@ class Names:
         canon = self.org_phrase.setdefault(phrase, phrase)
         if stems:
             self.org_first.setdefault(stems[0], canon)
+            if len(stems) == 1:
+                self.org_single.setdefault(stems[0], canon)
             if len(stems) >= 2:  # noqa: PLR2004
                 self.org_multi.setdefault(stems[0], []).append((stems, canon))
         self.hits.add(ORG, precision, start, end, canon)
@@ -338,8 +342,38 @@ class Names:
             return index + 1
         end, count = self._initials_after(we[last], le)
         end = end if count else we[last]
+        if not count and len(run) == 1:
+            given = self._comma_given(le, ws, we, last)
+            if given is not None:
+                self.add_person(
+                    ws[run[0]],
+                    we[given],
+                    self.u[ws[run[0]] : we[run[0]]],
+                    self.u[ws[given] : we[given]],
+                )
+                return given + 1
         self._register_run(ws, we, run, ws[run[0]], end, count > 0)
         return last + 1
+
+    def _comma_given(self, le: int, ws: array[int], we: array[int], last: int) -> int | None:
+        """``DOE, JANE``: the index of the given name after "Surname, ", or ``None``."""
+        u = self.u
+        nxt = last + 1
+        if nxt >= len(ws) or u[we[last] : ws[nxt]] != ", " or ws[nxt] >= le:
+            return None
+        word = u[ws[nxt] : we[nxt]]
+        if not self.name_word(word) or self.s[ws[nxt] : we[nxt]] in LEGAL_PREFIX | LEGAL_SUFFIX:
+            return None
+        if self.is_covered(ws[nxt], we[nxt]):
+            return None
+        after = nxt + 1
+        if (
+            after < len(ws)
+            and self.adjacent(we[nxt], ws[after])
+            and self.name_word(u[ws[after] : we[after]])
+        ):
+            return None  # a longer run of words: not "Surname, Given"
+        return nxt
 
     def _initials_name(self, ls: int, le: int, ws: array[int], we: array[int], index: int) -> int:
         end, count = self._initials_after(we[index], le)
@@ -584,12 +618,25 @@ class Names:
         while last > first and u[last - 1] == " ":
             last -= 1
         ws, we = words_of(u, first, last)
+        stop = next(
+            (k for k in range(len(ws)) if is_obligation(self.folded(u[ws[k] : we[k]]))), None
+        )
+        hit_end = close + 1
+        if stop is not None:
+            # The line goes on with an obligation: the signature ends before it.
+            if stop == 0:
+                return
+            last = ws[stop]
+            while last > first and u[last - 1] == " ":
+                last -= 1
+            hit_end = last
+            ws, we = ws[:stop], we[:stop]
         capital = [k for k in range(len(ws)) if u[ws[k]].isupper()]
         if not capital or any(ch.isdigit() for ch in u[first:last]):
             return
         key = "".join(c for c in fold(u[first:last]) if c.isalnum())
-        self.hits.add(SIGNATURE, NORMAL, start, close + 1, key)
-        self.mark(start, close + 1)
+        self.hits.add(SIGNATURE, NORMAL, start, hit_end, key)
+        self.mark(start, hit_end)
         long_words = [
             u[ws[k] : we[k]]
             for k in range(len(ws))
@@ -631,7 +678,13 @@ class Names:
             return self._known_person(ls, le, ws, we, index, canon)
         candidates = self.org_multi.get(key)
         if candidates:
-            return self._known_org(ws, we, index, candidates)
+            done = self._known_org(ws, we, index, candidates)
+            if done > index + 1:
+                return done
+        single = self.org_single.get(key)
+        if single is not None:
+            self.hits.add(ORG, NORMAL, ws[index], we[index], single)
+            self.mark(ws[index], we[index])
         return index + 1
 
     def _known_person(  # noqa: PLR0913, PLR0917

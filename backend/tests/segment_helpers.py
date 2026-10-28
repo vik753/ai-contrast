@@ -72,8 +72,13 @@ DETECTOR_WARNINGS = frozenset(
 )
 
 
-def warning_codes(data: dict[str, Any]) -> list[str]:
-    return sorted(w["code"] for w in data["warnings"] if w["code"] not in DETECTOR_WARNINGS)
+def warning_codes(data: dict[str, Any], include_detector: bool = False) -> list[str]:
+    """Sorted warning codes; the detector's own codes only on request."""
+    return sorted(
+        w["code"]
+        for w in data["warnings"]
+        if include_detector or w["code"] not in DETECTOR_WARNINGS
+    )
 
 
 def cover_problems(data: dict[str, Any]) -> list[str]:

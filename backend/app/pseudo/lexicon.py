@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import hashlib
 import unicodedata
+from functools import lru_cache
 from typing import Final
 
 from app.pseudo import tables
 from app.pseudo.confusable_table import UNICODE_VERSION
 from app.pseudo.matching import LATIN_TO_CYRILLIC, SKELETON, fold
 
-RULES_VERSION: Final = "1"
+RULES_VERSION: Final = "2"
 
 
 def _runs(text: str) -> tuple[str, ...]:
@@ -73,9 +74,22 @@ DOCUMENT_STEMS: Final = frozenset(fold(word) for word in tables.DOCUMENT_WORDS)
 PERSON_TRIGGERS: Final = frozenset(_keyword(t) for t in tables.PERSON_TRIGGERS)
 DEFINITION_OPENERS: Final = frozenset(_keyword(t) for t in tables.DEFINITION_OPENERS)
 DEFINITION_FILLERS: Final = frozenset(fold(word) for word in tables.DEFINITION_FILLERS)
-OBLIGATIONS: Final = tuple(fold(word) for word in tables.OBLIGATION_MARKERS)
+_EXACT_MARKERS: Final = frozenset({"may", "will", "should", "must", "pays", "shall"})
+_FOLDED_MARKERS: Final = tuple(fold(word) for word in tables.OBLIGATION_MARKERS)
+# Short markers ("не", "no", "must") match the whole word; longer ones are stems.
+OBLIGATION_WORDS: Final = frozenset(
+    marker
+    for marker in _FOLDED_MARKERS
+    if len(marker) <= 3 or marker in _EXACT_MARKERS  # noqa: PLR2004
+)
+OBLIGATIONS: Final = tuple(marker for marker in _FOLDED_MARKERS if marker not in OBLIGATION_WORDS)
 REQUISITES_LABELS: Final = frozenset(fold(word) for word in tables.REQUISITES_LABELS)
 AMOUNT_WORDS: Final = frozenset(fold(word) for word in tables.AMOUNT_WORDS)
+# Units that also appear in plain addresses ("12 кв. 5"); they do not count as an amount there.
+_AMBIGUOUS_UNITS: Final = frozenset(
+    fold(word) for word in ("кв", "л", "k", "м2", "m2", "м3", "m3", "куб", "мм", "см", "mm", "cm")
+)
+STRONG_AMOUNT_WORDS: Final = AMOUNT_WORDS - _AMBIGUOUS_UNITS
 ABBREVIATIONS: Final = frozenset(fold(word) for word in tables.ADDRESS_ABBREVIATIONS)
 ADDRESS_STARTS: Final = frozenset(fold(word) for word in tables.ADDRESS_STARTS)
 TLDS: Final = frozenset(tables.TLDS)
@@ -83,12 +97,14 @@ PATRONYMICS: Final = tuple(sorted({e.lower() for e in tables.PATRONYMIC_ENDINGS}
 STEM_ENDINGS: Final = tuple(
     sorted({e.replace("y", "i") for e in tables.STEM_ENDINGS}, key=len, reverse=True)
 )
+_CACHE: Final = 8192
 _MAX_SUFFIX: Final = 4
 _MAX_DOCUMENT_SUFFIX: Final = 6
 _MIN_STEM: Final = 3
 _MIN_PATRONYMIC_WORD: Final = 5
 
 
+@lru_cache(maxsize=_CACHE)
 def is_role(word: str) -> bool:
     """``word`` (folded) is a role word, also in a case form."""
     return any(
@@ -98,6 +114,7 @@ def is_role(word: str) -> bool:
     )
 
 
+@lru_cache(maxsize=_CACHE)
 def is_title(word: str) -> bool:
     return any(
         word.startswith(stem) and len(word) - len(stem) <= _MAX_SUFFIX
@@ -106,6 +123,7 @@ def is_title(word: str) -> bool:
     )
 
 
+@lru_cache(maxsize=_CACHE)
 def is_document_word(word: str) -> bool:
     return any(
         word.startswith(stem) and len(word) - len(stem) <= _MAX_DOCUMENT_SUFFIX
@@ -114,14 +132,19 @@ def is_document_word(word: str) -> bool:
     )
 
 
+@lru_cache(maxsize=_CACHE)
 def is_not_name(word: str) -> bool:
     return word in NOT_NAMES or is_role(word) or is_title(word)
 
 
+@lru_cache(maxsize=_CACHE)
 def is_obligation(word: str) -> bool:
-    return any(word.startswith(marker) for marker in OBLIGATIONS if marker[0] == word[:1])
+    return word in OBLIGATION_WORDS or any(
+        word.startswith(marker) for marker in OBLIGATIONS if marker[0] == word[:1]
+    )
 
 
+@lru_cache(maxsize=_CACHE)
 def is_patronymic(word: str) -> bool:
     """A patronymic (any case form), Cyrillic or Latin; ``word`` is NFKC, any case."""
     lower = word.lower()
@@ -137,6 +160,8 @@ def stem_key(word: str) -> str:
     then it is transliterated, lower-cased and cut at a known case ending.
     """
     lower = word.lower().replace("’", "'")
+    if lower.endswith("'s") and len(lower) > _MIN_STEM + 2:
+        lower = lower[:-2]  # possessive: Smith's
     if any("Ѐ" <= char <= "ӿ" for char in lower):
         lower = "".join(chr(LATIN_TO_CYRILLIC.get(ord(c), ord(c))) for c in lower)
     latin = "".join(tables.TRANSLITERATION.get(char, char) for char in lower)

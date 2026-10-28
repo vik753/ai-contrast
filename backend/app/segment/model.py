@@ -40,6 +40,7 @@ SegmentChildError = Literal[
     "clause_too_long",
     "too_many_identifiers",
 ]
+LineAction = Literal["drop", "keep"]
 EntityClass = Literal[
     "ORG",
     "PERSON",
@@ -110,7 +111,7 @@ class Entity(_Strict):
 
 class RequisitesLine(_Strict):
     span: Span
-    action: Literal["drop", "keep"]
+    action: LineAction
 
 
 class RequisitesClause(_Strict):
