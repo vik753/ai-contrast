@@ -139,9 +139,17 @@ def _segment(data: bytes, header: dict[str, object]) -> bytes:
     )
 
 
+def _safety(data: bytes, header: dict[str, object]) -> bytes:
+    from app.safety.child import run  # noqa: PLC0415 - after the limits
+
+    return run(data, max_clauses=_non_negative(header, "safety_max_clauses"))
+
+
 def _extract(kind: str, data: bytes, header: dict[str, object]) -> bytes:
     if kind == "segment":
         return _segment(data, header)
+    if kind == "safety":
+        return _safety(data, header)
     from app.extraction.model import (  # noqa: PLC0415 - after the limits
         ExtractionError,
         ExtractionResult,
