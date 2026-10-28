@@ -276,8 +276,12 @@ def test_symbol_short_code_mapped() -> None:
     assert texts(extract(body_docx(p(r(inner=sym), r(" insured"))))) == ["☑ insured"]
 
 
-def test_private_use_text_without_wingdings_kept() -> None:
-    assert texts(extract(body_docx(p(r(" x"))))) == [" x"]
+def test_private_use_text_without_checkbox_meaning_removed() -> None:
+    # ADR 0009 Layer 1 (S5-T1b): other private-use code points are removed and reported.
+    result = extract(body_docx(p(r("\ue000 x"))))
+
+    assert texts(result) == ["x"]
+    assert [i.reason for i in result.removed] == ["private_use"]
 
 
 def test_checkbox_without_checked_state_unchecked() -> None:
@@ -795,3 +799,12 @@ def test_line_repeated_inside_one_header_part_kept_once() -> None:
 
     assert texts(result, "header") == [line]
     assert [x.reason for x in result.removed] == ["repeated_header_footer"]
+
+
+def test_wingdings_sym_checkbox_survives_shared_cleaning() -> None:
+    sym = '<w:sym w:font="Wingdings" w:char="F0FD"/>'
+
+    result = extract(body_docx(p(r(inner=sym), r(" excluded"))))
+
+    assert texts(result) == ["☒ excluded"]
+    assert result.removed == []

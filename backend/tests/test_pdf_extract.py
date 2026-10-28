@@ -145,7 +145,7 @@ def test_control_character_removed_and_counted() -> None:
 
     assert "\u0007" not in joined(result)
     assert squashed(result) == "Сторонапогоджуєтьсязумовамидоговору."
-    assert "control_characters" in reasons(result)
+    assert "control_character" in reasons(result)
 
 
 # --- AC2: encryption ----------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """The segmenter: blocks in, clauses out (ADR 0014; threat model T5, T6).
 
-``segment`` is pure and deterministic. It cleans the input (``InputCleaner``), then
+``segment`` is pure and deterministic. It cleans the input (``app.textclean``), then
 assigns every non-white-space character of the cleaned body and non-body blocks to
 exactly one clause, and returns the cleaned blocks once with ``spans`` into them.
 Nothing is rewritten, truncated or dropped; every cap fails closed.
@@ -39,7 +39,6 @@ from typing import Final
 
 from app.extraction.model import Block
 from app.segment import patterns
-from app.segment.clean import InputCleaner
 from app.segment.model import (
     CLAUSE_TOO_LONG,
     NO_TEXT_EXTRACTED,
@@ -51,6 +50,7 @@ from app.segment.model import (
     SegmentWarning,
     Span,
 )
+from app.textclean import TextCleaner
 
 __all__ = ["InputBlock", "SegmentError", "SegmentLimits", "SegmentResult", "segment"]
 
@@ -253,8 +253,8 @@ class _Numbering:
         return False
 
 
-def _clean(blocks: Sequence[InputBlock]) -> tuple[list[Block], InputCleaner]:
-    cleaner = InputCleaner()
+def _clean(blocks: Sequence[InputBlock]) -> tuple[list[Block], TextCleaner]:
+    cleaner = TextCleaner()
     cleaned = [Block(text=cleaner.clean(b.text), part=b.part, page=b.page) for b in blocks]
     return cleaned, cleaner
 
@@ -420,7 +420,7 @@ def segment(blocks: Sequence[InputBlock], *, limits: SegmentLimits) -> SegmentRe
 
 def _result(
     blocks: list[Block],
-    cleaner: InputCleaner,
+    cleaner: TextCleaner,
     entries: list[_Entry],
     warnings: list[tuple[str, _Entry | None]],
 ) -> SegmentResult:
