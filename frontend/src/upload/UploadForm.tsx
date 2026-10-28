@@ -457,6 +457,7 @@ export function UploadForm() {
   // files lose their reference.
   // A `File` just added is in the map before its row is in the state: an effect of an
   // older state must not drop it. Only ids the state has shown (or shows) are dropped.
+  // Only ids the state has shown before (`seen`) or shows now (`present`) are dropped.
   const seenIdsRef = useRef(new Set<string>());
   useEffect(() => {
     const keep = fileIdsToKeep(state);

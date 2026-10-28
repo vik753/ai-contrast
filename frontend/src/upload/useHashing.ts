@@ -21,18 +21,46 @@ import {
 } from "./state";
 import type { GetFile } from "./useOcrScheduler";
 
+/** Longest wait for reading and hashing one file. Later rows must not wait longer. */
+export const HASH_TIMEOUT_MS = 30_000;
+
+/** Hash of the bytes, or `undefined` on error or timeout (the row goes on without one). */
+async function hashFile(blob: File | undefined): Promise<string | undefined> {
+  if (blob === undefined) {
+    return undefined;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(undefined);
+    }, HASH_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([blob.arrayBuffer().then(sha256Hex), timeout]);
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function useHashing(
   state: UploadState,
   dispatch: Dispatch<UploadAction>,
   getFile: GetFile,
 ): void {
-  /** Rows whose byte hash was started: never started twice. */
   const orderRef = useRef<Promise<void>>(Promise.resolve());
+  /** Rows whose byte hash was started: never started twice. Dropped with the row. */
   const fileStartedRef = useRef(new Set<string>());
-  /** Rows whose text hash was started (or failed): never started twice. */
+  /**
+   * Rows whose text hash was started (or failed): never started twice. A failed text
+   * hash is advisory: the row keeps no `textHash`, so `contractTextHash` stays `null`
+   * for its contract. Stage 9 must handle that `null`.
+   */
   const textStartedRef = useRef(new Set<string>());
   const getFileRef = useRef(getFile);
   const aliveRef = useRef(true);
+  const isAlive = (): boolean => aliveRef.current;
 
   useEffect(() => {
     getFileRef.current = getFile;
@@ -58,24 +86,18 @@ export function useHashing(
         continue;
       }
       started.add(row.id);
-      const blob = getFileRef.current(row.id);
-      const work = (async () => {
-        try {
-          return blob === undefined ? undefined : await sha256Hex(await blob.arrayBuffer());
-        } catch {
-          return undefined;
-        }
-      })();
+      // One file at a time (memory): the bytes are read inside the chain, not before it.
       // Results are applied in the order the rows were added, so of two copies the
-      // first one is kept, whatever hash finishes first.
-      const previous = orderRef.current;
-      orderRef.current = (async () => {
-        const hash = await work;
-        await previous;
-        if (aliveRef.current) {
+      // first one is kept.
+      orderRef.current = orderRef.current.then(async () => {
+        if (!started.has(row.id) || !isAlive()) {
+          return; // The row left the state meanwhile: skip the work.
+        }
+        const hash = await hashFile(getFileRef.current(row.id));
+        if (isAlive()) {
           dispatch({ type: "fileHashed", fileId: row.id, ...(hash === undefined ? {} : { hash }) });
         }
-      })();
+      });
     }
   }, [state, dispatch]);
 
