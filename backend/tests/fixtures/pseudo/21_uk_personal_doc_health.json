@@ -1,0 +1,26 @@
+{
+  "name": "21_uk_personal_doc_health",
+  "language": "uk",
+  "description": "PERSONAL_DOC: passport series+number (label 'серія' excluded), date of birth, ID card number, driver licence. TAX_ID: УНЗР (contains date of birth). HEALTH: diagnosis of a named insured person (span = the diagnosis phrase after 'діагноз').",
+  "blocks": [
+    {"text": "3.1. Паспорт: серія АА № 123456; дата народження 14.03.1985.", "part": "body", "page": null},
+    {"text": "3.2. ID-картка № 123456789, посвідчення водія ВХА 123456.", "part": "body", "page": null},
+    {"text": "3.3. УНЗР 19850314-12345.", "part": "body", "page": null},
+    {"text": "4.1. Застрахована особа Гончар Олена Миколаївна має діагноз цукровий діабет 2 типу.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["АА № 123456"], "spans": [[0, 20, 31]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["14.03.1985"], "spans": [[0, 49, 59]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["123456789"], "spans": [[1, 17, 26]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["ВХА 123456"], "spans": [[1, 46, 56]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["19850314-12345"], "spans": [[2, 10, 24]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Гончар Олена Миколаївна"], "spans": [[3, 24, 47]]},
+      {"class": "HEALTH", "precision": "normal", "value_forms": ["цукровий діабет 2 типу"], "spans": [[3, 60, 82]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Застрахована особа", "Паспорт"]
+  }
+}

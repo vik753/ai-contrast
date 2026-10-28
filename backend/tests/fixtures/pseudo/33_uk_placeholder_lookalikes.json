@@ -1,0 +1,17 @@
+{
+  "name": "33_uk_placeholder_lookalikes",
+  "language": "uk",
+  "description": "Placeholder look-alikes in the source. Block 0: ASCII '[ORG_2]' and '[A.PERSON_1]'. Block 1: skeleton variants with a Cyrillic О (U+041E) in '[ОRG_3]' and a Cyrillic А (U+0410) in '[А.ORG_1]' (written as \\u escapes in the JSON). Spans in 'neutralized' include the brackets; the returned blocks have the brackets replaced by U+27E6/U+27E7 with the same length. Block 2: ordinary square brackets are not look-alikes.",
+  "blocks": [
+    {"text": "5.1. Сума виплати визначається згідно з [ORG_2] та [A.PERSON_1] без обмежень.", "part": "body", "page": null},
+    {"text": "5.2. Див. [ОRG_3] і [А.ORG_1].", "part": "body", "page": null},
+    {"text": "5.3. Маска [ключ] і [1] не є заміною.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [[0, 40, 47], [0, 51, 63], [1, 10, 17], [1, 20, 29]],
+    "warnings": ["placeholder_lookalike"],
+    "must_not_mask": ["[ключ]", "[1]"]
+  }
+}

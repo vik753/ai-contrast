@@ -1,0 +1,22 @@
+{
+  "name": "12_en_iban_vat_card",
+  "language": "en",
+  "description": "EN account data: foreign IBANs (GB, DE; public documentation examples), BIC, VAT number with context (no checksum, normal), Luhn-valid card number (public test number).",
+  "blocks": [
+    {"text": "Payment shall be made to IBAN GB82 WEST 1234 5698 7654 32, BIC WESTGB2L.", "part": "body", "page": null},
+    {"text": "VAT number DE123456789, card number 4111 1111 1111 1111, IBAN DE89370400440532013000.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["GB82 WEST 1234 5698 7654 32"], "spans": [[0, 30, 57]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["WESTGB2L"], "spans": [[0, 63, 71]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["DE123456789"], "spans": [[1, 11, 22]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["4111 1111 1111 1111"], "spans": [[1, 36, 55]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["DE89370400440532013000"], "spans": [[1, 62, 84]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": []
+  }
+}

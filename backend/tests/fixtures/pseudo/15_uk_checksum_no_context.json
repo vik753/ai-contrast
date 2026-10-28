@@ -1,0 +1,20 @@
+{
+  "name": "15_uk_checksum_no_context",
+  "language": "uk",
+  "description": "Checksum-valid 8- and 10-digit numbers with no context keyword and no amount marker: a 'normal' TAX_ID proposal the client can unmask. A number with a wrong check digit (21045678) and no context gives nothing.",
+  "blocks": [
+    {"text": "4.1. Сторони погодили значення 21045679 для обліку.", "part": "body", "page": null},
+    {"text": "4.2. Також погоджено 3521741827 як позначення.", "part": "body", "page": null},
+    {"text": "4.3. Номер замовлення 21045678 дійсний до кінця місяця.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["21045679"], "spans": [[0, 31, 39]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["3521741827"], "spans": [[1, 21, 31]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["21045678"]
+  }
+}

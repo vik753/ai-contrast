@@ -1,0 +1,19 @@
+{
+  "name": "25_ru_vehicle",
+  "language": "ru",
+  "description": "VEHICLE in RU: VIN, RU plate with region (Cyrillic letters), ПТС series and number.",
+  "blocks": [
+    {"text": "4.2. Автомобиль, VIN XTA210930Y2765432, госномер А123ВС 77, ПТС 77 ОК 123456.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["XTA210930Y2765432"], "spans": [[0, 21, 38]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["А123ВС 77"], "spans": [[0, 49, 58]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["77 ОК 123456"], "spans": [[0, 64, 76]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Автомобиль", "госномер"]
+  }
+}

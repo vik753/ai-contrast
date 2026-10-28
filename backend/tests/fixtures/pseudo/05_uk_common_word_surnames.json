@@ -1,0 +1,21 @@
+{
+  "name": "05_uk_common_word_surnames",
+  "language": "uk",
+  "description": "Surnames that are common words (Коваль, Мельник): masked when used as a surname (full name, initials), not masked as lowercase common nouns in block 3.",
+  "blocks": [
+    {"text": "Страхувальник — Коваль Микола Петрович, Вигодонабувач — Мельник Оксана Іванівна.", "part": "body", "page": null},
+    {"text": "3.1. Коваль М.П. отримує виплату.", "part": "body", "page": null},
+    {"text": "3.2. Мельник О.І. має право на заміну.", "part": "body", "page": null},
+    {"text": "3.3. Роботи виконує коваль за окремим договором, а зерно мелє мельник.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Коваль Микола Петрович", "Коваль М.П."], "spans": [[0, 16, 38], [1, 5, 16]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Мельник Оксана Іванівна", "Мельник О.І."], "spans": [[0, 56, 79], [2, 5, 17]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["коваль", "мельник", "Страхувальник", "Вигодонабувач"]
+  }
+}

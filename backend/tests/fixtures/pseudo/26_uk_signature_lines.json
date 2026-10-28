@@ -1,0 +1,23 @@
+{
+  "name": "26_uk_signature_lines",
+  "language": "uk",
+  "description": "Signature lines outside a requisites heading. SIGNATURE span = from the underscores to the closing slash; the name inside is also a PERSON entity (overlapping spans on purpose). Block 2: e-signature (КЕП) stamp text with certificate serial; span = the serial.",
+  "blocks": [
+    {"text": "Страховик: ____________ /Петренко О.М./", "part": "body", "page": null},
+    {"text": "Страхувальник: ____________ /Іваненко І.І./", "part": "body", "page": null},
+    {"text": "Підписано КЕП. Серійний номер сертифіката: 5A3F9C21B07D4E88.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Петренко О.М./"], "spans": [[0, 11, 39]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Петренко О.М."], "spans": [[0, 25, 38]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Іваненко І.І./"], "spans": [[1, 15, 43]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Іваненко І.І."], "spans": [[1, 29, 42]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["5A3F9C21B07D4E88"], "spans": [[2, 43, 59]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страховик", "Страхувальник", "Підписано КЕП"]
+  }
+}

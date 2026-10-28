@@ -1,0 +1,18 @@
+{
+  "name": "32_uk_defined_term_name",
+  "language": "uk",
+  "description": "A defined term that equals a masked name: '(далі — «Іваненко»)' is masked too (span = the word inside the guillemets) and a bare 'Іваненко' later joins the same entity.",
+  "blocks": [
+    {"text": "Громадянин Іваненко Петро Олексійович (далі — «Іваненко») уклав цей договір.", "part": "body", "page": null},
+    {"text": "2.1. Іваненко зобов'язаний повідомити Страховика.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Іваненко Петро Олексійович", "Іваненко"], "spans": [[0, 11, 37], [0, 47, 55], [1, 5, 13]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Громадянин", "Страховика"]
+  }
+}

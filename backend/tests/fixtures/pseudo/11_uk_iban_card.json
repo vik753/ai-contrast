@@ -1,0 +1,23 @@
+{
+  "name": "11_uk_iban_card",
+  "language": "uk",
+  "description": "UA IBAN without spaces, IBAN with spaces (grouped by 4), the same IBAN repeated in the spaced form (one entity, two forms), Luhn-valid card number, МФО (6 digits, normal) and SWIFT/BIC (normal).",
+  "blocks": [
+    {"text": "7.1. Рахунок Страховика: IBAN UA863204782600123456789012345, МФО 320478, SWIFT EXMPUA2XXXX.", "part": "body", "page": null},
+    {"text": "7.2. Той самий рахунок з пробілами: UA42 3052 9900 0026 2001 9876 5432 1; картка 4276 3800 1234 5679.", "part": "body", "page": null},
+    {"text": "7.3. Повторно: UA86 3204 7826 0012 3456 7890 1234 5.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["UA863204782600123456789012345", "UA86 3204 7826 0012 3456 7890 1234 5"], "spans": [[0, 30, 59], [2, 15, 51]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["320478"], "spans": [[0, 65, 71]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["EXMPUA2XXXX"], "spans": [[0, 79, 90]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["UA42 3052 9900 0026 2001 9876 5432 1"], "spans": [[1, 36, 72]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["4276 3800 1234 5679"], "spans": [[1, 81, 100]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страховика"]
+  }
+}

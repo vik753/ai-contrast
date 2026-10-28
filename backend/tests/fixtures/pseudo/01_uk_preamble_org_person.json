@@ -1,0 +1,22 @@
+{
+  "name": "01_uk_preamble_org_person",
+  "language": "uk",
+  "description": "UK preamble: legal form plus quoted name, 'в особі' person, defined terms (role words stay), later occurrences with case forms and initials. City-level place of signing is kept.",
+  "blocks": [
+    {"text": "ДОГОВІР СТРАХУВАННЯ", "part": "body", "page": null},
+    {"text": "м. Одеса", "part": "body", "page": null},
+    {"text": "ТОВ «Альфа Захист», в особі директора Петренка Ігоря Миколайовича, що діє на підставі Статуту (далі — Страховик), та громадянин Мельниченко Олег Васильович (далі — Страхувальник) уклали цей договір.", "part": "body", "page": null},
+    {"text": "2.1. ТОВ «Альфа Захист» не відповідає за шкоду, завдану Мельниченку О.В. умисно.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Альфа Захист»"], "spans": [[2, 0, 18], [3, 5, 23]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Петренка Ігоря Миколайовича"], "spans": [[2, 38, 65]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Мельниченко Олег Васильович", "Мельниченку О.В."], "spans": [[2, 128, 155], [3, 56, 72]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страховик", "Страхувальник", "Статуту", "Одеса"]
+  }
+}

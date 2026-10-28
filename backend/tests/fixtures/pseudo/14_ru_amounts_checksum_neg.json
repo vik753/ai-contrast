@@ -1,0 +1,19 @@
+{
+  "name": "14_ru_amounts_checksum_neg",
+  "language": "ru",
+  "description": "Negative control. Checksum-valid digit strings (12345678, 7712345671, 38126404) written as amounts, with currency or unit, plus percentages, terms and dates. Nothing is masked.",
+  "blocks": [
+    {"text": "2.1. Арендная плата составляет 12 345 678 руб. в месяц.", "part": "body", "page": null},
+    {"text": "2.2. Залог — 7712345671 рублей.", "part": "body", "page": null},
+    {"text": "2.3. Штраф 0,5 % за каждый день, но не более 20 %.", "part": "body", "page": null},
+    {"text": "2.4. Срок оплаты — 10 рабочих дней, площадь помещения — 38126404 кв. м.", "part": "body", "page": null},
+    {"text": "2.5. Оплата производится до 05.02.2027.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["12 345 678 руб.", "7712345671 рублей", "0,5 %", "20 %", "10 рабочих дней", "38126404 кв. м", "05.02.2027"]
+  }
+}

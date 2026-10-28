@@ -1,0 +1,21 @@
+{
+  "name": "02_ru_preamble_org_person",
+  "language": "ru",
+  "description": "RU preamble: ООО with quoted name, 'в лице' female representative, defined terms stay, later occurrences with Russian case forms and initials.",
+  "blocks": [
+    {"text": "ДОГОВОР АРЕНДЫ ОФИСА", "part": "body", "page": null},
+    {"text": "ООО «Север Консалт», в лице генерального директора Сидоровой Анны Петровны, действующей на основании Устава (далее — Арендодатель), и гражданин Громов Павел Иванович (далее — Арендатор) заключили настоящий договор.", "part": "body", "page": null},
+    {"text": "3.2. ООО «Север Консалт» не отвечает за вред, причиненный Громовым П.И.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["ООО «Север Консалт»"], "spans": [[1, 0, 19], [2, 5, 24]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Сидоровой Анны Петровны"], "spans": [[1, 51, 74]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Громов Павел Иванович", "Громовым П.И."], "spans": [[1, 144, 165], [2, 58, 71]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Арендодатель", "Арендатор", "Устава"]
+  }
+}

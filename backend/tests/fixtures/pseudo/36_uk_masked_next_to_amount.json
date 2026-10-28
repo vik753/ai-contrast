@@ -1,0 +1,17 @@
+{
+  "name": "36_uk_masked_next_to_amount",
+  "language": "uk",
+  "description": "A masked name directly followed by an amount: the clause gets the warning masked_next_to_amount. The amount itself is not masked.",
+  "blocks": [
+    {"text": "4.1. Виплата Іваненку І.І. 25 000 грн здійснюється одразу.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Іваненку І.І."], "spans": [[0, 13, 26]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": ["masked_next_to_amount"],
+    "must_not_mask": ["25 000 грн"]
+  }
+}

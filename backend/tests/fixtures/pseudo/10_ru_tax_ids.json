@@ -1,0 +1,24 @@
+{
+  "name": "10_ru_tax_ids",
+  "language": "ru",
+  "description": "RU tax identifiers with context: ИНН 10 and 12 digits, КПП (no checksum, so normal), ОГРН, ОКПО, ОГРНИП, СНИЛС. Checksummed codes with context are high.",
+  "blocks": [
+    {"text": "1.1. ИНН 7712345671, КПП 771201001, ОГРН 1027700123450, ОКПО 21045679.", "part": "body", "page": null},
+    {"text": "1.2. ИНН физического лица 504712345623, ОГРНИП 316774600012348, СНИЛС 112-233-445 95.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["7712345671"], "spans": [[0, 9, 19]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["771201001"], "spans": [[0, 25, 34]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["1027700123450"], "spans": [[0, 41, 54]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["21045679"], "spans": [[0, 61, 69]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["504712345623"], "spans": [[1, 26, 38]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["316774600012348"], "spans": [[1, 47, 62]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["112-233-445 95"], "spans": [[1, 70, 84]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["физического лица"]
+  }
+}

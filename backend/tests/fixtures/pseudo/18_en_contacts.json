@@ -1,0 +1,19 @@
+{
+  "name": "18_en_contacts",
+  "language": "en",
+  "description": "EN contacts: international phone (reserved fictional 555 range), obfuscated email with (at), URL.",
+  "blocks": [
+    {"text": "Contact: Tel +1 202 555 0143, mail john.rose(at)example.org, web https://example.org/help.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PHONE", "precision": "high", "value_forms": ["+1 202 555 0143"], "spans": [[0, 13, 28]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["john.rose(at)example.org"], "spans": [[0, 35, 59]]},
+      {"class": "URL", "precision": "high", "value_forms": ["https://example.org/help"], "spans": [[0, 65, 89]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Contact", "Tel", "mail", "web"]
+  }
+}
