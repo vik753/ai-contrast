@@ -24,7 +24,7 @@
     "@tesseract.js-data/ukr": "1.0.0",
     "i18next": "26.4.4",
     "pdfjs-dist": "6.4.299",
-    "react": "19.3.0",
+    "react": "19.3.1",
     "react-dom": "19.3.0",
     "react-i18next": "17.0.16",
     "tesseract.js": "7.0.0",
