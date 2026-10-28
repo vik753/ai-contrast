@@ -25,7 +25,7 @@ const DIGEST = "a".repeat(64);
 
 function run(status: number, reply: unknown) {
   const fetchImpl = vi.fn(() => Promise.resolve(jsonResponse(status, reply)));
-  return { fetchImpl, result: safety.checkSafety(DOC, { fetchImpl: fetchImpl as never }) };
+  return { fetchImpl, result: safety.checkSafety(DOC, { fetchImpl }) };
 }
 
 describe("request", () => {
@@ -42,7 +42,7 @@ describe("request", () => {
     const { fetchImpl, result } = run(200, { ok: true, detector_version: "det-1", digest: DIGEST });
     await result;
     const init = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1];
-    expect(JSON.parse(String(init.body))).toEqual({
+    expect(JSON.parse(init.body as string)).toEqual({
       label: "A",
       detector_version: "det-1",
       clauses: DOC.clauses,
@@ -140,7 +140,7 @@ describe("answers", () => {
 
   it("test_network_failure_is_a_network_error", async () => {
     const r = await safety.checkSafety(DOC, {
-      fetchImpl: (() => Promise.reject(new TypeError("down"))) as never,
+      fetchImpl: () => Promise.reject(new TypeError("down")),
     });
     expect(r).toMatchObject({ ok: false, code: "network_error" });
   });

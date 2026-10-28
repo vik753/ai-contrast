@@ -16,12 +16,12 @@ import { jsonResponse } from "./upload-fakes";
 import type { WireBlock } from "./segment-fakes";
 import { body, segmentReply } from "./segment-fakes";
 
-export type WireEntity = {
+export interface WireEntity {
   id: string;
   class: string;
   precision: string;
   spans: [number, number, number][];
-};
+}
 
 /** Every occurrence of `needle` in block `index`, as wire spans (code points = UTF-16 here). */
 export function occurrences(
@@ -38,6 +38,28 @@ export function occurrences(
     throw new Error(`fixture: ${needle} not in block ${String(index)}`);
   }
   return out;
+}
+
+/** The JSON string body of a request (all JSON requests of the client are strings). */
+function bodyText(init?: RequestInit): string {
+  const body = init?.body;
+  if (typeof body !== "string") {
+    throw new Error("expected a JSON string body");
+  }
+  return body;
+}
+
+/**
+ * Offsets of the `n`-th `needle` in MASKED clause text. `acknowledged_unmasked` and the
+ * `unmasked_identifier` spans use these offsets (the server sees only masked text).
+ */
+export function maskedSpan(maskedText: string, needle: string, n = 0): [number, number] {
+  let at = -1;
+  for (let i = 0; i <= n; i += 1) {
+    at = maskedText.indexOf(needle, at + 1);
+    if (at < 0) throw new Error(`fixture: ${needle} not in masked text`);
+  }
+  return [at, at + needle.length];
 }
 
 export const DETECTOR_VERSION = "det-2026-10-28";
@@ -128,11 +150,11 @@ export function installRouter(handlers: {
     recorded.push({ url, body: init?.body });
     if (url.includes("/api/safety-check")) {
       return Promise.resolve(
-        handlers.safety(JSON.parse(String(init?.body)) as Record<string, unknown>),
+        handlers.safety(JSON.parse(bodyText(init)) as Record<string, unknown>),
       );
     }
     if (url.includes("/api/segment")) {
-      const parsed = JSON.parse(String(init?.body)) as { blocks: WireBlock[] };
+      const parsed = JSON.parse(bodyText(init)) as { blocks: WireBlock[] };
       return Promise.resolve(handlers.segment(parsed.blocks));
     }
     if (url.includes("/api/extract")) {
@@ -141,4 +163,12 @@ export function installRouter(handlers: {
     return Promise.reject(new Error(`unexpected request to ${url}`));
   });
   return recorded;
+}
+
+/** Narrows `undefined`/`null` away, or fails the test with a clear message. */
+export function must<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error("fixture: expected a value");
+  }
+  return value;
 }

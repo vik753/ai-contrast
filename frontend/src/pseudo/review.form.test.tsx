@@ -25,6 +25,8 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import i18next from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import enJson from "../i18n/locales/en.json";
+import ruJson from "../i18n/locales/ru.json";
+import ukJson from "../i18n/locales/uk.json";
 import { resetBrowserEnv } from "../test/browser-env";
 import { flattenLocale } from "../test/locale-utils";
 import {
@@ -35,6 +37,8 @@ import {
   SECRETS,
   fixtureReply,
   installRouter,
+  maskedSpan,
+  must,
   occurrences,
   type RecordedRequest,
 } from "../test/pseudo-fakes";
@@ -164,7 +168,11 @@ function assertNoLeak(extraAllowed: string[] = []) {
       }
     }
   }
-  const store = JSON.stringify([{ ...localStorage }, { ...sessionStorage }, location.href]);
+  const store = JSON.stringify([
+    Object.entries(localStorage),
+    Object.entries(sessionStorage),
+    location.href,
+  ]);
   const logs = JSON.stringify(consoleCalls);
   const live = Array.from(document.querySelectorAll("[aria-live], [role=status], [role=alert]"))
     .map((e) => e.textContent)
@@ -187,7 +195,7 @@ describe("labels and the mandatory step", () => {
   it("test_labels_follow_contract_order_and_reach_the_safety_check", async () => {
     await renderForm();
     act(() => {
-      fireEvent.click(screen.getAllByRole("button", { name: /add contract/i })[0] as HTMLElement);
+      fireEvent.click(must(screen.getAllByRole("button", { name: /add contract/i })[0]));
     });
     await load("A");
     await load("B", DOC_B, FILE_B);
@@ -391,10 +399,12 @@ describe("unmask and manual masking", () => {
     await renderForm();
     await load();
     const review = await open();
-    click(button(marks(review, "e1")[1] as HTMLElement, "pseudo.unmaskOne"));
+    click(button(must(marks(review, "e1")[1]), "pseudo.unmaskOne"));
     await confirm(review);
-    const [, s, e] = occurrences(BLOCKS, 0, "John Smith")[1] as number[];
-    expect(safetyBodies[0]?.acknowledged_unmasked).toEqual([["c1", s, e]]);
+    const masked = (safetyBodies[0]?.clauses as { text: string }[])[0]?.text ?? "";
+    const [ms, me] = maskedSpan(masked, "John Smith");
+    expect(safetyBodies[0]?.acknowledged_unmasked).toEqual([["c1", ms, me]]);
+    expect(ms).not.toBe(occurrences(BLOCKS, 0, "John Smith")[1]?.[1]); // masked offset differs
     expect((safetyBodies[0]?.clauses as { text: string }[])[0]?.text).toContain(
       "[A.PERSON_1] agree. John Smith pays",
     );
@@ -404,12 +414,12 @@ describe("unmask and manual masking", () => {
     await renderForm();
     await load();
     const review = await open();
-    const clause3 = review.querySelector<HTMLElement>('[data-clause-id="c3"]') as HTMLElement;
+    const clause3 = must(review.querySelector<HTMLElement>('[data-clause-id="c3"]'));
     const node = clause3.firstChild as Text; // "Ref code " is plain text before the tax id
     const range = document.createRange();
     range.setStart(node, 4);
     range.setEnd(node, 8);
-    const sel = window.getSelection() as Selection;
+    const sel = must(window.getSelection());
     sel.removeAllRanges();
     sel.addRange(range);
     act(() => {
@@ -461,7 +471,8 @@ describe("safety-check flow", () => {
   });
 
   it("test_unmasked_identifier_premasks_spans_and_requires_second_confirmation", async () => {
-    const [, s, e] = occurrences(BLOCKS, 0, "30 days")[0] as number[];
+    const [s, e] = maskedSpan(EXPECTED_MASKED[0] ?? "", "30 days"); // masked-text offsets
+    expect(s).not.toBe(occurrences(BLOCKS, 0, "30 days")[0]?.[1]);
     let n = 0;
     safety = () =>
       n++ === 0 ? jsonResponse(422, { error: "unmasked_identifier", spans: [["c1", s, e]] }) : OK();
@@ -483,7 +494,7 @@ describe("safety-check flow", () => {
   });
 
   it("test_second_confirmation_is_not_automatic_after_unmasked_identifier", async () => {
-    const [, s, e] = occurrences(BLOCKS, 0, "30 days")[0] as number[];
+    const [s, e] = maskedSpan(EXPECTED_MASKED[0] ?? "", "30 days");
     safety = () => jsonResponse(422, { error: "unmasked_identifier", spans: [["c1", s, e]] });
     await renderForm();
     await load();
@@ -579,7 +590,8 @@ describe("safety-check flow", () => {
     const review = await open();
     click(button(within(review).getByTestId("pseudo-entity-e3"), "pseudo.unmaskAll"));
     await confirm(review);
-    const spans = occurrences(BLOCKS, 0, "ACME LLC").map(([, s, e]) => ["c1", s, e]);
+    const masked = (safetyBodies[0]?.clauses as { text: string }[])[0]?.text ?? "";
+    const spans = [0, 1].map((n) => ["c1", ...maskedSpan(masked, "ACME LLC", n)]);
     expect(safetyBodies[0]?.acknowledged_unmasked).toEqual(spans);
   });
 });
@@ -602,12 +614,12 @@ describe("readiness reset", () => {
 
   it("test_manual_mask_after_ok_resets_readiness", async () => {
     const review = await ready();
-    const clause3 = review.querySelector<HTMLElement>('[data-clause-id="c3"]') as HTMLElement;
+    const clause3 = must(review.querySelector<HTMLElement>('[data-clause-id="c3"]'));
     const node = clause3.firstChild as Text;
     const range = document.createRange();
     range.setStart(node, 0);
     range.setEnd(node, 3);
-    const sel = window.getSelection() as Selection;
+    const sel = must(window.getSelection());
     sel.removeAllRanges();
     sel.addRange(range);
     act(() => {
@@ -636,7 +648,7 @@ describe("nothing leaks", () => {
     await renderForm();
     await load();
     const review = await open();
-    click(button(marks(review, "e2")[0] as HTMLElement, "pseudo.unmaskOne"));
+    click(button(must(marks(review, "e2")[0]), "pseudo.unmaskOne"));
     await confirm(review);
     assertNoLeak(["Beta Inc"]);
   });
@@ -660,15 +672,12 @@ describe("languages", () => {
     // Open first: `open` finds the region by its English name "Contract A".
     const review = await open();
     await i18next.changeLanguage(lng);
-    const flat = flattenLocale((await import(`../i18n/locales/${lng}.json`)).default) as Record<
-      string,
-      string
-    >;
+    const flat = flattenLocale(lng === "uk" ? ukJson : ruJson) as Record<string, string>;
     expect(flat["pseudo.everythingCorrect"]).not.toBe(t("pseudo.everythingCorrect"));
     expect(
-      within(review).getByRole("button", { name: flat["pseudo.everythingCorrect"] as string }),
+      within(review).getByRole("button", { name: must(flat["pseudo.everythingCorrect"]) }),
     ).toBeTruthy();
-    expect(review.textContent).toContain(flat["pseudo.class.ORG"] as string);
+    expect(review.textContent).toContain(must(flat["pseudo.class.ORG"]));
     expect(ENTITIES.length).toBeGreaterThan(0);
   });
 });

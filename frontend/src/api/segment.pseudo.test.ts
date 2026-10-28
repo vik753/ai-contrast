@@ -39,7 +39,7 @@ describe("new segment fields", () => {
     "test_segment_reply_missing_%s_is_invalid_response",
     async (key) => {
       const reply = fixtureReply();
-      delete reply[key];
+      Reflect.deleteProperty(reply, key);
       expect(await call(reply)).toEqual({ ok: false, code: "invalid_response" });
     },
   );

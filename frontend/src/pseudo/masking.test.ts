@@ -22,6 +22,8 @@ import {
   BLOCKS,
   ENTITIES,
   EXPECTED_MASKED,
+  maskedSpan,
+  must,
   occurrences,
   parsedFixture,
 } from "../test/pseudo-fakes";
@@ -29,8 +31,7 @@ import * as masking from "./masking";
 
 const texts = (r: unknown) => masking.maskedClauses(r as never).map((c) => c.text);
 const start = async () => masking.startReview(await parsedFixture(), "A");
-const at = (b: number, needle: string, n = 0) =>
-  occurrences(BLOCKS, b, needle)[n] as [number, number, number];
+const at = (b: number, needle: string, n = 0) => must(occurrences(BLOCKS, b, needle)[n]);
 
 describe("placeholders and masked text", () => {
   it("test_masked_text_equals_expected_for_fixture", async () => {
@@ -153,18 +154,24 @@ describe("unmasking rules", () => {
 
   it("test_acknowledged_unmasked_lists_clause_relative_spans_of_unmasked_occurrences", async () => {
     const r = masking.unmaskOccurrence(await start(), "e1", 1);
-    const [, s, e] = at(0, "John Smith", 1);
+    // Offsets are in the MASKED clause text (the server sees only that).
+    const masked = texts(r)[0] ?? "";
+    const [s, e] = maskedSpan(masked, "John Smith");
     expect(masking.acknowledgedUnmasked(r)).toEqual([["c1", s, e]]);
+    // Earlier placeholders change the length: the original offset is a different number.
+    expect(s).not.toBe(at(0, "John Smith", 1)[1]);
   });
 
   it("test_acknowledged_unmasked_after_unmask_entity_is_sorted_and_complete", async () => {
     const r = masking.unmaskEntity(await start(), "e3");
-    const a = at(0, "ACME LLC", 0);
-    const b = at(0, "ACME LLC", 1);
+    const masked = texts(r)[0] ?? "";
+    const a = maskedSpan(masked, "ACME LLC", 0);
+    const b = maskedSpan(masked, "ACME LLC", 1);
     expect(masking.acknowledgedUnmasked(r)).toEqual([
-      ["c1", a[1], a[2]],
-      ["c1", b[1], b[2]],
+      ["c1", a[0], a[1]],
+      ["c1", b[0], b[1]],
     ]);
+    expect(b[0]).not.toBe(at(0, "ACME LLC", 1)[1]);
   });
 
   it("test_acknowledged_unmasked_is_empty_when_nothing_unmasked", async () => {
@@ -231,14 +238,17 @@ describe("manual masking", () => {
 describe("server answers fed back", () => {
   it("test_apply_unmasked_identifiers_remasks_an_unmasked_occurrence", async () => {
     const unmasked = masking.unmaskEntity(await start(), "e3");
-    const [, s, e] = at(0, "ACME LLC", 1);
+    // The server span is in masked text; the client maps it back to the original position.
+    const [s, e] = maskedSpan(texts(unmasked)[0] ?? "", "ACME LLC", 1);
+    expect(s).not.toBe(at(0, "ACME LLC", 1)[1]);
     const r = masking.applyUnmaskedIdentifiers(unmasked, [["c1", s, e]]);
     expect(texts(r)[0]).toContain("pays [A.ORG");
     expect(texts(r)[0]).not.toContain("ACME LLC within");
   });
 
   it("test_apply_unmasked_identifiers_masks_unknown_text_with_a_valid_placeholder", async () => {
-    const [, s, e] = at(0, "30 days");
+    const [s, e] = maskedSpan(EXPECTED_MASKED[0] ?? "", "30 days");
+    expect(s).not.toBe(at(0, "30 days")[1]);
     const r = masking.applyUnmaskedIdentifiers(await start(), [["c1", s, e]]);
     const line = texts(r)[0] ?? "";
     expect(line).not.toContain("30 days");
