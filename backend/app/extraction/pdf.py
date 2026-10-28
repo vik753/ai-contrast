@@ -64,7 +64,7 @@ Steps:
    a non-empty value (``V`` of the widget or its parent fields) → material warning
    ``not_read_annotation``; Hidden and NoView annotations are ignored. An AcroForm
    with ``XFA`` → ``not_read_xfa``.
-9. Shared post-processing: NFC, control characters (``ControlCleaner``), external
+9. Shared post-processing: NFC and invisible and control characters (``app.textclean``), external
    references (``app.extraction.references``), language, caps (characters, blocks,
    ``removed`` and ``warnings`` at most ``MAX_LIST_ITEMS`` each; a cap fails closed
    with ``too_much_text``). Zero blocks and no OCR page → ``no_text_extracted``.
@@ -120,7 +120,7 @@ from app.extraction.model import (
     Removed,
     Warning,
 )
-from app.extraction.normalize import PAGE_NUMBER_LINE, ControlCleaner
+from app.extraction.normalize import PAGE_NUMBER_LINE, normalize_line_breaks
 from app.extraction.pdf_colour import Colour, is_white, luminance
 from app.extraction.pdf_content import OptionalContent
 from app.extraction.pdf_device import (
@@ -134,6 +134,7 @@ from app.extraction.pdf_device import (
 )
 from app.extraction.pdf_document import CheckedDocument, PdfDamagedError
 from app.extraction.references import external_reference_warnings
+from app.textclean import TextCleaner, clean_text
 
 # --- pdfminer logging (AC1) -------------------------------------------------------------------
 
@@ -715,7 +716,7 @@ class _Report:
             return
         if len(self.removed) >= MAX_LIST_ITEMS:
             raise ExtractionError(TOO_MUCH_TEXT)
-        sample = _SPACES.sub(" ", ControlCleaner().clean(head[:HEAD_CHARS])).strip()
+        sample = _SPACES.sub(" ", clean_text(normalize_line_breaks(head[:HEAD_CHARS])).text).strip()
         self.removed.append(Removed(reason=reason, count=count, sample=sample[:MAX_SAMPLE_CHARS]))
 
     def warnings(self, extra: list[Warning]) -> list[Warning]:
@@ -748,7 +749,7 @@ def _repeated_keys(pages: list[_PageText]) -> set[str]:
 def _blocks(  # noqa: PLR0912 - one pass over lines, removals and warnings
     pages: list[_PageText],
     report: _Report,
-    cleaner: ControlCleaner,
+    cleaner: TextCleaner,
     *,
     max_chars: int,
     max_blocks: int,
@@ -777,7 +778,7 @@ def _blocks(  # noqa: PLR0912 - one pass over lines, removals and warnings
                 else:
                     body_chars += len("".join(line.text.split()))
                 kept.append(line.text)
-            text = cleaner.clean(unicodedata.normalize("NFC", "\n".join(kept))).strip()
+            text = cleaner.clean(normalize_line_breaks("\n".join(kept))).strip()
             if not text:
                 continue
             chars += len(text)
@@ -848,7 +849,7 @@ def _extract(
     if _PDFMINER_HANDLER.count:
         report.warn(DAMAGED_PDF)
 
-    cleaner = ControlCleaner()
+    cleaner = TextCleaner()
     blocks, ocr_pages = _blocks(texts, report, cleaner, max_chars=max_chars, max_blocks=max_blocks)
     if not blocks and not ocr_pages:
         raise ExtractionError(NO_TEXT_EXTRACTED)

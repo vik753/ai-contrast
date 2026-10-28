@@ -89,8 +89,10 @@ from app.extraction.model import (
     Removed,
     Warning,
 )
-from app.extraction.normalize import PAGE_NUMBER_LINE, ControlCleaner
+from app.extraction.normalize import PAGE_NUMBER_LINE, normalize_line_breaks
 from app.extraction.references import external_reference_warnings
+from app.textclean import TextCleaner, clean_text
+from app.textclean.symbols import CHECKBOX_GLYPHS, CHECKED, UNCHECKED, WINGDINGS
 
 __all__ = ["DocxLimits", "extract_docx"]
 
@@ -294,13 +296,9 @@ HEAD_CHARS: Final = 2 * MAX_SAMPLE_CHARS
 
 # --- Symbols (ADR 0009 Layer 1) -------------------------------------------------------------
 
-CHECKED: Final = "☒"
-UNCHECKED: Final = "☐"
-CHECKBOX_GLYPHS: Final = "☐☑☒"
 _SYMBOL_BASE: Final = 0xF000
 _BYTE: Final = 0x100
-# Wingdings checkbox glyphs (private-use code points).
-WINGDINGS: Final = {0xF0FE: "☑", 0xF0FD: "☒", 0xF0A8: "☐", 0xF06F: "☐", 0xF078: "☒"}
+# The Wingdings checkbox glyphs live in app.textclean.symbols (one table, ADR 0009).
 # The Symbol font (Adobe Symbol encoding) for code points that differ from ASCII.
 _SYMBOL_CHARS: Final = {
     0x22: "∀", 0x24: "∃", 0x27: "∋", 0x2A: "∗", 0x2D: "−", 0x40: "≅",
@@ -347,7 +345,7 @@ class _Collector:
         self.max_blocks = max_blocks
         self.blocks: list[Block] = []
         self.chars = 0
-        self.cleaner = ControlCleaner()
+        self.cleaner = TextCleaner()
         self.removed: list[Removed] = []
         self.warnings: list[Warning] = []
         self.warned: set[str] = set()
@@ -363,7 +361,7 @@ class _Collector:
             return
         if len(self.removed) >= MAX_LIST_ITEMS:
             raise ExtractionError(TOO_MUCH_TEXT)
-        cleaned = ControlCleaner().clean(head[:HEAD_CHARS])
+        cleaned = clean_text(normalize_line_breaks(head[:HEAD_CHARS])).text
         sample = _SPACES.sub(" ", cleaned).strip()[:MAX_SAMPLE_CHARS]
         self.removed.append(Removed(reason=reason, count=count, sample=sample))
 
@@ -377,7 +375,7 @@ class _Collector:
         self.warnings.append(Warning(code=code, page=None))
 
     def paragraph(self, part: Part, text: str) -> None:
-        text = self.cleaner.clean(text).strip()
+        text = self.cleaner.clean(normalize_line_breaks(text)).strip()
         if not text:
             return
         lines = self.lines.get(part)

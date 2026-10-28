@@ -2,7 +2,7 @@
 
 Form feed (FF) and vertical tab (VT) become ``\\n`` (S3-T1 follow-up from the
 security delta review of PR #20: words must not run together). The Cc rule of
-S3-T1 (other control characters removed and reported as ``control_characters``;
+S3-T1 (other control characters removed and reported as ``control_character``;
 NEL, LS and PS become ``\\n``) also applies to DOCX text.
 
 XML 1.0 cannot carry FF, VT or other C0 controls in ``w:t``, so the DOCX side is
@@ -53,7 +53,7 @@ def test_text_double_ff_splits_blocks() -> None:
 def test_text_other_controls_still_removed() -> None:
     result = extract_text_file(f"{LONG}\x1bend".encode())
 
-    assert reasons(result) == {"control_characters": 1}
+    assert reasons(result) == {"control_character": 1}
 
 
 # --- DOCX: the same rule -----------------------------------------------------------------------
@@ -77,4 +77,4 @@ def test_docx_c1_control_removed_and_reported(char: str) -> None:
     result = extract(body_docx(para(CLAUSE), p(r(f"Clause{char} two."))))
 
     assert char not in joined(result)
-    assert "control_characters" in reasons(result)
+    assert "control_character" in reasons(result)

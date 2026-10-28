@@ -28,7 +28,7 @@ def test_control_character_removed_and_counted() -> None:
 
     assert "\x01" not in _joined(result)
     assert [(r.reason, r.count, r.sample) for r in result.removed] == [
-        ("control_characters", 2, "U+0001")
+        ("control_character", 2, "U+0001")
     ]
 
 
@@ -82,5 +82,5 @@ def test_removed_reported_through_the_api(make_client: Callable[..., TestClient]
 
     assert response.status_code == 200
     assert response.json()["removed"] == [
-        {"reason": "control_characters", "count": 1, "sample": "U+0007"}
+        {"reason": "control_character", "count": 1, "sample": "U+0007"}
     ]

@@ -12,8 +12,9 @@
 4. The shared normalization (``app.extraction.normalize``): line breaks (CR LF,
    CR, NEL U+0085, LS U+2028, PS U+2029, FF and VT) become ``\\n``; other control
    characters (Unicode category Cc, TAB and LF excepted) are removed and reported in
-   ``removed`` (reason ``control_characters``, with a sample of their code points
-   such as ``U+0001``).
+   ``removed`` (reason ``control_character``, with a sample of their code points
+   such as ``U+0001``); the other invisible characters go the same way (ADR 0009
+   Layer 1, ``app.textclean``).
 5. Blocks are split at blank lines (lines with
    only whitespace) and trimmed; empty blocks are dropped. More blocks than
    ``max_blocks`` → ``too_much_text``; no block → ``no_text_extracted``.
@@ -39,8 +40,9 @@ from app.extraction.model import (
     ExtractionError,
     ExtractionResult,
 )
-from app.extraction.normalize import ControlCleaner
+from app.extraction.normalize import normalize_line_breaks
 from app.extraction.references import external_reference_warnings
+from app.textclean import TextCleaner
 
 UTF8_BOM: Final = b"\xef\xbb\xbf"
 UTF16_LE_BOM: Final = b"\xff\xfe"
@@ -110,8 +112,8 @@ def extract_text_file(
     if len(text) > max_chars:
         raise ExtractionError(TOO_MUCH_TEXT)
     _check_controls(text)
-    cleaner = ControlCleaner()
-    text = cleaner.clean(text)
+    cleaner = TextCleaner()
+    text = cleaner.clean(normalize_line_breaks(text))
     blocks = _split_blocks(text, max_blocks)
     if not blocks:
         raise ExtractionError(NO_TEXT_EXTRACTED)
