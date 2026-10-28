@@ -84,7 +84,10 @@ Controls:
 4. API responses carry `Cache-Control: no-store`.
 5. The UI warns that contract text goes to the provider chosen by the client.
 6. Browser (ADR 0013): "Save results in this browser" is off by default; turning it off deletes saved results; "Clear all" removes app keys and databases; 90-day retention; caps fail closed; other tabs stop writing at once (`storage` event, setting re-read before every write); at start-up with history off the database is deleted again. Saved results hold placeholders, never the mapping.
-7. Extracted text is kept in in-memory React state only; never in storage, URLs, logs or announcements; dropped when the file is removed.
+   - **Turning history off is always possible,** also when the store is unavailable: the setting key is removed first, then the database is deleted.
+   - **Rule for stage 10:** the app must subscribe its store to `subscribeHistoryChanges` and switch to `DisabledCacheStore` when the setting changes in another tab.
+   - **Residual risk:** IndexedDB is not encrypted. Anyone with access to the browser profile can read saved results. The UI warns about shared computers. Where `indexedDB.databases()` is missing, "Clear all" deletes only `aic-cache`.
+7. Extracted text is kept in in-memory React state only; never in storage, URLs, logs or announcements; dropped when the file is removed. File hashes and text hashes live only in memory, are dropped with the row and are never sent to the server. Duplicate detection is advisory and fails open (a hash failure shows no warning); it is not a security control.
 8. CI rejects telemetry SDKs, exporters and distros (`opentelemetry-sdk|distro|exporter-*`, `logfire`, `sentry-sdk`) in `uv.lock` until a security review approves one.
 
 ## T4. Malicious files
@@ -188,6 +191,7 @@ Controls:
 8. Tesseract language data and fonts are built into the bundle, not loaded from a CDN. `scripts/copy-ocr-assets.mjs` checks every language file (`4.0.0_best_int`) against a SHA-256 manifest before it copies anything; a mismatch fails the build. `pdfjs-dist` has the optional dependency `@napi-rs/canvas`: it installs native binaries in dev and CI only and is never shipped to the browser.
 9. `frontend/.npmrc` sets `ignore-scripts=true` (do not remove it without security review); npm is pinned with `packageManager`. The Vite dev server is never exposed beyond localhost. The Compose frontend dev container runs as `node` (uid 1000) with a read-only root filesystem, no capabilities, `no-new-privileges` and `npm ci --ignore-scripts`. Residual risk: the `./frontend` bind mount is read-write, so on a Linux host where the developer is uid 1000, dev-server code can change the source tree. Planned mitigation: Compose Watch `sync`.
 10. **Eval secrets (ADR 0009 Layer 6):** the eval never runs on `pull_request`. The GitHub `eval` environment has required reviewers and a deployment branch policy limited to `main` (`workflow_dispatch` runs the workflow file of the dispatched branch). PR-head evals run locally with a separate eval key with a low spending limit, never the production free-model token.
+11. **Test-only code stays out of the bundle:** a CI step after `npm run build` fails if `frontend/dist/` contains `fake-indexeddb` or `FDBFactory` (`fake-indexeddb` 6.2.5 is a dev dependency, imported only in tests).
 
 ## T9. Security headers
 
@@ -242,7 +246,7 @@ Controls:
 6. **Fail-closed safety pass:** a detector version mismatch is rejected (`detector_version_mismatch`); idempotent input cleaning is only a check (`input_not_clean` if it would change anything, offsets never mapped); high-precision hits return `unmasked_identifier` with offsets, the browser pre-masks them and asks for a new confirmation; the server never changes confirmed text silently.
 7. **Type gate:** a frozen dataclass with a runtime sentinel, created only by `safety_pass()`; never a request model; the `AIProvider` port takes no `str`; topics and side text become `PseudonymizedText` or `ConfirmedTopic`; repair never re-sends model output; an AST policy test enforces this, including `__new__` and `object.__setattr__` on gate types.
 8. File names, PDF Info and XMP, DOCX `docProps`, embedded files and Google titles are never parsed into text, never logged, never sent. Uploads are raw bytes (`application/octet-stream`) with no file name in the URL, headers or body (ADR 0010). The browser sends them with `credentials: "omit"`, `redirect: "error"` and `cache: "no-store"`; tests pin these options.
-9. Cache key = SHA-256 of the final masked text plus prompt and model versions.
+9. Cache key = SHA-256 of the final masked text plus prompt and model versions. File and text hashes (stage 4) live only in browser memory, are dropped with the row and are never sent. Duplicate detection is advisory and fails open; it is not a security control.
 10. **AI payload canaries on the wire** under the real `anthropic` and `openai` adapters (httpx `MockTransport`): URL, headers and the whole body, for every AI call type; plus negative checks for logs, SSE, errors, `422` and the browser's outgoing analysis request.
 11. The eval measures recall and precision per class and per language.
 
