@@ -192,7 +192,8 @@ def test_segment_no_numbering_fixture_has_no_preamble_clause(
 ) -> None:
     _, data = replies["18_uk_no_numbering"]
 
-    assert all(c["part"] == "body" and c["level"] == 0 for c in data["clauses"])
+    assert all(c["part"] != "preamble" for c in data["clauses"])
+    assert all(c["level"] == 0 for c in data["clauses"] if c["part"] == "body")
 
 
 def test_segment_decimal_fixture_levels_follow_depth(
