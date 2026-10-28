@@ -3,6 +3,8 @@
  *
  * - At most `MAX_PARALLEL_REQUESTS` checks in flight; the rest stay `queued`.
  * - `check` makes one attempt; this hook retries `busy` (see `checkWithRetry`).
+ * - A file that waits for its hash (`awaitingHash`) is not sent yet, and holds back
+ *   the files after it (display order).
  * - A file that leaves the state (file or contract removed) has its check
  *   aborted and its slot freed. Unmounting aborts every check.
  * - When the effect starts again (remount, StrictMode), `checking` files
@@ -57,9 +59,10 @@ export function useCheckScheduler(
     if (free <= 0) {
       return;
     }
-    const next = filesWithStatus(state, "queued")
-      .filter((file) => !inFlight.has(file.id))
-      .slice(0, free);
+    // Display order is kept: the first file still being hashed holds back those after it.
+    const queued = filesWithStatus(state, "queued").filter((file) => !inFlight.has(file.id));
+    const blocked = queued.findIndex((file) => file.awaitingHash === true);
+    const next = (blocked === -1 ? queued : queued.slice(0, blocked)).slice(0, free);
     for (const { id } of next) {
       const controller = new AbortController();
       inFlight.set(id, controller);

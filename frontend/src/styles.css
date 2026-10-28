@@ -762,3 +762,12 @@ ul {
 .site-footer__link:hover {
   text-decoration-thickness: 2px;
 }
+
+.file-row__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  grid-column: 1 / 2;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}

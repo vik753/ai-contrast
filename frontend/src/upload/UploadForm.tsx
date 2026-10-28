@@ -44,13 +44,18 @@ import {
   fileIdsToKeep,
   initialUploadState,
   needsOcr,
+  hashNotes,
   readiness,
   type Contract,
+  type HashNote,
   type RejectionCode,
   type UploadFile,
 } from "./state";
 import { useCheckScheduler, type CheckFile } from "./useCheckScheduler";
+import { useHashing } from "./useHashing";
 import { useOcrScheduler } from "./useOcrScheduler";
+
+const NO_NOTES: readonly HashNote[] = [];
 
 const ACCEPT = ".pdf,.docx,.txt";
 
@@ -149,12 +154,24 @@ function useLocale(): string {
   return i18n.resolvedLanguage ?? i18n.language;
 }
 
+function noteText(t: TFunction, note: HashNote): string {
+  switch (note.type) {
+    case "sameFileIn":
+      return t("upload.hash.sameFileIn", { label: note.label });
+    case "sameTextHere":
+      return t("upload.hash.sameTextHere");
+    case "sameTextIn":
+      return t("upload.hash.sameTextIn", { label: note.label });
+  }
+}
+
 interface FileRowProps {
   file: UploadFile;
+  notes: readonly HashNote[];
   onRemove: () => void;
 }
 
-function FileRow({ file, onRemove }: FileRowProps) {
+function FileRow({ file, notes, onRemove }: FileRowProps) {
   const { t } = useTranslation();
   const locale = useLocale();
   const name = fileDisplayName(t, file);
@@ -170,6 +187,18 @@ function FileRow({ file, onRemove }: FileRowProps) {
         <FileStatusIcon status={needsOcr(file) ? "checking" : file.status} />
         <span className="file-row__status-text">{statusText(t, file, locale)}</span>
       </span>
+      {notes.length > 0 && (
+        <span className="file-row__notes">
+          {notes.map((note) => {
+            const text = noteText(t, note);
+            return (
+              <span key={text} className="file-row__note">
+                {text}
+              </span>
+            );
+          })}
+        </span>
+      )}
       <button
         type="button"
         className="button button--small file-row__remove"
@@ -184,6 +213,7 @@ function FileRow({ file, onRemove }: FileRowProps) {
 
 interface ContractCardProps {
   contract: Contract;
+  notes: ReadonlyMap<string, readonly HashNote[]>;
   index: number;
   removable: boolean;
   onAddFiles: (contractId: string, files: File[]) => void;
@@ -195,6 +225,7 @@ interface ContractCardProps {
 
 function ContractCard({
   contract,
+  notes,
   index,
   removable,
   onAddFiles,
@@ -284,6 +315,7 @@ function ContractCard({
             <FileRow
               key={file.id}
               file={file}
+              notes={notes.get(file.id) ?? NO_NOTES}
               onRemove={() => {
                 onRemoveFile(contract.id, file.id);
               }}
@@ -417,17 +449,25 @@ export function UploadForm() {
 
   const fileById = useCallback((fileId: string) => filesRef.current.get(fileId), []);
   useOcrScheduler(state, dispatch, fileById);
+  useHashing(state, dispatch, fileById);
+  const notes = useMemo(() => hashNotes(state), [state]);
 
   // Keep a `File` only while it can still be needed: a check (queued or checking,
   // also after a requeue) or OCR. Accepted files without OCR, rejected and removed
   // files lose their reference.
+  // A `File` just added is in the map before its row is in the state: an effect of an
+  // older state must not drop it. Only ids the state has shown (or shows) are dropped.
+  const seenIdsRef = useRef(new Set<string>());
   useEffect(() => {
     const keep = fileIdsToKeep(state);
+    const present = new Set(state.contracts.flatMap((c) => c.files.map((f) => f.id)));
+    const seen = seenIdsRef.current;
     for (const id of filesRef.current.keys()) {
-      if (!keep.has(id)) {
+      if (!keep.has(id) && (present.has(id) || seen.has(id))) {
         filesRef.current.delete(id);
       }
     }
+    seenIdsRef.current = present;
   }, [state]);
 
   // Forget the ID of a row that left the state (row or contract removed).
@@ -491,7 +531,7 @@ export function UploadForm() {
       const id = `file-${nextFileNumberRef.current}`;
       nextFileNumberRef.current += 1;
       filesRef.current.set(id, file);
-      return { id, name: file.name, size: file.size };
+      return { id, name: file.name, size: file.size, hashPending: true };
     });
     dispatch({ type: "filesAdded", contractId, files: specs });
   };
@@ -562,6 +602,7 @@ export function UploadForm() {
           <ContractCard
             key={contract.id}
             contract={contract}
+            notes={notes}
             index={index}
             removable={removable}
             onAddFiles={addFiles}

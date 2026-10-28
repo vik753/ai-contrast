@@ -25,6 +25,9 @@ import {
   MIN_CONTRACTS,
   OCR_LOW_CONFIDENCE,
 } from "./limits";
+import { canonicalJson } from "../hash/key";
+import { normalizeForHash } from "../hash/normalize";
+import { sha256Hex } from "../hash/sha256";
 
 /** Codes of checks made in the browser before any request. */
 export type ClientRejectionCode =
@@ -35,7 +38,8 @@ export type ClientRejectionCode =
   | "pages_unsupported"
   | "legacy_office_unsupported"
   | "too_many_ocr_pages"
-  | "ocr_failed";
+  | "ocr_failed"
+  | "duplicate_file";
 
 export type RejectionCode = ExtractErrorCode | ClientRejectionCode;
 
@@ -52,6 +56,13 @@ interface UploadFileBase {
    * label. The full ID never enters the state (threat model T7).
    */
   readonly googleSuffix?: string;
+  /**
+   * SHA-256 of the file bytes (S4-T1). In memory only; never shown, stored or
+   * sent. Absent for a Google document and while the hash is computed.
+   */
+  readonly fileHash?: string;
+  /** `true` while the browser hashes the bytes: the row stays `queued` until then. */
+  readonly awaitingHash?: true;
 }
 
 export type UploadFile =
@@ -61,6 +72,11 @@ export type UploadFile =
       readonly kind: FileKind;
       /** Extracted text, in memory only (never written to storage). */
       readonly extraction: Extraction;
+      /**
+       * SHA-256 of the normalized text (S4-T1). In memory only. Absent while it is
+       * computed and while OCR still has pages to read.
+       */
+      readonly textHash?: string;
       /** Set while OCR runs: the page being recognized (1-based) of the total. */
       readonly ocr?: OcrProgress;
     })
@@ -96,6 +112,8 @@ export interface FileSpec {
   readonly id: string;
   readonly name: string;
   readonly size: number;
+  /** The form sets this: the row waits (queued) until its bytes are hashed. */
+  readonly hashPending?: boolean;
 }
 
 export type UploadAction =
@@ -105,6 +123,10 @@ export type UploadAction =
   | { type: "contractRemoved"; contractId: string }
   | { type: "filesAdded"; contractId: string; files: readonly FileSpec[] }
   | { type: "fileRemoved"; contractId: string; fileId: string }
+  /** Internal: the bytes of a queued file were hashed (`hash` absent: hashing failed). */
+  | { type: "fileHashed"; fileId: string; hash?: string }
+  /** Internal: the text of an accepted file was hashed. */
+  | { type: "textHashed"; fileId: string; hash: string }
   /** Internal: a queued file was sent to the server. */
   | { type: "fileCheckStarted"; fileId: string }
   /** Internal: `checking` files without a request in flight go back to `queued`. */
@@ -212,7 +234,11 @@ function addFiles(state: UploadState, targetId: string, specs: readonly FileSpec
     if (code === null) {
       activeInContract += 1;
       total += spec.size;
-      added.push({ ...base, status: "queued" });
+      added.push(
+        spec.hashPending === true
+          ? { ...base, status: "queued", awaitingHash: true }
+          : { ...base, status: "queued" },
+      );
     } else {
       added.push({ ...base, status: "rejected", code });
     }
@@ -251,8 +277,33 @@ function addGoogleDoc(
 
 /** The identity of a file without its status data (the label suffix is kept). */
 function baseOf(file: UploadFile): UploadFileBase {
-  const base: UploadFileBase = { id: file.id, name: file.name, size: file.size };
-  return file.googleSuffix === undefined ? base : { ...base, googleSuffix: file.googleSuffix };
+  return {
+    id: file.id,
+    name: file.name,
+    size: file.size,
+    ...(file.googleSuffix === undefined ? {} : { googleSuffix: file.googleSuffix }),
+    ...(file.fileHash === undefined ? {} : { fileHash: file.fileHash }),
+  };
+}
+
+/** A queued file got its byte hash: refuse a copy of a file of the same contract. */
+function applyFileHash(state: UploadState, fileId: string, hash: string | undefined): UploadState {
+  const contract = state.contracts.find((c) => c.files.some((f) => f.id === fileId));
+  const file = contract?.files.find((f) => f.id === fileId);
+  if (contract === undefined || file?.status !== "queued" || file.awaitingHash !== true) {
+    // Removed, or not waiting for a hash any more: drop the result.
+    return state;
+  }
+  const isCopy =
+    hash !== undefined &&
+    contract.files.some((f) => f.id !== fileId && f.status !== "rejected" && f.fileHash === hash);
+  return updateFile(state, fileId, (current) => {
+    if (isCopy) {
+      return rejected(current, "duplicate_file");
+    }
+    const next: UploadFile = { ...baseOf(current), status: "queued" };
+    return hash === undefined ? next : { ...next, fileHash: hash };
+  });
 }
 
 /** Replaces one file wherever it is. Returns `state` itself if nothing changed. */
@@ -393,6 +444,14 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
       return addFiles(state, action.contractId, action.files);
     case "googleDocAdded":
       return addGoogleDoc(state, action.contractId, action.fileId, action.suffix);
+    case "fileHashed":
+      return applyFileHash(state, action.fileId, action.hash);
+    case "textHashed":
+      return updateFile(state, action.fileId, (file) =>
+        file.status === "accepted" && !needsOcr(file) && file.textHash === undefined
+          ? { ...file, textHash: action.hash }
+          : file,
+      );
     case "fileRemoved": {
       const target = state.contracts.find((c) => c.id === action.contractId);
       if (target?.files.some((f) => f.id === action.fileId) !== true) {
@@ -475,4 +534,90 @@ export function readiness(state: UploadState): Readiness {
     return { ready: false, reason: "contract_without_file" };
   }
   return { ready: true, contracts: state.contracts.length };
+}
+
+/** Text that is hashed for an accepted file: blocks in order, joined by a blank line. */
+export function textToHash(file: AcceptedFile): string {
+  return normalizeForHash(file.extraction.blocks.map((b) => b.text).join("\n\n"));
+}
+
+/**
+ * Hash of the text of a contract: the canonical JSON of the ordered text hashes
+ * of its accepted rows. `null` while a row is queued or checking, or while an
+ * accepted row has no text hash yet. Rejected rows are ignored. For stage 9.
+ */
+export async function contractTextHash(contract: Contract): Promise<string | null> {
+  const hashes: string[] = [];
+  for (const file of contract.files) {
+    if (isPending(file)) {
+      return null;
+    }
+    if (file.status === "accepted") {
+      if (file.textHash === undefined) {
+        return null;
+      }
+      hashes.push(file.textHash);
+    }
+  }
+  return sha256Hex(canonicalJson(hashes));
+}
+
+/** A note about a file that also appears elsewhere. Shown in the row, never stored. */
+export type HashNote =
+  | { type: "sameFileIn"; label: string }
+  | { type: "sameTextHere" }
+  | { type: "sameTextIn"; label: string };
+
+/** Notes by file id (only files that have one). Derived from the in-memory hashes. */
+export function hashNotes(state: UploadState): Map<string, HashNote[]> {
+  const notes = new Map<string, HashNote[]>();
+  const add = (id: string, note: HashNote): void => {
+    notes.set(id, [...(notes.get(id) ?? []), note]);
+  };
+  state.contracts.forEach((contract) => {
+    for (const file of contract.files) {
+      if (file.status === "rejected") {
+        continue;
+      }
+      const sameFile = new Set<number>();
+      const sameText = new Set<number>();
+      const sameHere = new Set<number>();
+      state.contracts.forEach((other, index) => {
+        for (const peer of other.files) {
+          if (peer.id === file.id || peer.status === "rejected") {
+            continue;
+          }
+          if (
+            other !== contract &&
+            file.fileHash !== undefined &&
+            peer.fileHash === file.fileHash
+          ) {
+            sameFile.add(index);
+          }
+          if (
+            file.status === "accepted" &&
+            peer.status === "accepted" &&
+            file.textHash !== undefined &&
+            peer.textHash === file.textHash
+          ) {
+            if (other === contract) {
+              sameHere.add(index);
+            } else {
+              sameText.add(index);
+            }
+          }
+        }
+      });
+      for (const index of sameFile) {
+        add(file.id, { type: "sameFileIn", label: contractLabel(index) });
+      }
+      if (sameHere.size > 0) {
+        add(file.id, { type: "sameTextHere" });
+      }
+      for (const index of sameText) {
+        add(file.id, { type: "sameTextIn", label: contractLabel(index) });
+      }
+    }
+  });
+  return notes;
 }
