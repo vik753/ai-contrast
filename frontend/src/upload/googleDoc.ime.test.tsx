@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupI18n } from "../i18n";
 import { resetBrowserEnv } from "../test/browser-env";
 import { FakeFetch } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import { UploadForm } from "./UploadForm";
 
 const LINK = "https://docs.google.com/document/d/DocIdAAAAAAAAAAAAAAAAAAAAabc123/edit";
@@ -14,7 +15,7 @@ let server: FakeFetch;
 beforeEach(() => {
   resetBrowserEnv();
   server = new FakeFetch();
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {

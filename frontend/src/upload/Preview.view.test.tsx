@@ -10,6 +10,7 @@ import { setupI18n } from "../i18n";
 import enJson from "../i18n/locales/en.json";
 import { resetBrowserEnv } from "../test/browser-env";
 import { FakeFetch, fileList, makeFile, okResponse } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import { PREVIEW_CHAR_LIMIT } from "./Preview";
 import { UploadForm } from "./UploadForm";
 
@@ -20,7 +21,7 @@ beforeEach(() => {
   const server = new FakeFetch();
   server.autoRespond = (body) =>
     okResponse("text", (body as Blob).size, { blocks: blocksForNextFile });
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {

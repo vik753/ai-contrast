@@ -20,6 +20,7 @@ import enJson from "../i18n/locales/en.json";
 import { resetBrowserEnv } from "../test/browser-env";
 import { flattenLocale } from "../test/locale-utils";
 import { FakeFetch, fileList, makeFile, okResponse } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import * as UploadFormModule from "./UploadForm";
 
 interface Job {
@@ -80,7 +81,7 @@ beforeEach(() => {
       ocr_pages: pages,
     });
   };
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {
@@ -300,9 +301,13 @@ describe("merge and warnings (AC5, AC6)", () => {
     });
     await settle(jobAt(0), pages);
     const region = screen.getByRole("region", { name: "Contract A" });
-    await waitFor(() => within(region).getByRole("button", { name: "Preview" }));
+    // The preview offers the Clauses view once the split is done (S5-T2): wait, then show Text.
+    await waitFor(() => within(region).getByText(/\d+ clauses?/));
     act(() => {
       fireEvent.click(within(region).getByRole("button", { name: "Preview" }));
+    });
+    act(() => {
+      fireEvent.click(within(region).getByRole("button", { name: "Text" }));
     });
     return region;
   }
