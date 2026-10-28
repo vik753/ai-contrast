@@ -70,6 +70,10 @@ export function segmentReply(
     blocks,
     removed: [],
     warnings: [],
+    detector_version: "det-test",
+    entities: [],
+    requisites: [],
+    neutralized: [],
     ...overrides,
   };
 }

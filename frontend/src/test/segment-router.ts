@@ -32,6 +32,10 @@ function echoReply(body: unknown): Response {
     blocks,
     removed: [],
     warnings: [],
+    detector_version: "det-test",
+    entities: [],
+    requisites: [],
+    neutralized: [],
   });
 }
 
@@ -67,6 +71,10 @@ export function splitActions(file: AcceptedFile): UploadAction[] {
       blocks,
       removed: [],
       warnings: [],
+      detectorVersion: "det-test",
+      entities: [],
+      requisites: [],
+      neutralized: [],
     },
   };
   return [

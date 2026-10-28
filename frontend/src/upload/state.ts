@@ -25,7 +25,7 @@ import {
   MIN_CONTRACTS,
   OCR_LOW_CONFIDENCE,
 } from "./limits";
-import type { Clause, SegmentResult, SegmentWarning } from "../api/segment";
+import type { Clause, Detection, SegmentResult, SegmentWarning } from "../api/segment";
 import { canonicalJson } from "../hash/key";
 import { normalizeForHash } from "../hash/normalize";
 import { sha256Hex } from "../hash/sha256";
@@ -56,6 +56,8 @@ export type SegmentState =
       readonly status: "done";
       readonly clauses: readonly Clause[];
       readonly warnings: readonly SegmentWarning[];
+      /** What the detector found (S5b). In memory only, with the row. */
+      readonly detection: Detection;
     };
 
 export type UploadFileStatus = "queued" | "checking" | "accepted" | "rejected";
@@ -149,6 +151,8 @@ export type UploadAction =
   | { type: "segmentFinished"; fileId: string; result: SegmentResult }
   /** The user asked to send a failed split again. */
   | { type: "segmentRetried"; fileId: string }
+  /** The detector changed (safety check answered `detector_version_mismatch`): split again. */
+  | { type: "segmentsRestarted"; fileIds: readonly string[] }
   /** Internal: the text of an accepted file was hashed. */
   | { type: "textHashed"; fileId: string; hash: string }
   /** Internal: a queued file was sent to the server. */
@@ -468,7 +472,8 @@ function applySegment(file: UploadFile, result: SegmentResult): UploadFile {
   if (!result.ok) {
     return { ...file, segment: { status: "failed", code: result.code } };
   }
-  const { clauses, blocks, removed, warnings } = result.segmentation;
+  const { clauses, blocks, removed, warnings, detectorVersion, entities, requisites, neutralized } =
+    result.segmentation;
   return {
     ...file,
     extraction: {
@@ -476,7 +481,12 @@ function applySegment(file: UploadFile, result: SegmentResult): UploadFile {
       blocks,
       removed: [...file.extraction.removed, ...removed],
     },
-    segment: { status: "done", clauses, warnings },
+    segment: {
+      status: "done",
+      clauses,
+      warnings,
+      detection: { detectorVersion, entities, requisites, neutralized },
+    },
   };
 }
 
@@ -542,6 +552,17 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
           ? withoutSegment(file)
           : file,
       );
+    case "segmentsRestarted": {
+      let next = state;
+      for (const fileId of action.fileIds) {
+        next = updateFile(next, fileId, (file) =>
+          file.status === "accepted" && file.segment?.status === "done"
+            ? withoutSegment(file)
+            : file,
+        );
+      }
+      return next;
+    }
     case "textHashed":
       return updateFile(state, action.fileId, (file) =>
         isSegmented(file) && file.textHash === undefined

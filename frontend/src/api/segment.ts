@@ -63,8 +63,53 @@ export interface SegmentWarning {
   readonly clause: string | null;
 }
 
+/** Identifier classes of ADR 0008 point 1 (the server's `EntityClass`). */
+export const ENTITY_CLASSES = [
+  "ORG",
+  "PERSON",
+  "TAX_ID",
+  "ACCOUNT",
+  "ADDRESS",
+  "PHONE",
+  "EMAIL",
+  "URL",
+  "PERSONAL_DOC",
+  "DOC_NO",
+  "VEHICLE",
+  "SIGNATURE",
+  "HEALTH",
+] as const;
+export type EntityClass = (typeof ENTITY_CLASSES)[number];
+
+/** One identifier of the document: every occurrence, no value string (ADR 0015 point 1). */
+export interface Entity {
+  readonly id: string;
+  readonly cls: EntityClass;
+  readonly precision: "high" | "normal";
+  readonly spans: readonly Span[];
+}
+
+export interface RequisitesLine {
+  readonly span: Span;
+  readonly action: "drop" | "keep";
+}
+
+export interface RequisitesClause {
+  readonly clause: string;
+  readonly lines: readonly RequisitesLine[];
+}
+
+/** What the detector found (S5b). Spans point into the returned blocks. */
+export interface Detection {
+  readonly detectorVersion: string;
+  readonly entities: readonly Entity[];
+  readonly requisites: readonly RequisitesClause[];
+  /** Placeholder look-alikes, already neutralized (`⟦…⟧`) in the returned blocks. */
+  readonly neutralized: readonly Span[];
+}
+
 /** The validated reply. Kept in memory only. */
-export interface Segmentation {
+export interface Segmentation extends Detection {
   readonly clauses: readonly Clause[];
   readonly blocks: readonly Block[];
   readonly removed: readonly RemovedText[];
@@ -89,6 +134,7 @@ const SEGMENT_ERRORS: ErrorTable = new Map<number, ReadonlySet<ServerErrorCode>>
       "no_text_extracted",
       "too_many_clauses",
       "clause_too_long",
+      "too_many_identifiers",
       "segment_failed",
     ]),
   ],
@@ -120,7 +166,29 @@ const CLAUSE_KEYS = [
   "heading_span",
 ] as const;
 const WARNING_KEYS = ["code", "clause"] as const;
-const RESULT_KEYS = ["clauses", "blocks", "removed", "warnings"] as const;
+const RESULT_KEYS = [
+  "clauses",
+  "blocks",
+  "removed",
+  "warnings",
+  "detector_version",
+  "entities",
+  "requisites",
+  "neutralized",
+] as const;
+const ENTITY_KEYS = ["id", "class", "precision", "spans"] as const;
+const REQUISITES_KEYS = ["clause", "lines"] as const;
+const LINE_KEYS = ["span", "action"] as const;
+
+/** Caps equal to the server's (ADR 0015 point 1). */
+export const MAX_ENTITIES = 5_000;
+export const MAX_ENTITY_SPANS = 50_000;
+/** Most spans of different entities that may overlap one position (ORG, PERSON, SIGNATURE…). */
+const MAX_OVERLAP_DEPTH = 8;
+
+const ENTITY_ID = /^e[1-9][0-9]{0,4}$/;
+const VERSION = /^[a-z0-9-]{1,64}$/;
+const CLASS_SET: ReadonlySet<string> = new Set(ENTITY_CLASSES);
 
 const SURROGATE = /[\ud800-\udfff]/;
 
@@ -332,6 +400,152 @@ function parseWarnings(value: unknown, clauses: readonly Clause[]): SegmentWarni
   return warnings;
 }
 
+/** Spans that the detector may put on the same text: a name that is also a company, a signature line. */
+function mayOverlap(a: EntityClass, b: EntityClass): boolean {
+  return (
+    a === "SIGNATURE" ||
+    b === "SIGNATURE" ||
+    (a === "ORG" && b === "PERSON") ||
+    (a === "PERSON" && b === "ORG")
+  );
+}
+
+/**
+ * No two spans of one entity overlap; spans of two entities overlap only for the pairs
+ * of `mayOverlap`. A sweep over the spans in document order; the active set is capped,
+ * so the check stays linear.
+ */
+function noBadOverlap(entities: readonly Entity[]): boolean {
+  const all: { span: Span; owner: number }[] = [];
+  for (const [owner, entity] of entities.entries()) {
+    for (const span of entity.spans) {
+      all.push({ span, owner });
+    }
+  }
+  all.sort((a, b) => a.span[0] - b.span[0] || a.span[1] - b.span[1] || a.span[2] - b.span[2]);
+  let active: { span: Span; owner: number }[] = [];
+  for (const item of all) {
+    active = active.filter(
+      (other) => other.span[0] === item.span[0] && other.span[2] > item.span[1],
+    );
+    for (const other of active) {
+      const a = entities[item.owner];
+      const b = entities[other.owner];
+      if (a === undefined || b === undefined) {
+        return false;
+      }
+      if (item.owner === other.owner || !mayOverlap(a.cls, b.cls)) {
+        return false;
+      }
+    }
+    active.push(item);
+    if (active.length > MAX_OVERLAP_DEPTH) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function parseEntities(value: unknown, lengths: readonly number[]): Entity[] | null {
+  if (!Array.isArray(value) || value.length > MAX_ENTITIES) {
+    return null;
+  }
+  const entities: Entity[] = [];
+  const ids = new Set<string>();
+  let spanCount = 0;
+  for (const item of value as unknown[]) {
+    if (!isPlainObject(item) || !hasExactKeys(item, ENTITY_KEYS)) {
+      return null;
+    }
+    const { id, class: cls, precision, spans: rawSpans } = item;
+    if (
+      typeof id !== "string" ||
+      !ENTITY_ID.test(id) ||
+      ids.has(id) ||
+      typeof cls !== "string" ||
+      !CLASS_SET.has(cls) ||
+      (precision !== "high" && precision !== "normal") ||
+      !Array.isArray(rawSpans) ||
+      rawSpans.length === 0
+    ) {
+      return null;
+    }
+    spanCount += rawSpans.length;
+    if (spanCount > MAX_ENTITY_SPANS) {
+      return null;
+    }
+    const spans: Span[] = [];
+    for (const raw of rawSpans as unknown[]) {
+      const span = parseSpan(raw, lengths);
+      // An empty span would mask nothing.
+      if (span === null || span[2] <= span[1]) {
+        return null;
+      }
+      spans.push(span);
+    }
+    if (!inOrder(spans)) {
+      return null;
+    }
+    ids.add(id);
+    entities.push({ id, cls: cls as EntityClass, precision, spans });
+  }
+  return noBadOverlap(entities) ? entities : null;
+}
+
+function parseRequisites(
+  value: unknown,
+  lengths: readonly number[],
+  clauses: readonly Clause[],
+): RequisitesClause[] | null {
+  if (!Array.isArray(value) || value.length > MAX_CLAUSES) {
+    return null;
+  }
+  const ids = new Set(clauses.map((clause) => clause.id));
+  const out: RequisitesClause[] = [];
+  let lineCount = 0;
+  for (const item of value as unknown[]) {
+    if (!isPlainObject(item) || !hasExactKeys(item, REQUISITES_KEYS)) {
+      return null;
+    }
+    const { clause, lines: rawLines } = item;
+    if (typeof clause !== "string" || !ids.has(clause) || !Array.isArray(rawLines)) {
+      return null;
+    }
+    lineCount += rawLines.length;
+    if (lineCount > MAX_ENTITY_SPANS) {
+      return null;
+    }
+    const lines: RequisitesLine[] = [];
+    for (const raw of rawLines as unknown[]) {
+      if (!isPlainObject(raw) || !hasExactKeys(raw, LINE_KEYS)) {
+        return null;
+      }
+      const span = parseSpan(raw.span, lengths);
+      if (span === null || (raw.action !== "drop" && raw.action !== "keep")) {
+        return null;
+      }
+      lines.push({ span, action: raw.action });
+    }
+    out.push({ clause, lines });
+  }
+  return out;
+}
+
+function parseNeutralized(value: unknown, lengths: readonly number[]): Span[] | null {
+  if (!Array.isArray(value) || value.length > MAX_ENTITY_SPANS) {
+    return null;
+  }
+  const spans: Span[] = [];
+  for (const raw of value as unknown[]) {
+    const span = parseSpan(raw, lengths);
+    if (span === null) {
+      return null;
+    }
+    spans.push(span);
+  }
+  return spans;
+}
+
 /** The `200` body, validated strictly. `null` when anything is off. */
 function parseSegmentation(
   body: Record<string, unknown>,
@@ -365,7 +579,32 @@ function parseSegmentation(
   if (warnings === null || !disjoint(clauses) || !covers(clauses, indexes)) {
     return null;
   }
-  return { ok: true, segmentation: { clauses, blocks, removed, warnings } };
+  const version = body.detector_version;
+  const entities = parseEntities(body.entities, lengths);
+  const requisites = parseRequisites(body.requisites, lengths, clauses);
+  const neutralized = parseNeutralized(body.neutralized, lengths);
+  if (
+    typeof version !== "string" ||
+    !VERSION.test(version) ||
+    entities === null ||
+    requisites === null ||
+    neutralized === null
+  ) {
+    return null;
+  }
+  return {
+    ok: true,
+    segmentation: {
+      clauses,
+      blocks,
+      removed,
+      warnings,
+      detectorVersion: version,
+      entities,
+      requisites,
+      neutralized,
+    },
+  };
 }
 
 /**
@@ -374,7 +613,7 @@ function parseSegmentation(
  * checked against it. Never throws.
  */
 export function segmentBlocks(
-  blocks: readonly Block[],
+  blocks: readonly { text: string; part: string; page: number | null }[],
   pages: number | null,
   options: ExtractOptions = {},
 ): Promise<SegmentResult> {
@@ -392,8 +631,38 @@ export function segmentBlocks(
   );
 }
 
+/** Offset in UTF-16 units of a code point offset of `block`. */
+export function unitOffset(block: Block, codePoint: number): number {
+  const index = indexOf(block);
+  return index.units === null ? codePoint : (index.units[codePoint] ?? index.text.length);
+}
+
+/** Code point offset of a UTF-16 offset of `block` (the unit must start a code point). */
+export function codePointOffset(block: Block, unit: number): number {
+  const index = indexOf(block);
+  if (index.units === null) {
+    return unit;
+  }
+  let low = 0;
+  let high = index.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if ((index.units[mid] ?? 0) < unit) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
+/** Length of a block in code points. */
+export function blockLength(block: Block): number {
+  return indexOf(block).length;
+}
+
 /** The text of a span. */
-function spanText(blocks: readonly Block[], span: Span): string {
+export function spanText(blocks: readonly Block[], span: Span): string {
   const block = blocks[span[0]];
   return block === undefined ? "" : sliceIndex(indexOf(block), span[1], span[2]);
 }

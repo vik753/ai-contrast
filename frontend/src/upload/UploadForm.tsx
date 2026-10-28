@@ -32,7 +32,7 @@ import {
   type DragEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { extractFile } from "../api/extract";
+import { extractFile, isSafetyOnlyCode } from "../api/extract";
 import { extractGoogleDoc, parseGoogleDocLink } from "../api/googleDoc";
 import { segmentBlocks } from "../api/segment";
 import { formReducer, initialFormState, type Announcement } from "./announcements";
@@ -41,6 +41,8 @@ import { displaySize, limitText } from "./format";
 import { fileDisplayName } from "./names";
 import { MAX_FILE_BYTES, MAX_FILES_PER_CONTRACT, MAX_TOTAL_BYTES } from "./limits";
 import { Preview, type PreviewFile } from "./Preview";
+import { PseudoSection } from "../pseudo/PseudoSection";
+import { usePseudoReviews, type PseudoReviews } from "../pseudo/usePseudoReviews";
 import {
   canAddContract,
   canRemoveContract,
@@ -98,6 +100,9 @@ function isLimitCode(code: RejectionCode): code is LimitCode {
 
 /** Message for an error code. Limits come from `limits.ts`, never from the strings. */
 function errorText(t: TFunction, code: RejectionCode, locale: string): string {
+  if (isSafetyOnlyCode(code)) {
+    return t("upload.errors.unknown_error");
+  }
   if (!isLimitCode(code)) {
     return t(`upload.errors.${code}`);
   }
@@ -268,6 +273,7 @@ interface ContractCardProps {
   contract: Contract;
   notes: ReadonlyMap<string, readonly HashNote[]>;
   index: number;
+  pseudo: PseudoReviews;
   removable: boolean;
   onAddFiles: (contractId: string, files: File[]) => void;
   onAddGoogleDoc: (contractId: string, link: string) => GoogleLinkProblem | null;
@@ -281,6 +287,7 @@ function ContractCard({
   contract,
   notes,
   index,
+  pseudo,
   removable,
   onAddFiles,
   onAddGoogleDoc,
@@ -448,6 +455,8 @@ function ContractCard({
 
       {previewFiles.length > 0 && <Preview files={previewFiles} />}
 
+      <PseudoSection label={label} section={pseudo.forContract(contract.id, index)} />
+
       {/* Opened by the button above; hidden from the tab order and from assistive technology. */}
       <input
         ref={inputRef}
@@ -512,6 +521,7 @@ export function UploadForm() {
   const [budget] = useState(createRequestBudget);
   useSegmentScheduler(state, dispatch, segment, budget);
   useCheckScheduler(state, dispatch, check, budget);
+  const pseudo = usePseudoReviews(state, dispatch, budget);
 
   const fileById = useCallback((fileId: string) => filesRef.current.get(fileId), []);
   useOcrScheduler(state, dispatch, fileById);
@@ -675,6 +685,7 @@ export function UploadForm() {
             contract={contract}
             notes={notes}
             index={index}
+            pseudo={pseudo}
             removable={removable}
             onAddFiles={addFiles}
             onAddGoogleDoc={addGoogleDoc}

@@ -57,7 +57,15 @@ export type ServerErrorCode =
   | "too_many_clauses"
   | "clause_too_long"
   | "segment_timeout"
-  | "segment_failed";
+  | "segment_failed"
+  // Pseudonymization (S5b): `/api/segment` and `/api/safety-check`.
+  | "too_many_identifiers"
+  | "detector_version_mismatch"
+  | "input_not_clean"
+  | "invalid_placeholder"
+  | "unmasked_identifier"
+  | "safety_timeout"
+  | "safety_failed";
 
 /** Error codes produced in the browser only. */
 export type ClientErrorCode =
@@ -69,6 +77,21 @@ export type ClientErrorCode =
   | "invalid_response";
 
 export type ExtractErrorCode = ServerErrorCode | ClientErrorCode;
+
+/** Codes only `/api/safety-check` gives: no upload row can fail with them. */
+const SAFETY_ONLY_CODES = [
+  "detector_version_mismatch",
+  "input_not_clean",
+  "invalid_placeholder",
+  "unmasked_identifier",
+  "safety_timeout",
+  "safety_failed",
+] as const;
+export type SafetyOnlyCode = (typeof SAFETY_ONLY_CODES)[number];
+
+export function isSafetyOnlyCode(code: string): code is SafetyOnlyCode {
+  return (SAFETY_ONLY_CODES as readonly string[]).includes(code);
+}
 
 export type Language = "uk" | "ru" | "en" | "mixed" | "unknown";
 
@@ -115,7 +138,18 @@ export interface PostFailure {
   readonly ok: false;
   readonly code: ExtractErrorCode;
   readonly retryAfterSeconds?: number;
+  /** `unmasked_identifier` only: `[clause id, start, end]`, offsets and ids, never text. */
+  readonly spans?: readonly (readonly [string, number, number])[];
 }
+
+/**
+ * Extra validated fields of an error body, per code. `null` = the body broke the
+ * contract (reported as the endpoint's invalid code). Offsets only, never text.
+ */
+export type ErrorExtras = (
+  code: string,
+  body: Record<string, unknown>,
+) => Pick<PostFailure, "spans"> | null;
 
 export type ExtractResult = ExtractSuccess | PostFailure;
 
@@ -562,6 +596,7 @@ function interpret<T extends { ok: true }>(
   parse: (body: Record<string, unknown>) => T | null,
   invalidCode: ExtractErrorCode,
   headers: Headers,
+  extras?: ErrorExtras,
 ): T | PostFailure {
   if (!isPlainObject(body)) {
     return failure(status === 200 ? invalidCode : "unknown_error");
@@ -579,6 +614,10 @@ function interpret<T extends { ok: true }>(
       ? { ok: false, code }
       : { ok: false, code, retryAfterSeconds };
   }
+  if (extras !== undefined) {
+    const extra = extras(code, body);
+    return extra === null ? failure(invalidCode) : { ok: false, code, ...extra };
+  }
   return { ok: false, code };
 }
 
@@ -595,6 +634,7 @@ export async function postValidated<T extends { ok: true }>(
   parse: (body: Record<string, unknown>) => T | null,
   options: ExtractOptions = {},
   invalidCode: ExtractErrorCode = "unknown_error",
+  extras?: ErrorExtras,
 ): Promise<T | PostFailure> {
   const { signal, fetchImpl, timeoutMs = DEFAULT_EXTRACT_TIMEOUT_MS } = options;
   if (signal?.aborted === true) {
@@ -663,6 +703,7 @@ export async function postValidated<T extends { ok: true }>(
       parse,
       invalidCode,
       response.headers,
+      extras,
     );
   } finally {
     clearTimeout(timer);

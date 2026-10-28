@@ -108,6 +108,7 @@ export function describeChange(
     case "segmentStarted":
     case "segmentsRequeued":
     case "segmentRetried":
+    case "segmentsRestarted":
       return [];
     case "segmentFinished": {
       // A failed split is news (with our message, never the server text); clauses are not announced.

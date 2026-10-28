@@ -657,12 +657,13 @@ describe("languages", () => {
   it.each(["uk", "ru"])("test_review_is_translated_in_%s", async (lng) => {
     await renderForm();
     await load();
+    // Open first: `open` finds the region by its English name "Contract A".
+    const review = await open();
     await i18next.changeLanguage(lng);
     const flat = flattenLocale((await import(`../i18n/locales/${lng}.json`)).default) as Record<
       string,
       string
     >;
-    const review = await open();
     expect(flat["pseudo.everythingCorrect"]).not.toBe(t("pseudo.everythingCorrect"));
     expect(
       within(review).getByRole("button", { name: flat["pseudo.everythingCorrect"] as string }),
