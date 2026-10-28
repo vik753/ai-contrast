@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   clearAllData,
@@ -24,33 +24,37 @@ export function SettingsPanel({ id }: { id: string }) {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
+  // Every change bumps the generation. A count that started earlier is stale and is dropped,
+  // so a slow count can never overwrite the state after "turn off" or "delete all".
+  const generation = useRef(0);
+
   const refresh = useCallback(async () => {
-    const on = isHistoryEnabled();
+    const mine = ++generation.current;
     const saved = await countSavedResults();
-    setEnabled(on);
+    if (mine !== generation.current) {
+      return;
+    }
+    setEnabled(isHistoryEnabled());
     setCount(saved);
   }, []);
 
   useEffect(() => {
-    let active = true;
-    void countSavedResults().then((saved) => {
-      if (active) {
-        setEnabled(isHistoryEnabled());
-        setCount(saved);
-      }
-    });
+    void refresh();
     const unsubscribe = subscribeHistoryChanges(() => {
       void refresh();
     });
+    const counter = generation;
     return () => {
-      active = false;
+      counter.current++;
       unsubscribe();
     };
   }, [refresh]);
 
   const turnOff = async () => {
     setConfirm(null);
+    generation.current++;
     const result = await setHistoryEnabled(false);
+    generation.current++;
     setEnabled(false);
     setCount(0);
     setNotice(result === "deleted" ? null : result);
@@ -77,7 +81,9 @@ export function SettingsPanel({ id }: { id: string }) {
 
   const deleteAll = async () => {
     setConfirm(null);
+    generation.current++;
     const result = await clearAllData();
+    generation.current++;
     setEnabled(false);
     setCount(0);
     setNotice(result === "cleared" ? "deleted" : result);
