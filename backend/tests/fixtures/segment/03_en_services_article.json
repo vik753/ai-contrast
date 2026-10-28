@@ -1,0 +1,31 @@
+{
+  "name": "03_en_services_article",
+  "language": "en",
+  "description": "Services agreement. 'Article N. Title' lines are headings and start clauses; the number is stored without the word.",
+  "blocks": [
+    {"text": "SERVICES AGREEMENT", "part": "body", "page": null},
+    {"text": "This agreement is made between the Client and the Provider (each a Party).", "part": "body", "page": null},
+    {"text": "Article 1. Definitions", "part": "body", "page": null},
+    {"text": "1.1. \"Services\" means the consulting work described in this agreement.", "part": "body", "page": null},
+    {"text": "1.2. \"Fees\" means the amounts payable by the Client.", "part": "body", "page": null},
+    {"text": "Article 2. Payment Terms", "part": "body", "page": null},
+    {"text": "2.1. The Client shall pay each invoice within 30 days of receipt.", "part": "body", "page": null},
+    {"text": "2.2. Late payments bear interest at 0.1% per day.", "part": "body", "page": null},
+    {"text": "Article 3. Termination", "part": "body", "page": null},
+    {"text": "3.1. Either Party may terminate this agreement with 60 days written notice.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "SERVICES AGREEMENT"},
+      {"number": "1", "heading": "Definitions", "section_kind": null, "part": "body", "starts_with": "Article 1. Definitions"},
+      {"number": "1.1", "heading": "Definitions", "section_kind": null, "part": "body", "starts_with": "1.1. \"Services\" means the"},
+      {"number": "1.2", "heading": "Definitions", "section_kind": null, "part": "body", "starts_with": "1.2. \"Fees\" means the amounts"},
+      {"number": "2", "heading": "Payment Terms", "section_kind": null, "part": "body", "starts_with": "Article 2. Payment Terms"},
+      {"number": "2.1", "heading": "Payment Terms", "section_kind": null, "part": "body", "starts_with": "2.1. The Client shall pay each"},
+      {"number": "2.2", "heading": "Payment Terms", "section_kind": null, "part": "body", "starts_with": "2.2. Late payments bear"},
+      {"number": "3", "heading": "Termination", "section_kind": null, "part": "body", "starts_with": "Article 3. Termination"},
+      {"number": "3.1", "heading": "Termination", "section_kind": null, "part": "body", "starts_with": "3.1. Either Party may terminate"}
+    ],
+    "warnings": []
+  }
+}

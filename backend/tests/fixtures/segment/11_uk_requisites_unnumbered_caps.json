@@ -1,0 +1,27 @@
+{
+  "name": "11_uk_requisites_unnumbered_caps",
+  "language": "uk",
+  "description": "Unnumbered all-caps requisites heading (case-insensitive match of the closed list); the requisites clause includes an obligation line that must be kept.",
+  "blocks": [
+    {"text": "ДОГОВІР ПОСТАВКИ", "part": "body", "page": null},
+    {"text": "Постачальник та Покупець уклали цей договір.", "part": "body", "page": null},
+    {"text": "1. Товар і строк поставки", "part": "body", "page": null},
+    {"text": "1.1. Постачальник поставляє товар протягом 14 днів з дати оплати.", "part": "body", "page": null},
+    {"text": "1.2. Ризик випадкової загибелі товару переходить до Покупця з моменту передачі.", "part": "body", "page": null},
+    {"text": "РЕКВІЗИТИ ТА ПІДПИСИ СТОРІН", "part": "body", "page": null},
+    {"text": "Постачальник: ________________", "part": "body", "page": null},
+    {"text": "Покупець: ________________", "part": "body", "page": null},
+    {"text": "Сторони підтверджують, що ознайомилися з умовами цього договору.", "part": "body", "page": null},
+    {"text": "Підпис: __________ / __________", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВІР ПОСТАВКИ"},
+      {"number": "1", "heading": "Товар і строк поставки", "section_kind": null, "part": "body", "starts_with": "1. Товар і строк поставки"},
+      {"number": "1.1", "heading": "Товар і строк поставки", "section_kind": null, "part": "body", "starts_with": "1.1. Постачальник поставляє"},
+      {"number": "1.2", "heading": "Товар і строк поставки", "section_kind": null, "part": "body", "starts_with": "1.2. Ризик випадкової загибелі"},
+      {"number": null, "heading": "РЕКВІЗИТИ ТА ПІДПИСИ СТОРІН", "section_kind": "requisites", "part": "body", "starts_with": "РЕКВІЗИТИ ТА ПІДПИСИ СТОРІН"}
+    ],
+    "warnings": []
+  }
+}

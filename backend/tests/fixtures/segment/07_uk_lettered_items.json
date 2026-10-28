@@ -1,0 +1,25 @@
+{
+  "name": "07_uk_lettered_items",
+  "language": "uk",
+  "description": "Insurance rules. Cyrillic lettered items (а, б, в) inside clauses ending with a colon. Items never start clauses.",
+  "blocks": [
+    {"text": "1. Страховий випадок", "part": "body", "page": null},
+    {"text": "1.1. Страховик відшкодовує збитки у разі:", "part": "body", "page": null},
+    {"text": "а) пожежі, вибуху або удару блискавки;", "part": "body", "page": null},
+    {"text": "б) затоплення з вини третіх осіб;", "part": "body", "page": null},
+    {"text": "в) протиправних дій третіх осіб.", "part": "body", "page": null},
+    {"text": "1.2. Не вважається страховим випадком:", "part": "body", "page": null},
+    {"text": "а) шкода, завдана внаслідок зносу майна;", "part": "body", "page": null},
+    {"text": "б) шкода, завдана під час воєнних дій.", "part": "body", "page": null},
+    {"text": "1.3. Страхувальник повідомляє Страховика про подію протягом трьох робочих днів.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Страховий випадок", "section_kind": null, "part": "body", "starts_with": "1. Страховий випадок"},
+      {"number": "1.1", "heading": "Страховий випадок", "section_kind": null, "part": "body", "starts_with": "1.1. Страховик відшкодовує"},
+      {"number": "1.2", "heading": "Страховий випадок", "section_kind": null, "part": "body", "starts_with": "1.2. Не вважається страховим"},
+      {"number": "1.3", "heading": "Страховий випадок", "section_kind": null, "part": "body", "starts_with": "1.3. Страхувальник повідомляє"}
+    ],
+    "warnings": []
+  }
+}

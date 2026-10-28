@@ -1,0 +1,26 @@
+{
+  "name": "13_uk_footnotes",
+  "language": "uk",
+  "description": "DOCX footnotes. Footnote blocks (part footnote) are own clauses with number null even when the text starts with '1.'; no numbering warnings.",
+  "blocks": [
+    {"text": "1. Загальні положення", "part": "body", "page": null},
+    {"text": "1.1. Страхування здійснюється відповідно до Правил страхування.", "part": "body", "page": null},
+    {"text": "1.2. Страхова виплата здійснюється протягом 15 робочих днів.", "part": "body", "page": null},
+    {"text": "2. Виключення", "part": "body", "page": null},
+    {"text": "2.1. Страховик не відшкодовує непрямі збитки.", "part": "body", "page": null},
+    {"text": "1. Тут і далі «Правила» означають Правила добровільного страхування майна.", "part": "footnote", "page": null},
+    {"text": "2. Робочим днем вважається день, що не є вихідним або святковим.", "part": "footnote", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Загальні положення", "section_kind": null, "part": "body", "starts_with": "1. Загальні положення"},
+      {"number": "1.1", "heading": "Загальні положення", "section_kind": null, "part": "body", "starts_with": "1.1. Страхування здійснюється"},
+      {"number": "1.2", "heading": "Загальні положення", "section_kind": null, "part": "body", "starts_with": "1.2. Страхова виплата"},
+      {"number": "2", "heading": "Виключення", "section_kind": null, "part": "body", "starts_with": "2. Виключення"},
+      {"number": "2.1", "heading": "Виключення", "section_kind": null, "part": "body", "starts_with": "2.1. Страховик не відшкодовує"},
+      {"number": null, "heading": null, "section_kind": null, "part": "footnote", "starts_with": "1. Тут і далі «Правила»"},
+      {"number": null, "heading": null, "section_kind": null, "part": "footnote", "starts_with": "2. Робочим днем вважається"}
+    ],
+    "warnings": []
+  }
+}

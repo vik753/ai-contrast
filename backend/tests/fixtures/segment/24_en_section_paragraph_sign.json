@@ -1,0 +1,24 @@
+{
+  "name": "24_en_section_paragraph_sign",
+  "language": "en",
+  "description": "'§ N' and 'Section N.' styles, with unnumbered paragraphs continuing the clause.",
+  "blocks": [
+    {"text": "SALE OF GOODS", "part": "body", "page": null},
+    {"text": "§ 1 Scope", "part": "body", "page": null},
+    {"text": "The Seller sells and the Buyer buys the goods named in the order.", "part": "body", "page": null},
+    {"text": "Section 2. Delivery", "part": "body", "page": null},
+    {"text": "The Seller delivers the goods within 14 days.", "part": "body", "page": null},
+    {"text": "Delivery is complete when the Buyer signs the delivery note.", "part": "body", "page": null},
+    {"text": "§ 3 Warranty", "part": "body", "page": null},
+    {"text": "The warranty period is 12 months from delivery.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "SALE OF GOODS"},
+      {"number": "1", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "§ 1 Scope"},
+      {"number": "2", "heading": "Delivery", "section_kind": null, "part": "body", "starts_with": "Section 2. Delivery"},
+      {"number": "3", "heading": "Warranty", "section_kind": null, "part": "body", "starts_with": "§ 3 Warranty"}
+    ],
+    "warnings": []
+  }
+}

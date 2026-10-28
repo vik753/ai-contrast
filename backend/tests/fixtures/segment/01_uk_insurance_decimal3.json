@@ -1,0 +1,38 @@
+{
+  "name": "01_uk_insurance_decimal3",
+  "language": "uk",
+  "description": "Property insurance. Preamble, numbered all-caps section titles, decimal numbering to three levels, an unnumbered continuation block.",
+  "blocks": [
+    {"text": "ДОГОВІР СТРАХУВАННЯ МАЙНА", "part": "body", "page": null},
+    {"text": "Цей договір укладено між Страховиком та Страхувальником (далі — Сторони).", "part": "body", "page": null},
+    {"text": "1. ПРЕДМЕТ ДОГОВОРУ", "part": "body", "page": null},
+    {"text": "1.1. Страховик зобов'язується за плату виплатити страхове відшкодування при настанні страхового випадку.", "part": "body", "page": null},
+    {"text": "1.1.1. Страховим випадком є пошкодження або знищення застрахованого майна.", "part": "body", "page": null},
+    {"text": "1.1.2. Перелік застрахованого майна наведено у Полісі.", "part": "body", "page": null},
+    {"text": "1.2. Договір діє на території України.", "part": "body", "page": null},
+    {"text": "2. СТРАХОВА СУМА ТА ФРАНШИЗА", "part": "body", "page": null},
+    {"text": "2.1. Страхова сума становить 500 000 гривень.", "part": "body", "page": null},
+    {"text": "2.2. Франшиза встановлюється у розмірі 2 % від страхової суми.", "part": "body", "page": null},
+    {"text": "Франшиза не застосовується до шкоди, завданої пожежею.", "part": "body", "page": null},
+    {"text": "2.2.1. Розмір франшизи може бути змінений за згодою Сторін.", "part": "body", "page": null},
+    {"text": "3. ВИКЛЮЧЕННЯ ЗІ СТРАХОВОГО ПОКРИТТЯ", "part": "body", "page": null},
+    {"text": "3.1. Страховик не відшкодовує шкоду, завдану умисними діями Страхувальника.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВІР СТРАХУВАННЯ МАЙНА"},
+      {"number": "1", "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "1. ПРЕДМЕТ ДОГОВОРУ"},
+      {"number": "1.1", "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "1.1. Страховик зобов'язується за"},
+      {"number": "1.1.1", "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "1.1.1. Страховим випадком є"},
+      {"number": "1.1.2", "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "1.1.2. Перелік застрахованого"},
+      {"number": "1.2", "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "1.2. Договір діє на території"},
+      {"number": "2", "heading": "СТРАХОВА СУМА ТА ФРАНШИЗА", "section_kind": null, "part": "body", "starts_with": "2. СТРАХОВА СУМА ТА ФРАНШИЗА"},
+      {"number": "2.1", "heading": "СТРАХОВА СУМА ТА ФРАНШИЗА", "section_kind": null, "part": "body", "starts_with": "2.1. Страхова сума становить"},
+      {"number": "2.2", "heading": "СТРАХОВА СУМА ТА ФРАНШИЗА", "section_kind": null, "part": "body", "starts_with": "2.2. Франшиза встановлюється у"},
+      {"number": "2.2.1", "heading": "СТРАХОВА СУМА ТА ФРАНШИЗА", "section_kind": null, "part": "body", "starts_with": "2.2.1. Розмір франшизи може"},
+      {"number": "3", "heading": "ВИКЛЮЧЕННЯ ЗІ СТРАХОВОГО ПОКРИТТЯ", "section_kind": null, "part": "body", "starts_with": "3. ВИКЛЮЧЕННЯ ЗІ СТРАХОВОГО"},
+      {"number": "3.1", "heading": "ВИКЛЮЧЕННЯ ЗІ СТРАХОВОГО ПОКРИТТЯ", "section_kind": null, "part": "body", "starts_with": "3.1. Страховик не відшкодовує"}
+    ],
+    "warnings": []
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "21_uk_duplicate_number",
+  "language": "uk",
+  "description": "Number 4.2 is used twice in a row: one duplicate_number warning, no numbering_gap.",
+  "blocks": [
+    {"text": "4. Відповідальність", "part": "body", "page": null},
+    {"text": "4.1. За порушення строків поставки Постачальник сплачує пеню 0,05 % за день.", "part": "body", "page": null},
+    {"text": "4.2. Загальний розмір пені не може перевищувати 10 % від вартості партії.", "part": "body", "page": null},
+    {"text": "4.2. Сплата пені не звільняє Постачальника від виконання зобов'язань.", "part": "body", "page": null},
+    {"text": "4.3. Сторони звільняються від відповідальності у разі форс-мажору.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "4", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "4. Відповідальність"},
+      {"number": "4.1", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "4.1. За порушення строків"},
+      {"number": "4.2", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "4.2. Загальний розмір пені"},
+      {"number": "4.2", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "4.2. Сплата пені не звільняє"},
+      {"number": "4.3", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "4.3. Сторони звільняються"}
+    ],
+    "warnings": ["duplicate_number"]
+  }
+}

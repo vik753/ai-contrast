@@ -1,0 +1,27 @@
+{
+  "name": "26_uk_pdf_short_sentence_collapsed",
+  "language": "uk",
+  "description": "PDF, 4 pages. A short (under 120 characters) exclusion sentence is the last line of every page: it fits all running rules and becomes one running clause at the first occurrence. Its spans list every copy. The clause stays visible to later stages as its own clause.",
+  "blocks": [
+    {"text": "1. Страховий захист", "part": "body", "page": 1},
+    {"text": "1.1. Страховик відшкодовує пряму шкоду, завдану майну Страхувальника.", "part": "body", "page": 1},
+    {"text": "Страховик не несе відповідальності за непрямі збитки.", "part": "body", "page": 1},
+    {"text": "1.2. Страхова сума вказана у Полісі.", "part": "body", "page": 2},
+    {"text": "Страховик не несе відповідальності за непрямі збитки.", "part": "body", "page": 2},
+    {"text": "1.3. Франшиза вказана у Полісі.", "part": "body", "page": 3},
+    {"text": "Страховик не несе відповідальності за непрямі збитки.", "part": "body", "page": 3},
+    {"text": "1.4. Страхувальник зобов'язаний повідомити про настання події.", "part": "body", "page": 4},
+    {"text": "Страховик не несе відповідальності за непрямі збитки.", "part": "body", "page": 4}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Страховий захист", "section_kind": null, "part": "body", "starts_with": "1. Страховий захист"},
+      {"number": "1.1", "heading": "Страховий захист", "section_kind": null, "part": "body", "starts_with": "1.1. Страховик відшкодовує пряму"},
+      {"number": null, "heading": null, "section_kind": null, "part": "running", "starts_with": "Страховик не несе відповідальності"},
+      {"number": "1.2", "heading": "Страховий захист", "section_kind": null, "part": "body", "starts_with": "1.2. Страхова сума вказана"},
+      {"number": "1.3", "heading": "Страховий захист", "section_kind": null, "part": "body", "starts_with": "1.3. Франшиза вказана у Полісі."},
+      {"number": "1.4", "heading": "Страховий захист", "section_kind": null, "part": "body", "starts_with": "1.4. Страхувальник зобов'язаний"}
+    ],
+    "warnings": []
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "16_en_pdf_running_threshold",
+  "language": "en",
+  "description": "PDF, 6 pages. 'Confidential lease document.' is the first line of pages 2, 4, 6 (3 pages = exactly half): running. 'Draft for discussion.' is the last line of 2 pages only (below 3): stays in the body text of its clause.",
+  "blocks": [
+    {"text": "LEASE AGREEMENT", "part": "body", "page": 1},
+    {"text": "This lease is made between the Landlord and the Tenant.", "part": "body", "page": 1},
+    {"text": "1. Premises", "part": "body", "page": 1},
+    {"text": "1.1. The premises are used only as an office.", "part": "body", "page": 1},
+    {"text": "Draft for discussion.", "part": "body", "page": 1},
+    {"text": "Confidential lease document.", "part": "body", "page": 2},
+    {"text": "1.2. The Tenant keeps the premises clean.", "part": "body", "page": 2},
+    {"text": "Draft for discussion.", "part": "body", "page": 2},
+    {"text": "2. Rent", "part": "body", "page": 3},
+    {"text": "2.1. Rent is paid monthly in advance.", "part": "body", "page": 3},
+    {"text": "Confidential lease document.", "part": "body", "page": 4},
+    {"text": "2.2. Rent may be increased once a year.", "part": "body", "page": 4},
+    {"text": "3. Term", "part": "body", "page": 5},
+    {"text": "3.1. The term is two years.", "part": "body", "page": 5},
+    {"text": "Confidential lease document.", "part": "body", "page": 6},
+    {"text": "3.2. Either party may end the lease with 90 days notice.", "part": "body", "page": 6}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "LEASE AGREEMENT"},
+      {"number": "1", "heading": "Premises", "section_kind": null, "part": "body", "starts_with": "1. Premises"},
+      {"number": "1.1", "heading": "Premises", "section_kind": null, "part": "body", "starts_with": "1.1. The premises are used"},
+      {"number": null, "heading": null, "section_kind": null, "part": "running", "starts_with": "Confidential lease document."},
+      {"number": "1.2", "heading": "Premises", "section_kind": null, "part": "body", "starts_with": "1.2. The Tenant keeps the"},
+      {"number": "2", "heading": "Rent", "section_kind": null, "part": "body", "starts_with": "2. Rent"},
+      {"number": "2.1", "heading": "Rent", "section_kind": null, "part": "body", "starts_with": "2.1. Rent is paid monthly"},
+      {"number": "2.2", "heading": "Rent", "section_kind": null, "part": "body", "starts_with": "2.2. Rent may be increased"},
+      {"number": "3", "heading": "Term", "section_kind": null, "part": "body", "starts_with": "3. Term"},
+      {"number": "3.1", "heading": "Term", "section_kind": null, "part": "body", "starts_with": "3.1. The term is two years."},
+      {"number": "3.2", "heading": "Term", "section_kind": null, "part": "body", "starts_with": "3.2. Either party may end"}
+    ],
+    "warnings": []
+  }
+}

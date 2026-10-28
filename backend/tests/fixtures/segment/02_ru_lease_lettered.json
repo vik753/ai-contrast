@@ -1,0 +1,38 @@
+{
+  "name": "02_ru_lease_lettered",
+  "language": "ru",
+  "description": "Lease. Numbered titles in sentence case; lettered items (а, б, в) stay inside the parent clause; a clause ending with a colon is not a heading.",
+  "blocks": [
+    {"text": "ДОГОВОР АРЕНДЫ НЕЖИЛОГО ПОМЕЩЕНИЯ", "part": "body", "page": null},
+    {"text": "Арендодатель и Арендатор, далее вместе — Стороны, заключили настоящий договор о нижеследующем.", "part": "body", "page": null},
+    {"text": "1. Предмет договора", "part": "body", "page": null},
+    {"text": "1.1. Арендодатель передает Арендатору во временное пользование нежилое помещение.", "part": "body", "page": null},
+    {"text": "1.2. Арендатор использует помещение исключительно под офис.", "part": "body", "page": null},
+    {"text": "2. Права и обязанности сторон", "part": "body", "page": null},
+    {"text": "2.1. Арендатор обязан:", "part": "body", "page": null},
+    {"text": "а) своевременно вносить арендную плату;", "part": "body", "page": null},
+    {"text": "б) поддерживать помещение в надлежащем состоянии;", "part": "body", "page": null},
+    {"text": "в) не сдавать помещение в субаренду без письменного согласия Арендодателя.", "part": "body", "page": null},
+    {"text": "2.2. Арендодатель обязан:", "part": "body", "page": null},
+    {"text": "а) передать помещение по акту приема-передачи;", "part": "body", "page": null},
+    {"text": "б) не вмешиваться в хозяйственную деятельность Арендатора.", "part": "body", "page": null},
+    {"text": "3. Арендная плата и порядок расчетов", "part": "body", "page": null},
+    {"text": "3.1. Арендная плата составляет 30 000 гривен в месяц.", "part": "body", "page": null},
+    {"text": "3.2. Арендная плата вносится не позднее 5 числа текущего месяца.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВОР АРЕНДЫ НЕЖИЛОГО"},
+      {"number": "1", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1. Предмет договора"},
+      {"number": "1.1", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1.1. Арендодатель передает"},
+      {"number": "1.2", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1.2. Арендатор использует"},
+      {"number": "2", "heading": "Права и обязанности сторон", "section_kind": null, "part": "body", "starts_with": "2. Права и обязанности сторон"},
+      {"number": "2.1", "heading": "Права и обязанности сторон", "section_kind": null, "part": "body", "starts_with": "2.1. Арендатор обязан:"},
+      {"number": "2.2", "heading": "Права и обязанности сторон", "section_kind": null, "part": "body", "starts_with": "2.2. Арендодатель обязан:"},
+      {"number": "3", "heading": "Арендная плата и порядок расчетов", "section_kind": null, "part": "body", "starts_with": "3. Арендная плата и порядок"},
+      {"number": "3.1", "heading": "Арендная плата и порядок расчетов", "section_kind": null, "part": "body", "starts_with": "3.1. Арендная плата составляет"},
+      {"number": "3.2", "heading": "Арендная плата и порядок расчетов", "section_kind": null, "part": "body", "starts_with": "3.2. Арендная плата вносится"}
+    ],
+    "warnings": []
+  }
+}

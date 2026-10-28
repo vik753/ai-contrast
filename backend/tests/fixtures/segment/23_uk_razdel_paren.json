@@ -1,0 +1,24 @@
+{
+  "name": "23_uk_razdel_paren",
+  "language": "uk",
+  "description": "'Розділ N. Title' headings with '1.1)' / '2.1)' parenthesis numbering; the closing bracket is not part of the number.",
+  "blocks": [
+    {"text": "Розділ 1. Загальні положення", "part": "body", "page": null},
+    {"text": "1.1) Договір регулює відносини зберігання майна.", "part": "body", "page": null},
+    {"text": "1.2) Зберігач не має права користуватися майном.", "part": "body", "page": null},
+    {"text": "Розділ 2. Строки", "part": "body", "page": null},
+    {"text": "2.1) Строк зберігання — шість місяців.", "part": "body", "page": null},
+    {"text": "2.2) Майно повертається на першу вимогу Поклажодавця.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Загальні положення", "section_kind": null, "part": "body", "starts_with": "Розділ 1. Загальні положення"},
+      {"number": "1.1", "heading": "Загальні положення", "section_kind": null, "part": "body", "starts_with": "1.1) Договір регулює відносини"},
+      {"number": "1.2", "heading": "Загальні положення", "section_kind": null, "part": "body", "starts_with": "1.2) Зберігач не має права"},
+      {"number": "2", "heading": "Строки", "section_kind": null, "part": "body", "starts_with": "Розділ 2. Строки"},
+      {"number": "2.1", "heading": "Строки", "section_kind": null, "part": "body", "starts_with": "2.1) Строк зберігання"},
+      {"number": "2.2", "heading": "Строки", "section_kind": null, "part": "body", "starts_with": "2.2) Майно повертається на"}
+    ],
+    "warnings": []
+  }
+}

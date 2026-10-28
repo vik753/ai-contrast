@@ -1,0 +1,24 @@
+{
+  "name": "19_en_numbering_gap",
+  "language": "en",
+  "description": "Clause 1.3 is missing (1.2 is followed by 1.4): one numbering_gap warning.",
+  "blocks": [
+    {"text": "1. Scope", "part": "body", "page": null},
+    {"text": "1.1. The Supplier delivers the goods listed in the order.", "part": "body", "page": null},
+    {"text": "1.2. Delivery takes place at the Buyer's warehouse.", "part": "body", "page": null},
+    {"text": "1.4. Title passes to the Buyer on full payment.", "part": "body", "page": null},
+    {"text": "2. Price", "part": "body", "page": null},
+    {"text": "2.1. The price is fixed for the term of the order.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "1. Scope"},
+      {"number": "1.1", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "1.1. The Supplier delivers"},
+      {"number": "1.2", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "1.2. Delivery takes place"},
+      {"number": "1.4", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "1.4. Title passes to the Buyer"},
+      {"number": "2", "heading": "Price", "section_kind": null, "part": "body", "starts_with": "2. Price"},
+      {"number": "2.1", "heading": "Price", "section_kind": null, "part": "body", "starts_with": "2.1. The price is fixed"}
+    ],
+    "warnings": ["numbering_gap"]
+  }
+}

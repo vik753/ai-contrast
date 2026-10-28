@@ -1,0 +1,24 @@
+{
+  "name": "05_ru_statya_inline",
+  "language": "ru",
+  "description": "Policy. 'Статья N.' with the text on the same line (ends with a period, so it is not a heading; heading is null).",
+  "blocks": [
+    {"text": "ПОЛИС СТРАХОВАНИЯ", "part": "body", "page": null},
+    {"text": "Страховщик выдал настоящий полис Страхователю на следующих условиях.", "part": "body", "page": null},
+    {"text": "Статья 1. Страховым случаем признается повреждение имущества в результате пожара.", "part": "body", "page": null},
+    {"text": "Статья 2. Страховая сумма устанавливается в размере 400 000 гривен.", "part": "body", "page": null},
+    {"text": "Статья 3. Франшиза составляет 5 000 гривен по каждому страховому случаю.", "part": "body", "page": null},
+    {"text": "Франшиза вычитается из суммы страхового возмещения.", "part": "body", "page": null},
+    {"text": "Статья 4. Договор может быть расторгнут по соглашению сторон.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ПОЛИС СТРАХОВАНИЯ"},
+      {"number": "1", "heading": null, "section_kind": null, "part": "body", "starts_with": "Статья 1. Страховым случаем"},
+      {"number": "2", "heading": null, "section_kind": null, "part": "body", "starts_with": "Статья 2. Страховая сумма"},
+      {"number": "3", "heading": null, "section_kind": null, "part": "body", "starts_with": "Статья 3. Франшиза составляет"},
+      {"number": "4", "heading": null, "section_kind": null, "part": "body", "starts_with": "Статья 4. Договор может быть"}
+    ],
+    "warnings": []
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "29_uk_requisites_mid_document",
+  "language": "uk",
+  "description": "Requisites heading in the middle of the document (title case, unnumbered, whole line in the closed list): section_kind requisites only for its own clause (heading and lines up to the next clause start); the numbered clauses after it are null.",
+  "blocks": [
+    {"text": "1. Предмет договору", "part": "body", "page": null},
+    {"text": "1.1. Виконавець виконує роботи, визначені у завданні.", "part": "body", "page": null},
+    {"text": "Реквізити та підписи сторін", "part": "body", "page": null},
+    {"text": "Замовник: ________________", "part": "body", "page": null},
+    {"text": "Виконавець: ________________", "part": "body", "page": null},
+    {"text": "2. Відповідальність", "part": "body", "page": null},
+    {"text": "2.1. За прострочення робіт Виконавець сплачує пеню 0,1 % за день.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Предмет договору", "section_kind": null, "part": "body", "starts_with": "1. Предмет договору"},
+      {"number": "1.1", "heading": "Предмет договору", "section_kind": null, "part": "body", "starts_with": "1.1. Виконавець виконує роботи"},
+      {"number": null, "heading": "Реквізити та підписи сторін", "section_kind": "requisites", "part": "body", "starts_with": "Реквізити та підписи сторін"},
+      {"number": "2", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "2. Відповідальність"},
+      {"number": "2.1", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "2.1. За прострочення робіт"}
+    ],
+    "warnings": []
+  }
+}

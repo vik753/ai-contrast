@@ -1,0 +1,25 @@
+{
+  "name": "04_uk_stattya_unnumbered_body",
+  "language": "uk",
+  "description": "Services. 'Стаття N. Title' headings followed by unnumbered paragraphs; the paragraphs continue the article clause.",
+  "blocks": [
+    {"text": "ДОГОВІР НАДАННЯ ПОСЛУГ", "part": "body", "page": null},
+    {"text": "Виконавець та Замовник уклали цей договір про таке.", "part": "body", "page": null},
+    {"text": "Стаття 1. Предмет договору", "part": "body", "page": null},
+    {"text": "Виконавець надає Замовнику послуги з обслуговування обладнання.", "part": "body", "page": null},
+    {"text": "Перелік послуг визначається Сторонами письмово.", "part": "body", "page": null},
+    {"text": "Стаття 2. Вартість послуг", "part": "body", "page": null},
+    {"text": "Вартість послуг становить 12 000 гривень на місяць.", "part": "body", "page": null},
+    {"text": "Стаття 3. Відповідальність Сторін", "part": "body", "page": null},
+    {"text": "За порушення зобов'язань Сторони несуть відповідальність згідно із законодавством.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВІР НАДАННЯ ПОСЛУГ"},
+      {"number": "1", "heading": "Предмет договору", "section_kind": null, "part": "body", "starts_with": "Стаття 1. Предмет договору"},
+      {"number": "2", "heading": "Вартість послуг", "section_kind": null, "part": "body", "starts_with": "Стаття 2. Вартість послуг"},
+      {"number": "3", "heading": "Відповідальність Сторін", "section_kind": null, "part": "body", "starts_with": "Стаття 3. Відповідальність"}
+    ],
+    "warnings": []
+  }
+}

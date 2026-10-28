@@ -1,0 +1,27 @@
+{
+  "name": "08_en_lettered_nested",
+  "language": "en",
+  "description": "Services. (a), (b), (c) items with nested (i), (ii) items stay inside the parent clause.",
+  "blocks": [
+    {"text": "4. Contractor obligations", "part": "body", "page": null},
+    {"text": "4.1. The Contractor shall:", "part": "body", "page": null},
+    {"text": "(a) deliver the work on time;", "part": "body", "page": null},
+    {"text": "(b) notify the Client if:", "part": "body", "page": null},
+    {"text": "(i) the schedule changes;", "part": "body", "page": null},
+    {"text": "(ii) the cost changes; and", "part": "body", "page": null},
+    {"text": "(c) keep records of all work.", "part": "body", "page": null},
+    {"text": "4.2. The Contractor is liable for damage caused by its employees.", "part": "body", "page": null},
+    {"text": "5. Confidentiality", "part": "body", "page": null},
+    {"text": "5.1. Each Party keeps the other Party's information confidential.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "4", "heading": "Contractor obligations", "section_kind": null, "part": "body", "starts_with": "4. Contractor obligations"},
+      {"number": "4.1", "heading": "Contractor obligations", "section_kind": null, "part": "body", "starts_with": "4.1. The Contractor shall:"},
+      {"number": "4.2", "heading": "Contractor obligations", "section_kind": null, "part": "body", "starts_with": "4.2. The Contractor is liable"},
+      {"number": "5", "heading": "Confidentiality", "section_kind": null, "part": "body", "starts_with": "5. Confidentiality"},
+      {"number": "5.1", "heading": "Confidentiality", "section_kind": null, "part": "body", "starts_with": "5.1. Each Party keeps the other"}
+    ],
+    "warnings": []
+  }
+}
