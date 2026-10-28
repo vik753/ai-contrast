@@ -36,4 +36,6 @@ export interface CacheStore {
   clear(): Promise<void>;
   /** Deletes expired entries and returns how many were deleted. */
   purgeExpired(): Promise<number>;
+  /** Releases a held connection. Optional: adapters without one omit it. */
+  close?(): void;
 }

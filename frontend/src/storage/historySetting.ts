@@ -9,7 +9,7 @@ import { DB_NAME, HISTORY_KEY, IndexedDbCacheStore } from "./indexedDbCacheStore
 export const LANGUAGE_KEY = "aic.lang";
 const PREFIX = "aic.";
 
-type DeleteResult = "deleted" | "blocked" | "failed";
+export type DeleteResult = "deleted" | "blocked" | "failed";
 export type ClearResult = "cleared" | "blocked" | "failed";
 
 function getFactory(): IDBFactory | null {
@@ -57,10 +57,10 @@ function deleteDatabase(factory: IDBFactory, name: string): Promise<DeleteResult
 }
 
 /** Turning history off removes the key first, then deletes the database. */
-export async function setHistoryEnabled(enabled: boolean): Promise<void> {
+export async function setHistoryEnabled(enabled: boolean): Promise<DeleteResult> {
   if (enabled) {
     localStorage.setItem(HISTORY_KEY, "on");
-    return;
+    return "deleted";
   }
   try {
     localStorage.removeItem(HISTORY_KEY);
@@ -68,9 +68,7 @@ export async function setHistoryEnabled(enabled: boolean): Promise<void> {
     // Blocked storage: history is already off for every read.
   }
   const factory = getFactory();
-  if (factory !== null) {
-    await deleteDatabase(factory, DB_NAME);
-  }
+  return factory === null ? "deleted" : deleteDatabase(factory, DB_NAME);
 }
 
 function newIndexedDbStore(factory: IDBFactory): IndexedDbCacheStore {
@@ -110,7 +108,7 @@ export async function countSavedResults(): Promise<number | null> {
   } catch {
     return null;
   } finally {
-    (store as { close?: () => void }).close?.();
+    store.close?.();
   }
 }
 
@@ -127,7 +125,7 @@ export async function startupCleanup(): Promise<void> {
     if (isHistoryEnabled()) {
       const store = await createCacheStore();
       await store.purgeExpired();
-      (store as { close?: () => void }).close?.();
+      store.close?.();
     } else {
       await deleteDatabase(factory, DB_NAME);
     }
@@ -149,7 +147,9 @@ export function subscribeHistoryChanges(onChange: () => void): () => void {
   };
 }
 
-function removeAicKeys(storage: () => Storage): void {
+/** Returns false when a removal threw. Blocked storage has nothing to remove: not a failure. */
+function removeAicKeys(storage: () => Storage): boolean {
+  let ok = true;
   try {
     const s = storage();
     const keys: string[] = [];
@@ -160,20 +160,24 @@ function removeAicKeys(storage: () => Storage): void {
       }
     }
     for (const k of keys) {
-      s.removeItem(k);
+      try {
+        s.removeItem(k);
+      } catch {
+        ok = false;
+      }
     }
   } catch {
     // Blocked storage has nothing we can remove.
   }
+  return ok;
 }
 
 /** Removes `aic.*` keys (not the language), then deletes every IndexedDB database of the origin. */
 export async function clearAllData(): Promise<ClearResult> {
-  removeAicKeys(() => localStorage);
-  removeAicKeys(() => sessionStorage);
+  const keysOk = [removeAicKeys(() => localStorage), removeAicKeys(() => sessionStorage)];
   const factory = getFactory();
   if (factory === null) {
-    return "cleared";
+    return keysOk.includes(false) ? "failed" : "cleared";
   }
   const results: DeleteResult[] = [await deleteDatabase(factory, DB_NAME)];
   try {
@@ -188,7 +192,7 @@ export async function clearAllData(): Promise<ClearResult> {
   } catch {
     // The list is not available: the main database is already handled.
   }
-  if (results.includes("failed")) {
+  if (keysOk.includes(false) || results.includes("failed")) {
     return "failed";
   }
   return results.includes("blocked") ? "blocked" : "cleared";

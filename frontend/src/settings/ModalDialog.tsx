@@ -10,7 +10,7 @@ interface ModalDialogProps {
 }
 
 const FOCUSABLE =
-  "button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex='-1'])";
+  "button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
 
 function focusablesIn(node: HTMLElement | null): HTMLElement[] {
   return node ? Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE)) : [];

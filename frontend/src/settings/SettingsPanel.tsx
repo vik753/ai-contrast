@@ -17,9 +17,10 @@ type Notice = "deleted" | "blocked" | "failed" | null;
 export function SettingsPanel({ id }: { id: string }) {
   const { t } = useTranslation();
   const titleId = useId();
-  const available = isHistoryAvailable();
   const [enabled, setEnabled] = useState(isHistoryEnabled);
-  const [count, setCount] = useState<number | null>(enabled ? null : 0);
+  // undefined: still loading; null: history is on but the saved results cannot be read.
+  const [count, setCount] = useState<number | null | undefined>(enabled ? undefined : 0);
+  const available = isHistoryAvailable() && !(enabled && count === null);
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
@@ -49,10 +50,10 @@ export function SettingsPanel({ id }: { id: string }) {
 
   const turnOff = async () => {
     setConfirm(null);
-    await setHistoryEnabled(false);
+    const result = await setHistoryEnabled(false);
     setEnabled(false);
     setCount(0);
-    setNotice(null);
+    setNotice(result === "deleted" ? null : result);
   };
 
   const onToggle = async () => {

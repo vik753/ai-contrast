@@ -134,28 +134,44 @@ export class IndexedDbCacheStore implements CacheStore {
         json,
       };
       await this.run<true>(db, (store, setResult, fail) => {
-        // Least recently used first. A key cursor reads no values.
-        const keys: { key: string; used: number }[] = [];
-        const cursor = store.index("lastUsedAt").openKeyCursor();
-        cursor.onsuccess = () => {
-          const c = cursor.result;
+        // Count every record, valid or not. A key cursor reads no values.
+        const all: string[] = [];
+        const ordered: string[] = [];
+        const allCursor = store.openKeyCursor();
+        allCursor.onsuccess = () => {
+          const c = allCursor.result;
           if (c !== null) {
-            keys.push({ key: c.primaryKey as string, used: Number(c.key) });
+            all.push(c.primaryKey as string);
             c.continue();
             return;
           }
-          try {
-            store.put(record);
-          } catch (error) {
-            fail(error);
-            return;
-          }
-          const others = keys.filter((k) => k.key !== key);
-          const excess = others.length + 1 - MAX_ENTRIES;
-          for (const old of others.slice(0, Math.max(0, excess))) {
-            store.delete(old.key);
-          }
-          setResult(true);
+          const indexCursor = store.index("lastUsedAt").openKeyCursor();
+          indexCursor.onsuccess = () => {
+            const ic = indexCursor.result;
+            if (ic !== null) {
+              if (typeof ic.key === "number") {
+                ordered.push(ic.primaryKey as string);
+              }
+              ic.continue();
+              return;
+            }
+            try {
+              store.put(record);
+            } catch (error) {
+              fail(error);
+              return;
+            }
+            // Records without a valid numeric lastUsedAt count as the oldest.
+            const valid = new Set(ordered);
+            const oldestFirst = [...all.filter((k) => !valid.has(k)), ...ordered].filter(
+              (k) => k !== key,
+            );
+            const excess = new Set(all).add(key).size - MAX_ENTRIES;
+            for (const old of oldestFirst.slice(0, Math.max(0, excess))) {
+              store.delete(old);
+            }
+            setResult(true);
+          };
         };
       });
       return "stored";
@@ -172,19 +188,26 @@ export class IndexedDbCacheStore implements CacheStore {
       }
       await this.purge(db);
       const now = this.clock();
-      const all = await this.run<unknown[]>(
-        db,
-        (store, setResult) => {
-          const request = store.getAll();
-          request.onsuccess = () => {
-            setResult(request.result as unknown[]);
+      const metas =
+        (await this.run<CacheEntryMeta[]>(db, (store, setResult) => {
+          const found: CacheEntryMeta[] = [];
+          const cursor = store.openCursor();
+          cursor.onsuccess = () => {
+            const c = cursor.result;
+            if (c === null) {
+              setResult(found);
+              return;
+            }
+            const value: unknown = c.value;
+            const meta = toMeta(value, now);
+            if (meta !== null && readRecord(value, meta.key, now) !== null) {
+              found.push(meta);
+            } else {
+              c.delete();
+            }
+            c.continue();
           };
-        },
-        "readonly",
-      );
-      const metas = (all ?? [])
-        .map((r) => toMeta(r, now))
-        .filter((m): m is CacheEntryMeta => m !== null);
+        })) ?? [];
       return sortNewestFirst(metas);
     } catch {
       return [];
