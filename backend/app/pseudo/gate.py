@@ -32,6 +32,7 @@ from app.pseudo.untrusted import (
     UntrustedMaskedDocument,
 )
 from app.safety.adjacent import partial_spans
+from app.safety.keywords import keyword_digit_spans
 from app.safety.placeholders import Placeholder, PlaceholderError, find_placeholders
 from app.segment.model import Clause
 from app.textclean import TextCleaner
@@ -256,11 +257,15 @@ def safety_pass(
         raise SafetyError("invalid_placeholder") from None
     found, known = _leftovers(texts, placeholders)
     acknowledged = _acknowledged(untrusted, known)
-    leftover = {
-        (block, start, end)
-        for block, start, end, high in found
-        if high or (block, start, end) not in acknowledged
-    } | partial_spans(texts, placeholders)
+    leftover = (
+        {
+            (block, start, end)
+            for block, start, end, high in found
+            if high or (block, start, end) not in acknowledged
+        }
+        | partial_spans(texts, placeholders)
+        | keyword_digit_spans(texts, placeholders)
+    )
     unmasked = tuple(
         (untrusted.clauses[block].id, start, end) for block, start, end in sorted(leftover)
     )
