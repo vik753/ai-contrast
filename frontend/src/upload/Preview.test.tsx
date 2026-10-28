@@ -42,6 +42,7 @@ import {
   pluralBase,
   templateRegExp,
 } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import * as UploadFormModule from "./UploadForm";
 
 // S3-T5: a file with `ocr_pages` now starts OCR. Keep it pending here, so the
@@ -77,7 +78,7 @@ beforeEach(() => {
       ? okResponse("text", blob.size)
       : okResponse(answer.kind, blob.size, answer.overrides);
   };
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {
@@ -128,6 +129,8 @@ async function addAccepted(label: string, ...files: File[]): Promise<void> {
         .map((el) => el.closest("li"))
         .find((li) => li !== null);
       expect(row?.textContent).toContain(KIND_LABEL[kind]);
+      // The preview opens in the Clauses view once the split is done (S5-T2).
+      expect(row?.textContent).toMatch(/\d+ clauses?/);
     });
   }
 }
@@ -165,6 +168,12 @@ async function openPreview(label: string): Promise<HTMLElement> {
   const button = previewButton(label);
   expand(button);
   await waitFor(() => expect(button.getAttribute("aria-expanded")).toBe("true"));
+  // These tests check the block list: show the Text view of every file.
+  for (const text of within(region(label)).queryAllByRole("button", { name: "Text" })) {
+    act(() => {
+      fireEvent.click(text);
+    });
+  }
   return region(label);
 }
 
