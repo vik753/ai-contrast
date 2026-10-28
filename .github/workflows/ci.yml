@@ -124,6 +124,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check the bundle has no test-only code
+        run: "! grep -rlE 'fake-indexeddb|FDBFactory' dist"
+
       - name: Audit dependencies
         run: npm audit --audit-level=high
 

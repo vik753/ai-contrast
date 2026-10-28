@@ -192,6 +192,41 @@
       "fileRejected": "File {{name}} not accepted. {{reason}}"
     }
   },
+  "settings": {
+    "open": "Data and history",
+    "title": "Data and history",
+    "cancel": "Cancel",
+    "history": {
+      "label": "Save results in this browser",
+      "on": "On",
+      "off": "Off",
+      "explanation": "Results with contract quotes (names replaced by placeholders) are kept in this browser for 90 days and are not encrypted. Do not turn this on on a shared computer."
+    },
+    "count": "Saved results: {{count}}",
+    "unavailable": "History is not available in this browser.",
+    "turnOff": {
+      "title": "Turn off history?",
+      "message": "Saved results will be deleted from this browser. This cannot be undone.",
+      "confirm": "Turn off and delete"
+    },
+    "deleteAll": {
+      "button": "Delete all data in this browser",
+      "title": "Delete all data?",
+      "message": "Settings, saved results and other data of this app in this browser will be removed. The interface language stays.",
+      "confirm": "Delete all data"
+    },
+    "notice": {
+      "deleted": "All data in this browser was deleted.",
+      "blocked": "Close the other tabs of this app, then try again. Deletion finishes when they close.",
+      "failed": "The data could not be deleted. Try again."
+    }
+  },
+  "cachedResult": {
+    "title": "Already analyzed",
+    "text": "These contracts were analyzed before. Saved result from:",
+    "show": "Show saved result",
+    "new": "Run a new analysis"
+  },
   "footer": {
     "privacy": "We store nothing on our server: no contracts, no keys, no results.",
     "source": "Source code",
