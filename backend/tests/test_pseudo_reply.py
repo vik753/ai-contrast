@@ -214,7 +214,8 @@ def test_matching_hyphen_split_at_line_end_is_masked_as_one_value(make_client: M
 
     entities = covering(data, "ivan.test@exam", {"EMAIL"})
     assert entities
-    assert "ple.com" in "".join(entity_strings(data, entities[0]))
+    # Exact value, not a substring check (CodeQL: incomplete URL substring sanitization).
+    assert "".join(entity_strings(data, entities[0])) == "ivan.test@exam-\nple.com"
 
 
 def test_matching_hyphen_split_name_in_two_blocks_is_covered(make_client: Make) -> None:
