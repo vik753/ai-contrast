@@ -11,8 +11,8 @@ How to resume after a break: read this file, then continue with the first unchec
 | 2 | File upload | done |
 | 3 | Text extraction | done |
 | 4 | Browser hash and cache | done |
-| 5 | Clause splitting | next |
-| 5b | Pseudonymization | planned |
+| 5 | Clause splitting | done |
+| 5b | Pseudonymization | next |
 | 6 | Model connection | planned |
 | 7 | Topic catalog | planned |
 | 8 | Clause tagging | planned |
@@ -87,3 +87,11 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-28 — PR #50 merged (S4-T2: `CacheStore`, history off by default, settings panel "Data and history", clear all, cached-result dialog). Race fix: a stale count overwrote 0 after "delete all". CI checks that `dist/` has no `fake-indexeddb`. 1721 frontend tests.
 - 2026-10-28 — Stage 4 done. Finished stage 4 moved to `docs/agent/TASKS-archive.md`; ADR 0013 accepted; threat model T3, T8, T11 updated; README updated.
 - Lesson: the weekly usage limit stopped two agents mid-task on 2026-10-22. Their uncommitted work survived. Resuming the same agents after the reset continued it.
+- 2026-10-28 — PR #52 merged: stage 5 plan, ADR 0014, two security design rounds (cleaned blocks returned once with spans only, running-line and requisites abuse rules, parent never parses the body).
+- 2026-10-28 — PR #53 merged (S5-T0 30 synthetic UK/RU/EN fixtures + S5-T1 `/api/segment`). Worst case about 2.5 s at the caps. 2950 backend tests.
+- 2026-10-28 — PR #54 merged (S5-T1b shared Layer 1 cleaning). From the PR #53 security review: cleaning had been incomplete and different on the two endpoints. Python pinned to 3.13 after CI picked a newer Python with other Unicode tables.
+- 2026-10-28 — PR #55 merged (S5-T2 clauses in the browser): Clauses/Text preview, strict reply validation including coverage, shared request budget of 2, code-point index. 1823 frontend tests.
+- 2026-10-28 — A flaky log-canary test fixed: clause numbers such as "7.3" could match log durations.
+- 2026-10-28 — Customer now confirms merges in chat ("ask" permission mode). The tech lead merges after two approvals and green CI.
+- Lesson: a 5-hour usage limit stopped agents mid-task. Resuming the same agents kept their work.
+- 2026-10-28 — Stage 5 done. ADR 0014 accepted; threat model T5, T6, T11 updated; finished stage 5 moved to `docs/agent/TASKS-archive.md`; README and `CLAUDE.md` Commands updated.

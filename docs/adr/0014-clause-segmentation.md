@@ -1,6 +1,6 @@
 # ADR 0014 — Clause segmentation
 
-- Status: proposed (tech lead, 2026-10-28; `security-reviewer` approved the design after round 2; accepted when stage 5 is merged)
+- Status: accepted (tech lead, 2026-10-28; `security-reviewer` approved the design after round 2; stage 5 merged)
 - Date: 2026-10-28
 - Related: ADR 0008 (pseudonymization works on clauses and the requisites section), ADR 0009 (no clause can be hidden; every cap fails closed; linear-time patterns in the parsing subprocess), ADR 0011 (sandbox), threat model T5, T6
 

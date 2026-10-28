@@ -611,3 +611,80 @@ Order: S4-T1 and S4-T2 in parallel (different modules; resolve conflicts in the 
 
 - Owner: `docs-writer`. After S4-T1 and S4-T2 are merged.
 - Threat model: check T3 control 6 and T11 control 5 against the merged code (updated in the stage 4 plan PR); add the no-encryption residual risk. ADR 0013 status → accepted. `CLAUDE.md` architecture row unchanged unless the design changed. README: "Data and history" in "How it works".
+
+## Stage 5 — Clause splitting
+
+Design: ADR 0014 (clause segmentation), ADR 0011 (sandbox), ADR 0009 (no clause hidden, caps fail closed, linear-time patterns), ADR 0008 point 2 (requisites headings). Threats: T3, T5, T6.
+
+Order: S5-T0 (fixtures) and the S5-T1 tests in parallel; then S5-T1 (backend); S5-T2 (frontend) after S5-T1 is merged; S5-T3 docs last.
+
+### S5-T0 Segmentation fixtures (PR #53)
+
+- Owner: `domain-analyst`. Branch: `feat/s5-segment` (same branch as S5-T1; fixtures only).
+- Synthetic contracts (no real names or identifiers) as JSON block lists in `backend/tests/fixtures/segment/`, each with the expected clause numbers, headings, `section_kind` and warnings: UK, RU and EN; decimal numbering to three levels; `Стаття`/`Статья`/`Article` styles; Roman sections; lettered sub-items (`а)`, `(a)`, `(i)`); all-caps and numbered headings; a preamble; a requisites section (`Реквізити та підписи сторін`, `Реквизиты и подписи сторон`, `Signatures`); footnotes; a PDF-like file with running headers and footers on every page and a clause across a page break; a file with no numbering; files with a numbering gap, a restart and a duplicate number; an annex with its own numbering. At least 15 files. A `README.md` in that folder lists them.
+
+### S5-T1 Segmentation endpoint (backend) (PR #53)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s5-segment` (worktree `/home/claude/wt/s5-segment`).
+- Threats: T1, T3, T5, T6.
+
+1. **Pure function** `app/segment/segmenter.py`: `segment(blocks: Sequence[InputBlock], *, limits: SegmentLimits) -> SegmentResult` (raises `SegmentError(code)`). Deterministic. Rules exactly as ADR 0014 points 4–8.
+2. **Output contract** (`200`):
+   ```json
+   {
+     "clauses": [{
+       "id": "c1", "number": "3.2" | null, "level": 2, "part_index": 0,
+       "section_kind": "requisites" | null,
+       "part": "body" | "footnote" | "endnote" | "header" | "footer" | "textbox" | "running" | "preamble",
+       "pages": [3, 4], "spans": [[0, 0, 120], [1, 0, 37]], "heading_span": [2, 0, 15] | null
+     }],
+     "blocks": [{ "text": "…", "part": "body", "page": 1 }],
+     "removed": [{ "reason": "<code>", "count": 1, "sample": "…" }],
+     "warnings": [{ "code": "numbering_gap", "clause": "c7" }]
+   }
+   ```
+   `id` is `c1…cN` in document order. `blocks` are the **cleaned** input blocks, returned once. `spans` are `[block_index, start, end]` into them; clause text = the span texts joined with `\n` (no `text` field). `heading_span` points to the heading text in `blocks` (there is no separate `heading` string; the browser reads it from the span). `pages` is `[]` for DOCX and text. `level` 0 for preamble, running and fallback clauses. **Size test:** 1,000,000 Cyrillic characters in 20,000 blocks at the clause cap give a reply under `extract_max_result_bytes`.
+2a. **Divergence test:** input with characters that cleaning removes (zero-width, controls, lone surrogates) → the reply's `blocks` are the cleaned text, all spans point into them, and the `removed` list reports what changed.
+3. **Cover test (property):** for every fixture and for random inputs, the spans of all clauses cover every non-white-space character of the cleaned input exactly once, in order (running-header duplicates: the repeated occurrences are covered by the one `running` clause, whose `spans` list every occurrence).
+4. **Sandbox:** worker kind `segment` (ADR 0011): the parent never parses the body; the raw JSON bytes go to the child, which validates them with strict Pydantic `model_validate_json` (extra fields forbidden, no `json.loads`), removes lone surrogates, cleans (the same `normalize` as extraction, `removed` reported), segments and replies. Tests: nesting 10,000 levels deep → `422 invalid_request` without a crash; duplicate keys → `422 invalid_request` (explicit check: the parser alone keeps the last value); lone `\ud800` → either `422 invalid_request` or removed and reported. Same memory, CPU and wall limits as extraction; same result-size cap (`extract_max_result_bytes`). Errors map like extraction (`extraction_timeout` → `segment_timeout`, `extraction_failed` → `segment_failed`).
+5. **Endpoint** `POST /api/segment`:
+   - `Content-Type: application/json` (else `415`, header check before the slot, `early_error`);
+   - body limit `SEGMENT_MAX_BODY_BYTES` (4 MiB) for this exact path (`413 request_too_large`); `Transfer-Encoding` → `411`; early errors carry `Connection: close`; the slot is taken before the body is read (`503 busy` with `Retry-After`), the body is read with the same deadline and minimum-rate rule as `/api/extract` (`408 upload_timeout`), then passed to the child;
+   - body `{"blocks": [{"text": str, "part": <extract part enum>, "page": int | null}]}` — no other fields; at most `extract_max_blocks` blocks and `extract_max_text_chars` characters in total, else `422 too_much_text`; `page` 1–`max_pdf_pages` or `null`; malformed → `422 invalid_request`; empty text overall → `422 no_text_extracted`; errors are `{"error": "<code>"}` and never echo input;
+   - new error codes: `too_many_clauses`, `clause_too_long`, `segment_timeout`, `segment_failed` (`422`, `504` for the timeout, `500`-class never echoes);
+   - `Cache-Control: no-store`; logging: method, path, status, duration, counts only. Extend the log canary test: a canary string inside a block never appears in logs.
+6. **Linear time:** a test feeds adversarial input at the caps (1,000,000 characters: one line of digits and dots, `1.1.1.1…`, thousands of `а)` items, long all-caps lines, 20,000 tiny blocks) and the child finishes within the CPU limit. Patterns are anchored with bounded repetition; a policy test rejects nested quantifiers in `app/segment/`.
+7. **Caps:** `SEGMENT_MAX_CLAUSES` (2,000) and `SEGMENT_MAX_CLAUSE_CHARS` (20,000), validated like other settings. Every cap has a test; nothing is truncated.
+8. Fixtures from S5-T0: every fixture gives exactly the expected numbers, headings, `section_kind` and warnings.
+9. **Abuse rules (ADR 0014 points 5–6):** a line longer than 120 characters, a clause-start line or a heading line repeated on every page is not collapsed into `running`; an early or mid-document "Signatures" heading followed by numbered clauses does not make them `requisites`; a heading line stays inside exactly one clause's spans.
+10. **Linear algorithm:** running-line detection by hashing; patterns applied per line with `match`; a test at the caps with 100 pages and 20,000 blocks finishes within the CPU limit.
+
+### S5-T1b Shared Layer 1 input cleaning (backend) (PR #54)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s5-clean` (worktree `/home/claude/wt/s5-clean`). From the PR #53 security review: cleaning is incomplete and differs between `/api/extract` and `/api/segment`. **Blocker for stage 5b** (no text reaches an AI provider before this is merged).
+- Threats: T5 (ADR 0009 Layer 1), T11.
+
+1. **One shared module** `app/textclean/` used by the extraction worker (PDF, DOCX, text — after extraction, before the reply) and by the segment child (instead of `app/segment/clean.py`, which is removed). No other cleaner remains (`ControlCleaner` is folded in).
+2. **Order (ADR 0009 Layer 1):** (a) symbol-font glyphs mapped first: the checked-in table maps U+F0FE, U+F0FD, U+F0A8, U+F06F, U+F078 and the other Wingdings/Symbol checkbox code points already known to the DOCX walker to ☐, ☑ or ☒ (one table, used by DOCX and by plain text, PDF and segment input); (b) remove every code point in the generated table; (c) NFC.
+3. **Generated table** `app/textclean/ignorable_table.py`, checked in, made by `backend/scripts/gen_ignorable_table.py` from the Unicode data of a pinned Unicode version (the script records the version; Python's `unicodedata` 15.1 is acceptable as the source if the version is recorded and a test fails when the table and the recorded version differ from what the script generates). It contains: `Default_Ignorable_Code_Point` (including unassigned ones: U+2065, U+FFF0–U+FFF8, U+E0000–U+E0FFF), categories Cf, Co, Cs, Cn, plus U+034F, U+115F, U+1160, U+3164, U+FFA0, U+2800, U+FFF9–U+FFFB, U+180E, variation selectors U+FE00–U+FE0F and U+E0100–U+E01EF, and Cc except tab, line feed and carriage return (line breaks are handled by the existing rules). White space is never removed.
+4. **Report:** every removal appears in `removed` with a reason code (`default_ignorable`, `format_character`, `private_use`, `unassigned`, `surrogate`, `control_character`) and a sample (as today, at most 200 characters, the sample itself cleaned).
+5. **Idempotent:** property test `clean(clean(x)) == clean(x)` over random strings from all planes. A test feeds every code point named in ADR 0009 Layer 1 and checks none survives (except the mapped checkbox glyphs, which become ☐/☑/☒).
+6. **Same result on both endpoints:** for the same text, `/api/extract` (text upload) blocks equal `/api/segment` cleaned blocks; DOCX and PDF fixtures with zero-width, bidi, tag and braille-blank characters are cleaned and reported.
+7. Linear time; runs inside the sandbox child only.
+
+### S5-T2 Clauses in the browser (frontend) (PR #55)
+
+- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s5-clauses` (worktree `/home/claude/wt/s5-clauses`). After S5-T1 is merged.
+- Threats: T3 (control 7), T6.
+
+1. After a row is accepted and has no OCR pages left, the browser calls `POST /api/segment` with that row's blocks (OCR blocks for scanned pages included, in page order), through the existing scheduler (at most two requests in flight, `busy` retry with a capped delay), with the same fetch options as uploads (`credentials: "omit"`, `redirect: "error"`, `cache: "no-store"`) and strict response validation with caps (clause count, block count and total characters within the server caps, every span inside the returned blocks, spans in order within each clause and no character covered by two clauses — else `invalid_response`). The browser then **replaces the row's text with the returned cleaned blocks** and builds clause text from spans; the text hash (S4-T1) is recomputed from the cleaned blocks.
+2. Row states: the row shows "Splitting into clauses…" while the request runs, then the clause count. Segment errors are shown on the row with their own messages (all codes of S5-T1, all three languages); the row stays in the contract; "Try again" re-sends.
+3. Clauses live only in memory next to the extracted text and are dropped with the row (T3 control 7); never in storage, URLs, the console or announcements.
+4. Preview: a "Clauses" / "Text" switch. "Clauses" shows each clause as plain text with its number and heading, `part` label (footnote, running header, preamble…), a "Requisites" badge for `section_kind: "requisites"`, and the warnings. Long lists use the existing preview caps and "Show all".
+5. Readiness: a contract is ready only when every row has clauses. Removing a row aborts its segment request.
+6. Tests (Vitest): request body and options, validation failures, every error code shown, retry, abort on removal, preview switch, no storage writes.
+
+### S5-T3 Docs for stage 5
+
+- Owner: `docs-writer`. After S5-T1 and S5-T2 are merged.
+- Threat model: T5 control 6 (segmentation in the sandbox, linear-time patterns and algorithm, clause caps, running-line and requisites abuse rules, running clauses rated like body clauses), T6 controls 3–4 (new endpoint: body limit, slot, deadline and minimum rate; add `/api/segment` to the stage 13 per-IP slot blocker), T11 (headings are copied text and are masked in stage 5b). Stage 11 eval case: a harmful sentence repeated on every page. ADR 0014 → accepted. `CLAUDE.md` Commands: a `curl` check for `/api/segment`. README status.
