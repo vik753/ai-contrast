@@ -1,6 +1,6 @@
 # ADR 0013 — Browser cache and history
 
-- Status: proposed (tech lead, 2026-10-22; `security-reviewer` approved the design after round 2; accepted when stage 4 is merged)
+- Status: accepted (2026-10-28; proposed by the tech lead on 2026-10-22; `security-reviewer` approved the design after round 2; stage 4 merged)
 - Date: 2026-10-22
 - Related: ADR 0001 (stateless, `CacheStore` port), ADR 0008 point 4 (cache key, mapping), threat model T3, T11
 

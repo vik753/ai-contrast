@@ -9,7 +9,7 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 - 🟡 **Attention** needed
 - 🔴 **Unfavorable** or risky for you
 
-> **Status:** in development. Stage 0 (project rules), stage 1 (scaffold), stage 2 (file upload) and stage 3 (text extraction) are done. See [`docs/plan.md`](docs/plan.md).
+> **Status:** in development. Stage 0 (project rules), stage 1 (scaffold), stage 2 (file upload), stage 3 (text extraction) and stage 4 (browser hash and cache) are done. See [`docs/plan.md`](docs/plan.md).
 > You can add contracts and files, and the server extracts and shows their text. Contract comparison is not built yet.
 
 ## Principles
@@ -29,6 +29,8 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 3. Choose your side: for example, the insured party, the buyer or the supplier.
 4. Choose the AI provider and enter your API key.
 5. Get a color-coded comparison table, topic by topic.
+
+Data and history: results are saved only in this browser, and only if you turn it on (off by default). Saved results are kept for 90 days. The "Delete all data" button removes them at once.
 
 ## Tech
 

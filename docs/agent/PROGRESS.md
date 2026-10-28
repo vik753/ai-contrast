@@ -10,8 +10,8 @@ How to resume after a break: read this file, then continue with the first unchec
 | 1 | Scaffold | done |
 | 2 | File upload | done |
 | 3 | Text extraction | done |
-| 4 | Browser hash and cache | next |
-| 5 | Clause splitting | planned |
+| 4 | Browser hash and cache | done |
+| 5 | Clause splitting | next |
 | 5b | Pseudonymization | planned |
 | 6 | Model connection | planned |
 | 7 | Topic catalog | planned |
@@ -80,3 +80,10 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-22 — Stage 3 done. Finished stages 2 and 3 moved to `docs/agent/TASKS-archive.md`; open follow-ups stay in `docs/agent/TASKS.md`.
 - Lesson: in this session the tech lead cannot merge (permission classifier, "Merge Without Review"). The customer merges approved PRs. A local trial merge is blocked too. Rebase the second PR after the first is merged.
 - Lesson: CI jobs `docker` and `compose` can fail transiently on the image build. Rerun failed jobs before you investigate.
+- 2026-10-28 — PR #38 merged: stage 4 plan, ADR 0013, two security design rounds (multi-tab fail closed, mapping never stored).
+- 2026-10-28 — PR #47 merged: all agents run on medium effort (customer request).
+- 2026-10-28 — PR #48 merged: `filelock` 4.2.4 (six advisories, dev-only dependency). The advisories blocked all PRs until the fix.
+- 2026-10-28 — PR #49 merged (S4-T1: hashes and duplicate detection). Hashing is sequential with a 30 s timeout. The test setup wraps `crypto.subtle.digest` with a Node hash, so fake-timer tests are stable.
+- 2026-10-28 — PR #50 merged (S4-T2: `CacheStore`, history off by default, settings panel "Data and history", clear all, cached-result dialog). Race fix: a stale count overwrote 0 after "delete all". CI checks that `dist/` has no `fake-indexeddb`. 1721 frontend tests.
+- 2026-10-28 — Stage 4 done. Finished stage 4 moved to `docs/agent/TASKS-archive.md`; ADR 0013 accepted; threat model T3, T8, T11 updated; README updated.
+- Lesson: the weekly usage limit stopped two agents mid-task on 2026-10-22. Their uncommitted work survived. Resuming the same agents after the reset continued it.
