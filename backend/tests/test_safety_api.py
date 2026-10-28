@@ -419,8 +419,6 @@ INVALID_REQUESTS = [
     _with(acknowledged_unmasked=[["c1", 0]]),
     _with(acknowledged_unmasked=[["c1", "0", 1]]),
     _with(acknowledged_unmasked=[["c1", -1, 1]]),
-    _with(acknowledged_unmasked=[["c1", 2, 1]]),
-    _with(acknowledged_unmasked=[["c9", 0, 1]]),
     b'{"label": "A", "label": "B", "detector_version": "V", "clauses": [], '
     b'"acknowledged_unmasked": []}',
     b'{"label":"A","detector_version":"V","clauses":[{"id":"c1","text":"x"}],'
@@ -438,6 +436,20 @@ def test_safety_malformed_request_returns_422_invalid_request(
 
     assert response.status_code == 422
     assert response.json() == {"error": "invalid_request"}
+
+
+@pytest.mark.parametrize(
+    "ack", [[["c1", 2, 1]], [["c9", 0, 1]]], ids=["end-before-start", "unknown-clause"]
+)
+def test_safety_bad_acknowledged_list_with_real_version_returns_422_invalid_request(
+    make_client: Make, ack: list[list[object]]
+) -> None:
+    client = make_client()
+    payload = doc(detector_version(client), "Pay.", ack=ack)
+
+    response = post_doc(client, payload)
+
+    assert (response.status_code, response.json()) == (422, {"error": "invalid_request"})
 
 
 def test_safety_deeply_nested_json_returns_422_without_crash(make_client: Make) -> None:
