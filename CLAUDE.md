@@ -167,6 +167,14 @@ curl -sS -i -X POST -H 'Content-Type: application/json' -d '{"document_id":"shor
 
 Expected: status `422` and the body `{"error":"invalid_google_doc_id"}`.
 To try a real document, share a Google Doc as "Anyone with the link can view" and paste its link into the "Google Docs link" field of the UI.
+Check the clause splitting endpoint:
+
+```bash
+curl -sS -X POST -H 'Content-Type: application/json' -d '{"blocks":[{"text":"1. Subject","part":"body","page":null},{"text":"1.1. The insurer pays within 10 days.","part":"body","page":null}]}' http://127.0.0.1:8000/api/segment
+```
+
+Expected: `{"clauses":[{"id":"c1","number":"1","level":1,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[0,0,10]],"heading_span":[0,3,10]},{"id":"c2","number":"1.1","level":2,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[1,0,37]],"heading_span":[0,3,10]}],"blocks":[{"text":"1. Subject","part":"body","page":null},{"text":"1.1. The insurer pays within 10 days.","part":"body","page":null}],"removed":[],"warnings":[]}`.
+A span is `[block, start, end]` into `blocks`. Clause 1.1 carries the heading of section 1.
 
 Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
 
