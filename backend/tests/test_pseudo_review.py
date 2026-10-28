@@ -242,3 +242,76 @@ def test_review_one_million_characters_of_repeats_detect_under_six_seconds(
     elapsed = time.monotonic() - start
     assert response.status_code in (200, 422), response.text[:100]
     assert elapsed < 6, f"{name}: {elapsed:.1f} s"
+
+
+# ------------------------------------------------------------ round 2
+
+DEFINITION = "Сторона: ТОВ «Альфа{h}Гарант» (далі — Страховик) уклала договір."
+HYPHENS = {
+    "u2010": "‐",
+    "u2011": "‑",
+    "u2013": "–",
+    "u2212": "−",
+    "uff0d": "－",
+}
+
+
+@pytest.mark.parametrize("mark", sorted(HYPHENS))
+def test_review2_unicode_hyphen_variant_is_masked_and_grouped_with_definition(
+    make_client: Make, mark: str
+) -> None:
+    later = f"Альфа{HYPHENS[mark]}Гарант"
+
+    data = detect(make_client(), DEFINITION.format(h="-"), f"1. Платіж {later} сплачено.")
+
+    assert_masked(data, later, only_block=1)
+    [org] = [
+        e for e in covering(data, "Альфа-Гарант", {"ORG"}) if any(sp[0] == 0 for sp in e["spans"])
+    ]
+    assert any(sp[0] == 1 for sp in org["spans"])
+
+
+@pytest.mark.parametrize("mark", ["‑", "‐", "–"])
+def test_review2_definition_with_unicode_hyphen_masks_later_ascii_hyphen(
+    make_client: Make, mark: str
+) -> None:
+    data = detect(make_client(), DEFINITION.format(h=mark), "1. Платіж Альфа-Гарант сплачено.")
+
+    assert_masked(data, "Альфа-Гарант", only_block=1)
+
+
+def test_review2_later_mention_wrapped_at_its_own_hyphen_is_one_span(make_client: Make) -> None:
+    data = detect(
+        make_client(), DEFINITION.format(h="-"), "1. Платіж Альфа-\nГарант сплачено вчасно."
+    )
+
+    assert_masked(data, "Альфа-\nГарант", only_block=1)
+    assert any(
+        sp[0] == 1 and "Альфа" in span_text(data, sp) and "Гарант" in span_text(data, sp)
+        for e in data["entities"]
+        for sp in e["spans"]
+    )
+
+
+def test_review2_bare_idn_domain_is_masked_as_url(make_client: Make) -> None:
+    data = detect(make_client(), "Сайт alfa-garant.укр містить умови.")
+
+    assert_masked(data, "alfa-garant.укр")
+    assert covering(data, "alfa-garant.укр", {"URL"})
+
+
+def test_review2_surname_comma_given_name_each_part_is_masked(make_client: Make) -> None:
+    data = detect(
+        make_client(), "The seller is represented by DOE, JANE, acting under the Charter."
+    )
+
+    assert_masked(data, "DOE")
+    assert_masked(data, "JANE")
+
+
+def test_review2_space_instead_of_hyphen_after_hyphenated_definition_is_masked(
+    make_client: Make,
+) -> None:
+    data = detect(make_client(), DEFINITION.format(h="-"), "1. Платіж Альфа Гарант сплачено.")
+
+    assert_masked(data, "Альфа Гарант", only_block=1)
