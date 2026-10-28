@@ -217,7 +217,8 @@
       "filesAdded_other": "{{count}} files added to Contract {{label}}.",
       "fileRemoved": "File {{name}} removed.",
       "fileAccepted": "File {{name}} accepted: {{kind}}.",
-      "fileRejected": "File {{name}} not accepted. {{reason}}"
+      "fileRejected": "File {{name}} not accepted. {{reason}}",
+      "segmentFailed": "Could not split {{name}} into clauses. {{reason}}"
     },
     "retry": "Try again",
     "clauses": {

@@ -227,7 +227,8 @@
       "filesAdded_other": "Додано файлів до договору {{label}}: {{count}}.",
       "fileRemoved": "Файл {{name}} видалено.",
       "fileAccepted": "Файл {{name}} прийнято: {{kind}}.",
-      "fileRejected": "Файл {{name}} не прийнято. {{reason}}"
+      "fileRejected": "Файл {{name}} не прийнято. {{reason}}",
+      "segmentFailed": "Не вдалося розбити {{name}} на пункти. {{reason}}"
     },
     "retry": "Спробувати ще раз",
     "clauses": {

@@ -319,6 +319,7 @@ function ClauseListItem({
   focusRef?: Ref<HTMLLIElement> | undefined;
 }) {
   const { t } = useTranslation();
+  const locale = useLocale();
   const { clause, heading } = item.block;
   return (
     <li className="preview-block" ref={focusRef} tabIndex={focusRef === undefined ? undefined : -1}>
@@ -331,7 +332,7 @@ function ClauseListItem({
           <span className="preview-clause__badge">{t("upload.preview.requisites")}</span>
         )}
         {clause.pages.length > 0 && (
-          <span>{t("upload.preview.clausePages", { pages: clause.pages.join(", ") })}</span>
+          <span>{t("upload.preview.clausePages", { pages: pageList(clause.pages, locale) })}</span>
         )}
       </span>
       {heading !== null && <bdi className="preview-clause__heading preview-text">{heading}</bdi>}

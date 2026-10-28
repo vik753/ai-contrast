@@ -124,19 +124,53 @@ const RESULT_KEYS = ["clauses", "blocks", "removed", "warnings"] as const;
 
 const SURROGATE = /[\ud800-\udfff]/;
 
-/** Length in code points. */
-function codePointLength(text: string): number {
-  if (!SURROGATE.test(text)) {
-    return text.length;
-  }
-  return Array.from(text).length;
+/**
+ * Maps code point offsets (what the server counts) to UTF-16 offsets, built once
+ * per block. `units` is `null` when the block has no surrogate: offsets are equal.
+ */
+interface BlockIndex {
+  readonly text: string;
+  /** Length in code points. */
+  readonly length: number;
+  readonly units: Uint32Array | null;
 }
 
-/** The part of `text` between two code point offsets. */
-function sliceCodePoints(text: string, start: number, end: number): string {
-  return SURROGATE.test(text)
-    ? Array.from(text).slice(start, end).join("")
-    : text.slice(start, end);
+function buildIndex(text: string): BlockIndex {
+  if (!SURROGATE.test(text)) {
+    return { text, length: text.length, units: null };
+  }
+  const units: number[] = [];
+  for (let i = 0; i < text.length; i += 1) {
+    units.push(i);
+    const unit = text.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < text.length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        i += 1;
+      }
+    }
+  }
+  units.push(text.length);
+  return { text, length: units.length - 1, units: Uint32Array.from(units) };
+}
+
+/** Indexes of blocks already built, so clause text never rescans a block. */
+const INDEXES = new WeakMap<Block, BlockIndex>();
+
+function indexOf(block: Block): BlockIndex {
+  let index = INDEXES.get(block);
+  if (index === undefined) {
+    index = buildIndex(block.text);
+    INDEXES.set(block, index);
+  }
+  return index;
+}
+
+/** The part of a block between two code point offsets. */
+function sliceIndex(index: BlockIndex, start: number, end: number): string {
+  return index.units === null
+    ? index.text.slice(start, end)
+    : index.text.slice(index.units[start], index.units[end]);
 }
 
 function isOffset(value: unknown): value is number {
@@ -253,6 +287,32 @@ function disjoint(clauses: readonly Clause[]): boolean {
   return true;
 }
 
+/**
+ * Every non-white-space character of the returned blocks is inside a clause: no
+ * text can be left out of the analysis (ADR 0009, no hidden clause). Linear: each
+ * gap between spans is scanned once.
+ */
+function covers(clauses: readonly Clause[], indexes: readonly BlockIndex[]): boolean {
+  const spans = clauses.flatMap((clause) => clause.spans).filter((span) => span[2] > span[1]);
+  spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let at = 0;
+  for (const [blockIndex, index] of indexes.entries()) {
+    let cursor = 0;
+    for (let span = spans[at]; span?.[0] === blockIndex; span = spans[at]) {
+      const [, start, end] = span;
+      if (start > cursor && /\S/.test(sliceIndex(index, cursor, start))) {
+        return false;
+      }
+      cursor = Math.max(cursor, end);
+      at += 1;
+    }
+    if (cursor < index.length && /\S/.test(sliceIndex(index, cursor, index.length))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function parseWarnings(value: unknown, clauses: readonly Clause[]): SegmentWarning[] | null {
   if (!Array.isArray(value) || value.length > MAX_WARNINGS) {
     return null;
@@ -291,7 +351,8 @@ function parseSegmentation(
   ) {
     return null;
   }
-  const lengths = blocks.map((block) => codePointLength(block.text));
+  const indexes = blocks.map(indexOf);
+  const lengths = indexes.map((index) => index.length);
   const clauses: Clause[] = [];
   for (const [index, item] of (body.clauses as unknown[]).entries()) {
     const clause = parseClause(item, index, lengths, pages);
@@ -301,7 +362,7 @@ function parseSegmentation(
     clauses.push(clause);
   }
   const warnings = parseWarnings(body.warnings, clauses);
-  if (warnings === null || !disjoint(clauses)) {
+  if (warnings === null || !disjoint(clauses) || !covers(clauses, indexes)) {
     return null;
   }
   return { ok: true, segmentation: { clauses, blocks, removed, warnings } };
@@ -333,7 +394,8 @@ export function segmentBlocks(
 
 /** The text of a span. */
 function spanText(blocks: readonly Block[], span: Span): string {
-  return sliceCodePoints(blocks[span[0]]?.text ?? "", span[1], span[2]);
+  const block = blocks[span[0]];
+  return block === undefined ? "" : sliceIndex(indexOf(block), span[1], span[2]);
 }
 
 /** The heading text of a clause, read from its `heading_span`, or `null`. */

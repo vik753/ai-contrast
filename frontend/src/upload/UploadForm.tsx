@@ -57,6 +57,7 @@ import {
   type UploadFile,
   type UploadFileStatus,
 } from "./state";
+import { createRequestBudget } from "./budget";
 import { useCheckScheduler, type CheckFile } from "./useCheckScheduler";
 import { useHashing } from "./useHashing";
 import { useOcrScheduler } from "./useOcrScheduler";
@@ -128,6 +129,11 @@ function announcementText(t: TFunction, announcement: Announcement, locale: stri
       });
     case "fileRejected":
       return t("upload.announce.fileRejected", {
+        name: fileDisplayName(t, announcement),
+        reason: errorText(t, announcement.code, locale),
+      });
+    case "segmentFailed":
+      return t("upload.announce.segmentFailed", {
         name: fileDisplayName(t, announcement),
         reason: errorText(t, announcement.code, locale),
       });
@@ -207,8 +213,8 @@ function FileRow({ file, notes, onRemove, onRetry }: FileRowProps) {
   const { t } = useTranslation();
   const locale = useLocale();
   const name = fileDisplayName(t, file);
-  // A Google document has no size until the server has read it.
   const note = segmentNote(t, file);
+  // A Google document has no size until the server has read it.
   const sizeKnown = file.googleSuffix === undefined || file.size > 0;
   return (
     <li className={`file-row file-row--${file.status}`}>
@@ -226,8 +232,9 @@ function FileRow({ file, notes, onRemove, onRetry }: FileRowProps) {
               <span>{note}</span>
             </>
           )}
+          {/* Keeps the text apart from the next control for readers of the row text. */}{" "}
         </span>
-      </span>{" "}
+      </span>
       {notes.length > 0 && (
         <span className="file-row__notes">
           {notes.map((note) => {
@@ -496,13 +503,15 @@ export function UploadForm() {
     return extractFile(blob, { signal });
   }, []);
 
-  useCheckScheduler(state, dispatch, check);
-
   const segment = useCallback<SegmentRow>(
     (file, signal) => segmentBlocks(file.extraction.blocks, file.extraction.pages, { signal }),
     [],
   );
-  useSegmentScheduler(state, dispatch, segment);
+  // One budget of in-flight requests for checks and splits. The split hook runs first
+  // (effects run in order), so a row that is already extracted goes before new checks.
+  const [budget] = useState(createRequestBudget);
+  useSegmentScheduler(state, dispatch, segment, budget);
+  useCheckScheduler(state, dispatch, check, budget);
 
   const fileById = useCallback((fileId: string) => filesRef.current.get(fileId), []);
   useOcrScheduler(state, dispatch, fileById);
