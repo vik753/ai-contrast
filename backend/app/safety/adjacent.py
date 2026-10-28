@@ -12,15 +12,30 @@ returns offsets only and is linear in the text.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Sequence
 from typing import Final
 
+from app.pseudo.matching import DASH_CODES
 from app.safety.placeholders import Placeholder
 
 CODE_CLASSES: Final = frozenset({"TAX_ID", "ACCOUNT", "PHONE", "PERSONAL_DOC", "DOC_NO", "VEHICLE"})
 MAX_RUNS: Final = 8
-_SEPARATORS: Final = frozenset("-.@/+()")
+_ASCII_SEPARATORS: Final = frozenset("-.@/+()")
+_OTHER_SEPARATORS: Final = _ASCII_SEPARATORS | frozenset(map(chr, DASH_CODES))
+_CODE_CATEGORIES: Final = frozenset({"Pd", "Pc", "Po", "Sm"})
 _PLATE_LETTERS: Final = 2
+
+
+def is_separator(char: str, code: bool) -> bool:
+    """A separator after a placeholder. Code classes: any white space except a line break,
+    dash, connector, other punctuation or math symbol (``|``), and ``+()/@``. Other classes:
+    ASCII separators and every Unicode dash, never white space."""
+    if not code:
+        return char in _OTHER_SEPARATORS
+    if char.isspace():
+        return char != "\n"
+    return char in _ASCII_SEPARATORS or unicodedata.category(char) in _CODE_CATEGORIES
 
 
 def _code_like(run: str, cls: str) -> bool:
@@ -34,7 +49,7 @@ def _right(text: str, end: int, cls: str, out: list[tuple[int, int]]) -> None:
     position, size = end, len(text)
     for step in range(MAX_RUNS):
         start = position
-        while start < size and (text[start] in _SEPARATORS or (space and text[start] == " ")):
+        while start < size and is_separator(text[start], space):
             start += 1
         if start >= size or not text[start].isalnum():
             return
@@ -52,7 +67,7 @@ def _left(text: str, begin: int, cls: str, out: list[tuple[int, int]]) -> None:
     position = begin
     for step in range(MAX_RUNS):
         stop = position
-        while stop > 0 and (text[stop - 1] in _SEPARATORS or (space and text[stop - 1] == " ")):
+        while stop > 0 and is_separator(text[stop - 1], space):
             stop -= 1
         if stop <= 0 or not text[stop - 1].isalnum():
             return

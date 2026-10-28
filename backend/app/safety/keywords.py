@@ -15,6 +15,7 @@ from typing import Final
 
 from app.pseudo.lines import amount_or_date_follows
 from app.pseudo.matching import fold
+from app.safety.adjacent import is_separator
 from app.safety.placeholders import Placeholder
 
 KEYWORDS: Final = frozenset(
@@ -27,7 +28,6 @@ WINDOW: Final = 3
 MAX_POSITION: Final = 1 << 62
 MIN_DIGITS: Final = 3
 _TOKEN: Final = re.compile(r"[^\W_]+|№")
-_GROUP_GAP: Final = frozenset(" -.")
 _FRACTION: Final = re.compile(r",[0-9]{1,2}(?![0-9])")
 
 
@@ -43,7 +43,7 @@ def _group_end(text: str, tokens: list[re.Match[str]], first: int) -> tuple[int,
     while last + 1 < len(tokens):
         gap = text[tokens[last].end() : tokens[last + 1].start()]
         following = tokens[last + 1].group()
-        if not (following.isdigit() and gap and set(gap) <= _GROUP_GAP):
+        if not (following.isdigit() and gap and all(is_separator(char, True) for char in gap)):
             break
         last += 1
     return tokens[last].end(), last
