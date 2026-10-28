@@ -57,7 +57,7 @@ GATEWAY_TIMEOUT: Final = 504
         415: {"description": "unsupported_media_type"},
         422: {
             "description": "invalid_request, too_much_text, no_text_extracted, "
-            "too_many_clauses, clause_too_long or segment_failed"
+            "too_many_clauses, clause_too_long, too_many_identifiers or segment_failed"
         },
         503: {"description": "busy"},
         504: {"description": "segment_timeout"},
@@ -106,4 +106,4 @@ async def _receive_and_segment(request: Request, declared: int, settings: Settin
         )
     except SegmentError as error:
         return error_response(error.code, GATEWAY_TIMEOUT if error.code == SEGMENT_TIMEOUT else 422)
-    return Response(result.model_dump_json(), media_type="application/json")
+    return Response(result.model_dump_json(by_alias=True), media_type="application/json")
