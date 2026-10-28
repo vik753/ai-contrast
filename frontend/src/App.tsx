@@ -1,21 +1,43 @@
 import i18next from "i18next";
+import { useEffect, useId, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { RatingIcon, type Rating } from "./components/RatingIcon";
 import { SOURCE_CODE_URL } from "./config";
+import { SettingsPanel } from "./settings/SettingsPanel";
+import { startupCleanup } from "./storage/historySetting";
 import { UploadForm } from "./upload/UploadForm";
 
 const RATINGS: readonly Rating[] = ["green", "yellow", "red"];
 
 function Shell() {
   const { t } = useTranslation();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const panelId = useId();
+
+  useEffect(() => {
+    void startupCleanup();
+  }, []);
 
   return (
     <div className="layout">
       <header className="site-header">
         <div className="container site-header__inner">
           <p className="brand">{t("app.title")}</p>
-          <LanguageSwitcher />
+          <div className="site-header__actions">
+            <button
+              type="button"
+              className="button button--quiet button--small"
+              aria-expanded={settingsOpen}
+              aria-controls={settingsOpen ? panelId : undefined}
+              onClick={() => {
+                setSettingsOpen((open) => !open);
+              }}
+            >
+              {t("settings.open")}
+            </button>
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
 
@@ -26,6 +48,8 @@ function Shell() {
           </h1>
           <p className="intro__lead">{t("home.description")}</p>
         </section>
+
+        {settingsOpen ? <SettingsPanel id={panelId} /> : null}
 
         <UploadForm />
 
