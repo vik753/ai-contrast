@@ -101,9 +101,9 @@ class _ClauseIndex:
 
 
 def detect(texts: Sequence[str], clauses: Sequence[Clause]) -> Detection:
-    view = build_view(list(texts))
-    result = Detection(list(texts))
     index = _ClauseIndex(clauses, len(texts))
+    view = build_view(list(texts), index.find)
+    result = Detection(list(texts))
     _neutralize(view, result, index)
     requisites = _requisites_ranges(view, clauses)
     hits = Hits()

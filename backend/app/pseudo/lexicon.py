@@ -17,7 +17,7 @@ from app.pseudo import tables
 from app.pseudo.confusable_table import UNICODE_VERSION
 from app.pseudo.matching import LATIN_TO_CYRILLIC, SKELETON, fold
 
-RULES_VERSION: Final = "2"
+RULES_VERSION: Final = "3"
 
 
 def _runs(text: str) -> tuple[str, ...]:
@@ -92,7 +92,7 @@ _AMBIGUOUS_UNITS: Final = frozenset(
 STRONG_AMOUNT_WORDS: Final = AMOUNT_WORDS - _AMBIGUOUS_UNITS
 ABBREVIATIONS: Final = frozenset(fold(word) for word in tables.ADDRESS_ABBREVIATIONS)
 ADDRESS_STARTS: Final = frozenset(fold(word) for word in tables.ADDRESS_STARTS)
-TLDS: Final = frozenset(tables.TLDS)
+TLDS: Final = frozenset(fold(tld) for tld in tables.TLDS)
 PATRONYMICS: Final = tuple(sorted({e.lower() for e in tables.PATRONYMIC_ENDINGS}, key=len))
 STEM_ENDINGS: Final = tuple(
     sorted({e.replace("y", "i") for e in tables.STEM_ENDINGS}, key=len, reverse=True)

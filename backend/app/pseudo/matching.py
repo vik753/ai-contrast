@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001, RUF002
+# ruff: noqa: RUF002
 """The matching view of the document (ADR 0015 point 2, ADR 0009).
 
 The cleaned blocks are joined with ``\\n`` into ``g``. The view is ``g`` without line-end
@@ -16,13 +16,17 @@ from __future__ import annotations
 import unicodedata
 from array import array
 from bisect import bisect_right
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Final
 
 from app.pseudo.confusable_table import PAIRS
 
 SKELETON: Final[dict[int, int]] = dict(PAIRS)
-HYPHENS: Final = frozenset("-‐‑")
+# Every Unicode hyphen and dash is "-" in the view (same length, so offsets stay valid).
+DASH_CODES: Final = (*range(0x2010, 0x2016), 0x2212, 0xFE58, 0xFE63, 0xFF0D)
+DASH_FOLD: Final = {code: ord("-") for code in DASH_CODES}
+HYPHENS: Final = frozenset(chr(code) for code in (ord("-"), *DASH_CODES))
 _CYRILLIC_LOW: Final = 0x0400
 _CYRILLIC_HIGH: Final = 0x04FF
 
@@ -60,7 +64,7 @@ def fold_view(text: str) -> str:
 
 def fold(text: str) -> str:
     """NFKC and ``fold_view``: the form in which table entries are compared."""
-    return fold_view(unicodedata.normalize("NFKC", text))
+    return fold_view(unicodedata.normalize("NFKC", text).translate(DASH_FOLD))
 
 
 @dataclass(slots=True)
@@ -111,20 +115,32 @@ class View:
         return bisect_right(self.bases, self.g_start(index)) - 1
 
 
-def _joins(g: str) -> list[int]:
-    """Indexes of hyphens that are line-end joins (letter, hyphen, LF, lower-case letter)."""
-    found: list[int] = []
+def _joins(g: str, same_clause: Callable[[int, int], bool] | None) -> list[tuple[int, int]]:
+    """Ranges of ``g`` that the view drops at line ends.
+
+    A letter, a hyphen, a line break and a lower-case letter: the hyphen and the break go.
+    With ``same_clause``, a letter, a hyphen, a break and an upper-case letter in the same
+    clause (a name wrapped at its own hyphen): only the break goes.
+    """
+    found: list[tuple[int, int]] = []
     position = g.find("\n")
     size = len(g)
     while position != -1:
         if (
-            0 < position < size - 1
+            position >= 2  # noqa: PLR2004 - a letter before the hyphen
+            and position < size - 1
             and g[position - 1] in HYPHENS
-            and position >= 2  # noqa: PLR2004 - a letter before the hyphen
             and g[position - 2].isalpha()
-            and g[position + 1].islower()
         ):
-            found.append(position - 1)
+            after = g[position + 1]
+            if after.islower():
+                found.append((position - 1, position + 1))
+            elif (
+                after.isupper()
+                and same_clause is not None
+                and same_clause(position - 2, position + 1)
+            ):
+                found.append((position, position + 1))
         position = g.find("\n", position + 1)
     return found
 
@@ -147,7 +163,8 @@ def _changes(g: str) -> dict[str, str]:
     return changes
 
 
-def build_view(texts: list[str]) -> View:
+def build_view(texts: list[str], clause_of: Callable[[int, int], str | None] | None = None) -> View:
+    """The matching view. ``clause_of(block, offset)`` is the clause id of a position."""
     bases: list[int] = []
     sizes: list[int] = []
     offset = 0
@@ -156,7 +173,15 @@ def build_view(texts: list[str]) -> View:
         sizes.append(len(text))
         offset += len(text) + 1
     g = "\n".join(texts)
-    joins = _joins(g)
+
+    def same_clause(first: int, second: int) -> bool:
+        assert clause_of is not None  # noqa: S101
+        one = bisect_right(bases, first) - 1
+        two = bisect_right(bases, second) - 1
+        clause = clause_of(one, first - bases[one])
+        return clause is not None and clause == clause_of(two, second - bases[two])
+
+    joins = _joins(g, same_clause if clause_of is not None else None)
     changes = _changes(g)
     extra: dict[int, int] = {}
     if not joins and not changes and unicodedata.is_normalized("NFKC", g):
@@ -166,10 +191,11 @@ def build_view(texts: list[str]) -> View:
         pieces: list[str] = []
         src = array("i")
         previous = 0
-        for hyphen in [*joins, len(g)]:
-            _append_chunk(g[previous:hyphen], previous, changes, pieces, src, extra)
-            previous = hyphen + 2  # the hyphen and the line break are dropped
+        for cut, resume in [*joins, (len(g), len(g))]:
+            _append_chunk(g[previous:cut], previous, changes, pieces, src, extra)
+            previous = resume
         view = "".join(pieces)
+    view = view.translate(DASH_FOLD)
     skeleton = view.translate(SKELETON)
     return View(g, bases, sizes, view, skeleton, fold_view(view), src, extra)
 

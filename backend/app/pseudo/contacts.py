@@ -13,7 +13,6 @@ from app.pseudo.hits import EMAIL, HIGH, NORMAL, PHONE, URL, Hits
 from app.pseudo.lexicon import TLDS
 from app.pseudo.matching import fold
 
-_DOMAIN: Final = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-")
 _HANDLE: Final = frozenset("abcdefghijklmnopqrstuvwxyz0123456789_")
 _BARE_BEFORE: Final = ("@", "(at)", "[at]", "{at}", "(@)")
 _MAX_LOCAL: Final = 64
@@ -216,10 +215,10 @@ def _domains(low: str, hits: Hits) -> None:
             position = low.find(".", done)
             continue
         begin = position
-        while begin > done and low[begin - 1] in _DOMAIN:
+        while begin > done and _domain_char(low[begin - 1]):
             begin -= 1
         end = position
-        while end < size and low[end] in _DOMAIN:
+        while end < size and _domain_char(low[end]):
             end += 1
         done = end
         position = low.find(".", end)

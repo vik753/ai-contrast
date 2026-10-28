@@ -342,6 +342,7 @@ TLDS: Final = (
     "tech", "app", "dev", "xyz", "top", "club", "cc", "fr", "it", "es", "nl", "cz", "ch",
     "at", "ro", "md", "lt", "lv", "ee", "ge", "am", "az", "kg", "uz", "tr", "cn", "jp",
     "in", "ca", "au", "ai", "su", "mobi", "name", "link", "live", "cloud", "agency",
+    "укр", "рф", "бел", "срб", "рус", "онлайн", "сайт",
 )  # fmt: skip
 
 # Countries of IBAN with the total length.

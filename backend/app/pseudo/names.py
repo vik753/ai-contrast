@@ -129,6 +129,10 @@ class Names:
         stems = tuple(self.stem(word) for word in name_words)
         phrase = " ".join(stems)
         canon = self.org_phrase.setdefault(phrase, phrase)
+        parts = tuple(self.stem(part) for word in name_words for part in word.split("-") if part)
+        if len(parts) > len(stems) and parts[0]:
+            # A hyphenated name is also found with a space instead of the hyphen.
+            self.org_multi.setdefault(parts[0], []).append((parts, canon))
         if stems:
             self.org_first.setdefault(stems[0], canon)
             if len(stems) == 1:
