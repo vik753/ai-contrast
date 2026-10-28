@@ -38,7 +38,6 @@ from dataclasses import dataclass
 from typing import Final
 
 from app.extraction.model import Block
-from app.extraction.normalize import normalize_line_breaks
 from app.segment import patterns
 from app.segment.model import (
     CLAUSE_TOO_LONG,
@@ -256,10 +255,7 @@ class _Numbering:
 
 def _clean(blocks: Sequence[InputBlock]) -> tuple[list[Block], TextCleaner]:
     cleaner = TextCleaner()
-    cleaned = [
-        Block(text=cleaner.clean(normalize_line_breaks(b.text)), part=b.part, page=b.page)
-        for b in blocks
-    ]
+    cleaned = [Block(text=cleaner.clean(b.text), part=b.part, page=b.page) for b in blocks]
     return cleaned, cleaner
 
 

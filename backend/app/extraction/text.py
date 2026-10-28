@@ -40,7 +40,6 @@ from app.extraction.model import (
     ExtractionError,
     ExtractionResult,
 )
-from app.extraction.normalize import normalize_line_breaks
 from app.extraction.references import external_reference_warnings
 from app.textclean import TextCleaner
 
@@ -113,7 +112,7 @@ def extract_text_file(
         raise ExtractionError(TOO_MUCH_TEXT)
     _check_controls(text)
     cleaner = TextCleaner()
-    text = cleaner.clean(normalize_line_breaks(text))
+    text = cleaner.clean(text)
     blocks = _split_blocks(text, max_blocks)
     if not blocks:
         raise ExtractionError(NO_TEXT_EXTRACTED)

@@ -64,10 +64,10 @@ Steps:
    a non-empty value (``V`` of the widget or its parent fields) → material warning
    ``not_read_annotation``; Hidden and NoView annotations are ignored. An AcroForm
    with ``XFA`` → ``not_read_xfa``.
-9. Shared post-processing: NFC and invisible and control characters (``app.textclean``), external
-   references (``app.extraction.references``), language, caps (characters, blocks,
-   ``removed`` and ``warnings`` at most ``MAX_LIST_ITEMS`` each; a cap fails closed
-   with ``too_much_text``). Zero blocks and no OCR page → ``no_text_extracted``.
+9. Shared post-processing: NFC and invisible and control characters
+   (``app.textclean``), external references (``app.extraction.references``), language,
+   caps (characters, blocks, ``removed`` and ``warnings`` at most ``MAX_LIST_ITEMS`` each;
+   a cap fails closed with ``too_much_text``). Zero blocks and no OCR page → ``no_text_extracted``.
 
 Errors carry codes only, never text.
 """
@@ -120,7 +120,7 @@ from app.extraction.model import (
     Removed,
     Warning,
 )
-from app.extraction.normalize import PAGE_NUMBER_LINE, normalize_line_breaks
+from app.extraction.normalize import PAGE_NUMBER_LINE
 from app.extraction.pdf_colour import Colour, is_white, luminance
 from app.extraction.pdf_content import OptionalContent
 from app.extraction.pdf_device import (
@@ -716,7 +716,7 @@ class _Report:
             return
         if len(self.removed) >= MAX_LIST_ITEMS:
             raise ExtractionError(TOO_MUCH_TEXT)
-        sample = _SPACES.sub(" ", clean_text(normalize_line_breaks(head[:HEAD_CHARS])).text).strip()
+        sample = _SPACES.sub(" ", clean_text(head[:HEAD_CHARS]).text).strip()
         self.removed.append(Removed(reason=reason, count=count, sample=sample[:MAX_SAMPLE_CHARS]))
 
     def warnings(self, extra: list[Warning]) -> list[Warning]:
@@ -778,7 +778,7 @@ def _blocks(  # noqa: PLR0912 - one pass over lines, removals and warnings
                 else:
                     body_chars += len("".join(line.text.split()))
                 kept.append(line.text)
-            text = cleaner.clean(normalize_line_breaks("\n".join(kept))).strip()
+            text = cleaner.clean("\n".join(kept)).strip()
             if not text:
                 continue
             chars += len(text)

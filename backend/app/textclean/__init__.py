@@ -1,9 +1,10 @@
 """Shared Layer 1 input cleaning (ADR 0009; threat model T5, T11).
 
 One cleaner for every text path: the extraction child (text, DOCX, PDF) and the
-segmentation child. Order: (a) symbol-font checkbox glyphs are mapped, (b) every code
-point of the generated table is removed (default-ignorable, Cf, Co, Cs, Cn, and Cc
-except TAB, LF, CR), (c) NFC. Idempotent. Linear time. Runs inside the sandbox child.
+segmentation child. Order: (0) line breaks (CR LF, CR, VT, FF, NEL, LS, PS) become LF,
+(a) symbol-font checkbox glyphs are mapped, (b) every code point of the generated table
+is removed (default-ignorable, Cf, Co, Cs, Cn, and Cc except TAB, LF, CR), (c) NFC.
+Idempotent. Linear time. Runs inside the sandbox child.
 
 ``removed`` has one entry per reason: ``default_ignorable``, ``format_character``,
 ``private_use``, ``unassigned``, ``surrogate``, ``control_character``, with a count and
@@ -19,6 +20,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from app.extraction.model import Removed
+from app.extraction.normalize import normalize_line_breaks
 from app.textclean.ignorable_table import RANGES
 from app.textclean.symbols import CHECKBOX_TABLE
 
@@ -75,6 +77,7 @@ class TextCleaner:
             return reason
 
     def clean(self, text: str) -> str:
+        text = normalize_line_breaks(text)
         if not text.isascii():
             text = text.translate(CHECKBOX_TABLE)
         counts = Counter(text)
@@ -93,6 +96,8 @@ class TextCleaner:
         return unicodedata.normalize("NFC", text)
 
     def removed(self) -> list[Removed]:
+        """One entry per reason; ``sample`` lists up to 16 distinct ``U+XXXX`` code points
+        (never raw text)."""
         return [
             Removed(
                 reason=reason,

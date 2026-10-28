@@ -89,7 +89,7 @@ from app.extraction.model import (
     Removed,
     Warning,
 )
-from app.extraction.normalize import PAGE_NUMBER_LINE, normalize_line_breaks
+from app.extraction.normalize import PAGE_NUMBER_LINE
 from app.extraction.references import external_reference_warnings
 from app.textclean import TextCleaner, clean_text
 from app.textclean.symbols import CHECKBOX_GLYPHS, CHECKED, UNCHECKED, WINGDINGS
@@ -361,7 +361,7 @@ class _Collector:
             return
         if len(self.removed) >= MAX_LIST_ITEMS:
             raise ExtractionError(TOO_MUCH_TEXT)
-        cleaned = clean_text(normalize_line_breaks(head[:HEAD_CHARS])).text
+        cleaned = clean_text(head[:HEAD_CHARS]).text
         sample = _SPACES.sub(" ", cleaned).strip()[:MAX_SAMPLE_CHARS]
         self.removed.append(Removed(reason=reason, count=count, sample=sample))
 
@@ -375,7 +375,7 @@ class _Collector:
         self.warnings.append(Warning(code=code, page=None))
 
     def paragraph(self, part: Part, text: str) -> None:
-        text = self.cleaner.clean(normalize_line_breaks(text)).strip()
+        text = self.cleaner.clean(text).strip()
         if not text:
             return
         lines = self.lines.get(part)
