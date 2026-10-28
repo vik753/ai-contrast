@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState, type Dispatch } from "react";
 import type { SegmentResult } from "../api/segment";
 import { checkWithRetry } from "./check";
-import { createRequestBudget, freeSlots, type RequestBudget } from "./budget";
+import { createRequestBudget, freeSlots, released, type RequestBudget } from "./budget";
 import { awaitsSegment, type AcceptedFile, type UploadAction, type UploadState } from "./state";
 
 /** One attempt to split one row. Must not throw. */
@@ -29,6 +29,18 @@ export function useSegmentScheduler(
 ): void {
   /** The budget is shared with the file checks when the form passes one. */
   const [shared] = useState(() => budget ?? createRequestBudget());
+  /** Bumped when the other scheduler frees a slot, so this effect runs again. */
+  const [wakeCount, setWakeCount] = useState(0);
+
+  useEffect(() => {
+    const wake = (): void => {
+      setWakeCount((count) => count + 1);
+    };
+    shared.wake.add(wake);
+    return () => {
+      shared.wake.delete(wake);
+    };
+  }, [shared]);
   const segmentRef = useRef(segment);
 
   useEffect(() => {
@@ -37,6 +49,7 @@ export function useSegmentScheduler(
 
   useEffect(() => {
     const inFlight = shared.splits;
+    let freed = false;
     const waiting = state.contracts.flatMap((c) => c.files.filter(awaitsSegment));
     const waitingIds = new Set(waiting.map((f) => f.id));
 
@@ -44,7 +57,12 @@ export function useSegmentScheduler(
       if (!waitingIds.has(id)) {
         inFlight.delete(id);
         controller.abort();
+        freed = true;
       }
+    }
+    if (freed) {
+      // No state change follows an abort: wake the other scheduler to use the slot.
+      released(shared);
     }
 
     const orphans = waiting
@@ -77,7 +95,7 @@ export function useSegmentScheduler(
         },
       );
     }
-  }, [state, dispatch, shared]);
+  }, [state, dispatch, shared, wakeCount]);
 
   // Unmount: abort every request. A new mount starts with an empty map.
   useEffect(() => {

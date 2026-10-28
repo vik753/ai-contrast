@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState, type Dispatch } from "react";
 import type { ExtractResult } from "../api/extract";
 import { checkWithRetry } from "./check";
-import { createRequestBudget, freeSlots, type RequestBudget } from "./budget";
+import { createRequestBudget, freeSlots, released, type RequestBudget } from "./budget";
 import { filesWithStatus, isPending, type UploadAction, type UploadState } from "./state";
 
 /** One check attempt for one file. Must not throw. */
@@ -28,6 +28,18 @@ export function useCheckScheduler(
 ): void {
   /** The budget is shared with the clause splits when the form passes one. */
   const [shared] = useState(() => budget ?? createRequestBudget());
+  /** Bumped when the other scheduler frees a slot, so this effect runs again. */
+  const [wakeCount, setWakeCount] = useState(0);
+
+  useEffect(() => {
+    const wake = (): void => {
+      setWakeCount((count) => count + 1);
+    };
+    shared.wake.add(wake);
+    return () => {
+      shared.wake.delete(wake);
+    };
+  }, [shared]);
   const checkRef = useRef(check);
 
   useEffect(() => {
@@ -36,6 +48,7 @@ export function useCheckScheduler(
 
   useEffect(() => {
     const inFlight = shared.checks;
+    let freed = false;
     const pending = new Set(
       state.contracts.flatMap((c) => c.files.filter(isPending).map((f) => f.id)),
     );
@@ -45,7 +58,12 @@ export function useCheckScheduler(
       if (!pending.has(id)) {
         inFlight.delete(id);
         controller.abort();
+        freed = true;
       }
+    }
+    if (freed) {
+      // No state change follows an abort: wake the other scheduler to use the slot.
+      released(shared);
     }
 
     // `checking` files that lost their request: queue them again.
@@ -80,7 +98,7 @@ export function useCheckScheduler(
         },
       );
     }
-  }, [state, dispatch, shared]);
+  }, [state, dispatch, shared, wakeCount]);
 
   // Unmount: abort every check. A new mount starts with an empty map.
   useEffect(() => {
