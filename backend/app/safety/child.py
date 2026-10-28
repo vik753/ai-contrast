@@ -16,15 +16,9 @@ from pydantic import ValidationError
 from app.pseudo.gate import PseudonymizedDocument, SafetyError, safety_pass
 from app.pseudo.lexicon import DETECTOR_VERSION
 from app.pseudo.untrusted import UntrustedMaskedDocument
+from app.segment.child import no_duplicate_keys
 
 INVALID_REQUEST = "invalid_request"
-
-
-def _no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result = dict(pairs)
-    if len(result) != len(pairs):
-        raise ValueError
-    return result
 
 
 def digest(document: PseudonymizedDocument) -> str:
@@ -40,7 +34,7 @@ def digest(document: PseudonymizedDocument) -> str:
 def run(data: bytes, *, max_clauses: int) -> bytes:
     try:
         untrusted = UntrustedMaskedDocument.model_validate_json(data)
-        json.loads(data.decode("utf-8"), object_pairs_hook=_no_duplicate_keys)
+        json.loads(data.decode("utf-8"), object_pairs_hook=no_duplicate_keys)
     except (ValidationError, ValueError):
         return json.dumps({"error": INVALID_REQUEST}).encode()
     try:

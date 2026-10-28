@@ -40,7 +40,7 @@ def _error(code: str) -> bytes:
     return json.dumps({"error": code}).encode()
 
 
-def _no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+def no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result = dict(pairs)
     if len(result) != len(pairs):
         raise ValueError
@@ -97,7 +97,7 @@ def run(  # noqa: PLR0913 - the caps come from the parent header, one value each
 ) -> bytes:
     try:
         request = SegmentRequest.model_validate_json(data)
-        json.loads(data.decode("utf-8"), object_pairs_hook=_no_duplicate_keys)
+        json.loads(data.decode("utf-8"), object_pairs_hook=no_duplicate_keys)
     except (ValidationError, ValueError):
         return _error(INVALID_REQUEST)
     if any(block.page is not None and block.page > max_pages for block in request.blocks):

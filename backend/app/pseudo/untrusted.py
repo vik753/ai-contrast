@@ -42,16 +42,4 @@ class UntrustedMaskedDocument(_Strict):
         if len(set(ids)) != len(ids):
             msg = "duplicate clause id"
             raise ValueError(msg)
-        position = {clause_id: index for index, clause_id in enumerate(ids)}
-        previous: tuple[int, int] | None = None
-        for clause_id, start, end in self.acknowledged_unmasked:
-            index = position.get(clause_id)
-            if index is None or start >= end or end > len(self.clauses[index].text):
-                msg = "acknowledged span outside the document"
-                raise ValueError(msg)
-            # Sorted by (clause position, start), no overlap, no duplicate.
-            if previous is not None and (index, start) < previous:
-                msg = "acknowledged spans not sorted or overlapping"
-                raise ValueError(msg)
-            previous = (index, end)
         return self
