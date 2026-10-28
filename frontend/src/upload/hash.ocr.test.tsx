@@ -4,6 +4,7 @@ import { useReducer } from "react";
 import { describe, expect, it } from "vitest";
 import { sha256Hex } from "../hash/sha256";
 import { normalizeForHash } from "../hash/normalize";
+import { segmentAll, splitActions } from "../test/segment-router";
 import { okResult } from "../test/upload-fakes";
 import {
   hashNotes,
@@ -42,7 +43,7 @@ describe("text hash after OCR", () => {
   it("test_scan_gets_a_text_hash_and_a_warning_only_after_ocr_finished", async () => {
     const { result } = renderHook(() => {
       const [state, dispatch] = useReducer(uploadReducer, initialUploadState, (s) =>
-        acts.reduce(uploadReducer, s),
+        segmentAll(acts.reduce(uploadReducer, s)),
       );
       useHashing(state, dispatch, () => undefined);
       return { state, dispatch };
@@ -64,6 +65,17 @@ describe("text hash after OCR", () => {
       fileId: "scan",
       pages: [{ page: 1, text: TEXT, confidence: 90 }],
     });
+    // The text hash waits for the clause split (S5-T2).
+    await waitFor(() => {
+      expect(files().find((f) => f.id === "scan")?.extraction.ocrPages).toEqual([]);
+    });
+    const scan = files().find((f) => f.id === "scan");
+    expect(scan).toBeDefined();
+    if (scan !== undefined) {
+      for (const action of splitActions(scan)) {
+        result.current.dispatch(action);
+      }
+    }
     await waitFor(() => {
       expect(files().find((f) => f.id === "scan")?.textHash).toBe(expected);
     });

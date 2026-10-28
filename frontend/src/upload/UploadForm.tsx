@@ -14,6 +14,9 @@
  * - A Google document is added by link (S3-T6): the browser keeps only the ID,
  *   in memory, and sends it to `POST /api/extract/google-doc` through the same
  *   scheduler. The row is shown as "Google Docs document …<last 6 of the ID>".
+ * - An accepted file with its text complete is split into clauses by
+ *   `POST /api/segment` (S5-T2, `useSegmentScheduler`); the cleaned blocks of the
+ *   reply replace its text. A failed split shows its message and "Try again".
  * - Accepted files keep their extracted text in memory only; the per-contract
  *   `Preview` shows it as plain text (S3-T4).
  */
@@ -31,6 +34,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { extractFile } from "../api/extract";
 import { extractGoogleDoc, parseGoogleDocLink } from "../api/googleDoc";
+import { segmentBlocks } from "../api/segment";
 import { formReducer, initialFormState, type Announcement } from "./announcements";
 import { FileStatusIcon } from "./FileStatusIcon";
 import { displaySize, limitText } from "./format";
@@ -44,16 +48,20 @@ import {
   fileIdsToKeep,
   initialUploadState,
   needsOcr,
+  awaitsSegment,
   hashNotes,
   readiness,
   type Contract,
   type HashNote,
   type RejectionCode,
   type UploadFile,
+  type UploadFileStatus,
 } from "./state";
+import { createRequestBudget } from "./budget";
 import { useCheckScheduler, type CheckFile } from "./useCheckScheduler";
 import { useHashing } from "./useHashing";
 import { useOcrScheduler } from "./useOcrScheduler";
+import { useSegmentScheduler, type SegmentRow } from "./useSegmentScheduler";
 
 const NO_NOTES: readonly HashNote[] = [];
 
@@ -124,7 +132,22 @@ function announcementText(t: TFunction, announcement: Announcement, locale: stri
         name: fileDisplayName(t, announcement),
         reason: errorText(t, announcement.code, locale),
       });
+    case "segmentFailed":
+      return t("upload.announce.segmentFailed", {
+        name: fileDisplayName(t, announcement),
+        reason: errorText(t, announcement.code, locale),
+      });
   }
+}
+
+/** The clause split of an accepted row, shown next to its kind: the count, or "splitting". */
+function segmentNote(t: TFunction, file: UploadFile): string | null {
+  if (file.status !== "accepted" || needsOcr(file) || file.segment?.status === "failed") {
+    return null;
+  }
+  return file.segment?.status === "done"
+    ? t("upload.clauses.count", { count: file.segment.clauses.length })
+    : t("upload.clauses.splitting");
 }
 
 function statusText(t: TFunction, file: UploadFile, locale: string): string {
@@ -138,6 +161,9 @@ function statusText(t: TFunction, file: UploadFile, locale: string): string {
         return file.ocr === undefined
           ? t("upload.ocr.waiting")
           : t("upload.ocr.progress", { current: file.ocr.current, total: file.ocr.total });
+      }
+      if (file.segment?.status === "failed") {
+        return errorText(t, file.segment.code, locale);
       }
       return t(`upload.kind.${file.kind}`);
     case "rejected":
@@ -165,16 +191,29 @@ function noteText(t: TFunction, note: HashNote): string {
   }
 }
 
+/** The icon follows the work in progress: OCR and the clause split show as "checking". */
+function rowIconStatus(file: UploadFile): UploadFileStatus {
+  if (file.status !== "accepted") {
+    return file.status;
+  }
+  if (file.segment?.status === "failed") {
+    return "rejected";
+  }
+  return needsOcr(file) || awaitsSegment(file) ? "checking" : "accepted";
+}
+
 interface FileRowProps {
   file: UploadFile;
   notes: readonly HashNote[];
   onRemove: () => void;
+  onRetry: () => void;
 }
 
-function FileRow({ file, notes, onRemove }: FileRowProps) {
+function FileRow({ file, notes, onRemove, onRetry }: FileRowProps) {
   const { t } = useTranslation();
   const locale = useLocale();
   const name = fileDisplayName(t, file);
+  const note = segmentNote(t, file);
   // A Google document has no size until the server has read it.
   const sizeKnown = file.googleSuffix === undefined || file.size > 0;
   return (
@@ -184,8 +223,17 @@ function FileRow({ file, notes, onRemove }: FileRowProps) {
         {sizeKnown && <span className="file-row__size">{sizeText(t, file.size, locale)}</span>}
       </span>
       <span className="file-row__status">
-        <FileStatusIcon status={needsOcr(file) ? "checking" : file.status} />
-        <span className="file-row__status-text">{statusText(t, file, locale)}</span>
+        <FileStatusIcon status={rowIconStatus(file)} />
+        <span className="file-row__status-text">
+          <span>{statusText(t, file, locale)}</span>
+          {note !== null && (
+            <>
+              {" · "}
+              <span>{note}</span>
+            </>
+          )}
+          {/* Keeps the text apart from the next control for readers of the row text. */}{" "}
+        </span>
       </span>
       {notes.length > 0 && (
         <span className="file-row__notes">
@@ -198,6 +246,11 @@ function FileRow({ file, notes, onRemove }: FileRowProps) {
             );
           })}
         </span>
+      )}
+      {file.status === "accepted" && file.segment?.status === "failed" && (
+        <button type="button" className="button button--small" onClick={onRetry}>
+          {t("upload.retry")}
+        </button>
       )}
       <button
         type="button"
@@ -219,6 +272,7 @@ interface ContractCardProps {
   onAddFiles: (contractId: string, files: File[]) => void;
   onAddGoogleDoc: (contractId: string, link: string) => GoogleLinkProblem | null;
   onRemoveFile: (contractId: string, fileId: string) => void;
+  onRetryFile: (fileId: string) => void;
   onRemoveContract: (contractId: string) => void;
   addButtonRef: (contractId: string, element: HTMLButtonElement | null) => void;
 }
@@ -231,6 +285,7 @@ function ContractCard({
   onAddFiles,
   onAddGoogleDoc,
   onRemoveFile,
+  onRetryFile,
   onRemoveContract,
   addButtonRef,
 }: ContractCardProps) {
@@ -318,6 +373,9 @@ function ContractCard({
               notes={notes.get(file.id) ?? NO_NOTES}
               onRemove={() => {
                 onRemoveFile(contract.id, file.id);
+              }}
+              onRetry={() => {
+                onRetryFile(file.id);
               }}
             />
           ))}
@@ -445,7 +503,15 @@ export function UploadForm() {
     return extractFile(blob, { signal });
   }, []);
 
-  useCheckScheduler(state, dispatch, check);
+  const segment = useCallback<SegmentRow>(
+    (file, signal) => segmentBlocks(file.extraction.blocks, file.extraction.pages, { signal }),
+    [],
+  );
+  // One budget of in-flight requests for checks and splits. The split hook runs first
+  // (effects run in order), so a row that is already extracted goes before new checks.
+  const [budget] = useState(createRequestBudget);
+  useSegmentScheduler(state, dispatch, segment, budget);
+  useCheckScheduler(state, dispatch, check, budget);
 
   const fileById = useCallback((fileId: string) => filesRef.current.get(fileId), []);
   useOcrScheduler(state, dispatch, fileById);
@@ -570,6 +636,10 @@ export function UploadForm() {
     dispatch({ type: "fileRemoved", contractId, fileId });
   };
 
+  const retryFile = (fileId: string): void => {
+    dispatch({ type: "segmentRetried", fileId });
+  };
+
   const removeContract = (contractId: string): void => {
     focusRef.current = { type: "addContract" };
     dispatch({ type: "contractRemoved", contractId });
@@ -609,6 +679,7 @@ export function UploadForm() {
             onAddFiles={addFiles}
             onAddGoogleDoc={addGoogleDoc}
             onRemoveFile={removeFile}
+            onRetryFile={retryFile}
             onRemoveContract={removeContract}
             addButtonRef={registerAddButton}
           />

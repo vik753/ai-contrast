@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupI18n } from "../i18n";
 import { resetBrowserEnv } from "../test/browser-env";
 import { FakeFetch, acceptAsPdf, fileList, makeFile } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import { UploadForm } from "./UploadForm";
 
 let server: FakeFetch;
@@ -18,7 +19,7 @@ let server: FakeFetch;
 beforeEach(() => {
   resetBrowserEnv();
   server = new FakeFetch();
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {

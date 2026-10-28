@@ -120,7 +120,12 @@
       "google_doc_not_found": "The document was not found. Check the link, then remove this row and add the link again.",
       "google_doc_too_large": "The document is too large. Download it as DOCX or PDF, split it into parts and upload the parts as separate files.",
       "google_doc_unavailable": "Google Docs did not give the document. Try again in a minute, or download it as DOCX or PDF and upload the file.",
-      "google_doc_timeout": "Google Docs took too long to answer. Try again in a minute, or download it as DOCX or PDF and upload the file."
+      "google_doc_timeout": "Google Docs took too long to answer. Try again in a minute, or download it as DOCX or PDF and upload the file.",
+      "too_many_clauses": "The file has too many clauses. Split it into parts and add them as separate files.",
+      "clause_too_long": "One clause is too long to process. Split the file into parts and add them as separate files.",
+      "segment_timeout": "Splitting the text into clauses took too long. Try again, or use a shorter file.",
+      "segment_failed": "The text could not be split into clauses. Try again, or check the file and add it again.",
+      "invalid_response": "The server gave an unexpected answer while splitting the text. Try again."
     },
     "preview": {
       "title": "Preview",
@@ -138,7 +143,9 @@
         "endnote": "Endnote",
         "header": "Header",
         "footer": "Footer",
-        "textbox": "Text box"
+        "textbox": "Text box",
+        "running": "Running header or footer",
+        "preamble": "Preamble"
       },
       "page": "Page {{page}}",
       "showAll_one": "Show all {{count}} block",
@@ -153,7 +160,13 @@
           "same_color": "Same color as the background",
           "tiny_text": "Too small to read",
           "control_characters": "Control characters",
-          "other": "Other invisible text"
+          "other": "Other invisible text",
+          "control_character": "Control characters",
+          "default_ignorable": "Invisible characters",
+          "format_character": "Invisible formatting characters",
+          "private_use": "Private-use characters",
+          "unassigned": "Unassigned characters",
+          "surrogate": "Broken characters"
         }
       },
       "warning": {
@@ -165,10 +178,24 @@
         "external_reference": "The file refers to outside content that was not read. Check it in the original file.",
         "ocr_used": "Some pages are scans. The text was recognized automatically and can contain mistakes. Check it in the original file.",
         "ocr_low_confidence": "Text recognition was uncertain on some pages. Check them in the original file.",
-        "unknown": "Some content could not be read. Check it in the original file."
+        "unknown": "Some content could not be read. Check it in the original file.",
+        "numbering_gap": "Clause numbers skip a number. Check that no clause is missing.",
+        "numbering_restart": "Clause numbering starts again from 1. Check the file structure.",
+        "duplicate_number": "Two clauses have the same number. Check the file structure.",
+        "no_numbering_found": "No clause numbers were found. The text is split by paragraphs."
       },
       "warningPages": "(pages: {{pages}})",
-      "ocrPages": "Pages that need text recognition: {{pages}}."
+      "ocrPages": "Pages that need text recognition: {{pages}}.",
+      "view": {
+        "label": "Preview view",
+        "clauses": "Clauses",
+        "text": "Text"
+      },
+      "requisites": "Requisites",
+      "clausePages": "Pages: {{pages}}",
+      "warningClauses": "(clauses: {{numbers}})",
+      "showAllClauses_one": "Show all {{count}} clause",
+      "showAllClauses_other": "Show all {{count}} clauses"
     },
     "ocr": {
       "progress": "Recognizing page {{current}} of {{total}}…",
@@ -179,7 +206,8 @@
       "checking": "Checking files…",
       "rejected_files": "Remove the files that were not accepted",
       "ready_one": "Ready to compare: {{count}} contract",
-      "ready_other": "Ready to compare: {{count}} contracts"
+      "ready_other": "Ready to compare: {{count}} contracts",
+      "segment_failed": "Some files were not split into clauses. Try again or remove them"
     },
     "privacy": "Our server checks each file and does not keep it: files are not stored. File names stay in your browser and are never sent.",
     "announce": {
@@ -189,7 +217,14 @@
       "filesAdded_other": "{{count}} files added to Contract {{label}}.",
       "fileRemoved": "File {{name}} removed.",
       "fileAccepted": "File {{name}} accepted: {{kind}}.",
-      "fileRejected": "File {{name}} not accepted. {{reason}}"
+      "fileRejected": "File {{name}} not accepted. {{reason}}",
+      "segmentFailed": "Could not split {{name}} into clauses. {{reason}}"
+    },
+    "retry": "Try again",
+    "clauses": {
+      "splitting": "Splitting into clauses…",
+      "count_one": "{{count}} clause",
+      "count_other": "{{count}} clauses"
     }
   },
   "settings": {

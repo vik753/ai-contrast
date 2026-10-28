@@ -15,7 +15,9 @@
 import { memo, useEffect, useId, useMemo, useRef, useState, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 import type { Block, BlockPart, Extraction, ExtractionWarning, RemovedText } from "../api/extract";
+import { clauseBody, clauseHeading, type Clause, type SegmentWarning } from "../api/segment";
 import { fileDisplayName, type NamedFile } from "./names";
+import type { SegmentState } from "./state";
 
 /** Blocks rendered per file before "Show all". */
 export const PREVIEW_BLOCK_LIMIT = 200;
@@ -23,15 +25,15 @@ export const PREVIEW_BLOCK_LIMIT = 200;
 /** Characters (UTF-16 units) rendered per file before "Show all". */
 export const PREVIEW_CHAR_LIMIT = 50_000;
 
-export interface ShownBlock {
-  readonly block: Block;
+export interface ShownBlock<T extends { readonly text: string } = Block> {
+  readonly block: T;
   /** The text to render: the whole block text, or its start when `shortened`. */
   readonly text: string;
   readonly shortened: boolean;
 }
 
-export interface DefaultView {
-  readonly shown: readonly ShownBlock[];
+export interface DefaultView<T extends { readonly text: string } = Block> {
+  readonly shown: readonly ShownBlock<T>[];
   /** `true` when every block is shown in full. */
   readonly complete: boolean;
 }
@@ -42,12 +44,12 @@ export interface DefaultView {
  * block that crosses the character cap is cut there (never inside a
  * surrogate pair) and marked as shortened.
  */
-export function defaultView(
-  blocks: readonly Block[],
+export function defaultView<T extends { readonly text: string } = Block>(
+  blocks: readonly T[],
   maxBlocks: number = PREVIEW_BLOCK_LIMIT,
   maxChars: number = PREVIEW_CHAR_LIMIT,
-): DefaultView {
-  const shown: ShownBlock[] = [];
+): DefaultView<T> {
+  const shown: ShownBlock<T>[] = [];
   let chars = 0;
   for (const block of blocks) {
     if (shown.length >= maxBlocks) {
@@ -77,6 +79,8 @@ export function defaultView(
 export interface PreviewFile extends NamedFile {
   readonly id: string;
   readonly extraction: Extraction;
+  /** The clause split, once it is done: the preview then offers "Clauses". */
+  readonly segment?: SegmentState;
 }
 
 type WarningKey =
@@ -88,6 +92,10 @@ type WarningKey =
   | "upload.preview.warning.external_reference"
   | "upload.preview.warning.ocr_used"
   | "upload.preview.warning.ocr_low_confidence"
+  | "upload.preview.warning.numbering_gap"
+  | "upload.preview.warning.numbering_restart"
+  | "upload.preview.warning.duplicate_number"
+  | "upload.preview.warning.no_numbering_found"
   | "upload.preview.warning.unknown";
 
 /** Known warning codes. `Map` lookups never reach `Object.prototype`. */
@@ -100,6 +108,10 @@ const WARNING_KEYS: ReadonlyMap<string, WarningKey> = new Map<string, WarningKey
   ["external_reference", "upload.preview.warning.external_reference"],
   ["ocr_used", "upload.preview.warning.ocr_used"],
   ["ocr_low_confidence", "upload.preview.warning.ocr_low_confidence"],
+  ["numbering_gap", "upload.preview.warning.numbering_gap"],
+  ["numbering_restart", "upload.preview.warning.numbering_restart"],
+  ["duplicate_number", "upload.preview.warning.duplicate_number"],
+  ["no_numbering_found", "upload.preview.warning.no_numbering_found"],
 ]);
 
 type ReasonKey =
@@ -107,6 +119,12 @@ type ReasonKey =
   | "upload.preview.removed.reason.same_color"
   | "upload.preview.removed.reason.tiny_text"
   | "upload.preview.removed.reason.control_characters"
+  | "upload.preview.removed.reason.control_character"
+  | "upload.preview.removed.reason.default_ignorable"
+  | "upload.preview.removed.reason.format_character"
+  | "upload.preview.removed.reason.private_use"
+  | "upload.preview.removed.reason.unassigned"
+  | "upload.preview.removed.reason.surrogate"
   | "upload.preview.removed.reason.other";
 
 const REASON_KEYS: ReadonlyMap<string, ReasonKey> = new Map<string, ReasonKey>([
@@ -114,6 +132,12 @@ const REASON_KEYS: ReadonlyMap<string, ReasonKey> = new Map<string, ReasonKey>([
   ["same_color", "upload.preview.removed.reason.same_color"],
   ["tiny_text", "upload.preview.removed.reason.tiny_text"],
   ["control_characters", "upload.preview.removed.reason.control_characters"],
+  ["control_character", "upload.preview.removed.reason.control_character"],
+  ["default_ignorable", "upload.preview.removed.reason.default_ignorable"],
+  ["format_character", "upload.preview.removed.reason.format_character"],
+  ["private_use", "upload.preview.removed.reason.private_use"],
+  ["unassigned", "upload.preview.removed.reason.unassigned"],
+  ["surrogate", "upload.preview.removed.reason.surrogate"],
 ]);
 
 export function warningKey(code: string): WarningKey {
@@ -148,6 +172,30 @@ export function groupWarnings(warnings: readonly ExtractionWarning[]): WarningGr
     key,
     pages: Array.from(pages).sort((a, b) => a - b),
   }));
+}
+
+/** Segment warnings: one entry per message, with the numbers of the clauses it is about. */
+export interface ClauseWarningGroup {
+  readonly key: WarningKey;
+  readonly clauses: readonly Clause[];
+}
+
+export function groupClauseWarnings(
+  warnings: readonly SegmentWarning[],
+  clauses: readonly Clause[],
+): ClauseWarningGroup[] {
+  const byId = new Map(clauses.map((clause) => [clause.id, clause]));
+  const groups = new Map<WarningKey, Clause[]>();
+  for (const warning of warnings) {
+    const key = warningKey(warning.code);
+    const list = groups.get(key) ?? [];
+    const clause = warning.clause === null ? undefined : byId.get(warning.clause);
+    if (clause !== undefined) {
+      list.push(clause);
+    }
+    groups.set(key, list);
+  }
+  return Array.from(groups, ([key, list]) => ({ key, clauses: list }));
 }
 
 function pageList(pages: readonly number[], locale: string): string {
@@ -243,12 +291,173 @@ function BlockItem({
   );
 }
 
+type View = "clauses" | "text";
+
+/** A clause ready to show: its text is read from the spans once. */
+interface ClauseItem {
+  readonly clause: Clause;
+  readonly heading: string | null;
+  readonly text: string;
+}
+
+const CLAUSE_PART_KEYS = {
+  body: "upload.preview.part.body",
+  footnote: "upload.preview.part.footnote",
+  endnote: "upload.preview.part.endnote",
+  header: "upload.preview.part.header",
+  footer: "upload.preview.part.footer",
+  textbox: "upload.preview.part.textbox",
+  running: "upload.preview.part.running",
+  preamble: "upload.preview.part.preamble",
+} as const;
+
+function ClauseListItem({
+  item,
+  focusRef,
+}: {
+  item: ShownBlock<ClauseItem>;
+  focusRef?: Ref<HTMLLIElement> | undefined;
+}) {
+  const { t } = useTranslation();
+  const locale = useLocale();
+  const { clause, heading } = item.block;
+  return (
+    <li className="preview-block" ref={focusRef} tabIndex={focusRef === undefined ? undefined : -1}>
+      <span className="preview-block__meta">
+        {clause.number !== null && (
+          <bdi className="preview-clause__number preview-text">{clause.number}</bdi>
+        )}
+        {clause.part !== "body" && <span>{t(CLAUSE_PART_KEYS[clause.part])}</span>}
+        {clause.sectionKind === "requisites" && (
+          <span className="preview-clause__badge">{t("upload.preview.requisites")}</span>
+        )}
+        {clause.pages.length > 0 && (
+          <span>{t("upload.preview.clausePages", { pages: pageList(clause.pages, locale) })}</span>
+        )}
+      </span>
+      {heading !== null && <bdi className="preview-clause__heading preview-text">{heading}</bdi>}
+      {item.text !== "" && <bdi className="preview-block__text preview-text">{item.text}</bdi>}
+      {item.shortened && (
+        <span className="preview-block__shortened">{t("upload.preview.shortened")}</span>
+      )}
+    </li>
+  );
+}
+
+function ClauseList({
+  clauses,
+  warnings,
+  blocks,
+}: {
+  clauses: readonly Clause[];
+  warnings: readonly SegmentWarning[];
+  blocks: readonly Block[];
+}) {
+  const { t } = useTranslation();
+  const [showAll, setShowAll] = useState(false);
+  const items: readonly ClauseItem[] = useMemo(
+    () =>
+      clauses.map((clause) => ({
+        clause,
+        heading: clauseHeading(blocks, clause),
+        text: clauseBody(blocks, clause),
+      })),
+    [clauses, blocks],
+  );
+  const groups = useMemo(() => groupClauseWarnings(warnings, clauses), [warnings, clauses]);
+  const view = useMemo(() => defaultView(items), [items]);
+  const shown: readonly ShownBlock<ClauseItem>[] = useMemo(
+    () =>
+      showAll ? items.map((block) => ({ block, text: block.text, shortened: false })) : view.shown,
+    [showAll, items, view],
+  );
+  const focusIndex = showAll
+    ? view.shown.length - (view.shown.at(-1)?.shortened === true ? 1 : 0)
+    : -1;
+  const focusRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (showAll) {
+      focusRef.current?.focus();
+    }
+  }, [showAll]);
+
+  return (
+    <>
+      {groups.length > 0 && (
+        <ul className="preview-warnings">
+          {groups.map((group) => (
+            <li key={group.key} className="preview-warning">
+              <WarningIcon />
+              <span>{t(group.key)}</span>
+              {group.clauses.some((clause) => clause.number !== null) && (
+                <span className="preview-warning__pages">
+                  {" "}
+                  {t("upload.preview.warningClauses", {
+                    numbers: group.clauses
+                      .map((clause) => clause.number)
+                      .filter((number) => number !== null)
+                      .join(", "),
+                  })}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ol className="preview-blocks">
+        {shown.map((item, index) => (
+          <ClauseListItem
+            key={index}
+            item={item}
+            focusRef={index === focusIndex ? focusRef : undefined}
+          />
+        ))}
+      </ol>
+      {!showAll && !view.complete && (
+        <button
+          type="button"
+          className="button button--small button--quiet"
+          onClick={() => {
+            setShowAll(true);
+          }}
+        >
+          {t("upload.preview.showAllClauses", { count: clauses.length })}
+        </button>
+      )}
+    </>
+  );
+}
+
+function ViewSwitch({ view, onChange }: { view: View; onChange: (view: View) => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="preview-switch" role="group" aria-label={t("upload.preview.view.label")}>
+      {(["clauses", "text"] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          className="button button--small"
+          aria-pressed={view === value}
+          onClick={() => {
+            onChange(value);
+          }}
+        >
+          {t(`upload.preview.view.${value}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const FilePreview = memo(function FilePreview({ file }: { file: PreviewFile }) {
   const { t } = useTranslation();
   const locale = useLocale();
   const headingId = useId();
   const [showAll, setShowAll] = useState(false);
+  const [chosen, setChosen] = useState<View>("clauses");
   const { extraction } = file;
+  const segment = file.segment?.status === "done" ? file.segment : undefined;
+  const mode: View = segment === undefined ? "text" : chosen;
   const view = useMemo(() => defaultView(extraction.blocks), [extraction.blocks]);
   const warnings = useMemo(() => groupWarnings(extraction.warnings), [extraction.warnings]);
   const shown: readonly ShownBlock[] = useMemo(
@@ -306,16 +515,28 @@ const FilePreview = memo(function FilePreview({ file }: { file: PreviewFile }) {
 
       {extraction.removed.length > 0 && <RemovedList removed={extraction.removed} />}
 
-      <ol className="preview-blocks">
-        {shown.map((item, index) => (
-          <BlockItem
-            key={index}
-            item={item}
-            focusRef={index === focusIndex ? focusRef : undefined}
-          />
-        ))}
-      </ol>
-      {!showAll && !view.complete && (
+      {segment !== undefined && <ViewSwitch view={mode} onChange={setChosen} />}
+
+      {mode === "clauses" && segment !== undefined && (
+        <ClauseList
+          clauses={segment.clauses}
+          warnings={segment.warnings}
+          blocks={extraction.blocks}
+        />
+      )}
+
+      {mode === "text" && (
+        <ol className="preview-blocks">
+          {shown.map((item, index) => (
+            <BlockItem
+              key={index}
+              item={item}
+              focusRef={index === focusIndex ? focusRef : undefined}
+            />
+          ))}
+        </ol>
+      )}
+      {mode === "text" && !showAll && !view.complete && (
         <button
           type="button"
           className="button button--small button--quiet"

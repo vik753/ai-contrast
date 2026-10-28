@@ -21,7 +21,8 @@ export type Announcement =
   | { type: "filesAdded"; label: string; count: number }
   | { type: "fileRemoved"; name: string; googleSuffix?: string }
   | { type: "fileAccepted"; name: string; kind: FileKind; googleSuffix?: string }
-  | { type: "fileRejected"; name: string; code: RejectionCode; googleSuffix?: string };
+  | { type: "fileRejected"; name: string; code: RejectionCode; googleSuffix?: string }
+  | { type: "segmentFailed"; name: string; code: RejectionCode; googleSuffix?: string };
 
 /** The part of a file that names it: its file name, or the suffix of a Google document. */
 function nameOf(file: UploadFile): { name: string; googleSuffix?: string } {
@@ -104,6 +105,17 @@ export function describeChange(
       return [];
     case "fileChecked":
       return resultOf(findFile(next, action.fileId));
+    case "segmentStarted":
+    case "segmentsRequeued":
+    case "segmentRetried":
+      return [];
+    case "segmentFinished": {
+      // A failed split is news (with our message, never the server text); clauses are not announced.
+      const file = findFile(next, action.fileId);
+      return file?.status === "accepted" && file.segment?.status === "failed"
+        ? [{ type: "segmentFailed", ...nameOf(file), code: file.segment.code }]
+        : [];
+    }
     case "ocrProgress":
       return [];
     case "ocrFinished":

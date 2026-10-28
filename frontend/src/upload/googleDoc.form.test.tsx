@@ -37,6 +37,7 @@ import {
   makeFile,
   okResponse,
 } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import * as UploadFormModule from "./UploadForm";
 
 const EN = flattenLocale(enJson);
@@ -56,7 +57,7 @@ let server: FakeFetch;
 beforeEach(() => {
   resetBrowserEnv();
   server = new FakeFetch();
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {

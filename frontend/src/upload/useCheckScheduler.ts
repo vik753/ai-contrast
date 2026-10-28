@@ -1,7 +1,8 @@
 /**
  * Check scheduler for the upload form (S2-T2 AC4, AC8).
  *
- * - At most `MAX_PARALLEL_REQUESTS` checks in flight; the rest stay `queued`.
+ * - At most `MAX_PARALLEL_REQUESTS` requests in flight, counting the clause splits too
+ *   (`RequestBudget`); the rest stay `queued`.
  * - `check` makes one attempt; this hook retries `busy` (see `checkWithRetry`).
  * - A file that waits for its hash (`awaitingHash`) is not sent yet, and holds back
  *   the files after it (display order).
@@ -10,10 +11,10 @@
  * - When the effect starts again (remount, StrictMode), `checking` files
  *   without a request in flight go back to `queued`, so no file is stuck.
  */
-import { useEffect, useRef, type Dispatch } from "react";
+import { useEffect, useRef, useState, type Dispatch } from "react";
 import type { ExtractResult } from "../api/extract";
 import { checkWithRetry } from "./check";
-import { MAX_PARALLEL_REQUESTS } from "./limits";
+import { createRequestBudget, freeSlots, released, type RequestBudget } from "./budget";
 import { filesWithStatus, isPending, type UploadAction, type UploadState } from "./state";
 
 /** One check attempt for one file. Must not throw. */
@@ -23,9 +24,22 @@ export function useCheckScheduler(
   state: UploadState,
   dispatch: Dispatch<UploadAction>,
   check: CheckFile,
+  budget?: RequestBudget,
 ): void {
-  /** Requests in flight (also during a `busy` wait), by file id. */
-  const inFlightRef = useRef(new Map<string, AbortController>());
+  /** The budget is shared with the clause splits when the form passes one. */
+  const [shared] = useState(() => budget ?? createRequestBudget());
+  /** Bumped when the other scheduler frees a slot, so this effect runs again. */
+  const [wakeCount, setWakeCount] = useState(0);
+
+  useEffect(() => {
+    const wake = (): void => {
+      setWakeCount((count) => count + 1);
+    };
+    shared.wake.add(wake);
+    return () => {
+      shared.wake.delete(wake);
+    };
+  }, [shared]);
   const checkRef = useRef(check);
 
   useEffect(() => {
@@ -33,7 +47,8 @@ export function useCheckScheduler(
   }, [check]);
 
   useEffect(() => {
-    const inFlight = inFlightRef.current;
+    const inFlight = shared.checks;
+    let freed = false;
     const pending = new Set(
       state.contracts.flatMap((c) => c.files.filter(isPending).map((f) => f.id)),
     );
@@ -43,7 +58,12 @@ export function useCheckScheduler(
       if (!pending.has(id)) {
         inFlight.delete(id);
         controller.abort();
+        freed = true;
       }
+    }
+    if (freed) {
+      // No state change follows an abort: wake the other scheduler to use the slot.
+      released(shared);
     }
 
     // `checking` files that lost their request: queue them again.
@@ -55,7 +75,7 @@ export function useCheckScheduler(
       return;
     }
 
-    const free = MAX_PARALLEL_REQUESTS - inFlight.size;
+    const free = freeSlots(shared);
     if (free <= 0) {
       return;
     }
@@ -78,16 +98,16 @@ export function useCheckScheduler(
         },
       );
     }
-  }, [state, dispatch]);
+  }, [state, dispatch, shared, wakeCount]);
 
   // Unmount: abort every check. A new mount starts with an empty map.
   useEffect(() => {
-    const inFlight = inFlightRef.current;
+    const inFlight = shared.checks;
     return () => {
       for (const controller of inFlight.values()) {
         controller.abort();
       }
       inFlight.clear();
     };
-  }, []);
+  }, [shared]);
 }

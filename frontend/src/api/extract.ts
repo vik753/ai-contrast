@@ -52,10 +52,21 @@ export type ServerErrorCode =
   | "google_doc_not_found"
   | "google_doc_too_large"
   | "google_doc_unavailable"
-  | "google_doc_timeout";
+  | "google_doc_timeout"
+  // Clauses (S5-T1): only `POST /api/segment`.
+  | "too_many_clauses"
+  | "clause_too_long"
+  | "segment_timeout"
+  | "segment_failed";
 
 /** Error codes produced in the browser only. */
-export type ClientErrorCode = "network_error" | "timeout" | "aborted" | "unknown_error";
+export type ClientErrorCode =
+  | "network_error"
+  | "timeout"
+  | "aborted"
+  | "unknown_error"
+  /** A `200` answer of `POST /api/segment` that broke the contract (S5-T2). */
+  | "invalid_response";
 
 export type ExtractErrorCode = ServerErrorCode | ClientErrorCode;
 
@@ -92,9 +103,21 @@ export interface Extraction {
   readonly warnings: readonly ExtractionWarning[];
 }
 
-export type ExtractResult =
-  | { ok: true; kind: FileKind; bytes: number; extraction: Extraction }
-  | { ok: false; code: ExtractErrorCode; retryAfterSeconds?: number };
+export interface ExtractSuccess {
+  ok: true;
+  kind: FileKind;
+  bytes: number;
+  extraction: Extraction;
+}
+
+/** A request that failed. The code comes from an allowlist; server text never gets here. */
+export interface PostFailure {
+  readonly ok: false;
+  readonly code: ExtractErrorCode;
+  readonly retryAfterSeconds?: number;
+}
+
+export type ExtractResult = ExtractSuccess | PostFailure;
 
 export interface ExtractOptions {
   /** Aborts the request; the result is then `aborted`. */
@@ -206,7 +229,7 @@ function isServerErrorCode(
   return errors.get(status)?.has(code) === true;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -214,16 +237,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * Exactly these own keys, no more (`extra="forbid"`). `JSON.parse` makes a
  * `"__proto__"` key an own property, so it is caught here as an unknown key.
  */
-function hasExactKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
+export function hasExactKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
   const own = Object.keys(record);
   return own.length === keys.length && keys.every((key) => Object.hasOwn(record, key));
 }
 
-function isPositiveInt(value: unknown): value is number {
+export function isPositiveInt(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
-function isCode(value: unknown): value is string {
+export function isCode(value: unknown): value is string {
   return typeof value === "string" && CODE_PATTERN.test(value);
 }
 
@@ -297,11 +320,11 @@ function isJson(headers: Headers): boolean {
  * A page number: positive, and within `pages` for a PDF. DOCX and text have
  * no pages, so their page is always `null`.
  */
-function isPageOf(value: unknown, pages: number | null): value is number {
+export function isPageOf(value: unknown, pages: number | null): value is number {
   return pages !== null && isPositiveInt(value) && value <= pages;
 }
 
-function parseBlocks(value: unknown, pages: number | null): Block[] | null {
+export function parseBlocks(value: unknown, pages: number | null): Block[] | null {
   if (!Array.isArray(value) || value.length > MAX_BLOCKS) {
     return null;
   }
@@ -346,7 +369,7 @@ function parseOcrPages(value: unknown, pages: number | null): number[] | null {
   return list as number[];
 }
 
-function parseRemoved(value: unknown): RemovedText[] | null {
+export function parseRemoved(value: unknown): RemovedText[] | null {
   if (!Array.isArray(value) || value.length > MAX_REMOVED) {
     return null;
   }
@@ -399,7 +422,7 @@ function parseWarnings(value: unknown, pages: number | null): ExtractionWarning[
 }
 
 /** The stage 3 `200` body, validated strictly. `null` when anything is off. */
-function parseSuccess(body: Record<string, unknown>, rules: ResponseRules): ExtractResult | null {
+function parseSuccess(body: Record<string, unknown>, rules: ResponseRules): ExtractSuccess | null {
   if (!hasExactKeys(body, RESULT_KEYS)) {
     return null;
   }
@@ -528,24 +551,26 @@ async function readCapped(
   }
 }
 
-function failure(code: ExtractErrorCode): ExtractResult {
+function failure(code: ExtractErrorCode): PostFailure {
   return { ok: false, code };
 }
 
-function interpret(
+function interpret<T extends { ok: true }>(
   status: number,
   body: unknown,
-  rules: ResponseRules,
+  errors: ErrorTable,
+  parse: (body: Record<string, unknown>) => T | null,
+  invalidCode: ExtractErrorCode,
   headers: Headers,
-): ExtractResult {
+): T | PostFailure {
   if (!isPlainObject(body)) {
-    return failure("unknown_error");
+    return failure(status === 200 ? invalidCode : "unknown_error");
   }
   if (status === 200) {
-    return parseSuccess(body, rules) ?? failure("unknown_error");
+    return parse(body) ?? failure(invalidCode);
   }
   const code = ownValue(body, "error");
-  if (typeof code !== "string" || !isServerErrorCode(rules.errors, status, code)) {
+  if (typeof code !== "string" || !isServerErrorCode(errors, status, code)) {
     return failure("unknown_error");
   }
   if (code === "busy") {
@@ -558,16 +583,19 @@ function interpret(
 }
 
 /**
- * Sends one request to an extraction endpoint and validates the answer with
- * `rules`. Shared by `extractFile` and `extractGoogleDoc`. Never throws. An
- * error result never contains text from the server; an ok result carries the
- * validated extraction (plain text, shown as text only).
+ * Sends one request and validates the answer: `parse` checks a `200` body
+ * strictly (`null` = contract broken, reported as `invalidCode`), `errors` is
+ * the allowlist of error codes per status. Shared by every endpoint. Never
+ * throws. An error result never contains text from the server; an ok result
+ * carries validated data (plain text, shown as text only).
  */
-export async function postExtract(
+export async function postValidated<T extends { ok: true }>(
   request: ExtractRequest,
-  rules: ResponseRules,
+  errors: ErrorTable,
+  parse: (body: Record<string, unknown>) => T | null,
   options: ExtractOptions = {},
-): Promise<ExtractResult> {
+  invalidCode: ExtractErrorCode = "unknown_error",
+): Promise<T | PostFailure> {
   const { signal, fetchImpl, timeoutMs = DEFAULT_EXTRACT_TIMEOUT_MS } = options;
   if (signal?.aborted === true) {
     return failure("aborted");
@@ -612,7 +640,7 @@ export async function postExtract(
       });
       if (!isJson(response.headers)) {
         void response.body?.cancel().catch(() => undefined);
-        return failure("unknown_error");
+        return failure(response.status === 200 ? invalidCode : "unknown_error");
       }
       text = await readCapped(
         response,
@@ -626,13 +654,32 @@ export async function postExtract(
       return failure(stopReason("aborted"));
     }
     if (text === UNREADABLE) {
-      return failure("unknown_error");
+      return failure(response.status === 200 ? invalidCode : "unknown_error");
     }
-    return interpret(response.status, parseJson(text), rules, response.headers);
+    return interpret(
+      response.status,
+      parseJson(text),
+      errors,
+      parse,
+      invalidCode,
+      response.headers,
+    );
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", onCallerAbort);
   }
+}
+
+/**
+ * Sends one request to an extraction endpoint and validates the answer with
+ * `rules`. Shared by `extractFile` and `extractGoogleDoc`. Never throws.
+ */
+export function postExtract(
+  request: ExtractRequest,
+  rules: ResponseRules,
+  options: ExtractOptions = {},
+): Promise<ExtractResult> {
+  return postValidated(request, rules.errors, (body) => parseSuccess(body, rules), options);
 }
 
 /**

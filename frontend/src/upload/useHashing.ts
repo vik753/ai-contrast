@@ -6,14 +6,14 @@
  *   stays `queued` until its hash is in the state. A failure (no Web Crypto,
  *   unreadable file) clears the wait without a hash: duplicate detection is a
  *   help, not a gate.
- * - Text: when a row is accepted and has no OCR pages left, its normalized text
- *   is hashed.
+ * - Text: when a row has its clauses (the text is then the cleaned text of the
+ *   server, S5-T2), its normalized text is hashed.
  * - A result for a row that left the state is dropped by the reducer.
  */
 import { useEffect, useRef, type Dispatch } from "react";
 import { sha256Hex } from "../hash/sha256";
 import {
-  needsOcr,
+  isSegmented,
   textToHash,
   type AcceptedFile,
   type UploadAction,
@@ -112,8 +112,7 @@ export function useHashing(
     const rows = state.contracts
       .flatMap((c) => c.files)
       .filter(
-        (f): f is AcceptedFile =>
-          f.status === "accepted" && !needsOcr(f) && f.textHash === undefined && !started.has(f.id),
+        (f): f is AcceptedFile => isSegmented(f) && f.textHash === undefined && !started.has(f.id),
       );
     for (const row of rows) {
       started.add(row.id);
