@@ -243,3 +243,79 @@ def test_safety_unmasked_identifier_spans_have_no_duplicates(make_client: Make) 
     keys = [tuple(s) for s in spans]
     assert len(keys) == len(set(keys))
     assert len(keys) >= 3
+
+
+# --- round 2: separators between a placeholder and a partial value -----------------------------
+
+SEPARATORS = {
+    "nbsp": " ",
+    "narrow-nbsp": " ",
+    "thin-space": " ",
+    "tab": "\t",
+    "nb-hyphen": "‑",
+    "en-dash": "–",
+    "underscore": "_",
+    "comma": ",",
+    "colon": ":",
+    "pipe": "|",
+}
+
+
+@pytest.mark.parametrize("sep", sorted(SEPARATORS))
+def test_safety_iban_tail_after_placeholder_and_separator_returns_unmasked_identifier(
+    make_client: Make, sep: str
+) -> None:
+    client = make_client()
+    text = f"Pay to [A.ACCOUNT_1]{SEPARATORS[sep]}{IBAN[-15:]} today."
+    start = text.index(IBAN[-15:])
+
+    spans = _unmasked(post_doc(client, doc(detector_version(client), text)))
+
+    assert _overlaps(spans, (start, start + 15)), spans
+
+
+@pytest.mark.parametrize("sep", sorted(SEPARATORS))
+def test_safety_iban_head_before_placeholder_and_separator_returns_unmasked_identifier(
+    make_client: Make, sep: str
+) -> None:
+    client = make_client()
+    head = IBAN[:14]
+    assert head.startswith("UA")
+    text = f"Pay to {head}{SEPARATORS[sep]}[A.ACCOUNT_1] today."
+    start = text.index(head)
+
+    spans = _unmasked(post_doc(client, doc(detector_version(client), text)))
+
+    assert _overlaps(spans, (start, start + 14)), spans
+
+
+def test_safety_phone_tail_after_placeholder_with_nbsp_returns_unmasked_identifier(
+    make_client: Make,
+) -> None:
+    client = make_client()
+    tail = "123 45 67"
+    text = f"[A.PHONE_1] {tail}"
+
+    spans = _unmasked(post_doc(client, doc(detector_version(client), text)))
+
+    assert _overlaps(spans, (text.index(tail), len(text))), spans
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[A.ORG_1], сплачує 1 000 грн протягом 10 днів.",
+        "[A.ORG_1] сплачує 25 % до 15.03.2026 та 1 000,50 грн.",
+        "[A.PERSON_1], the Buyer, pays 30 days after 01.02.2026.",
+        "[A.ORG_1]: сплачує 1000 грн.",
+        "[A.ORG_1] сплачує 10 днів.",
+    ],
+)
+def test_safety_normal_words_amounts_and_dates_after_placeholder_pass(
+    make_client: Make, text: str
+) -> None:
+    client = make_client()
+
+    response = post_doc(client, doc(detector_version(client), text))
+
+    assert response.status_code == 200, response.text[:200]
