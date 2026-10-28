@@ -6,7 +6,12 @@
  * `node` environment have no DOM, so the cleanup is skipped for them.
  */
 import { createHash } from "node:crypto";
+import { configure } from "@testing-library/dom";
 import { afterEach } from "vitest";
+
+// Forms chain several fake requests; with the whole suite running in parallel a step can
+// take over the 1 s default of `waitFor` and `findBy*` (and the stale-ref race fixed in usePseudoReviews).
+configure({ asyncUtilTimeout: 3000 });
 
 /**
  * SHA-256 through Web Crypto runs on a thread pool, so its result arrives after

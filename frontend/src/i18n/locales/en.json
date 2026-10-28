@@ -333,7 +333,8 @@
       "unmasked_identifier": "The safety check found more text that looks like an identifier. It is masked now. Check it and confirm again.",
       "too_many_identifiers": "The contract has too many identifiers. Split it into parts.",
       "safety_failed": "The safety check failed. Try again.",
-      "unknown_error": "The server gave an unexpected answer. Try again."
+      "unknown_error": "The server gave an unexpected answer. Try again.",
+      "unmapped_span": "The safety check returned text that could not be matched to the contract. Remove the file and add it again."
     }
   }
 }

@@ -13,7 +13,8 @@
  * - Clause text = the spans of the clause joined with "\n" (heading included). A requisites
  *   line that the server marked `drop` is left out unless the client unmasked a value in it.
  * - Offsets are code points (the server counts them so). Clause-relative offsets count the
- *   clause text before masking.
+ *   MASKED clause text (the only text the server sees): `acknowledgedUnmasked` returns them,
+ *   and `applyUnmaskedIdentifiers` takes them from the server and maps them back.
  */
 import { spanText, unitOffset, codePointOffset, blockLength } from "../api/segment";
 import type { ClauseSpan, MaskedClause } from "../api/safetyCheck";
@@ -184,6 +185,7 @@ export interface ViewClause {
 }
 
 interface Segment {
+  /** Offsets in the masked clause text (what the server sees), in code points. */
   readonly origStart: number;
   readonly origEnd: number;
   readonly block: number;
@@ -424,17 +426,18 @@ function buildView(review: Review): View {
           continue;
         }
         const length = cpLength(piece.text);
-        const segment = {
+        // What this piece adds to the masked text: the placeholder, or the text itself.
+        const shown = piece.kind === "mark" ? assign(piece.entity, piece.text) : piece.text;
+        const width = piece.kind === "mark" ? cpLength(shown) : length;
+        clauseSegments.push({
           origStart: orig,
-          origEnd: orig + length,
+          origEnd: orig + width,
           block: piece.block,
           start: piece.start,
-        };
-        clauseSegments.push({ ...segment, masked: piece.kind === "mark" });
-        if (piece.kind === "mark") {
-          out.text += assign(piece.entity, piece.text);
-        } else {
-          out.text += piece.text;
+          masked: piece.kind === "mark",
+        });
+        out.text += shown;
+        if (piece.kind !== "mark") {
           if (piece.kind === "text" && piece.occ !== undefined) {
             const owner = review.entities[piece.occ.entity];
             if (owner !== undefined && !owner.manual) {
@@ -442,7 +445,7 @@ function buildView(review: Review): View {
             }
           }
         }
-        orig += length;
+        orig += width;
       }
     };
     for (const pieces of spans) {
@@ -741,7 +744,7 @@ export function countMaskable(review: Review, span: Span): number {
 
 /**
  * Masks the spans that the safety check found unmasked. Spans are clause-relative offsets
- * into the clause text before masking. An unmasked occurrence they touch is masked again;
+ * into the MASKED clause text. An unmasked occurrence they touch is masked again;
  * any other text gets a manual mask. Everything touched is marked for a new confirmation.
  */
 export function applyUnmaskedIdentifiers(review: Review, spans: readonly ClauseSpan[]): Review {
@@ -781,6 +784,19 @@ export function applyUnmaskedIdentifiers(review: Review, spans: readonly ClauseS
     }
   }
   return next;
+}
+
+/**
+ * The server spans that cannot be mapped back to the contract text: an unknown clause, or a
+ * start inside a placeholder or outside any text. They are never dropped silently: the caller
+ * shows an error and the contract stays not ready.
+ */
+export function unmappedSpans(review: Review, spans: readonly ClauseSpan[]): ClauseSpan[] {
+  const segments = viewOf(review).segments;
+  return spans.filter(([clauseId, start]) => {
+    const found = segments.get(clauseId)?.find((s) => s.origStart <= start && start < s.origEnd);
+    return found === undefined || found.masked;
+  });
 }
 
 /* --- DOM positions -------------------------------------------------------------------------- */

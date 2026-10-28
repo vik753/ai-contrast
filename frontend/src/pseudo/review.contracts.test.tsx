@@ -126,7 +126,7 @@ describe("two contracts", () => {
     expect(screen.getByTestId("pseudo-status-B").textContent).toBe(t("pseudo.status.ready"));
   }
 
-  it("test_removing_contract_a_keeps_b_review_and_readiness_and_drops_a", async () => {
+  it("test_removing_contract_a_keeps_b_decisions_resets_its_readiness_and_drops_a", async () => {
     await both();
     const before = safetyBodies.length;
     // Two contracts is the minimum: add a third so that A can be removed.
@@ -139,17 +139,25 @@ describe("two contracts", () => {
       fireEvent.click(screen.getByRole("button", { name: "Remove Contract A" }));
     });
     await settle(30);
-    // B is now the first contract: label A, review and readiness intact.
-    expect(screen.getByTestId("pseudo-status-A").textContent).toBe(t("pseudo.status.ready"));
+    // B is now the first contract: label A. Its placeholders changed, so it is not ready.
+    expect(screen.getByTestId("pseudo-status-A").textContent).toBe(t("pseudo.status.notReviewed"));
     const review = screen.getByTestId("pseudo-review-A");
     expect(review.textContent).toContain("Gamma LLC");
     expect(review.textContent).toContain("[A.ORG_1]");
     expect(review.textContent).not.toContain("[B.");
-    // Nothing of the removed contract is left in the page, and nothing was sent again.
+    // Nothing of the removed contract is left in the page, and nothing was sent yet.
     for (const secret of SECRETS) {
       expect(document.body.textContent).not.toContain(secret);
     }
     expect(safetyBodies).toHaveLength(before);
+    // The decisions are kept: confirming sends the new label with the same replacements.
+    act(() => {
+      fireEvent.click(within(review).getByRole("button", { name: t("pseudo.everythingCorrect") }));
+    });
+    await settle(20);
+    expect(safetyBodies).toHaveLength(before + 1);
+    expect(JSON.stringify(safetyBodies.at(-1))).toContain("[A.ORG_1]");
+    expect(screen.getByTestId("pseudo-status-A").textContent).toBe(t("pseudo.status.ready"));
   });
 
   it("test_edit_in_one_contract_does_not_reset_the_other", async () => {

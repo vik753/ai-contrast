@@ -22,6 +22,7 @@ const ERROR_CODES = [
   "unmasked_identifier",
   "too_many_identifiers",
   "safety_failed",
+  "unmapped_span",
 ] as const;
 type ErrorCode = (typeof ERROR_CODES)[number];
 

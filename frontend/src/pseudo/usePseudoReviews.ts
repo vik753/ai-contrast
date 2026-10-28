@@ -14,6 +14,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -35,6 +36,7 @@ import {
   mergeSegmentations,
   relabel,
   startReview,
+  unmappedSpans,
   type Review,
 } from "./masking";
 
@@ -136,7 +138,9 @@ export function usePseudoReviews(
   const [store] = useState(() => new EntryStore());
   const entries = useSyncExternalStore(store.subscribe, store.get);
   const stateRef = useRef(state);
-  useEffect(() => {
+  // A layout effect: a passive one may run after the next click, and the handlers below
+  // would read the previous state (the cause of rare "review does not open" runs).
+  useLayoutEffect(() => {
     stateRef.current = state;
   });
 
@@ -170,7 +174,16 @@ export function usePseudoReviews(
   // Drop a review whose contract left or whose rows changed. Its request ends with it.
   useEffect(() => {
     const stale: string[] = [];
+    const relabelled: string[] = [];
     for (const [id, entry] of entries) {
+      const label = contractLabel(state.contracts.findIndex((c) => c.id === id));
+      if (
+        entry.review !== null &&
+        entry.review.label !== label &&
+        state.contracts.some((c) => c.id === id)
+      ) {
+        relabelled.push(id);
+      }
       const sources = sourcesOf(state, id);
       const gone = !state.contracts.some((c) => c.id === id);
       if (
@@ -180,16 +193,30 @@ export function usePseudoReviews(
         stale.push(id);
       }
     }
-    if (stale.length === 0) {
+    if (stale.length === 0 && relabelled.length === 0) {
       return;
     }
-    for (const id of stale) {
+    for (const id of [...stale, ...relabelled]) {
       abort(id);
     }
     store.update((current) => {
       const next = new Map(current);
       for (const id of stale) {
         next.delete(id);
+      }
+      // A new label changes every placeholder, so the masked text is a new text: the
+      // decisions stay, the safety check must pass again.
+      for (const id of relabelled) {
+        const entry = next.get(id);
+        const label = contractLabel(state.contracts.findIndex((c) => c.id === id));
+        if (entry?.review) {
+          next.set(id, {
+            ...entry,
+            review: relabel(entry.review, label),
+            phase: "editing",
+            error: null,
+          });
+        }
       }
       return next;
     });
@@ -243,11 +270,13 @@ export function usePseudoReviews(
       if (result.ok) {
         put(contractId, { ...current, phase: "ready", error: null });
       } else if (result.code === "unmasked_identifier" && result.spans !== undefined) {
+        // A span that cannot be mapped is an error, not a silent drop: no confirmation then.
+        const unmapped = unmappedSpans(current.review, result.spans).length > 0;
         put(contractId, {
           ...current,
           review: applyUnmaskedIdentifiers(current.review, result.spans),
-          phase: "confirmAgain",
-          error: "unmasked_identifier",
+          phase: unmapped ? "editing" : "confirmAgain",
+          error: unmapped ? "unmapped_span" : "unmasked_identifier",
         });
       } else if (result.code === "detector_version_mismatch") {
         const sources = sourcesOf(stateRef.current, contractId);
@@ -270,9 +299,15 @@ export function usePseudoReviews(
       (found.review === null || (sources !== null && sameSources(found.sources, sources.parts)))
         ? found
         : undefined;
+    const label = contractLabel(index);
+    // Until the effect stores the new label, show the contract as not ready.
+    const shown =
+      entry?.review && entry.review.label !== label
+        ? { ...entry, phase: "editing" as const, error: null }
+        : entry;
     return {
       available: sources !== null,
-      entry,
+      entry: shown,
       open: () => {
         const now = sourcesOf(stateRef.current, contractId);
         const review = now === null ? null : reviewOf(now, contractLabel(index));
