@@ -16,7 +16,7 @@ from fastapi.telemetry import TelemetryConfig
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import extract, google_doc, health
+from app.api import extract, google_doc, health, segment
 from app.api.validation_errors import validation_error_handler
 from app.extraction.limiter import ExtractionLimiter
 from app.middleware import (
@@ -67,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(extract.router)
     app.include_router(google_doc.router)
+    app.include_router(segment.router)
     for name in NET_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
     app.state.settings = settings
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         BodySizeLimitMiddleware,
         max_file_bytes=settings.max_file_bytes,
         max_json_body_bytes=settings.max_json_body_bytes,
+        max_segment_body_bytes=settings.segment_max_body_bytes,
     )
     app.add_middleware(
         CORSMiddleware,

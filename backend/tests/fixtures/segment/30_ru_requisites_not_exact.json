@@ -1,0 +1,24 @@
+{
+  "name": "30_ru_requisites_not_exact",
+  "language": "ru",
+  "description": "Near-miss headings are NOT requisites: 'ПОДПИСИ СТОРОН ПО АКТУ' is not in the closed list; a numbered clause that mentions the words is never requisites.",
+  "blocks": [
+    {"text": "1. Приемка работ", "part": "body", "page": null},
+    {"text": "1.1. Работы принимаются по акту.", "part": "body", "page": null},
+    {"text": "ПОДПИСИ СТОРОН ПО АКТУ", "part": "body", "page": null},
+    {"text": "Заказчик: ________________", "part": "body", "page": null},
+    {"text": "Исполнитель: ________________", "part": "body", "page": null},
+    {"text": "2. Прочие условия", "part": "body", "page": null},
+    {"text": "2.1. Реквизиты и подписи сторон указаны в конце договора.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Приемка работ", "section_kind": null, "part": "body", "starts_with": "1. Приемка работ"},
+      {"number": "1.1", "heading": "Приемка работ", "section_kind": null, "part": "body", "starts_with": "1.1. Работы принимаются по акту."},
+      {"number": null, "heading": "ПОДПИСИ СТОРОН ПО АКТУ", "section_kind": null, "part": "body", "starts_with": "ПОДПИСИ СТОРОН ПО АКТУ"},
+      {"number": "2", "heading": "Прочие условия", "section_kind": null, "part": "body", "starts_with": "2. Прочие условия"},
+      {"number": "2.1", "heading": "Прочие условия", "section_kind": null, "part": "body", "starts_with": "2.1. Реквизиты и подписи сторон"}
+    ],
+    "warnings": []
+  }
+}

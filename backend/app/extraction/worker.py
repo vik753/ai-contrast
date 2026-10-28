@@ -6,7 +6,10 @@ Started by ``app.extraction.sandbox`` only, never by hand. Protocol:
 - stdin: one JSON header line ``{"kind", "size", "max_text_chars", "max_blocks",
   "docx_max_part_bytes", "docx_max_total_bytes", "docx_max_xml_depth",
   "docx_max_elements", "pdf_max_pages", "pdf_max_prev_chain"}``, then exactly
-  ``size`` bytes of the file.
+  ``size`` bytes of the file. Kind ``segment`` (ADR 0014): the header holds
+  ``{"kind", "size", "max_text_chars", "max_blocks", "pdf_max_pages",
+  "segment_max_clauses", "segment_max_clause_chars"}`` and the bytes are the raw
+  JSON request.
 - stdout: one JSON object, ``{"result": <ExtractionResult>}`` or
   ``{"error": "<code>"}``; exit status 0.
 - Any other failure: exit status 1 and nothing on stdout. stderr is drained and
@@ -123,7 +126,22 @@ def _fork_probe() -> None:
     os._exit(_HOOK_EXIT)
 
 
+def _segment(data: bytes, header: dict[str, object]) -> bytes:
+    from app.segment.child import run  # noqa: PLC0415 - after the limits
+
+    return run(
+        data,
+        max_text_chars=_non_negative(header, "max_text_chars"),
+        max_blocks=_non_negative(header, "max_blocks"),
+        max_pages=_non_negative(header, "pdf_max_pages"),
+        max_clauses=_non_negative(header, "segment_max_clauses"),
+        max_clause_chars=_non_negative(header, "segment_max_clause_chars"),
+    )
+
+
 def _extract(kind: str, data: bytes, header: dict[str, object]) -> bytes:
+    if kind == "segment":
+        return _segment(data, header)
     from app.extraction.model import (  # noqa: PLC0415 - after the limits
         ExtractionError,
         ExtractionResult,

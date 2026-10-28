@@ -1,0 +1,31 @@
+{
+  "name": "06_en_roman_sections",
+  "language": "en",
+  "description": "Motor policy. Roman section titles (I., II., III.) with continuous Arabic clause numbers underneath; no warnings.",
+  "blocks": [
+    {"text": "INSURANCE POLICY", "part": "body", "page": null},
+    {"text": "This policy is issued by the Insurer to the Insured.", "part": "body", "page": null},
+    {"text": "I. GENERAL PROVISIONS", "part": "body", "page": null},
+    {"text": "1. The Insurer covers the Insured against loss of the insured vehicle.", "part": "body", "page": null},
+    {"text": "2. The policy period is twelve months.", "part": "body", "page": null},
+    {"text": "II. COVERAGE AND EXCLUSIONS", "part": "body", "page": null},
+    {"text": "3. The Insurer does not pay for loss caused by war or nuclear risks.", "part": "body", "page": null},
+    {"text": "4. The deductible is 500 per claim.", "part": "body", "page": null},
+    {"text": "III. CLAIMS", "part": "body", "page": null},
+    {"text": "5. The Insured must report a loss within 5 days.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "INSURANCE POLICY"},
+      {"number": "I", "heading": "GENERAL PROVISIONS", "section_kind": null, "part": "body", "starts_with": "I. GENERAL PROVISIONS"},
+      {"number": "1", "heading": "GENERAL PROVISIONS", "section_kind": null, "part": "body", "starts_with": "1. The Insurer covers the"},
+      {"number": "2", "heading": "GENERAL PROVISIONS", "section_kind": null, "part": "body", "starts_with": "2. The policy period is twelve"},
+      {"number": "II", "heading": "COVERAGE AND EXCLUSIONS", "section_kind": null, "part": "body", "starts_with": "II. COVERAGE AND EXCLUSIONS"},
+      {"number": "3", "heading": "COVERAGE AND EXCLUSIONS", "section_kind": null, "part": "body", "starts_with": "3. The Insurer does not pay"},
+      {"number": "4", "heading": "COVERAGE AND EXCLUSIONS", "section_kind": null, "part": "body", "starts_with": "4. The deductible is 500"},
+      {"number": "III", "heading": "CLAIMS", "section_kind": null, "part": "body", "starts_with": "III. CLAIMS"},
+      {"number": "5", "heading": "CLAIMS", "section_kind": null, "part": "body", "starts_with": "5. The Insured must report"}
+    ],
+    "warnings": []
+  }
+}

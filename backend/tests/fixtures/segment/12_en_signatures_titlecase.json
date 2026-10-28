@@ -1,0 +1,26 @@
+{
+  "name": "12_en_signatures_titlecase",
+  "language": "en",
+  "description": "Title-case unnumbered 'Signatures' line at the end. Not all-caps, not numbered, not followed by numbered clauses, so the heading rule alone does not fire. AMBIGUOUS. Expected here: the closed requisites list makes it a heading with section_kind requisites.",
+  "blocks": [
+    {"text": "LICENSE AGREEMENT", "part": "body", "page": null},
+    {"text": "The Licensor grants the Licensee a licence on the terms below.", "part": "body", "page": null},
+    {"text": "1. Grant of licence", "part": "body", "page": null},
+    {"text": "1.1. The licence is non-exclusive and limited to one site.", "part": "body", "page": null},
+    {"text": "1.2. The Licensee may not sublicense the software.", "part": "body", "page": null},
+    {"text": "Signatures", "part": "body", "page": null},
+    {"text": "Licensor: ________________", "part": "body", "page": null},
+    {"text": "Licensee: ________________", "part": "body", "page": null},
+    {"text": "Date: ________________", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "LICENSE AGREEMENT"},
+      {"number": "1", "heading": "Grant of licence", "section_kind": null, "part": "body", "starts_with": "1. Grant of licence"},
+      {"number": "1.1", "heading": "Grant of licence", "section_kind": null, "part": "body", "starts_with": "1.1. The licence is non-exclusive"},
+      {"number": "1.2", "heading": "Grant of licence", "section_kind": null, "part": "body", "starts_with": "1.2. The Licensee may not"},
+      {"number": null, "heading": "Signatures", "section_kind": "requisites", "part": "body", "starts_with": "Signatures"}
+    ],
+    "warnings": []
+  }
+}

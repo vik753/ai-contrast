@@ -1,0 +1,25 @@
+{
+  "name": "27_en_pdf_numbered_line_repeats",
+  "language": "en",
+  "description": "PDF, 4 pages. The numbered line '2. Internal copy.' repeats on every page. A clause-start line is never running: every copy starts its own clause. Consecutive equal numbers give one duplicate_number per extra copy (3). Warning list is per occurrence.",
+  "blocks": [
+    {"text": "1. The Seller delivers the goods.", "part": "body", "page": 1},
+    {"text": "2. Internal copy.", "part": "body", "page": 1},
+    {"text": "The goods are packed in boxes.", "part": "body", "page": 2},
+    {"text": "2. Internal copy.", "part": "body", "page": 2},
+    {"text": "Packing is paid by the Seller.", "part": "body", "page": 3},
+    {"text": "2. Internal copy.", "part": "body", "page": 3},
+    {"text": "Transport is paid by the Buyer.", "part": "body", "page": 4},
+    {"text": "2. Internal copy.", "part": "body", "page": 4}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": null, "section_kind": null, "part": "body", "starts_with": "1. The Seller delivers the goods."},
+      {"number": "2", "heading": null, "section_kind": null, "part": "body", "starts_with": "2. Internal copy."},
+      {"number": "2", "heading": null, "section_kind": null, "part": "body", "starts_with": "2. Internal copy."},
+      {"number": "2", "heading": null, "section_kind": null, "part": "body", "starts_with": "2. Internal copy."},
+      {"number": "2", "heading": null, "section_kind": null, "part": "body", "starts_with": "2. Internal copy."}
+    ],
+    "warnings": ["duplicate_number", "duplicate_number", "duplicate_number"]
+  }
+}

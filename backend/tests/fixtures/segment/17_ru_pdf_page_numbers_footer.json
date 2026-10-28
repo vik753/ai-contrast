@@ -1,0 +1,34 @@
+{
+  "name": "17_ru_pdf_page_numbers_footer",
+  "language": "ru",
+  "description": "PDF, 3 pages. The header is an exact repeat: running. The footer 'Страница N из 3' differs by digits, so it is NOT an exact match: it is not collapsed and stays as text of the clause above it.",
+  "blocks": [
+    {"text": "Условия страхования — общая часть.", "part": "body", "page": 1},
+    {"text": "ДОГОВОР СТРАХОВАНИЯ ИМУЩЕСТВА", "part": "body", "page": 1},
+    {"text": "Страховщик и Страхователь заключили настоящий договор.", "part": "body", "page": 1},
+    {"text": "1. Страховая сумма", "part": "body", "page": 1},
+    {"text": "1.1. Страховая сумма равна 300 000 гривен.", "part": "body", "page": 1},
+    {"text": "Страница 1 из 3", "part": "body", "page": 1},
+    {"text": "Условия страхования — общая часть.", "part": "body", "page": 2},
+    {"text": "1.2. Страховая сумма не изменяется в течение срока договора.", "part": "body", "page": 2},
+    {"text": "2. Франшиза", "part": "body", "page": 2},
+    {"text": "2.1. Франшиза составляет 2 % от страховой суммы.", "part": "body", "page": 2},
+    {"text": "Страница 2 из 3", "part": "body", "page": 2},
+    {"text": "Условия страхования — общая часть.", "part": "body", "page": 3},
+    {"text": "2.2. Франшиза не применяется при полной гибели имущества.", "part": "body", "page": 3},
+    {"text": "Страница 3 из 3", "part": "body", "page": 3}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "running", "starts_with": "Условия страхования — общая"},
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВОР СТРАХОВАНИЯ ИМУЩЕСТВА"},
+      {"number": "1", "heading": "Страховая сумма", "section_kind": null, "part": "body", "starts_with": "1. Страховая сумма"},
+      {"number": "1.1", "heading": "Страховая сумма", "section_kind": null, "part": "body", "starts_with": "1.1. Страховая сумма равна"},
+      {"number": "1.2", "heading": "Страховая сумма", "section_kind": null, "part": "body", "starts_with": "1.2. Страховая сумма не изменяется"},
+      {"number": "2", "heading": "Франшиза", "section_kind": null, "part": "body", "starts_with": "2. Франшиза"},
+      {"number": "2.1", "heading": "Франшиза", "section_kind": null, "part": "body", "starts_with": "2.1. Франшиза составляет 2 %"},
+      {"number": "2.2", "heading": "Франшиза", "section_kind": null, "part": "body", "starts_with": "2.2. Франшиза не применяется"}
+    ],
+    "warnings": []
+  }
+}

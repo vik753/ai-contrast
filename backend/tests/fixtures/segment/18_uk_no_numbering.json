@@ -1,0 +1,24 @@
+{
+  "name": "18_uk_no_numbering",
+  "language": "uk",
+  "description": "No numbering at all. Every body block is its own clause (part body, not preamble); the footnote is its own clause; warning no_numbering_found.",
+  "blocks": [
+    {"text": "Договір про надання консультаційних послуг", "part": "body", "page": null},
+    {"text": "Консультант зобов'язується надавати Клієнту консультації з питань оподаткування.", "part": "body", "page": null},
+    {"text": "Клієнт сплачує винагороду протягом десяти днів після підписання акта.", "part": "body", "page": null},
+    {"text": "Кожна зі Сторін може розірвати договір, письмово повідомивши іншу Сторону за місяць.", "part": "body", "page": null},
+    {"text": "Спори вирішуються в суді за місцезнаходженням відповідача.", "part": "body", "page": null},
+    {"text": "Під консультаціями розуміються лише усні та письмові поради.", "part": "footnote", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "body", "starts_with": "Договір про надання"},
+      {"number": null, "heading": null, "section_kind": null, "part": "body", "starts_with": "Консультант зобов'язується"},
+      {"number": null, "heading": null, "section_kind": null, "part": "body", "starts_with": "Клієнт сплачує винагороду"},
+      {"number": null, "heading": null, "section_kind": null, "part": "body", "starts_with": "Кожна зі Сторін може"},
+      {"number": null, "heading": null, "section_kind": null, "part": "body", "starts_with": "Спори вирішуються в суді"},
+      {"number": null, "heading": null, "section_kind": null, "part": "footnote", "starts_with": "Під консультаціями розуміються"}
+    ],
+    "warnings": ["no_numbering_found"]
+  }
+}

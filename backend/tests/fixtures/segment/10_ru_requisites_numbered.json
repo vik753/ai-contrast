@@ -1,0 +1,29 @@
+{
+  "name": "10_ru_requisites_numbered",
+  "language": "ru",
+  "description": "Services. Numbered requisites heading at the end (whole heading line in the closed list): heading plus unnumbered lines form one clause with section_kind requisites.",
+  "blocks": [
+    {"text": "ДОГОВОР ОКАЗАНИЯ УСЛУГ", "part": "body", "page": null},
+    {"text": "Заказчик и Исполнитель заключили настоящий договор.", "part": "body", "page": null},
+    {"text": "1. Предмет договора", "part": "body", "page": null},
+    {"text": "1.1. Исполнитель оказывает Заказчику услуги по переводу документов.", "part": "body", "page": null},
+    {"text": "2. Ответственность сторон", "part": "body", "page": null},
+    {"text": "2.1. За просрочку оплаты Заказчик уплачивает пеню 0,1 % в день.", "part": "body", "page": null},
+    {"text": "3. Реквизиты и подписи сторон", "part": "body", "page": null},
+    {"text": "Заказчик: ________________", "part": "body", "page": null},
+    {"text": "Исполнитель: ________________", "part": "body", "page": null},
+    {"text": "Банковский счет: ________________", "part": "body", "page": null},
+    {"text": "Подпись: __________ / __________", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВОР ОКАЗАНИЯ УСЛУГ"},
+      {"number": "1", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1. Предмет договора"},
+      {"number": "1.1", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1.1. Исполнитель оказывает"},
+      {"number": "2", "heading": "Ответственность сторон", "section_kind": null, "part": "body", "starts_with": "2. Ответственность сторон"},
+      {"number": "2.1", "heading": "Ответственность сторон", "section_kind": null, "part": "body", "starts_with": "2.1. За просрочку оплаты"},
+      {"number": "3", "heading": "Реквизиты и подписи сторон", "section_kind": "requisites", "part": "body", "starts_with": "3. Реквизиты и подписи сторон"}
+    ],
+    "warnings": []
+  }
+}

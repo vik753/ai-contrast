@@ -1,0 +1,24 @@
+{
+  "name": "20_ru_numbering_restart",
+  "language": "ru",
+  "description": "Flat top-level numbering 1, 2, 3 and then 1, 2 again (a copied block): one numbering_restart warning, no duplicate_number.",
+  "blocks": [
+    {"text": "ДОГОВОР ХРАНЕНИЯ", "part": "body", "page": null},
+    {"text": "1. Хранитель принимает на хранение имущество Поклажедателя.", "part": "body", "page": null},
+    {"text": "2. Срок хранения составляет шесть месяцев.", "part": "body", "page": null},
+    {"text": "3. Плата за хранение вносится ежемесячно.", "part": "body", "page": null},
+    {"text": "1. Хранитель обязан обеспечить сохранность имущества.", "part": "body", "page": null},
+    {"text": "2. Хранитель отвечает за утрату имущества, если не докажет отсутствие вины.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВОР ХРАНЕНИЯ"},
+      {"number": "1", "heading": null, "section_kind": null, "part": "body", "starts_with": "1. Хранитель принимает на"},
+      {"number": "2", "heading": null, "section_kind": null, "part": "body", "starts_with": "2. Срок хранения составляет"},
+      {"number": "3", "heading": null, "section_kind": null, "part": "body", "starts_with": "3. Плата за хранение"},
+      {"number": "1", "heading": null, "section_kind": null, "part": "body", "starts_with": "1. Хранитель обязан обеспечить"},
+      {"number": "2", "heading": null, "section_kind": null, "part": "body", "starts_with": "2. Хранитель отвечает за утрату"}
+    ],
+    "warnings": ["numbering_restart"]
+  }
+}

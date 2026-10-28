@@ -1,0 +1,31 @@
+{
+  "name": "09_uk_allcaps_unnumbered_headings",
+  "language": "uk",
+  "description": "Unnumbered all-caps lines are headings and start their own clauses (number null); numbered clauses under them carry the heading.",
+  "blocks": [
+    {"text": "ДОГОВІР ОРЕНДИ ТРАНСПОРТНОГО ЗАСОБУ", "part": "body", "page": null},
+    {"text": "Орендодавець та Орендар домовилися про таке.", "part": "body", "page": null},
+    {"text": "ПРЕДМЕТ ДОГОВОРУ", "part": "body", "page": null},
+    {"text": "1.1. Орендодавець передає Орендарю в строкове користування легковий автомобіль.", "part": "body", "page": null},
+    {"text": "1.2. Автомобіль передається за актом приймання-передачі.", "part": "body", "page": null},
+    {"text": "СТРОК ДІЇ ДОГОВОРУ", "part": "body", "page": null},
+    {"text": "2.1. Договір діє протягом одного року з дати підписання.", "part": "body", "page": null},
+    {"text": "2.2. Договір автоматично продовжується на той самий строк.", "part": "body", "page": null},
+    {"text": "ПОРЯДОК ВИРІШЕННЯ СПОРІВ", "part": "body", "page": null},
+    {"text": "3.1. Спори вирішуються шляхом переговорів, а за недосягнення згоди — в суді.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВІР ОРЕНДИ ТРАНСПОРТНОГО"},
+      {"number": null, "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "ПРЕДМЕТ ДОГОВОРУ"},
+      {"number": "1.1", "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "1.1. Орендодавець передає"},
+      {"number": "1.2", "heading": "ПРЕДМЕТ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "1.2. Автомобіль передається"},
+      {"number": null, "heading": "СТРОК ДІЇ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "СТРОК ДІЇ ДОГОВОРУ"},
+      {"number": "2.1", "heading": "СТРОК ДІЇ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "2.1. Договір діє протягом"},
+      {"number": "2.2", "heading": "СТРОК ДІЇ ДОГОВОРУ", "section_kind": null, "part": "body", "starts_with": "2.2. Договір автоматично"},
+      {"number": null, "heading": "ПОРЯДОК ВИРІШЕННЯ СПОРІВ", "section_kind": null, "part": "body", "starts_with": "ПОРЯДОК ВИРІШЕННЯ СПОРІВ"},
+      {"number": "3.1", "heading": "ПОРЯДОК ВИРІШЕННЯ СПОРІВ", "section_kind": null, "part": "body", "starts_with": "3.1. Спори вирішуються шляхом"}
+    ],
+    "warnings": []
+  }
+}

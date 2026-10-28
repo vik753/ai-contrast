@@ -1,0 +1,33 @@
+{
+  "name": "14_ru_docx_parts",
+  "language": "ru",
+  "description": "DOCX header, footer, text box and endnote parts: each is its own clause with its part; body numbering unaffected.",
+  "blocks": [
+    {"text": "Договор страхования — конфиденциально", "part": "header", "page": null},
+    {"text": "ДОГОВОР СТРАХОВАНИЯ ГРАЖДАНСКОЙ ОТВЕТСТВЕННОСТИ", "part": "body", "page": null},
+    {"text": "Страховщик и Страхователь заключили настоящий договор.", "part": "body", "page": null},
+    {"text": "1. Предмет договора", "part": "body", "page": null},
+    {"text": "1.1. Страховщик возмещает вред, причиненный третьим лицам.", "part": "body", "page": null},
+    {"text": "1.2. Лимит ответственности составляет 1 000 000 гривен.", "part": "body", "page": null},
+    {"text": "2. Исключения", "part": "body", "page": null},
+    {"text": "2.1. Не возмещается вред, причиненный умышленно.", "part": "body", "page": null},
+    {"text": "Внимание: франшиза по настоящему договору составляет 10 000 гривен.", "part": "textbox", "page": null},
+    {"text": "1. Лимит не включает судебные расходы.", "part": "endnote", "page": null},
+    {"text": "Страховщик — Страхователь", "part": "footer", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "header", "starts_with": "Договор страхования — конфиденциально"},
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВОР СТРАХОВАНИЯ ГРАЖДАНСКОЙ"},
+      {"number": "1", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1. Предмет договора"},
+      {"number": "1.1", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1.1. Страховщик возмещает вред"},
+      {"number": "1.2", "heading": "Предмет договора", "section_kind": null, "part": "body", "starts_with": "1.2. Лимит ответственности"},
+      {"number": "2", "heading": "Исключения", "section_kind": null, "part": "body", "starts_with": "2. Исключения"},
+      {"number": "2.1", "heading": "Исключения", "section_kind": null, "part": "body", "starts_with": "2.1. Не возмещается вред"},
+      {"number": null, "heading": null, "section_kind": null, "part": "textbox", "starts_with": "Внимание: франшиза по настоящему"},
+      {"number": null, "heading": null, "section_kind": null, "part": "endnote", "starts_with": "1. Лимит не включает судебные"},
+      {"number": null, "heading": null, "section_kind": null, "part": "footer", "starts_with": "Страховщик — Страхователь"}
+    ],
+    "warnings": []
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "15_uk_pdf_running",
+  "language": "uk",
+  "description": "PDF, 4 pages. Header (top of every page) and footer (bottom of every page) are exact repeats, at most 120 characters, not clause starts: two running clauses, positioned at the first occurrence. Clause 1.2 crosses the page 1/2 break (its spans are not contiguous).",
+  "blocks": [
+    {"text": "Договір оренди нежитлового приміщення.", "part": "body", "page": 1},
+    {"text": "ДОГОВІР ОРЕНДИ", "part": "body", "page": 1},
+    {"text": "Орендодавець та Орендар домовилися про таке.", "part": "body", "page": 1},
+    {"text": "1. Предмет договору", "part": "body", "page": 1},
+    {"text": "1.1. Орендодавець передає Орендарю приміщення площею 40 кв. м.", "part": "body", "page": 1},
+    {"text": "1.2. Орендна плата сплачується щомісяця до 5 числа місяця, наступного", "part": "body", "page": 1},
+    {"text": "Конфіденційно. Не для розповсюдження.", "part": "body", "page": 1},
+    {"text": "Договір оренди нежитлового приміщення.", "part": "body", "page": 2},
+    {"text": "за місяцем оренди, на підставі виставленого рахунку.", "part": "body", "page": 2},
+    {"text": "1.3. Орендар не має права передавати приміщення в суборенду.", "part": "body", "page": 2},
+    {"text": "2. Строк дії договору", "part": "body", "page": 2},
+    {"text": "2.1. Договір діє з дати підписання протягом одного року.", "part": "body", "page": 2},
+    {"text": "Конфіденційно. Не для розповсюдження.", "part": "body", "page": 2},
+    {"text": "Договір оренди нежитлового приміщення.", "part": "body", "page": 3},
+    {"text": "2.2. Договір може бути продовжений за письмовою згодою Сторін.", "part": "body", "page": 3},
+    {"text": "3. Відповідальність", "part": "body", "page": 3},
+    {"text": "3.1. За прострочення оплати Орендар сплачує пеню 0,1 % за кожен день.", "part": "body", "page": 3},
+    {"text": "Конфіденційно. Не для розповсюдження.", "part": "body", "page": 3},
+    {"text": "Договір оренди нежитлового приміщення.", "part": "body", "page": 4},
+    {"text": "3.2. Орендодавець відповідає за недоліки приміщення, про які знав.", "part": "body", "page": 4},
+    {"text": "Конфіденційно. Не для розповсюдження.", "part": "body", "page": 4}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "running", "starts_with": "Договір оренди нежитлового"},
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "ДОГОВІР ОРЕНДИ"},
+      {"number": "1", "heading": "Предмет договору", "section_kind": null, "part": "body", "starts_with": "1. Предмет договору"},
+      {"number": "1.1", "heading": "Предмет договору", "section_kind": null, "part": "body", "starts_with": "1.1. Орендодавець передає"},
+      {"number": "1.2", "heading": "Предмет договору", "section_kind": null, "part": "body", "starts_with": "1.2. Орендна плата сплачується"},
+      {"number": null, "heading": null, "section_kind": null, "part": "running", "starts_with": "Конфіденційно. Не для"},
+      {"number": "1.3", "heading": "Предмет договору", "section_kind": null, "part": "body", "starts_with": "1.3. Орендар не має права"},
+      {"number": "2", "heading": "Строк дії договору", "section_kind": null, "part": "body", "starts_with": "2. Строк дії договору"},
+      {"number": "2.1", "heading": "Строк дії договору", "section_kind": null, "part": "body", "starts_with": "2.1. Договір діє з дати"},
+      {"number": "2.2", "heading": "Строк дії договору", "section_kind": null, "part": "body", "starts_with": "2.2. Договір може бути"},
+      {"number": "3", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "3. Відповідальність"},
+      {"number": "3.1", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "3.1. За прострочення оплати"},
+      {"number": "3.2", "heading": "Відповідальність", "section_kind": null, "part": "body", "starts_with": "3.2. Орендодавець відповідає"}
+    ],
+    "warnings": []
+  }
+}

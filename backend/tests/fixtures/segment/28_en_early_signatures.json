@@ -1,0 +1,24 @@
+{
+  "name": "28_en_early_signatures",
+  "language": "en",
+  "description": "Early 'Signatures' heading (title case, whole line in the closed list) before the terms: the requisites clause ends at the next clause start; the numbered clauses after it are never requisites. Their heading is the nearest section heading '1. Services' title.",
+  "blocks": [
+    {"text": "SERVICES AGREEMENT", "part": "body", "page": null},
+    {"text": "Signatures", "part": "body", "page": null},
+    {"text": "Client: ________________", "part": "body", "page": null},
+    {"text": "Provider: ________________", "part": "body", "page": null},
+    {"text": "1. Services", "part": "body", "page": null},
+    {"text": "1.1. The Provider performs the services described in the order.", "part": "body", "page": null},
+    {"text": "1.2. The Client accepts the services within 5 days.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": null, "heading": null, "section_kind": null, "part": "preamble", "starts_with": "SERVICES AGREEMENT"},
+      {"number": null, "heading": "Signatures", "section_kind": "requisites", "part": "body", "starts_with": "Signatures"},
+      {"number": "1", "heading": "Services", "section_kind": null, "part": "body", "starts_with": "1. Services"},
+      {"number": "1.1", "heading": "Services", "section_kind": null, "part": "body", "starts_with": "1.1. The Provider performs"},
+      {"number": "1.2", "heading": "Services", "section_kind": null, "part": "body", "starts_with": "1.2. The Client accepts"}
+    ],
+    "warnings": []
+  }
+}

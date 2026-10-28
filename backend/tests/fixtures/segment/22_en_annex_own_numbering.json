@@ -1,0 +1,30 @@
+{
+  "name": "22_en_annex_own_numbering",
+  "language": "en",
+  "description": "Annex with its own 1.1, 1.2, 2.1 numbering after an all-caps annex heading: the heading opens a new numbering scope, so no restart or duplicate warnings. AMBIGUOUS (ADR does not say).",
+  "blocks": [
+    {"text": "1. Scope", "part": "body", "page": null},
+    {"text": "1.1. The Provider hosts the system for the Client.", "part": "body", "page": null},
+    {"text": "1.2. Service levels are set out in Annex 1.", "part": "body", "page": null},
+    {"text": "2. Fees", "part": "body", "page": null},
+    {"text": "2.1. The Client pays a monthly fee of 2,000.", "part": "body", "page": null},
+    {"text": "ANNEX 1 — SERVICE LEVELS", "part": "body", "page": null},
+    {"text": "1.1. The system is available 99.5% of each month.", "part": "body", "page": null},
+    {"text": "1.2. Planned maintenance is announced 3 days in advance.", "part": "body", "page": null},
+    {"text": "2.1. If availability is lower, the fee is reduced by 10%.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "clauses": [
+      {"number": "1", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "1. Scope"},
+      {"number": "1.1", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "1.1. The Provider hosts"},
+      {"number": "1.2", "heading": "Scope", "section_kind": null, "part": "body", "starts_with": "1.2. Service levels are set out"},
+      {"number": "2", "heading": "Fees", "section_kind": null, "part": "body", "starts_with": "2. Fees"},
+      {"number": "2.1", "heading": "Fees", "section_kind": null, "part": "body", "starts_with": "2.1. The Client pays a monthly"},
+      {"number": null, "heading": "ANNEX 1 — SERVICE LEVELS", "section_kind": null, "part": "body", "starts_with": "ANNEX 1 — SERVICE LEVELS"},
+      {"number": "1.1", "heading": "ANNEX 1 — SERVICE LEVELS", "section_kind": null, "part": "body", "starts_with": "1.1. The system is available"},
+      {"number": "1.2", "heading": "ANNEX 1 — SERVICE LEVELS", "section_kind": null, "part": "body", "starts_with": "1.2. Planned maintenance"},
+      {"number": "2.1", "heading": "ANNEX 1 — SERVICE LEVELS", "section_kind": null, "part": "body", "starts_with": "2.1. If availability is lower"}
+    ],
+    "warnings": []
+  }
+}
