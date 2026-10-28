@@ -585,7 +585,7 @@ _FILLER = "Payment is due within thirty days after the invoice. "
 
 
 def _filler(n: int) -> str:
-    return (_FILLER * (n // len(_FILLER) + 1))[:n].rstrip() + "."
+    return (_FILLER * (n // len(_FILLER) + 1))[: n - 1] + "."
 
 
 def test_safety_clause_at_40000_chars_is_accepted(make_client: Make) -> None:

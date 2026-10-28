@@ -58,6 +58,30 @@ def _names(node: ast.AST) -> set[str]:
     return out
 
 
+def _annotation_leaves(node: ast.AST) -> set[str]:
+    """Names in an annotation; the arguments of ``Literal[...]`` are constants, not types."""
+    if isinstance(node, ast.Subscript):
+        base = node.value
+        base_name = base.id if isinstance(base, ast.Name) else getattr(base, "attr", "")
+        if base_name == "Literal":
+            return {"Literal"}
+        return _annotation_leaves(node.value) | _annotation_leaves(node.slice)
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        try:
+            return _annotation_leaves(ast.parse(node.value, mode="eval").body)
+        except SyntaxError:
+            return set()
+    if isinstance(node, (ast.Tuple, ast.List)):
+        return set().union(*(_annotation_leaves(e) for e in node.elts)) if node.elts else set()
+    if isinstance(node, ast.BinOp):
+        return _annotation_leaves(node.left) | _annotation_leaves(node.right)
+    if isinstance(node, ast.Name):
+        return {node.id}
+    if isinstance(node, ast.Attribute):
+        return {node.attr}
+    return set()
+
+
 def _string_annotation_names(text: str) -> set[str]:
     try:
         return _names(ast.parse(text, mode="eval"))
@@ -186,7 +210,7 @@ def ai_module_problems(root: Path) -> list[str]:
                 if arg.annotation is None:
                     problems.append(f"{where}:{node.lineno}: {node.name}({arg.arg}) unannotated")
                     continue
-                for leaf in _names(arg.annotation):
+                for leaf in _annotation_leaves(arg.annotation):
                     if (
                         leaf not in GATE_TYPES
                         and leaf not in enums
