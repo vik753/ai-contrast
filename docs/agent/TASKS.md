@@ -54,6 +54,19 @@ Order: S5-T0 (fixtures) and the S5-T1 tests in parallel; then S5-T1 (backend); S
 9. **Abuse rules (ADR 0014 points 5–6):** a line longer than 120 characters, a clause-start line or a heading line repeated on every page is not collapsed into `running`; an early or mid-document "Signatures" heading followed by numbered clauses does not make them `requisites`; a heading line stays inside exactly one clause's spans.
 10. **Linear algorithm:** running-line detection by hashing; patterns applied per line with `match`; a test at the caps with 100 pages and 20,000 blocks finishes within the CPU limit.
 
+### S5-T1b Shared Layer 1 input cleaning (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s5-clean` (worktree `/home/claude/wt/s5-clean`). From the PR #53 security review: cleaning is incomplete and differs between `/api/extract` and `/api/segment`. **Blocker for stage 5b** (no text reaches an AI provider before this is merged).
+- Threats: T5 (ADR 0009 Layer 1), T11.
+
+1. **One shared module** `app/textclean/` used by the extraction worker (PDF, DOCX, text — after extraction, before the reply) and by the segment child (instead of `app/segment/clean.py`, which is removed). No other cleaner remains (`ControlCleaner` is folded in).
+2. **Order (ADR 0009 Layer 1):** (a) symbol-font glyphs mapped first: the checked-in table maps U+F0FE, U+F0FD, U+F0A8, U+F06F, U+F078 and the other Wingdings/Symbol checkbox code points already known to the DOCX walker to ☐, ☑ or ☒ (one table, used by DOCX and by plain text, PDF and segment input); (b) remove every code point in the generated table; (c) NFC.
+3. **Generated table** `app/textclean/ignorable_table.py`, checked in, made by `backend/scripts/gen_ignorable_table.py` from the Unicode data of a pinned Unicode version (the script records the version; Python's `unicodedata` 15.1 is acceptable as the source if the version is recorded and a test fails when the table and the recorded version differ from what the script generates). It contains: `Default_Ignorable_Code_Point` (including unassigned ones: U+2065, U+FFF0–U+FFF8, U+E0000–U+E0FFF), categories Cf, Co, Cs, Cn, plus U+034F, U+115F, U+1160, U+3164, U+FFA0, U+2800, U+FFF9–U+FFFB, U+180E, variation selectors U+FE00–U+FE0F and U+E0100–U+E01EF, and Cc except tab, line feed and carriage return (line breaks are handled by the existing rules). White space is never removed.
+4. **Report:** every removal appears in `removed` with a reason code (`default_ignorable`, `format_character`, `private_use`, `unassigned`, `surrogate`, `control_character`) and a sample (as today, at most 200 characters, the sample itself cleaned).
+5. **Idempotent:** property test `clean(clean(x)) == clean(x)` over random strings from all planes. A test feeds every code point named in ADR 0009 Layer 1 and checks none survives (except the mapped checkbox glyphs, which become ☐/☑/☒).
+6. **Same result on both endpoints:** for the same text, `/api/extract` (text upload) blocks equal `/api/segment` cleaned blocks; DOCX and PDF fixtures with zero-width, bidi, tag and braille-blank characters are cleaned and reported.
+7. Linear time; runs inside the sandbox child only.
+
 ### S5-T2 Clauses in the browser (frontend)
 
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s5-clauses` (worktree `/home/claude/wt/s5-clauses`). After S5-T1 is merged.
