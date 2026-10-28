@@ -32,7 +32,7 @@ describe("sha256Hex", () => {
 
   it("test_sha256Hex_arraybuffer_matches_string", async () => {
     const bytes = new TextEncoder().encode("abc");
-    expect(await sha256Hex(bytes.buffer.slice(0) as ArrayBuffer)).toBe(ABC);
+    expect(await sha256Hex(bytes.buffer.slice(0))).toBe(ABC);
   });
 
   it("test_sha256Hex_string_is_utf8_encoded", async () => {
