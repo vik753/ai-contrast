@@ -1,0 +1,19 @@
+{
+  "name": "17_ru_contacts",
+  "language": "ru",
+  "description": "RU contacts: +7 phone with parentheses, email, bare domain with www.",
+  "blocks": [
+    {"text": "8.1. Тел.: +7 (495) 555-01-23, e-mail: sales@example-lease.ru, сайт www.example-lease.ru.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PHONE", "precision": "high", "value_forms": ["+7 (495) 555-01-23"], "spans": [[0, 11, 29]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["sales@example-lease.ru"], "spans": [[0, 39, 61]]},
+      {"class": "URL", "precision": "high", "value_forms": ["www.example-lease.ru"], "spans": [[0, 68, 88]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Тел.", "e-mail"]
+  }
+}

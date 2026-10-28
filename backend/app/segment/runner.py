@@ -11,15 +11,18 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import Counter
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from app.extraction.model import EXTRACTION_TIMEOUT, ExtractionError
 from app.extraction.sandbox import SandboxLimits, run_child
+from app.pseudo.hits import MAX_ENTITIES, MAX_SPANS
 from app.segment.model import (
     SEGMENT_FAILED,
     SEGMENT_TIMEOUT,
+    TOO_MANY_IDENTIFIERS,
     TOO_MUCH_TEXT,
     SegmentChildError,
     SegmentResult,
@@ -59,6 +62,29 @@ def _check(result: SegmentResult, limits: SandboxLimits, segment_limits: Segment
         for index, start, end in spans:
             if index >= len(sizes) or not start < end <= sizes[index]:
                 raise SegmentError(SEGMENT_FAILED)
+    _check_ranges(result, sizes)
+
+
+def _check_ranges(result: SegmentResult, sizes: list[int]) -> None:
+    """Entities, requisites lines and neutralized spans: ranges, caps, references."""
+    if len(result.entities) > MAX_ENTITIES:
+        raise SegmentError(TOO_MANY_IDENTIFIERS)
+    total = 0
+    spans = []
+    for entity in result.entities:
+        total += len(entity.spans)
+        spans.extend(entity.spans)
+    if total > MAX_SPANS:
+        raise SegmentError(TOO_MANY_IDENTIFIERS)
+    clause_ids = {clause.id for clause in result.clauses}
+    for item in result.requisites:
+        if item.clause not in clause_ids:
+            raise SegmentError(SEGMENT_FAILED)
+        spans.extend(line.span for line in item.lines)
+    spans.extend(result.neutralized)
+    for index, start, end in spans:
+        if index >= len(sizes) or not start < end <= sizes[index]:
+            raise SegmentError(SEGMENT_FAILED)
 
 
 async def _run(
@@ -108,6 +134,13 @@ async def run_segmentation(
     try:
         result = await _run(body, limits, segment_limits, hook)
         outcome = "ok"
+        counts = Counter(entity.cls for entity in result.entities)
+        logger.info(
+            "detection entities=%d spans=%d classes=%s",
+            len(result.entities),
+            sum(len(entity.spans) for entity in result.entities),
+            ",".join(f"{name}:{counts[name]}" for name in sorted(counts)),
+        )
     except SegmentError as error:
         outcome = error.code
         raise

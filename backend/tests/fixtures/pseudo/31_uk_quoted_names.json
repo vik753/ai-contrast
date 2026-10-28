@@ -1,0 +1,21 @@
+{
+  "name": "31_uk_quoted_names",
+  "language": "uk",
+  "description": "Quoted names without a legal form: a product name ('КАСКО «Оптимум»') and a quoted party followed by a defined term. Span = the text inside the guillemets (the quotes and the word КАСКО stay). Later occurrences are found by value. Both are normal precision (no legal form).",
+  "blocks": [
+    {"text": "1.1. Страховик пропонує продукт КАСКО «Оптимум».", "part": "body", "page": null},
+    {"text": "1.2. Перевезення здійснює «Швидкий Кур'єр» (далі — Перевізник).", "part": "body", "page": null},
+    {"text": "1.3. Умови «Оптимум» діють до кінця року.", "part": "body", "page": null},
+    {"text": "1.4. Перевізник «Швидкий Кур'єр» не відповідає за затримку.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Оптимум"], "spans": [[0, 39, 46], [2, 12, 19]]},
+      {"class": "ORG", "precision": "normal", "value_forms": ["Швидкий Кур'єр"], "spans": [[1, 27, 41], [3, 17, 31]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страховик", "КАСКО", "Перевізник"]
+  }
+}

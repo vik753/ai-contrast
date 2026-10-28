@@ -1,0 +1,26 @@
+{
+  "name": "16_uk_contacts",
+  "language": "uk",
+  "description": "UK contacts: plain email, obfuscated emails ((at) and [at]), two phone formats, URL with scheme, bare domain, messenger handle (normal). The span covers the whole obfuscated form.",
+  "blocks": [
+    {"text": "9.1. Електронна пошта: ivan.petrenko@example.com, обфускована: info(at)example-insure.com та claims[at]example-insure.com.", "part": "body", "page": null},
+    {"text": "9.2. Телефони: +380 50 123 45 67 та (044) 555-01-23.", "part": "body", "page": null},
+    {"text": "9.3. Сайт: https://www.example-insure.ua/claims, також claims-partner.com.ua і @example_claims_bot.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "EMAIL", "precision": "high", "value_forms": ["ivan.petrenko@example.com"], "spans": [[0, 23, 48]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["info(at)example-insure.com"], "spans": [[0, 63, 89]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["claims[at]example-insure.com"], "spans": [[0, 93, 121]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+380 50 123 45 67"], "spans": [[1, 15, 32]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["(044) 555-01-23"], "spans": [[1, 36, 51]]},
+      {"class": "URL", "precision": "high", "value_forms": ["https://www.example-insure.ua/claims"], "spans": [[2, 11, 47]]},
+      {"class": "URL", "precision": "high", "value_forms": ["claims-partner.com.ua"], "spans": [[2, 55, 76]]},
+      {"class": "URL", "precision": "normal", "value_forms": ["@example_claims_bot"], "spans": [[2, 79, 98]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Електронна пошта", "Телефони"]
+  }
+}

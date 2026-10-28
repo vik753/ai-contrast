@@ -18,7 +18,21 @@ import json
 
 from pydantic import ValidationError
 
-from app.segment.model import INVALID_REQUEST, TOO_MUCH_TEXT, SegmentRequest
+from app.extraction.model import Block
+from app.pseudo.detector import TooManyIdentifiersError, detect
+from app.pseudo.lexicon import DETECTOR_VERSION
+from app.segment.model import (
+    INVALID_REQUEST,
+    TOO_MANY_IDENTIFIERS,
+    TOO_MUCH_TEXT,
+    Entity,
+    RequisitesClause,
+    RequisitesLine,
+    SegmentCore,
+    SegmentRequest,
+    SegmentResult,
+    SegmentWarning,
+)
 from app.segment.segmenter import SegmentError, SegmentLimits, segment
 
 
@@ -31,6 +45,45 @@ def _no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     if len(result) != len(pairs):
         raise ValueError
     return result
+
+
+def _detected(core: SegmentCore) -> SegmentResult:
+    """Run the detector on the cleaned blocks (ADR 0015 point 1)."""
+    detection = detect([block.text for block in core.blocks], core.clauses)
+    blocks = [
+        Block(text=text, part=block.part, page=block.page)
+        for text, block in zip(detection.texts, core.blocks, strict=True)
+    ]
+    warnings = [
+        *core.warnings,
+        *(SegmentWarning(code=code, clause=clause) for code, clause in detection.warnings),
+    ]
+    return SegmentResult(
+        clauses=core.clauses,
+        blocks=blocks,
+        removed=core.removed,
+        warnings=warnings,
+        detector_version=DETECTOR_VERSION,
+        entities=[
+            Entity.model_validate(
+                {
+                    "id": entity.id,
+                    "class": entity.cls,
+                    "precision": entity.precision,
+                    "spans": entity.spans,
+                }
+            )
+            for entity in detection.entities
+        ],
+        requisites=[
+            RequisitesClause(
+                clause=clause,
+                lines=[RequisitesLine(span=span, action=action) for span, action in lines],
+            )
+            for clause, lines in detection.requisites
+        ],
+        neutralized=detection.neutralized,
+    )
 
 
 def run(  # noqa: PLR0913 - the caps come from the parent header, one value each
@@ -54,10 +107,13 @@ def run(  # noqa: PLR0913 - the caps come from the parent header, one value each
     ):
         return _error(TOO_MUCH_TEXT)
     try:
-        result = segment(
+        core = segment(
             request.blocks,
             limits=SegmentLimits(max_clauses=max_clauses, max_clause_chars=max_clause_chars),
         )
+        result = _detected(core)
     except SegmentError as error:
         return _error(error.code)
-    return b'{"result":' + result.model_dump_json().encode() + b"}"
+    except TooManyIdentifiersError:
+        return _error(TOO_MANY_IDENTIFIERS)
+    return b'{"result":' + result.model_dump_json(by_alias=True).encode() + b"}"

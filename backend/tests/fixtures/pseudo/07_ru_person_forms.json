@@ -1,0 +1,24 @@
+{
+  "name": "07_ru_person_forms",
+  "language": "ru",
+  "description": "RU person forms: non-declining surname in -ко (Бондаренко in all cases), genitive of first name and patronymic, female surname declension (Петрова/Петровой) with initials, hyphenated double surname.",
+  "blocks": [
+    {"text": "Страхователь: Бондаренко Сергей Николаевич.", "part": "body", "page": null},
+    {"text": "2.1. Выплата производится Бондаренко С.Н. в течение 10 дней.", "part": "body", "page": null},
+    {"text": "2.2. Заявление Бондаренко Сергея Николаевича принимается.", "part": "body", "page": null},
+    {"text": "3.1. Полис выдан Петровой Марии Ивановне.", "part": "body", "page": null},
+    {"text": "3.2. Страхователь Петрова М.И. обязана уведомить об изменениях.", "part": "body", "page": null},
+    {"text": "4.1. Представитель — Орлов-Давыдов Игорь Львович.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Бондаренко Сергей Николаевич", "Бондаренко С.Н.", "Бондаренко Сергея Николаевича"], "spans": [[0, 14, 42], [1, 26, 41], [2, 15, 44]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Петровой Марии Ивановне", "Петрова М.И."], "spans": [[3, 17, 40], [4, 18, 30]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Орлов-Давыдов Игорь Львович"], "spans": [[5, 21, 48]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страхователь", "Представитель", "10 дней"]
+  }
+}

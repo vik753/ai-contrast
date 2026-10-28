@@ -1,0 +1,20 @@
+{
+  "name": "19_uk_address_cadastral",
+  "language": "uk",
+  "description": "UK address after the keyword 'за адресою:' up to the end of the sentence (the final full stop is not part of the span); cadastral number as ADDRESS; city-level territory of cover in block 2 is kept.",
+  "blocks": [
+    {"text": "2.1. Предмет страхування — квартира за адресою: м. Одеса, вул. Прикладна, буд. 12, кв. 34.", "part": "body", "page": null},
+    {"text": "2.2. Кадастровий номер земельної ділянки 5110100000:01:001:0123.", "part": "body", "page": null},
+    {"text": "2.3. Територія страхування — Україна та місто Львів.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["м. Одеса, вул. Прикладна, буд. 12, кв. 34"], "spans": [[0, 48, 89]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["5110100000:01:001:0123"], "spans": [[1, 41, 63]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Україна", "Львів", "квартира"]
+  }
+}

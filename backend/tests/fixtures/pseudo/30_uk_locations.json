@@ -1,0 +1,25 @@
+{
+  "name": "30_uk_locations",
+  "language": "uk",
+  "description": "Every location that exists as text: running header, heading, body, footnote, text box, footer. All are detected and masked like body text; nothing is dropped outside the requisites rule.",
+  "blocks": [
+    {"text": "Договір № 2026-45 — ТОВ «Альфа Захист»", "part": "header", "page": null},
+    {"text": "РОЗДІЛ 1. Відповідальність ТОВ «Альфа Захист»", "part": "body", "page": null},
+    {"text": "1.1. Страховик не відповідає за шкоду, завдану Петренком О.М.", "part": "body", "page": null},
+    {"text": "1. Тут і далі ТОВ «Альфа Захист» — Страховик.", "part": "footnote", "page": null},
+    {"text": "Зверніть увагу: Петренко О.М., тел. +380 50 123 45 67", "part": "textbox", "page": null},
+    {"text": "Сторінка 1 — ТОВ «Альфа Захист»", "part": "footer", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Альфа Захист»"], "spans": [[0, 20, 38], [1, 27, 45], [3, 14, 32], [5, 13, 31]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["2026-45"], "spans": [[0, 10, 17]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Петренком О.М.", "Петренко О.М."], "spans": [[2, 47, 61], [4, 16, 29]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+380 50 123 45 67"], "spans": [[4, 36, 53]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страховик", "Відповідальність", "Сторінка"]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "20_ru_address",
+  "language": "ru",
+  "description": "RU addresses after 'по адресу:' and 'Юридический адрес ...:' up to the end of the sentence (final full stop excluded).",
+  "blocks": [
+    {"text": "1.2. Арендуемое помещение находится по адресу: г. Днепр, ул. Примерная, д. 5, офис 12.", "part": "body", "page": null},
+    {"text": "1.3. Юридический адрес Арендодателя: 49000, г. Днепр, пр. Тестовый, 7.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["г. Днепр, ул. Примерная, д. 5, офис 12"], "spans": [[0, 47, 85]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["49000, г. Днепр, пр. Тестовый, 7"], "spans": [[1, 37, 69]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Арендуемое помещение", "Арендодателя"]
+  }
+}

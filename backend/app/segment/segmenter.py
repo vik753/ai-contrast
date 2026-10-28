@@ -20,6 +20,8 @@ Rules (ADR 0014 points 5 to 8, tech lead decisions of S5-T1):
   is a heading once a start was seen, before that only if a clause text follows it. A
   line of the closed requisites list is a heading; its clause has ``section_kind``
   ``requisites``.
+- A line of capitals with a colon or a digit inside a requisites section (``IBAN: UA86…``) is
+  a requisites line, not a heading (S5b-T1); an annex word still ends the section.
 - Running lines: exact repeats among the first or last two lines of at least three and
   at least half of the pages, up to 120 characters, never a start or a heading, become
   one ``running`` clause (spans at every occurrence, placed at the first one).
@@ -46,13 +48,13 @@ from app.segment.model import (
     Clause,
     ClausePart,
     InputBlock,
-    SegmentResult,
+    SegmentCore,
     SegmentWarning,
     Span,
 )
 from app.textclean import TextCleaner
 
-__all__ = ["InputBlock", "SegmentError", "SegmentLimits", "SegmentResult", "segment"]
+__all__ = ["InputBlock", "SegmentCore", "SegmentError", "SegmentLimits", "segment"]
 
 MIN_RUNNING_PAGES: Final = 3
 RUNNING_LINES_PER_EDGE: Final = 2
@@ -379,6 +381,15 @@ class _Structure:
             return None
         if (
             heading == patterns.HEADING_CAPS
+            and self.current is not None
+            and self.current.section_kind == _REQUISITES
+            and not line.startswith(patterns.ANNEX_WORDS)
+            and (":" in line or any(char.isdigit() for char in line))
+        ):
+            # A requisites line in capitals ("ЄДРПОУ: 21045679", "IBAN: UA86…") is not a heading.
+            return None
+        if (
+            heading == patterns.HEADING_CAPS
             and not self.started
             # The first line of the file is the title; later a heading needs clause text next.
             and (self.current is None or not _next_line_opens_clause(self.blocks, index, end))
@@ -391,7 +402,7 @@ class _Structure:
         return self._begin(_Entry(_BODY, None, 1, kind, self.heading))
 
 
-def segment(blocks: Sequence[InputBlock], *, limits: SegmentLimits) -> SegmentResult:
+def segment(blocks: Sequence[InputBlock], *, limits: SegmentLimits) -> SegmentCore:
     """Split the blocks of one document into clauses (ADR 0014)."""
     cleaned, cleaner = _clean(blocks)
     if not any(text and not text.isspace() for text in (b.text for b in cleaned)):
@@ -423,7 +434,7 @@ def _result(
     cleaner: TextCleaner,
     entries: list[_Entry],
     warnings: list[tuple[str, _Entry | None]],
-) -> SegmentResult:
+) -> SegmentCore:
     # Parts of a long clause and the running clauses interleave: order by the first span.
     parts: list[tuple[int, int, _Entry, int, list[list[int]], list[int]]] = []
     for entry in entries:
@@ -451,7 +462,7 @@ def _result(
                 heading_span=entry.heading_span,
             )
         )
-    return SegmentResult(
+    return SegmentCore(
         clauses=clauses,
         blocks=blocks,
         removed=cleaner.removed(),

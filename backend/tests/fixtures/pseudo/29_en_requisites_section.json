@@ -1,0 +1,38 @@
+{
+  "name": "29_en_requisites_section",
+  "language": "en",
+  "description": "EN requisites section (heading 'Details of the parties'). Dropped: labelled org, tax id, IBAN, email, signatory line. Kept: 'The Buyer agrees to pay a penalty ...' (obligation marker) and 'Late payment penalty 50 %' (non-identifier tokens). Kept lines give requisites_condition.",
+  "blocks": [
+    {"text": "1.1. The Seller delivers the goods to the Buyer.", "part": "body", "page": null},
+    {"text": "Details of the parties", "part": "body", "page": null},
+    {"text": "Seller: Orion Trading Ltd.", "part": "body", "page": null},
+    {"text": "Tax ID: 98-7654321", "part": "body", "page": null},
+    {"text": "IBAN: GB82 WEST 1234 5698 7654 32", "part": "body", "page": null},
+    {"text": "Email: orders@example-trading.com", "part": "body", "page": null},
+    {"text": "The Buyer agrees to pay a penalty of 50 % for late payment", "part": "body", "page": null},
+    {"text": "Authorised signatory: ____________ /Helen Carter/", "part": "body", "page": null},
+    {"text": "Late payment penalty 50 %", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Orion Trading Ltd."], "spans": [[2, 8, 26]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["98-7654321"], "spans": [[3, 8, 18]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["GB82 WEST 1234 5698 7654 32"], "spans": [[4, 6, 33]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["orders@example-trading.com"], "spans": [[5, 7, 33]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Helen Carter/"], "spans": [[7, 22, 49]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Helen Carter"], "spans": [[7, 36, 48]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Seller: Orion", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "Tax ID:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "IBAN:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "Email:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "The Buyer agrees", "action": "keep"},
+      {"block": 7, "line_text_starts_with": "Authorised signatory", "action": "drop"},
+      {"block": 8, "line_text_starts_with": "Late payment penalty", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["The Seller", "the Buyer", "50 %", "Late payment penalty"]
+  }
+}

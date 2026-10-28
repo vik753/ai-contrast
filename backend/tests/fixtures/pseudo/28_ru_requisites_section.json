@@ -1,0 +1,44 @@
+{
+  "name": "28_ru_requisites_section",
+  "language": "ru",
+  "description": "RU requisites section (heading 'Реквизиты и подписи сторон'). Dropped: role + org, labelled codes and accounts, signature line, role + person. Kept: 'Арендатор обязуется ...' (obligation marker) and 'Арендатор не вправе передавать права по договору' (non-identifier tokens above the threshold, no marker word). КПП and р/с have no usable checksum: normal. Kept lines give requisites_condition.",
+  "blocks": [
+    {"text": "1.1. Арендодатель передает Арендатору помещение.", "part": "body", "page": null},
+    {"text": "Реквизиты и подписи сторон", "part": "body", "page": null},
+    {"text": "Арендодатель: ООО «Север Консалт»", "part": "body", "page": null},
+    {"text": "ИНН: 7712345671", "part": "body", "page": null},
+    {"text": "КПП: 771201001", "part": "body", "page": null},
+    {"text": "р/с: 40702810900000012345", "part": "body", "page": null},
+    {"text": "БИК: 044500123", "part": "body", "page": null},
+    {"text": "Арендатор обязуется вернуть помещение до 31.12.2027", "part": "body", "page": null},
+    {"text": "Директор _________ /Сидорова А.П./", "part": "body", "page": null},
+    {"text": "Арендатор: Громов П.И.", "part": "body", "page": null},
+    {"text": "Арендатор не вправе передавать права по договору", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["ООО «Север Консалт»"], "spans": [[2, 14, 33]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["7712345671"], "spans": [[3, 5, 15]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["771201001"], "spans": [[4, 5, 14]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["40702810900000012345"], "spans": [[5, 5, 25]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["044500123"], "spans": [[6, 5, 14]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Сидорова А.П."], "spans": [[8, 20, 33]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["_________ /Сидорова А.П./"], "spans": [[8, 9, 34]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Громов П.И."], "spans": [[9, 11, 22]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Арендодатель: ООО", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "ИНН:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "КПП:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "р/с:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "БИК:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "Арендатор обязуется", "action": "keep"},
+      {"block": 8, "line_text_starts_with": "Директор", "action": "drop"},
+      {"block": 9, "line_text_starts_with": "Арендатор: Громов", "action": "drop"},
+      {"block": 10, "line_text_starts_with": "Арендатор не вправе", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["Арендодатель передает", "Арендатору", "31.12.2027"]
+  }
+}

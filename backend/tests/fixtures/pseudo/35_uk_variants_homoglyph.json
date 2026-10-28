@@ -1,0 +1,22 @@
+{
+  "name": "35_uk_variants_homoglyph",
+  "language": "uk",
+  "description": "VARIANTS FILE (homoglyphs, written as \\u escapes). Homoglyphs survive Layer 1 cleaning, so spans are offsets into the text as given. Block 0: name with a Latin I (U+0049) and a Latin e (U+0065) inside 'Іваненко'. Block 1: IBAN with two Latin O (U+004F) in place of the digit 0. Blocks 2 and 3: 'ТОВ «Альфа Захист»' once in Cyrillic and once with a Latin A (U+0041); both belong to one ORG entity (grouping on the confusable skeleton).",
+  "blocks": [
+    {"text": "Страхувальник — Iванeнко Петро Олексійович.", "part": "body", "page": null},
+    {"text": "IBAN UA8632047826OO123456789012345.", "part": "body", "page": null},
+    {"text": "5.1. ТОВ «Альфа Захист» відповідає.", "part": "body", "page": null},
+    {"text": "5.2. ТОВ «Aльфа Захист» не відповідає.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Iванeнко Петро Олексійович"], "spans": [[0, 16, 42]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["UA8632047826OO123456789012345"], "spans": [[1, 5, 34]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Альфа Захист»", "ТОВ «Aльфа Захист»"], "spans": [[2, 5, 23], [3, 5, 23]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страхувальник"]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "08_uk_fop",
+  "language": "uk",
+  "description": "ФОП is both ORG and PERSON. ORG span = 'ФОП' plus the name; PERSON span = the name only (the two spans overlap on purpose). Later 'Савченку В.А.' is PERSON only. РНОКПП with context is a high-precision TAX_ID.",
+  "blocks": [
+    {"text": "ФОП Савченко Віктор Андрійович, РНОКПП 3012345670 (далі — Виконавець).", "part": "body", "page": null},
+    {"text": "5.1. Виконавець ФОП Савченко В.А. відповідає за якість.", "part": "body", "page": null},
+    {"text": "5.2. Оплата Савченку В.А. здійснюється щомісяця.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["ФОП Савченко Віктор Андрійович", "ФОП Савченко В.А."], "spans": [[0, 0, 30], [1, 16, 33]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Савченко Віктор Андрійович", "Савченко В.А.", "Савченку В.А."], "spans": [[0, 4, 30], [1, 20, 33], [2, 12, 25]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["3012345670"], "spans": [[0, 39, 49]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Виконавець"]
+  }
+}

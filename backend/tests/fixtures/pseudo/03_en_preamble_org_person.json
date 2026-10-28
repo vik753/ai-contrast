@@ -1,0 +1,22 @@
+{
+  "name": "03_en_preamble_org_person",
+  "language": "en",
+  "description": "EN preamble: company with legal-form suffix but no quotes (normal precision), 'represented by', surname Rose (also a common word: lowercase 'rose' in block 3 is a verb and stays).",
+  "blocks": [
+    {"text": "SERVICES AGREEMENT", "part": "body", "page": null},
+    {"text": "This Agreement is made between Northwind Logistics Ltd. (the Supplier), represented by Helen Carter, and John Rose (the Customer).", "part": "body", "page": null},
+    {"text": "4.1. Northwind Logistics Ltd. shall not be liable for delays caused by John Rose.", "part": "body", "page": null},
+    {"text": "5.2. If the premium rose by more than 5 % the Customer may terminate.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Northwind Logistics Ltd."], "spans": [[1, 31, 55], [2, 5, 29]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Helen Carter"], "spans": [[1, 87, 99]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["John Rose"], "spans": [[1, 105, 114], [2, 71, 80]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Supplier", "Customer", "rose", "5 %"]
+  }
+}

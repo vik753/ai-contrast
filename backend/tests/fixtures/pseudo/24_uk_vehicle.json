@@ -1,0 +1,19 @@
+{
+  "name": "24_uk_vehicle",
+  "language": "uk",
+  "description": "VEHICLE: VIN (17 characters), UA registration plate (Cyrillic letters), vehicle registration certificate series and number.",
+  "blocks": [
+    {"text": "6.1. Застрахований автомобіль: VIN WVWZZZ3CZ9E123456, державний номер АА 1234 ВК, свідоцтво про реєстрацію ХУЗ 123456.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["WVWZZZ3CZ9E123456"], "spans": [[0, 35, 52]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["АА 1234 ВК"], "spans": [[0, 70, 80]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["ХУЗ 123456"], "spans": [[0, 107, 117]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Застрахований автомобіль", "державний номер"]
+  }
+}

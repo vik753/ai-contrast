@@ -1,0 +1,23 @@
+{
+  "name": "34_uk_variants_invisible_hyphen",
+  "language": "uk",
+  "description": "VARIANTS FILE (invisible characters, written as \\u escapes). Blocks contain zero-width spaces (U+200B) and a soft hyphen (U+00AD) inside names, an email and a phone number, plus a line-end hyphen split ('Іва-' newline 'ненку'). ADR 0009 Layer 1 removes the invisible characters first; ALL SPANS in 'expected' are offsets into the text AFTER Layer 1 cleaning (the test must clean the blocks, or use the cleaned blocks of the reply, before comparing). The line-end hyphen and the newline are not removed by cleaning, so the span in block 3 covers 'Іва-\\nненку Петру Олексійовичу'.",
+  "blocks": [
+    {"text": "Страхувальник — Іва​ненко Петро Олексійович.", "part": "body", "page": null},
+    {"text": "Пошта: in​fo@exa​mple.com, тел.: +380 50 12​3 45 67", "part": "body", "page": null},
+    {"text": "Контакт: Пет­ренко О.М.", "part": "body", "page": null},
+    {"text": "Виплата Іва-\nненку Петру Олексійовичу.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Іваненко Петро Олексійович", "Іва-\nненку Петру Олексійовичу"], "spans": [[0, 16, 42], [3, 8, 37]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["info@example.com"], "spans": [[1, 7, 23]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+380 50 123 45 67"], "spans": [[1, 31, 48]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Петренко О.М."], "spans": [[2, 9, 22]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страхувальник", "Контакт"]
+  }
+}

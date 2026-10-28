@@ -66,8 +66,19 @@ def heading_text(clause: Clause, blocks: Sequence[Block]) -> str | None:
     return text.strip()
 
 
-def warning_codes(data: dict[str, Any]) -> list[str]:
-    return sorted(w["code"] for w in data["warnings"])
+# Warnings of the detector (S5b-T1, ADR 0015 point 1); the segmentation tests ignore them.
+DETECTOR_WARNINGS = frozenset(
+    {"requisites_condition", "placeholder_lookalike", "masked_next_to_amount"}
+)
+
+
+def warning_codes(data: dict[str, Any], include_detector: bool = False) -> list[str]:
+    """Sorted warning codes; the detector's own codes only on request."""
+    return sorted(
+        w["code"]
+        for w in data["warnings"]
+        if include_detector or w["code"] not in DETECTOR_WARNINGS
+    )
 
 
 def cover_problems(data: dict[str, Any]) -> list[str]:
@@ -115,7 +126,12 @@ def cover_problems(data: dict[str, Any]) -> list[str]:
 def contract_problems(data: dict[str, Any]) -> list[str]:
     """Shape of the 200 reply (AC2)."""
     problems: list[str] = []
-    if set(data) != {"clauses", "blocks", "removed", "warnings"}:
+    # S5b-T1 (ADR 0015 point 1) adds the detector fields to the S5 reply.
+    expected = {
+        "clauses", "blocks", "removed", "warnings",
+        "detector_version", "entities", "requisites", "neutralized",
+    }  # fmt: skip
+    if set(data) != expected:
         problems.append(f"top-level keys {sorted(data)}")
     clause_keys = {
         "id",

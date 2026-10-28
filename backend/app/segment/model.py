@@ -28,11 +28,33 @@ TOO_MUCH_TEXT: Final = "too_much_text"
 NO_TEXT_EXTRACTED: Final = "no_text_extracted"
 TOO_MANY_CLAUSES: Final = "too_many_clauses"
 CLAUSE_TOO_LONG: Final = "clause_too_long"
+TOO_MANY_IDENTIFIERS: Final = "too_many_identifiers"
 
 # Codes that the child may report. The parent's own codes (timeout, failure) are not
 # in this list: a child cannot claim them.
 SegmentChildError = Literal[
-    "invalid_request", "too_much_text", "no_text_extracted", "too_many_clauses", "clause_too_long"
+    "invalid_request",
+    "too_much_text",
+    "no_text_extracted",
+    "too_many_clauses",
+    "clause_too_long",
+    "too_many_identifiers",
+]
+LineAction = Literal["drop", "keep"]
+EntityClass = Literal[
+    "ORG",
+    "PERSON",
+    "TAX_ID",
+    "ACCOUNT",
+    "ADDRESS",
+    "PHONE",
+    "EMAIL",
+    "URL",
+    "PERSONAL_DOC",
+    "DOC_NO",
+    "VEHICLE",
+    "SIGNATURE",
+    "HEALTH",
 ]
 
 
@@ -69,8 +91,36 @@ class SegmentWarning(_Strict):
     clause: str | None
 
 
-class SegmentResult(_Strict):
+class SegmentCore(_Strict):
+    """The segmentation part of the reply (what ``segment`` returns)."""
+
     clauses: list[Clause]
     blocks: list[Block]
     removed: list[Removed]
     warnings: list[SegmentWarning]
+
+
+class Entity(_Strict):
+    """One identifier in the document: all its occurrences, no value string (ADR 0015)."""
+
+    id: Annotated[str, Field(pattern=r"^e[1-9][0-9]{0,4}$")]
+    cls: EntityClass = Field(alias="class")
+    precision: Literal["high", "normal"]
+    spans: list[Span]
+
+
+class RequisitesLine(_Strict):
+    span: Span
+    action: LineAction
+
+
+class RequisitesClause(_Strict):
+    clause: Annotated[str, Field(pattern=r"^c[1-9][0-9]{0,6}$")]
+    lines: list[RequisitesLine]
+
+
+class SegmentResult(SegmentCore):
+    detector_version: Annotated[str, Field(pattern=r"^[a-z0-9-]{1,64}$")]
+    entities: list[Entity]
+    requisites: list[RequisitesClause]
+    neutralized: list[Span]

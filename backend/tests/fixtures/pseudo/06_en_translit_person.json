@@ -1,0 +1,18 @@
+{
+  "name": "06_en_translit_person",
+  "language": "en",
+  "description": "Latin transliteration of a Ukrainian name (IVANENKO Ivan Petrovych) next to the Cyrillic original, later 'Ivan Ivanenko' and 'I. Ivanenko' (initials, first-name-first order): one entity. Cyrillic letters in block 0 spans [34,56); all other letters are ASCII.",
+  "blocks": [
+    {"text": "Insured: IVANENKO Ivan Petrovych (Іваненко Іван Петрович).", "part": "body", "page": null},
+    {"text": "2.1. Notices go to Ivan Ivanenko or I. Ivanenko.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["IVANENKO Ivan Petrovych", "Іваненко Іван Петрович", "Ivan Ivanenko", "I. Ivanenko"], "spans": [[0, 9, 32], [0, 34, 56], [1, 19, 32], [1, 36, 47]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Insured", "Notices"]
+  }
+}

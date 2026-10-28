@@ -1,0 +1,22 @@
+{
+  "name": "09_uk_tax_ids_context",
+  "language": "uk",
+  "description": "Checksum-valid ЄДРПОУ and РНОКПП with a context keyword within 5 tokens: high-precision TAX_ID. Codes cover the three ЄДРПОУ weight ranges (21045679 normal weights; 38126404 range 30M-60M; 64001830 above 60M) and the second-round case (10000062). Values are in README.md.",
+  "blocks": [
+    {"text": "1.1. Страхувальник (код ЄДРПОУ 21045679) та Страховик (код за ЄДРПОУ 38126404).", "part": "body", "page": null},
+    {"text": "1.2. РНОКПП (ІПН) Страхувальника: 3521741827; ЄДРПОУ 64001830; код ЄДРПОУ 10000062.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["21045679"], "spans": [[0, 31, 39]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["38126404"], "spans": [[0, 69, 77]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["3521741827"], "spans": [[1, 34, 44]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["64001830"], "spans": [[1, 53, 61]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["10000062"], "spans": [[1, 74, 82]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страхувальник", "Страховик", "Страхувальника"]
+  }
+}

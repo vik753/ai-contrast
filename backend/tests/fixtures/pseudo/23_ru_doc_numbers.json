@@ -1,0 +1,19 @@
+{
+  "name": "23_ru_doc_numbers",
+  "language": "ru",
+  "description": "DOC_NO in RU: contract, invoice, power of attorney. The span is the number after '№' only; issue dates stay.",
+  "blocks": [
+    {"text": "6.1. Договор аренды № 15/А от 01.03.2026, счет № 2026-118, доверенность № 77 от 10.02.2026.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["15/А"], "spans": [[0, 22, 26]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["2026-118"], "spans": [[0, 49, 57]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["77"], "spans": [[0, 74, 76]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Договор аренды", "01.03.2026", "10.02.2026"]
+  }
+}

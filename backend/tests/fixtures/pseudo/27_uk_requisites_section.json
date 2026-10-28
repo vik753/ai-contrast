@@ -1,0 +1,46 @@
+{
+  "name": "27_uk_requisites_section",
+  "language": "uk",
+  "description": "UK requisites section (heading 'Реквізити та підписи сторін'), one line per block. Identifier-only lines (role word + org, labelled codes, signature) are dropped. Lines with an obligation marker, a non-identifier phrase ('Неустойка 50 %') or a name plus a verb ('Іваненко І.І. відмовляється від претензій') are kept and masked. Each kept line gives the warning requisites_condition.",
+  "blocks": [
+    {"text": "1.1. Виконавець надає послуги Замовнику.", "part": "body", "page": null},
+    {"text": "Реквізити та підписи сторін", "part": "body", "page": null},
+    {"text": "Замовник: ТОВ «Омега Трейд»", "part": "body", "page": null},
+    {"text": "ЄДРПОУ: 21045679", "part": "body", "page": null},
+    {"text": "IBAN: UA863204782600123456789012345", "part": "body", "page": null},
+    {"text": "Адреса: м. Одеса, вул. Прикладна, 12", "part": "body", "page": null},
+    {"text": "Тел.: +380 50 123 45 67", "part": "body", "page": null},
+    {"text": "Замовник зобов'язується сплатити неустойку 50 % у разі прострочення", "part": "body", "page": null},
+    {"text": "Неустойка 50 %", "part": "body", "page": null},
+    {"text": "Іваненко І.І. відмовляється від претензій", "part": "body", "page": null},
+    {"text": "____________ /Іваненко І.І./", "part": "body", "page": null},
+    {"text": "Виконавець: ТОВ «Дельта Сервіс»", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Омега Трейд»"], "spans": [[2, 10, 27]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["21045679"], "spans": [[3, 8, 16]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["UA863204782600123456789012345"], "spans": [[4, 6, 35]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["м. Одеса, вул. Прикладна, 12"], "spans": [[5, 8, 36]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+380 50 123 45 67"], "spans": [[6, 6, 23]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Іваненко І.І."], "spans": [[9, 0, 13], [10, 14, 27]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Іваненко І.І./"], "spans": [[10, 0, 28]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Дельта Сервіс»"], "spans": [[11, 12, 31]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Замовник: ТОВ", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "ЄДРПОУ:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "IBAN:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "Адреса:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "Тел.:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "Замовник зобов'язується", "action": "keep"},
+      {"block": 8, "line_text_starts_with": "Неустойка 50 %", "action": "keep"},
+      {"block": 9, "line_text_starts_with": "Іваненко І.І. відмовляється", "action": "keep"},
+      {"block": 10, "line_text_starts_with": "____________ /Іваненко", "action": "drop"},
+      {"block": 11, "line_text_starts_with": "Виконавець: ТОВ", "action": "drop"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["Виконавець надає", "Замовнику", "50 %", "Неустойка"]
+  }
+}

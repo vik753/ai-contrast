@@ -1,0 +1,22 @@
+{
+  "name": "22_uk_doc_numbers",
+  "language": "uk",
+  "description": "DOC_NO: contract, policy, power of attorney, NBU licence, court case. The span is the number after '№' only; the document word and the issue date ('від 12.01.2026') stay.",
+  "blocks": [
+    {"text": "5.1. Договір страхування № КА-2026/0457 від 12.01.2026, поліс № АВ 7654321.", "part": "body", "page": null},
+    {"text": "5.2. Довіреність № 45 від 03.02.2026, ліцензія НБУ № 123, справа № 916/1234/26.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["КА-2026/0457"], "spans": [[0, 27, 39]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["АВ 7654321"], "spans": [[0, 64, 74]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["45"], "spans": [[1, 19, 21]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["123"], "spans": [[1, 53, 56]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["916/1234/26"], "spans": [[1, 67, 78]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Договір страхування", "Довіреність", "12.01.2026", "03.02.2026"]
+  }
+}

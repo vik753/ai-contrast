@@ -1,0 +1,20 @@
+{
+  "name": "13_uk_amounts_checksum_neg",
+  "language": "uk",
+  "description": "Negative control. Every number passes a checksum (12345678, 3012345670, 38126404, 21045679, 13579243 are valid ЄДРПОУ/РНОКПП) but is an amount, a measure or a percentage next to a currency/unit. Nothing is masked. Dates of obligations stay.",
+  "blocks": [
+    {"text": "3.1. Ліміт відповідальності становить 12 345 678,00 грн.", "part": "body", "page": null},
+    {"text": "3.2. Страхова сума дорівнює 3 012 345 670 грн, франшиза — 25 %.", "part": "body", "page": null},
+    {"text": "3.3. Строк виплати — 30 днів, гарантійний пробіг — 38126404 км.", "part": "body", "page": null},
+    {"text": "3.4. Неустойка становить 21045679 грн.", "part": "body", "page": null},
+    {"text": "3.5. Премія 13 579 243 грн сплачується до 15.03.2027.", "part": "body", "page": null},
+    {"text": "3.6. Строк дії договору — з 01.01.2027 по 31.12.2027.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["12 345 678,00 грн", "3 012 345 670 грн", "25 %", "30 днів", "38126404 км", "21045679 грн", "13 579 243 грн", "15.03.2027", "01.01.2027", "31.12.2027"]
+  }
+}
