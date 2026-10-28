@@ -40,6 +40,7 @@ SETTINGS_ENV_VARS = (
     "GOOGLE_CONNECT_TIMEOUT_SECONDS",
     # Stage 5 (S5-T1) segmentation caps.
     "SEGMENT_MAX_BODY_BYTES",
+    "SAFETY_MAX_BODY_BYTES",
     "SEGMENT_MAX_CLAUSES",
     "SEGMENT_MAX_CLAUSE_CHARS",
     # S3-T1 test-only worker hook: never set in the server environment.
