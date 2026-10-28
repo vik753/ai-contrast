@@ -111,6 +111,7 @@ ADR_LAYER1 = sorted(
         0x180E,
     }
 )
+LINE_BREAKS = {0x0B, 0x0C, 0x0D, 0x85, 0x2028, 0x2029}
 CHECKBOX = {0xF0FE: "☑", 0xF0FD: "☒", 0xF0A8: "☐", 0xF06F: "☐", 0xF078: "☒"}
 
 
@@ -273,7 +274,7 @@ def test_generator_records_the_unicode_version_it_used() -> None:
 
 
 def test_clean_text_without_removals_returns_same_text_and_empty_report() -> None:
-    text = "1. Payment is due in 30 days.\tСтаття 5.\r\nLine two."
+    text = "1. Payment is due in 30 days.\tСтаття 5.\nLine two."
     result = _clean(text)
 
     assert result.text == text
@@ -391,6 +392,10 @@ def test_every_code_point_in_the_table_is_removed_and_nothing_else_is() -> None:
         if cp in CHECKBOX:
             continue
         out = _clean(f"a{chr(cp)}b").text
+        if cp in LINE_BREAKS:
+            if out != "a\nb":
+                wrongly_removed.append(cp)
+            continue
         if cp in expected and out != "ab":
             wrongly_kept.append(cp)
         if cp not in expected and unicodedata.normalize("NFC", f"a{chr(cp)}b") != out:
@@ -418,3 +423,10 @@ def test_clean_text_runs_in_linear_time_at_one_million_characters() -> None:
 
     assert large < 10.0
     assert large < 12 * max(small, 0.02)
+
+
+def test_line_breaks_become_lf_and_are_not_reported() -> None:
+    result = _clean("a\r\nb\rc\u0085d\u2028e\u2029f\u000bg\u000ch")
+
+    assert result.text == "a\nb\nc\nd\ne\nf\ng\nh"
+    assert result.removed == []
