@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe("settings panel review fixes", () => {
-  it("test_history_on_but_store_cannot_open_shows_unavailable_and_disables_switch", async () => {
+  it("test_history_on_but_store_cannot_open_shows_unavailable_and_allows_only_turning_off", async () => {
     const real = freshFactory();
     vi.stubGlobal(
       "indexedDB",
@@ -38,7 +38,12 @@ describe("settings panel review fixes", () => {
     await screen.findByText(/history is not available in this browser/i);
     await waitFor(() => {
       const sw = screen.getByRole("switch", { name: /save results in this browser/i });
-      expect((sw as HTMLButtonElement).disabled).toBe(true);
+      // Turning off must stay possible (fail closed).
+      expect((sw as HTMLButtonElement).disabled).toBe(false);
+    });
+    fireEvent.click(screen.getByRole("switch", { name: /save results in this browser/i }));
+    await waitFor(() => {
+      expect(localStorage.getItem("aic.history")).toBeNull();
     });
   });
 });

@@ -68,7 +68,7 @@ export function SettingsPanel({ id }: { id: string }) {
       return;
     }
     const saved = await countSavedResults();
-    if (saved === 0) {
+    if (saved === 0 || saved === null) {
       await turnOff();
     } else {
       setConfirm("turnOff");
@@ -94,7 +94,7 @@ export function SettingsPanel({ id }: { id: string }) {
           role="switch"
           className="switch"
           aria-checked={enabled}
-          disabled={!available}
+          disabled={!available && !enabled}
           onClick={() => {
             void onToggle();
           }}
