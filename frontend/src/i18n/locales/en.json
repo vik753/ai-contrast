@@ -62,6 +62,11 @@
       "queued": "Waiting",
       "checking": "Checking…"
     },
+    "hash": {
+      "sameFileIn": "The same file is in Contract {{label}}",
+      "sameTextHere": "Same text as another file in this contract",
+      "sameTextIn": "Same text as a file in Contract {{label}}"
+    },
     "kind": {
       "pdf": "PDF",
       "docx": "Word document",
@@ -107,6 +112,7 @@
       "pdf_damaged": "The PDF file is damaged. Open it and save or print it to a new PDF, then add it again.",
       "too_many_ocr_pages": "This scan has too many pages to recognize. Split it into parts and add them as separate files.",
       "ocr_failed": "Text recognition failed. Remove the file and add it again, or add a PDF with selectable text.",
+      "duplicate_file": "This file is already in this contract. Remove the copy or add a different file.",
       "not_implemented": "PDF and Word support is coming. For now, save the contract as a .txt file and add it.",
       "invalid_request": "The request was not accepted. Reload the page and add the link again.",
       "invalid_google_doc_id": "The document ID in the link is not valid. Check the link, then remove this row and add the link again.",

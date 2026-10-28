@@ -15,7 +15,7 @@ export function makeFile(
   name: string,
   options: { content?: string; size?: number; type?: string } = {},
 ): File {
-  const file = new File([options.content ?? "%PDF-1.7 synthetic"], name, {
+  const file = new File([options.content ?? `%PDF-1.7 synthetic ${name}`], name, {
     type: options.type ?? "",
   });
   if (options.size !== undefined) {

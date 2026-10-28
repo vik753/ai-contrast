@@ -94,6 +94,10 @@ export function describeChange(
       const file = findFile(prev, action.fileId);
       return file === undefined ? [] : [{ type: "fileRemoved", ...nameOf(file) }];
     }
+    case "fileHashed":
+      // A refused copy is news; a hash is not.
+      return resultOf(findFile(next, action.fileId)).filter((a) => a.type === "fileRejected");
+    case "textHashed":
     case "fileCheckStarted":
     case "checksRequeued":
       // Internal steps; announcing them would only add noise.
