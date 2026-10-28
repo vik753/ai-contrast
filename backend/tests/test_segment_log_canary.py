@@ -152,9 +152,12 @@ def test_segment_logs_contain_no_clause_text_number_or_heading(
     client = make_client()
     log_capture.clear()
 
-    response = post_blocks(client, [block(f"7.3 {heading}"), block(f"7.4 {text} applies.")])
+    # Clause numbers that cannot collide with durations or sizes in the access log.
+    response = post_blocks(
+        client, [block(f"8641.9273 {heading}"), block(f"8641.9274 {text} applies.")]
+    )
 
     assert response.status_code == 200
     logs = all_log_text(log_capture)
     assert heading not in logs and text not in logs
-    assert "7.3" not in logs and "7.4" not in logs
+    assert "8641.9273" not in logs and "8641.9274" not in logs
