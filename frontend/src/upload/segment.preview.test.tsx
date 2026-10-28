@@ -91,7 +91,7 @@ function sample(): Record<string, unknown> {
         number: "3.2",
         spans: [
           [0, 0, 7],
-          [1, 0, 34],
+          [1, 0, 35],
         ],
         heading_span: [0, 0, 7],
       }),

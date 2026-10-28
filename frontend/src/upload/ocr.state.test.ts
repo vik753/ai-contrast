@@ -19,6 +19,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { MAX_BLOCKS, MAX_TEXT_CHARS, type Block } from "../api/extract";
+import { segmentAll } from "../test/segment-router";
 import { okResult } from "../test/upload-fakes";
 import {
   initialUploadState,
@@ -144,7 +145,7 @@ describe("OCR state", () => {
         ],
       },
     );
-    expect(readiness(state)).toEqual({ ready: true, contracts: 2 });
+    expect(readiness(segmentAll(state))).toEqual({ ready: true, contracts: 2 });
   });
 
   it("test_ocr_progress_is_stored_on_the_file", () => {

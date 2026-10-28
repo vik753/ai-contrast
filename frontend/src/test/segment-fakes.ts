@@ -94,7 +94,12 @@ export class Servers {
     this.extract.autoRespond = (payload) => {
       const blob = payload as Blob;
       const blocks = this.extractBlocks.get(blob) ?? [body("Synthetic clause one.")];
-      return okResponse("docx", blob.size, { blocks, ...this.extractOverrides.get(blob) });
+      const overrides = this.extractOverrides.get(blob);
+      // A reply with `pages` is a PDF; the strict client rejects "docx" with pages.
+      return okResponse(overrides?.pages === undefined ? "docx" : "pdf", blob.size, {
+        blocks,
+        ...overrides,
+      });
     };
   }
 

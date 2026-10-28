@@ -104,6 +104,17 @@ export function describeChange(
       return [];
     case "fileChecked":
       return resultOf(findFile(next, action.fileId));
+    case "segmentStarted":
+    case "segmentsRequeued":
+    case "segmentRetried":
+      return [];
+    case "segmentFinished": {
+      // A failed split is news (with our message, never the server text); clauses are not announced.
+      const file = findFile(next, action.fileId);
+      return file?.status === "accepted" && file.segment?.status === "failed"
+        ? [{ type: "fileRejected", ...nameOf(file), code: file.segment.code }]
+        : [];
+    }
     case "ocrProgress":
       return [];
     case "ocrFinished":

@@ -22,6 +22,7 @@ import enJson from "../i18n/locales/en.json";
 import { resetBrowserEnv } from "../test/browser-env";
 import { flattenLocale } from "../test/locale-utils";
 import { FakeFetch, fileList, keyContaining, makeFile, okResponse } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import * as UploadFormModule from "./UploadForm";
 
 const EN = flattenLocale(enJson);
@@ -57,7 +58,7 @@ let server: FakeFetch;
 beforeEach(() => {
   resetBrowserEnv();
   server = new FakeFetch();
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {
@@ -357,7 +358,10 @@ describe("AC7 — hashes stay in memory and never leave the browser", () => {
     answerWithTexts(TEXT);
     addFiles("A", makeFile("a.docx", { content: FILE_A }));
     await waitAccepted("A", "a.docx");
-    expect(digest.mock.calls.length).toBeGreaterThanOrEqual(2); // file hash and text hash
+    // File hash and text hash; the text hash waits for the clause split (S5-T2).
+    await waitFor(() => {
+      expect(digest.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
     for (const call of digest.mock.calls) {
       expect(call[0]).toBe("SHA-256");
     }

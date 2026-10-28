@@ -40,6 +40,7 @@ import {
   pluralBase,
   templateRegExp,
 } from "../test/upload-fakes";
+import { routeFetch } from "../test/segment-router";
 import { MAX_FILE_BYTES, MAX_FILES_PER_CONTRACT, MAX_TOTAL_BYTES } from "./limits";
 import * as UploadFormModule from "./UploadForm";
 
@@ -59,7 +60,7 @@ let server: FakeFetch;
 beforeEach(() => {
   resetBrowserEnv();
   server = new FakeFetch();
-  vi.stubGlobal("fetch", server.fetch);
+  routeFetch(server);
 });
 
 afterEach(() => {

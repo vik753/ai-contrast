@@ -25,6 +25,7 @@ import {
   MIN_CONTRACTS,
   OCR_LOW_CONFIDENCE,
 } from "./limits";
+import type { Clause, SegmentResult, SegmentWarning } from "../api/segment";
 import { canonicalJson } from "../hash/key";
 import { normalizeForHash } from "../hash/normalize";
 import { sha256Hex } from "../hash/sha256";
@@ -42,6 +43,20 @@ export type ClientRejectionCode =
   | "duplicate_file";
 
 export type RejectionCode = ExtractErrorCode | ClientRejectionCode;
+
+/**
+ * Where the clause split of an accepted row stands (S5-T2). Absent: waiting for
+ * its request. Clauses live in memory only, next to the extracted text, and go
+ * with the row (threat model T3 control 7).
+ */
+export type SegmentState =
+  | { readonly status: "running" }
+  | { readonly status: "failed"; readonly code: RejectionCode }
+  | {
+      readonly status: "done";
+      readonly clauses: readonly Clause[];
+      readonly warnings: readonly SegmentWarning[];
+    };
 
 export type UploadFileStatus = "queued" | "checking" | "accepted" | "rejected";
 
@@ -79,6 +94,8 @@ export type UploadFile =
       readonly textHash?: string;
       /** Set while OCR runs: the page being recognized (1-based) of the total. */
       readonly ocr?: OcrProgress;
+      /** The clause split. Starts when the text is complete (no OCR pages left). */
+      readonly segment?: SegmentState;
     })
   | (UploadFileBase & { readonly status: "rejected"; readonly code: RejectionCode });
 
@@ -125,6 +142,13 @@ export type UploadAction =
   | { type: "fileRemoved"; contractId: string; fileId: string }
   /** Internal: the bytes of a queued file were hashed (`hash` absent: hashing failed). */
   | { type: "fileHashed"; fileId: string; hash?: string }
+  /** Internal: the blocks of an accepted file were sent for the clause split. */
+  | { type: "segmentStarted"; fileId: string }
+  /** Internal: `running` splits without a request in flight wait for a new request. */
+  | { type: "segmentsRequeued"; fileIds: readonly string[] }
+  | { type: "segmentFinished"; fileId: string; result: SegmentResult }
+  /** The user asked to send a failed split again. */
+  | { type: "segmentRetried"; fileId: string }
   /** Internal: the text of an accepted file was hashed. */
   | { type: "textHashed"; fileId: string; hash: string }
   /** Internal: a queued file was sent to the server. */
@@ -141,7 +165,10 @@ export type UploadAction =
 
 export type Readiness =
   | { ready: true; contracts: number }
-  | { ready: false; reason: "checking" | "rejected_files" | "contract_without_file" };
+  | {
+      ready: false;
+      reason: "checking" | "rejected_files" | "segment_failed" | "contract_without_file";
+    };
 
 function contractId(number: number): string {
   return `contract-${number}`;
@@ -182,6 +209,20 @@ export function isPending(file: UploadFile): boolean {
 /** An accepted file with scanned pages that the browser still has to recognize. */
 export function needsOcr(file: UploadFile): boolean {
   return file.status === "accepted" && file.extraction.ocrPages.length > 0;
+}
+
+/** An accepted file whose text is complete but whose clauses are not there yet. */
+export function awaitsSegment(file: UploadFile): file is AcceptedFile {
+  return (
+    file.status === "accepted" &&
+    !needsOcr(file) &&
+    (file.segment === undefined || file.segment.status === "running")
+  );
+}
+
+/** An accepted file with its clauses. */
+export function isSegmented(file: UploadFile): file is AcceptedFile {
+  return file.status === "accepted" && file.segment?.status === "done";
 }
 
 function totalActiveBytes(state: UploadState): number {
@@ -409,6 +450,36 @@ function applyOcr(file: UploadFile, pages: readonly OcrPage[]): UploadFile {
   };
 }
 
+function withoutSegment(file: AcceptedFile): AcceptedFile {
+  const copy = { ...file };
+  delete copy.segment;
+  return copy;
+}
+
+/**
+ * The reply of the clause split. On success the cleaned blocks replace the row's
+ * text; the text hash is computed from them afterwards. A reply for a row that is
+ * not waiting for one (removed, or not running) is dropped.
+ */
+function applySegment(file: UploadFile, result: SegmentResult): UploadFile {
+  if (file.status !== "accepted" || file.segment?.status !== "running") {
+    return file;
+  }
+  if (!result.ok) {
+    return { ...file, segment: { status: "failed", code: result.code } };
+  }
+  const { clauses, blocks, removed, warnings } = result.segmentation;
+  return {
+    ...file,
+    extraction: {
+      ...file.extraction,
+      blocks,
+      removed: [...file.extraction.removed, ...removed],
+    },
+    segment: { status: "done", clauses, warnings },
+  };
+}
+
 /**
  * The size of a Google document is known only after the server read it. If it
  * pushes the total over the limit, the document is rejected like a file would be.
@@ -446,9 +517,34 @@ export function uploadReducer(state: UploadState, action: UploadAction): UploadS
       return addGoogleDoc(state, action.contractId, action.fileId, action.suffix);
     case "fileHashed":
       return applyFileHash(state, action.fileId, action.hash);
+    case "segmentStarted":
+      return updateFile(state, action.fileId, (file) =>
+        file.status === "accepted" && !needsOcr(file) && file.segment === undefined
+          ? { ...file, segment: { status: "running" } }
+          : file,
+      );
+    case "segmentsRequeued": {
+      let next = state;
+      for (const fileId of action.fileIds) {
+        next = updateFile(next, fileId, (file) =>
+          file.status === "accepted" && file.segment?.status === "running"
+            ? withoutSegment(file)
+            : file,
+        );
+      }
+      return next;
+    }
+    case "segmentFinished":
+      return updateFile(state, action.fileId, (file) => applySegment(file, action.result));
+    case "segmentRetried":
+      return updateFile(state, action.fileId, (file) =>
+        file.status === "accepted" && file.segment?.status === "failed"
+          ? withoutSegment(file)
+          : file,
+      );
     case "textHashed":
       return updateFile(state, action.fileId, (file) =>
-        file.status === "accepted" && !needsOcr(file) && file.textHash === undefined
+        isSegmented(file) && file.textHash === undefined
           ? { ...file, textHash: action.hash }
           : file,
       );
@@ -518,17 +614,21 @@ export function filesWithStatus(state: UploadState, status: UploadFileStatus): U
 
 /**
  * Whether the contracts can be compared. The first unmet condition wins:
- * 1. every check and every OCR job is finished (`checking`);
+ * 1. every check, OCR job and clause split is finished (`checking`);
  * 2. no file was rejected: rejected files must be removed (`rejected_files`);
+ * 2a. no clause split failed: retry or remove the file (`segment_failed`);
  * 3. every contract has an accepted file (`contract_without_file`).
  */
 export function readiness(state: UploadState): Readiness {
   const files = state.contracts.flatMap((c) => c.files);
-  if (files.some((f) => isPending(f) || needsOcr(f))) {
+  if (files.some((f) => isPending(f) || needsOcr(f) || awaitsSegment(f))) {
     return { ready: false, reason: "checking" };
   }
   if (files.some((f) => f.status === "rejected")) {
     return { ready: false, reason: "rejected_files" };
+  }
+  if (files.some((f) => f.status === "accepted" && f.segment?.status === "failed")) {
+    return { ready: false, reason: "segment_failed" };
   }
   if (!state.contracts.every((c) => c.files.some(isActive))) {
     return { ready: false, reason: "contract_without_file" };
