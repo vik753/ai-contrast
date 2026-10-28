@@ -1,4 +1,4 @@
-"""HTTP request limits shared by `BodySizeLimitMiddleware` and the extract router."""
+"""HTTP request limits shared by `BodySizeLimitMiddleware` and the upload routers."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Final
 from starlette.datastructures import Headers
 
 EXTRACT_PATH: Final = "/api/extract"
+SEGMENT_PATH: Final = "/api/segment"
 
 # A `Content-Length` with more digits than this counts as too large; it is never
 # passed to `int()` (no work proportional to a hostile header length).

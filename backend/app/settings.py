@@ -110,6 +110,13 @@ class Settings(BaseSettings):
     - ``EXTRACT_SEND_TIMEOUT_SECONDS``: deadline to send the response of
       ``POST /api/extract``; a client that does not read is cut off.
 
+    Clause segmentation (positive integers, threat model T3, T5 and T6, ADR 0014):
+
+    - ``SEGMENT_MAX_BODY_BYTES``: body size of ``POST /api/segment`` (that path only).
+    - ``SEGMENT_MAX_CLAUSES``: clauses of one file (``too_many_clauses``).
+    - ``SEGMENT_MAX_CLAUSE_CHARS``: characters of one clause; a longer clause is split
+      into parts (``clause_too_long`` if a single sentence is longer).
+
     DOCX extraction (positive integers, threat model T4 and T5, S3-T2):
 
     - ``MAX_DOCX_PART_BYTES``: real uncompressed size of one archive part. The
@@ -159,6 +166,9 @@ class Settings(BaseSettings):
     extract_max_text_chars: PositiveInt = DEFAULT_MAX_TEXT_CHARS
     extract_max_blocks: PositiveInt = DEFAULT_MAX_BLOCKS
     extract_send_timeout_seconds: PositiveInt = 30
+    segment_max_body_bytes: PositiveInt = 4 * MIB
+    segment_max_clauses: PositiveInt = 2000
+    segment_max_clause_chars: PositiveInt = 20_000
     max_docx_part_bytes: PositiveInt = DEFAULT_MAX_DOCX_PART_BYTES
     max_docx_xml_depth: PositiveInt = DEFAULT_MAX_DOCX_XML_DEPTH
     max_docx_elements: PositiveInt = DEFAULT_MAX_DOCX_ELEMENTS

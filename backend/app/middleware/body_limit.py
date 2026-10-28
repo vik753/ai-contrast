@@ -4,6 +4,8 @@ Pure ASGI middleware between CORS and the error catcher, so a ``413`` to an
 allowed origin carries the CORS headers.
 
 - The ``/api/extract`` path (any method): ``max_file_bytes``, error ``file_too_large``.
+- The ``/api/segment`` path (any method): ``max_segment_body_bytes``, error
+  ``request_too_large``.
 - Every other path: ``max_json_body_bytes``, error ``request_too_large``.
 
 Two checks:
@@ -27,7 +29,7 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.http_limits import EXTRACT_PATH, declared_length
+from app.http_limits import EXTRACT_PATH, SEGMENT_PATH, declared_length
 
 FILE_TOO_LARGE = "file_too_large"
 REQUEST_TOO_LARGE = "request_too_large"
@@ -40,14 +42,26 @@ async def _client_gone() -> Message:
 
 
 class BodySizeLimitMiddleware:
-    def __init__(self, app: ASGIApp, *, max_file_bytes: int, max_json_body_bytes: int) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_file_bytes: int,
+        max_json_body_bytes: int,
+        max_segment_body_bytes: int | None = None,
+    ) -> None:
         self.app = app
         self.max_file_bytes = max_file_bytes
         self.max_json_body_bytes = max_json_body_bytes
+        self.max_segment_body_bytes = (
+            max_json_body_bytes if max_segment_body_bytes is None else max_segment_body_bytes
+        )
 
     def _limit(self, scope: Scope) -> tuple[int, str]:
         if scope.get("path") == EXTRACT_PATH:
             return self.max_file_bytes, FILE_TOO_LARGE
+        if scope.get("path") == SEGMENT_PATH:
+            return self.max_segment_body_bytes, REQUEST_TOO_LARGE
         return self.max_json_body_bytes, REQUEST_TOO_LARGE
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

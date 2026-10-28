@@ -202,31 +202,25 @@ def _parse_reply(
     return result
 
 
-async def _run(
-    data: bytes, kind: FileKind, limits: SandboxLimits, test_hook: str | None
-) -> ExtractionResult:
-    header = json.dumps(
-        {
-            "kind": kind.value,
-            "size": len(data),
-            "max_text_chars": limits.max_text_chars,
-            "max_blocks": limits.max_blocks,
-            "docx_max_part_bytes": limits.docx_max_part_bytes,
-            "docx_max_total_bytes": limits.docx_max_total_bytes,
-            "docx_max_xml_depth": limits.docx_max_xml_depth,
-            "docx_max_elements": limits.docx_max_elements,
-            "pdf_max_pages": limits.pdf_max_pages,
-            "pdf_max_prev_chain": limits.pdf_max_prev_chain,
-        }
-    ).encode()
+async def run_child(
+    header: dict[str, object], data: bytes, limits: SandboxLimits, test_hook: str | None
+) -> bytes:
+    """Run one worker child with ``header`` and ``data`` and return its stdout.
+
+    Raises ``ExtractionError`` with ``extraction_timeout`` (wall deadline) or
+    ``extraction_failed`` (cannot start, non-zero exit, signal, output above the cap).
+    The caller validates the output. Shared by extraction and segmentation (ADR 0014).
+    """
     try:
         process = await _start_child(limits, test_hook)
     except OSError:
-        # No traceback: the outcome code is logged by `run_extraction`.
+        # No traceback: the outcome code is logged by the caller.
         raise ExtractionError(EXTRACTION_FAILED) from None
     try:
         async with asyncio.timeout(limits.wall_seconds):
-            output = await _communicate(process, header + b"\n", data, limits.max_result_bytes)
+            output = await _communicate(
+                process, json.dumps(header).encode() + b"\n", data, limits.max_result_bytes
+            )
     except TimeoutError:
         raise ExtractionError(EXTRACTION_TIMEOUT) from None
     except _ResultTooLargeError:
@@ -238,6 +232,25 @@ async def _run(
         await asyncio.gather(process.wait(), _discard_rest(process))
     if process.returncode != 0:
         raise ExtractionError(EXTRACTION_FAILED)
+    return output
+
+
+async def _run(
+    data: bytes, kind: FileKind, limits: SandboxLimits, test_hook: str | None
+) -> ExtractionResult:
+    header: dict[str, object] = {
+        "kind": kind.value,
+        "size": len(data),
+        "max_text_chars": limits.max_text_chars,
+        "max_blocks": limits.max_blocks,
+        "docx_max_part_bytes": limits.docx_max_part_bytes,
+        "docx_max_total_bytes": limits.docx_max_total_bytes,
+        "docx_max_xml_depth": limits.docx_max_xml_depth,
+        "docx_max_elements": limits.docx_max_elements,
+        "pdf_max_pages": limits.pdf_max_pages,
+        "pdf_max_prev_chain": limits.pdf_max_prev_chain,
+    }
+    output = await run_child(header, data, limits, test_hook)
     return _parse_reply(output, kind, data, limits)
 
 

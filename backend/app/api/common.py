@@ -15,18 +15,22 @@ from typing import Final
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
+from starlette.requests import ClientDisconnect
 from starlette.types import Receive, Scope, Send
 
 from app.extraction.detect import ZipLimits
 from app.extraction.limiter import ExtractionLimiter
 from app.extraction.model import MIB
 from app.extraction.sandbox import SandboxLimits
+from app.http_limits import declared_length
 from app.net.client import ClientFactory
 from app.settings import Settings
 
 RETRY_AFTER_SECONDS: Final = 5
 CLOSE: Final = {"Connection": "close"}
 SEND_CHUNK_BYTES: Final = 64 * 1024
+# How late a stalled stream may be detected after its rate falls below the minimum.
+RATE_TICK_SECONDS: Final = 1.0
 
 
 def error_response(code: str, status: int, headers: dict[str, str] | None = None) -> JSONResponse:
@@ -52,6 +56,93 @@ def app_state(request: Request) -> tuple[Settings, ExtractionLimiter]:
         msg = "app state is not configured"
         raise TypeError(msg)
     return settings, limiter
+
+
+class BodyRejectedError(Exception):
+    """The body read stopped early. ``status`` and ``code`` describe the answer."""
+
+    def __init__(self, status: int, code: str) -> None:
+        super().__init__(code)
+        self.status = status
+        self.code = code
+
+
+def check_upload_headers(
+    request: Request, *, max_bytes: int, too_large_code: str, accepted_media_type: str
+) -> JSONResponse | int:
+    """Order of header checks of the upload endpoints, from the headers alone.
+
+    Any ``Transfer-Encoding`` or no plain decimal ``Content-Length`` gives ``411``;
+    a length above ``max_bytes`` gives ``413`` (``too_large_code``); another media type
+    gives ``415``. Every answer is an early error. Returns the declared length otherwise.
+    """
+    if "transfer-encoding" in request.headers:
+        return early_error("length_required", 411)
+    length = declared_length(request.headers)
+    if length is None:
+        return early_error("length_required", 411)
+    if length > max_bytes:
+        return early_error(too_large_code, 413)
+    if media_type(request.headers.get("content-type")) != accepted_media_type:
+        return early_error("unsupported_media_type", 415)
+    return length
+
+
+async def read_body(
+    request: Request, declared: int, settings: Settings, *, max_bytes: int, too_large_code: str
+) -> bytes:
+    """Read exactly ``declared`` bytes into one pre-allocated buffer.
+
+    ``declared`` is at most ``max_bytes`` (checked by the caller). Raises
+    ``BodyRejectedError`` for 413 (``too_large_code``), 400 and 408, ``ClientDisconnect``
+    if the client leaves.
+
+    Deadline and minimum rate use one ``asyncio.timeout_at``. The average rate falls
+    below the minimum at ``fail_at = max(grace_end, start + received / min_rate)``.
+    The timeout is kept between ``fail_at`` and ``fail_at + RATE_TICK_SECONDS``
+    (never after the deadline), so it never fires early and a stalled stream is
+    caught within one tick. It is moved only when ``fail_at`` passes it, and each move
+    sets it at least one tick later, before the deadline: so there are at most
+    ``extract_body_timeout_seconds / RATE_TICK_SECONDS`` reschedules (60 by default),
+    not one timer per chunk. The rate is also checked when a chunk arrives.
+    """
+    loop = asyncio.get_running_loop()
+    start = loop.time()
+    deadline = start + settings.extract_body_timeout_seconds
+    grace_end = start + settings.extract_rate_grace_seconds
+    min_rate = settings.extract_min_rate_bytes_per_second
+    buffer = bytearray(declared)
+    received = 0
+    more_body = True
+    try:
+        async with asyncio.timeout_at(min(deadline, grace_end + RATE_TICK_SECONDS)) as timer:
+            while more_body:
+                message = await request.receive()
+                if message["type"] != "http.request":
+                    raise ClientDisconnect
+                chunk: bytes = message.get("body", b"")
+                more_body = bool(message.get("more_body", False))
+                end = received + len(chunk)
+                if end > max_bytes:
+                    raise BodyRejectedError(413, too_large_code)
+                if end > declared:
+                    raise BodyRejectedError(400, "length_mismatch")
+                buffer[received:end] = chunk
+                received = end
+                if not more_body:
+                    break
+                now = loop.time()
+                if now > grace_end and received < min_rate * (now - start):
+                    raise BodyRejectedError(408, "upload_timeout")
+                fail_at = max(grace_end, start + received / min_rate)
+                wake = timer.when()
+                if wake is not None and fail_at > wake and wake < deadline:
+                    timer.reschedule(min(deadline, fail_at + RATE_TICK_SECONDS))
+    except TimeoutError:
+        raise BodyRejectedError(408, "upload_timeout") from None
+    if received != declared:
+        raise BodyRejectedError(400, "length_mismatch")
+    return bytes(buffer)
 
 
 def google_client_factory(request: Request) -> ClientFactory:
