@@ -137,6 +137,7 @@ _UNIT_SEGMENT: Final = re.compile(
 )
 _MAX_NATIONAL: Final = 11
 _MAX_PHONE_RUN: Final = 5
+_MIN_HASH_NUMBER: Final = 2
 _MIN_NATIONAL: Final = 10
 _MAX_UNIT_GAP: Final = 2
 _SERIAL_MIN_VIN: Final = 17
@@ -350,6 +351,8 @@ class _Line:
         if consumed:
             return consumed
         if self.joined(index) or self.is_amount(index, index):
+            return index + 1
+        if self._hash_number(index, word):
             return index + 1
         if length <= _MAX_STREET_NUMBER:
             done = self._street(index)
@@ -933,12 +936,23 @@ class _Line:
 
     # ---------------------------------------------------------- document number
 
+    def _hash_number(self, index: int, word: str) -> bool:
+        """``invoice # 4521``: a number after ``#`` that follows a document word."""
+        before = self.low[max(self.ls, self.st[index] - 3) : self.st[index]].rstrip(" ")
+        if not before.endswith("#") or len(word) < _MIN_HASH_NUMBER:
+            return False
+        if not any(
+            is_document_word(self.text(previous)) for previous in range(max(0, index - 3), index)
+        ):
+            return False
+        self.hits.add(DOC_NO, NORMAL, self.st[index], self.en[index], word)
+        return True
+
     def _doc_no(self, index: int, word: str) -> None:
         if not any(
-            is_document_word(self.text(previous)) and self.gap(previous) != "-"
-            for previous in range(max(0, index - 3), index)
+            is_document_word(self.text(previous)) for previous in range(max(0, index - 3), index)
         ):
-            return  # a compound such as "счёт-фактура" is not a document word here
+            return
         low = self.low
         if len(word) > 2:  # noqa: PLR2004 - "no45": the numero sign glued to the number
             position = self.st[index] + 2

@@ -198,8 +198,27 @@ def test_sort_code_near_misses() -> None:
     assert texts("Account 41234567 is open.", cls="ACCOUNT") == []
 
 
-def test_invoice_compound_is_not_a_document_word() -> None:
-    assert texts("Оплата по счёт-фактура № 4521 в срок.") == []
+@pytest.mark.parametrize(
+    ("text", "number"),
+    [
+        ("Оплата по счёт-фактура № 4521 в срок.", "4521"),
+        ("Рахунок-фактура № 77812 сплачено.", "77812"),
+        ("Накладная No. 90431 получена.", "90431"),
+        ("Invoice # 5521 is due.", "5521"),
+        ("Policy #8812345 applies.", "8812345"),
+        ("Довіреність № 31 від 5 травня.", "31"),
+    ],
+)
+def test_number_after_a_document_word_is_doc_no(text: str, number: str) -> None:
+    assert texts(text, cls="DOC_NO") == [number]
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Партия № 4521 штук.", "Item # 4521 units.", "Hash # 4521 here.", "Оплата № 4521 в срок."],
+)
+def test_number_without_a_document_word_or_with_a_unit_is_not_doc_no(text: str) -> None:
+    assert texts(text, cls="DOC_NO") == []
 
 
 # -------------------------------------------------------------------- documents
