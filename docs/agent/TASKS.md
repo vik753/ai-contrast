@@ -5,7 +5,71 @@ Check a task only when it is merged to `main` with green CI.
 
 Finished stages 0 to 5b: `docs/agent/TASKS-archive.md`.
 
-Next: stage 6 (model connection). The tech lead writes the stage 6 tasks first.
+## Stage 6 — Model connection (ADR 0016)
+
+Order: S6-T0 (dependency approval) first; then S6-T1 (`app/net/` on `httpx2`); then S6-T2 (port and adapters) and S6-T3 (limiter and client IP) in parallel; then S6-T4 (check endpoint and free mode); S6-T5 (browser) after S6-T4's API is fixed; S6-T6 docs last.
+
+### S6-T0 Dependency approval
+
+- Owner: `security-reviewer`, with the tech lead.
+- Choose exact versions of `anthropic`, `openai`, `httpx2`, `httpcore2` (newest release at least 14 days old), audit them and every new transitive package (`truststore`, `opentelemetry-api`, `docstring-parser`, `jiter`, `sniffio`, others): maintainers, install scripts, network or telemetry at import, env variables read, known advisories. Record the result in ADR 0016.
+
+### S6-T1 Outbound client on `httpx2` (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer` (port the existing guard and Google Docs tests). Branch: `feat/s6-net`.
+- Threats: T2, T7, T8.
+
+1. `app/net/` uses `httpx2`/`httpcore2`; the guarded network backend, client factory and Google Docs export behave exactly as before (every existing guard, redirect, size-cap and error-mapping test passes on the new packages).
+2. TLS context from `certifi`, passed as `verify=`; `truststore` never used; `trust_env=False`. Test pins it.
+3. Policy tests: only `app/net/` imports `httpx2`/`httpcore2`; nothing in `app/` imports `httpx`/`httpcore`; no `opentelemetry-sdk` or exporter in `uv.lock`. `httpx2`/`httpcore2` loggers at `WARNING` in `log_config.json` and at startup.
+4. `httpx` remains a dev dependency only; `pip-audit` clean.
+
+### S6-T2 `AIProvider` port and adapters (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s6-ai`. After S6-T1.
+- Threats: T1, T2, T5, T11.
+
+1. Port, `AIRequest`, `ModelJson`, `CheckResult` per ADR 0016 point 2; no `str` parameter on the port (AST policy test covers `app/ai/`); one document per `AIRequest` (policy test).
+2. Prompt assembly with separate instruction and data messages, random per-block nonce delimiters, nonce never present in the block text.
+3. Adapters per point 3: one SDK client per request on the guarded client; `max_retries=0`; explicit `base_url`; environment variables `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`, `ANTHROPIC_LOG`, `OPENAI_LOG` have no effect (tests set them); no tool fields on the wire; `max_tokens` always set; timeouts and a 2 MiB response cap that fails closed.
+4. Error mapping to the codes of point 3 for every SDK error class and status; no SDK text, body or request ID in logs or errors (log canary).
+5. Presets and model-ID grammar per point 4; custom base URL syntax checks with tests for user info, query, fragment, port, IP literals, single labels, `http`.
+6. Wire canary (point 10): both adapters, `check()` and `complete_json()`, identifier and key canaries; the key only in the auth header.
+
+### S6-T3 Rate limiter and client IP (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s6-limits`. After S6-T1 (parallel to S6-T2).
+- Threats: T6, T10.
+
+1. `app/limits/` fixed-window limiter with a bounded table that fails closed; time injected for tests.
+2. Client IP per ADR 0016 point 8 (rightmost `X-Forwarded-For` hop in production, peer in development; invalid → `unknown`); spoofed leftmost entries have no effect.
+3. At most 1 extraction slot per IP across `/api/extract`, `/api/extract/google-doc`, `/api/segment`, `/api/safety-check`; `503 busy` with `Retry-After`; the shared pool of 2 stays. Closes the stage 13 blocker (T6 control 4).
+4. No IP address is logged (counts and codes only).
+
+### S6-T4 Connection check and free mode (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s6-check`. After S6-T2 and S6-T3.
+- Threats: T1, T2, T6, T10.
+
+1. `POST /api/provider/check` per ADR 0016 point 6; body cap 4 KiB; `X-Provider-Key` rules of point 5 (`invalid_provider_key`, `unexpected_provider_key`); never returns model text; per-IP limits; 2 checks in flight.
+2. Free mode per point 7: settings `CF_ACCOUNT_ID`, `CF_AI_TOKEN`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME` as `SecretStr`/validated; `503 free_mode_unavailable` without them; Turnstile verification through `app/net/` (mocked in tests; Cloudflare's documented test secrets for local use); token reuse refused; per-IP daily limit and global Neuron budget with `429 free_quota_exhausted`; reset at 00:00 UTC.
+3. Log canary for `CF_AI_TOKEN`, Turnstile secret and the client key on every path.
+4. `CLAUDE.md` Commands: a check request that returns `provider_blocked_host` for `https://127.0.0.1` without any network call, and one that returns `free_mode_unavailable` locally.
+
+### S6-T5 Provider settings in the browser (frontend)
+
+- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s6-ui`. After S6-T4's API is merged.
+- Threats: T1, T9, T10.
+
+1. Settings panel per ADR 0016 point 9, all strings in `en`, `uk`, `ru`.
+2. Key storage: `sessionStorage` default, opt-in `localStorage` with a warning, "Forget key", removed by "Clear all"; key only in `X-Provider-Key` with the pinned fetch options; tests check it never appears in a URL, IndexedDB or console output.
+3. Turnstile loaded lazily only for free mode; CSP and Trusted Types allow exactly `https://challenges.cloudflare.com` for script and frame; a test proves the script is not loaded on page load or for other presets; Cloudflare's test site key in development.
+4. Free mode notice and Gemini hint with the data-use warning.
+
+### S6-T6 Docs for stage 6
+
+- Owner: `docs-writer`. After S6-T1–T5 are merged.
+- ADR 0016 → accepted; threat model T1, T2, T6 (per-IP slot blocker closed), T9 (Turnstile CSP exception), T10, T11 control 10; `CLAUDE.md` architecture row (own limiter, `httpx2`) and rule 8 exception note; README (providers, free mode, key storage); customer actions for stage 13 (Cloudflare account, Workers AI token, Turnstile widget, Render env vars).
 
 ## Open follow-ups
 
