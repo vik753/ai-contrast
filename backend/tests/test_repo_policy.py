@@ -651,6 +651,7 @@ def test_dependabot_ecosystem_monthly_and_grouped(ecosystem: str) -> None:
         # stay separate and immediate.
         assert re.search(r"^\s*groups:\s*$", block, re.M), block
         assert re.search(r"applies-to:\s*version-updates\b", block), block
+        assert "security-updates" not in block, block
 
 
 def _ignore_entries(ecosystem: str | None = None, directory: str | None = None) -> dict[str, str]:
