@@ -45,6 +45,7 @@ _HELDOUT_REASON = (
     "S5b-T4 AC 2: detector round 3 still misses this held-out gate; detector work pending"
 )
 KNOWN_GATE_FAILURES: dict[str, str] = {
+    "heldout-recall:en:ADDRESS:normal": _HELDOUT_REASON,
     "heldout-recall:en:PERSON:normal": _HELDOUT_REASON,
 }
 

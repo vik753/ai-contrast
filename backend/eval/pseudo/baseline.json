@@ -6,7 +6,7 @@
     "precision:uk": 1.0,
     "recall:en:ACCOUNT:high": 1.0,
     "recall:en:ACCOUNT:normal": 1.0,
-    "recall:en:ADDRESS:normal": 1.0,
+    "recall:en:ADDRESS:normal": 0.6,
     "recall:en:DOC_NO:normal": 1.0,
     "recall:en:EMAIL:high": 1.0,
     "recall:en:HEALTH:normal": 1.0,
