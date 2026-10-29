@@ -62,7 +62,7 @@ Order: S6-T0 (dependency approval) first; then S6-T1 (`app/net/` on `httpx2`); t
 
 1. Settings panel per ADR 0016 point 9, all strings in `en`, `uk`, `ru`.
 2. Key storage: `sessionStorage` default, opt-in `localStorage` with a warning, "Forget key", removed by "Clear all"; key only in `X-Provider-Key` with the pinned fetch options; tests check it never appears in a URL, IndexedDB or console output.
-3. Turnstile isolated per ADR 0016 point 7: a static `turnstile.html` on a separate origin with its own CSP; the app embeds it as a sandboxed iframe only for free mode; `postMessage` with exact-origin checks both ways and a strict message shape; the app CSP adds only the frame origin to `frame-src` and never loads a Cloudflare script; tests prove nothing Cloudflare loads on page load or for other presets, and that messages from other origins or with other shapes are ignored; Cloudflare's test site key in development.
+3. Turnstile isolated per ADR 0016 point 7: a static `turnstile.html` on a separate origin with its own CSP; the app embeds it as a sandboxed iframe only for free mode; `postMessage` with exact-origin checks both ways, `event.source === iframe.contentWindow` on the app side and a strict message shape; the frame page sends `frame-ancestors <app origin>` and `Referrer-Policy: no-referrer`; the app CSP adds only the frame origin to `frame-src` and never loads a Cloudflare script; tests prove nothing Cloudflare loads on page load or for other presets, and that messages from other origins or with other shapes are ignored; Cloudflare's test site key in development.
 4. Free mode notice and Gemini hint with the data-use warning.
 
 ### S6-T6 Docs for stage 6
