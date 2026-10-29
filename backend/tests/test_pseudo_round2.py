@@ -279,3 +279,14 @@ def test_en_double_surname_wrapped_at_its_own_hyphen(
 
     covered = [span_text(data, sp) for e in data["entities"] for sp in e["spans"]]
     assert any("Smith" in t and "Jones" in t for t in covered), covered
+
+
+def test_address_goes_on_after_a_wrap_behind_an_abbreviation() -> None:
+    assert texts("Адреса: м.\nЛьвів, вул. Зелена, 8.", cls="ADDRESS") == [
+        "м.\nЛьвів, вул. Зелена, 8"
+    ]
+
+
+def test_rnokpp_in_two_groups_of_five_without_a_keyword_is_proposed() -> None:
+    assert texts("Також 31826 40979.", cls="TAX_ID") == ["31826 40979"]
+    assert texts("Також 12345 67890 грн.", cls="TAX_ID") == []

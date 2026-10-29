@@ -342,7 +342,7 @@ class _Line:
         self._code(index, word, length)
         return index + 1
 
-    def _structured(self, index: int, word: str, length: int) -> int:  # noqa: PLR0911
+    def _structured(self, index: int, word: str, length: int) -> int:  # noqa: PLR0911, PLR0912
         n = self.n
         if length == 10 and index + 3 < n and self._lens(index, (10, 2, 3, 4), ":"):  # noqa: PLR2004
             return self._add_range(ADDRESS, NORMAL, index, index + 3)
@@ -364,6 +364,11 @@ class _Line:
             return index + 3
         if length == 2 and index + 1 < n and self.gap(index) == "-" and self._lens(index, (2, 7)):  # noqa: PLR2004
             if self.near("ein", index, 4):
+                return self._add_range(TAX_ID, NORMAL, index, index + 1)
+            return 0
+        if length == 5 and index + 1 < n and self._lens(index, (5, 5), " "):  # noqa: PLR2004
+            digits = word + self.text(index + 1)
+            if checksums.rnokpp_valid(digits) and not self.is_amount(index, index + 1):
                 return self._add_range(TAX_ID, NORMAL, index, index + 1)
             return 0
         if length == _CARD_GROUP and index + 3 < n and self._lens(index, (4, 4, 4, 4), " -"):
@@ -850,8 +855,9 @@ class _Line:
         """``limit``, or the first line break in ``[start, limit)`` that ends the line.
 
         A break goes on when the text before it ends with a comma or a colon, or the next
-        line starts in lower case or with an address abbreviation ("буд.", "кв."): a wrapped
-        value. Any other break (a new item, a clause number, a label) ends the line.
+        line starts in lower case or with an address abbreviation, or the text before it ends
+        in one: a wrapped value. Any other break (a new item, a clause number, a label) ends
+        the line.
         """
         breaks = self.breaks
         at = bisect_left(breaks, start)
@@ -874,6 +880,12 @@ class _Line:
             return False
         if low[before - 1 : before] in (",", ":"):
             return True
+        if low[before - 1 : before] == ".":
+            start = before - 1
+            while start > 0 and low[start - 1].isalnum():
+                start -= 1
+            if low[start : before - 1] in ABBREVIATIONS:  # an abbreviation at the line end
+                return True
         if self.u[after].islower():
             return True
         stop = after
