@@ -39,29 +39,13 @@ from eval.pseudo.run_eval import (
 
 SPLITS = ("main", "heldout")
 
-# Detector round 2 (commit ceb391f) on the held-out split. Reported to the tech lead in
-# S5b-T4 AC 2; each entry goes away with the detector fix that makes it pass.
-_HELDOUT_REASON = "S5b-T4 AC 2: detector round 2 misses the held-out gate; detector work pending"
+# Held-out gates the detector does not meet yet (round 3, branch fix/detector-round3).
+# Each entry goes away with the detector fix that makes it pass (strict XPASS fails).
+_HELDOUT_REASON = (
+    "S5b-T4 AC 2: detector round 3 still misses this held-out gate; detector work pending"
+)
 KNOWN_GATE_FAILURES: dict[str, str] = {
-    f"heldout-{gate}": _HELDOUT_REASON
-    for gate in (
-        "recall:en:ACCOUNT:normal",
-        "recall:en:ADDRESS:normal",
-        "recall:en:PERSON:normal",
-        "recall:en:PHONE:high",
-        "recall:en:URL:high",
-        "recall:ru:ACCOUNT:normal",
-        "recall:ru:ORG:high",
-        "recall:ru:PERSONAL_DOC:normal",
-        "recall:ru:PHONE:high",
-        "recall:ru:TAX_ID:normal",
-        "recall:ru:VEHICLE:normal",
-        "recall:uk:ORG:normal",
-        "recall:uk:PERSONAL_DOC:normal",
-        "recall:uk:PHONE:high",
-        "recall:uk:TAX_ID:normal",
-        "must_not_mask_violations",
-    )
+    "heldout-recall:en:PERSON:normal": _HELDOUT_REASON,
 }
 
 
