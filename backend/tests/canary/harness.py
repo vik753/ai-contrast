@@ -17,7 +17,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
+import httpx2
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -133,7 +133,9 @@ class tap_logs:  # noqa: N801 - a context manager used like a function
         self.tap = LogTap()
         root = logging.getLogger()
         self.level = root.level
-        self.quiet = [(n, logging.getLogger(n).level) for n in ("httpx", "httpcore")]
+        self.quiet = [
+            (n, logging.getLogger(n).level) for n in ("httpx", "httpcore", "httpx2", "httpcore2")
+        ]
         for name, _ in self.quiet:
             logging.getLogger(name).setLevel(logging.WARNING)
         root.setLevel(logging.DEBUG)
@@ -163,9 +165,9 @@ def google_export(
     """The client with a fake Google transport that answers every request with ``data``."""
     app = client().app
     reply_headers = {"Content-Type": DOCX_CT, **(headers or {})}
-    app.state.google_client_factory = lambda: httpx.AsyncClient(  # type: ignore[attr-defined]
+    app.state.google_client_factory = lambda: httpx2.AsyncClient(  # type: ignore[attr-defined]
         transport=StreamingTransport(
-            lambda request: httpx.Response(status, headers=reply_headers, content=data)
+            lambda request: httpx2.Response(status, headers=reply_headers, content=data)
         )
     )
     return client()
