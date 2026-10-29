@@ -39,6 +39,12 @@
     },
     "httpcore2": {
       "level": "WARNING"
+    },
+    "anthropic": {
+      "level": "WARNING"
+    },
+    "openai": {
+      "level": "WARNING"
     }
   },
   "root": {
