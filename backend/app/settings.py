@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     - ``MAX_FILE_BYTES``: body size of ``POST /api/extract`` (one file).
     - ``MAX_JSON_BODY_BYTES``: body size of every other route.
     - ``MAX_CONCURRENT_EXTRACTIONS``: extractions in progress per server.
+    - ``MAX_EXTRACTIONS_PER_CLIENT``: extraction slots one client key may hold at once, across
+      ``/api/extract``, ``/api/extract/google-doc``, ``/api/segment`` and
+      ``/api/safety-check`` (``503 busy`` over the limit; S6-T3, ADR 0016 point 8).
+    - ``TRUSTED_PROXY_HOPS``: proxies in front of the server (1 to 10). In production the
+      client key is the Nth entry from the right of ``X-Forwarded-For``; in development it
+      is the socket peer.
     - ``MAX_ZIP_ENTRIES``: entries in one ZIP (DOCX) archive.
     - ``MAX_ZIP_UNCOMPRESSED_BYTES``: declared uncompressed size of one archive.
     - ``MAX_ZIP_RATIO``: uncompressed / compressed size of one archive entry.
@@ -154,6 +160,8 @@ class Settings(BaseSettings):
     max_file_bytes: PositiveInt = 10 * MIB
     max_json_body_bytes: PositiveInt = 64 * 1024
     max_concurrent_extractions: PositiveInt = 2
+    max_extractions_per_client: PositiveInt = 1
+    trusted_proxy_hops: Annotated[int, Field(ge=1, le=10)] = 1
     max_zip_entries: PositiveInt = 2000
     max_zip_uncompressed_bytes: PositiveInt = DEFAULT_MAX_ZIP_UNCOMPRESSED_BYTES
     max_zip_ratio: PositiveInt = 200
