@@ -43,27 +43,46 @@ def key(value: str) -> str:
     return "".join(ch for ch in fold(value) if ch.isalnum())
 
 
-def leaked_part(needle: str, haystack_key: str) -> str | None:
-    """The part of ``needle`` found in the (already keyed) haystack, or ``None``.
+def spaced_key(value: str) -> str:
+    """Like ``key`` but words stay apart: whitespace runs become one space, every other
+    non-alphanumeric character (hyphen, zero-width, punctuation) is dropped."""
+    out: list[str] = []
+    for ch in fold(value):
+        if ch.isalnum():
+            out.append(ch)
+        elif ch.isspace() and out and out[-1] != " ":
+            out.append(" ")
+    return " " + "".join(out)
 
-    The whole value counts, and so does any run of at least 70 % of it (and at least 5
-    characters): a partial mask is a leak.
+
+def leaked_part(needle: str, haystack_key: str, haystack_words: str) -> str | None:
+    """The part of ``needle`` found in the text, or ``None``.
+
+    The whole value counts anywhere (``haystack_key``: separators removed). A fragment of
+    at least 70 % of one word of the needle (and at least 5 characters) counts as a partial
+    mask, but only at the start of a word of the text (``haystack_words``): inside an
+    ordinary word (``льник`` in "Страхувальник") or across digits of a log line it is not a
+    leak.
     """
     k = key(needle)
-    if len(k) < MIN_FRAGMENT:
-        return k if k and k in haystack_key else None
-    if k in haystack_key:
+    if k and k in haystack_key:
         return k
-    window = max(MIN_FRAGMENT, math.ceil(len(k) * FRAGMENT_RATIO))
-    for start in range(len(k) - window + 1):
-        if k[start : start + window] in haystack_key:
-            return k[start : start + window]
+    for word in needle.split():
+        wk = key(word)
+        if len(wk) < MIN_FRAGMENT:
+            continue
+        window = max(MIN_FRAGMENT, math.ceil(len(wk) * FRAGMENT_RATIO))
+        for start in range(len(wk) - window + 1):
+            fragment = wk[start : start + window]
+            if " " + fragment in haystack_words:
+                return fragment
     return None
 
 
 def find_leaks(needles: Iterable[str], *texts: str) -> list[str]:
-    haystack = key("\n".join(texts))
-    return [n for n in needles if leaked_part(n, haystack) is not None]
+    text = "\n".join(texts)
+    full, words = key(text), spaced_key(text)
+    return [n for n in needles if leaked_part(n, full, words) is not None]
 
 
 # --------------------------------------------------------------------------------- logs

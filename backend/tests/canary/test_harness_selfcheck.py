@@ -56,6 +56,23 @@ def test_matcher_ignores_masked_and_unrelated_text(needle: str, haystack: str) -
     assert find_leaks([needle], haystack) == []
 
 
+@pytest.mark.parametrize(
+    ("needle", "haystack"),
+    [
+        ("Мельник", "Кадастровий номер земельної ділянки"),  # 'мельн' inside a word
+        ("Кравець", "[A.ORG_6] діє як виконавець за договором"),  # 'авець' inside a word
+        ("Коваль", "Страхувальник підписав"),  # 'вальн'/'льник' inside a word
+        ("15-К/2031", "('docx', 'ok', 203.1257)"),  # timing digits in a log tuple
+    ],
+)
+def test_matcher_ignores_fragment_inside_ordinary_word(needle: str, haystack: str) -> None:
+    assert find_leaks([needle], haystack) == []
+
+
+def test_matcher_still_flags_a_fragment_at_a_word_start() -> None:
+    assert find_leaks(["Мельник"], "підписав Мельни та інші") == ["Мельник"]
+
+
 def test_key_is_stable_and_alphanumeric_only() -> None:
     assert key("A-b\u200b c_1") == key("ａ B C 1") == "abc1"
 

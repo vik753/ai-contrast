@@ -16,16 +16,9 @@ ONE_WORD = (
     "residual: preview is the final control (one-word ORG without quotes, legal form or definition)"
 )
 
-FRAGMENT = (
-    "harness artifact, not a leak: the name is masked, but a 70 % fragment of it ('мельн', "
-    "'авець') is inside ordinary words of other canaries ('земельної', 'виконавець')"
-)
-
 GLOBAL_LEAKS: dict[str, str] = {
     "uk-org-one-word": ONE_WORD,
     "en-org-one-word": ONE_WORD,
-    "uk-person-common-word": FRAGMENT,
-    "uk-person-line-end-hyphen": FRAGMENT,
 }
 
 CELL_LEAKS: dict[tuple[str, str], dict[str, str]] = {}
@@ -33,8 +26,6 @@ CELL_LEAKS: dict[tuple[str, str], dict[str, str]] = {}
 SAFETY_NET: dict[str, int | None] = {
     "uk-org-one-word": 200,
     "en-org-one-word": 200,
-    "uk-person-common-word": 200,
-    "uk-person-line-end-hyphen": None,
 }
 
 
