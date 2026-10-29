@@ -96,6 +96,9 @@ type WarningKey =
   | "upload.preview.warning.numbering_restart"
   | "upload.preview.warning.duplicate_number"
   | "upload.preview.warning.no_numbering_found"
+  | "upload.preview.warning.requisites_condition"
+  | "upload.preview.warning.placeholder_lookalike"
+  | "upload.preview.warning.masked_next_to_amount"
   | "upload.preview.warning.unknown";
 
 /** Known warning codes. `Map` lookups never reach `Object.prototype`. */
@@ -112,6 +115,9 @@ const WARNING_KEYS: ReadonlyMap<string, WarningKey> = new Map<string, WarningKey
   ["numbering_restart", "upload.preview.warning.numbering_restart"],
   ["duplicate_number", "upload.preview.warning.duplicate_number"],
   ["no_numbering_found", "upload.preview.warning.no_numbering_found"],
+  ["requisites_condition", "upload.preview.warning.requisites_condition"],
+  ["placeholder_lookalike", "upload.preview.warning.placeholder_lookalike"],
+  ["masked_next_to_amount", "upload.preview.warning.masked_next_to_amount"],
 ]);
 
 type ReasonKey =

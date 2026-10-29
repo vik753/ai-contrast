@@ -125,7 +125,8 @@
       "clause_too_long": "One clause is too long to process. Split the file into parts and add them as separate files.",
       "segment_timeout": "Splitting the text into clauses took too long. Try again, or use a shorter file.",
       "segment_failed": "The text could not be split into clauses. Try again, or check the file and add it again.",
-      "invalid_response": "The server gave an unexpected answer while splitting the text. Try again."
+      "invalid_response": "The server gave an unexpected answer while splitting the text. Try again.",
+      "too_many_identifiers": "The file has too many identifiers (names, codes, addresses). Split it into parts and add them as separate files."
     },
     "preview": {
       "title": "Preview",
@@ -182,7 +183,10 @@
         "numbering_gap": "Clause numbers skip a number. Check that no clause is missing.",
         "numbering_restart": "Clause numbering starts again from 1. Check the file structure.",
         "duplicate_number": "Two clauses have the same number. Check the file structure.",
-        "no_numbering_found": "No clause numbers were found. The text is split by paragraphs."
+        "no_numbering_found": "No clause numbers were found. The text is split by paragraphs.",
+        "requisites_condition": "Clause with requisites: a line with an obligation was kept, check it.",
+        "placeholder_lookalike": "Text that looks like a placeholder was changed so that it cannot be mistaken for one.",
+        "masked_next_to_amount": "A masked value stands next to an amount. Check that the amount is still clear."
       },
       "warningPages": "(pages: {{pages}})",
       "ocrPages": "Pages that need text recognition: {{pages}}.",
@@ -266,5 +270,73 @@
     "privacy": "We store nothing on our server: no contracts, no keys, no results.",
     "source": "Source code",
     "license": "Free software under the AGPL-3.0 license."
+  },
+  "pseudo": {
+    "title": "Check replacements",
+    "intro": "Names and identifiers are replaced by placeholders before any AI call. Check every highlighted text. Nothing leaves your browser until you confirm.",
+    "checkReplacements": "Check replacements",
+    "everythingCorrect": "Everything is correct",
+    "unmaskAll": "Do not mask this value",
+    "unmaskOne": "Do not mask this one",
+    "cannotUnmask": "This value cannot be shown to the AI: it is an identifier or a code.",
+    "maskSelection": "Mask selected text",
+    "maskClassLabel": "Class of the mask",
+    "maskAllEqual": "Mask all equal texts ({{count}})",
+    "maskOnlyThis": "Mask only this text",
+    "maskCancel": "Cancel",
+    "maskRefused": "This text cannot be masked: it touches a text that is already marked.",
+    "selected": "Selected text",
+    "checking": "Safety check running…",
+    "entitiesTitle": "Replacements",
+    "clausesTitle": "Clauses as the AI will see them",
+    "unmasked": "Not masked",
+    "premasked": "Masked again by the safety check. Confirm again.",
+    "status": {
+      "label": "Status",
+      "notReviewed": "Not checked yet",
+      "ready": "Ready for analysis",
+      "confirmAgain": "Confirm again"
+    },
+    "neutralized": {
+      "explanation": "The contract text looks like a placeholder. We changed the brackets to ⟦ ⟧ so that it cannot be mistaken for one."
+    },
+    "requisites": {
+      "dropped": "Line will be dropped",
+      "kept": "Line is kept"
+    },
+    "class": {
+      "ORG": "Organization",
+      "PERSON": "Person",
+      "TAX_ID": "Tax or company code",
+      "ACCOUNT": "Bank account or card",
+      "ADDRESS": "Address",
+      "PHONE": "Phone",
+      "EMAIL": "Email",
+      "URL": "Web address",
+      "PERSONAL_DOC": "Personal document",
+      "DOC_NO": "Document number",
+      "VEHICLE": "Vehicle",
+      "SIGNATURE": "Signature line",
+      "HEALTH": "Health data"
+    },
+    "error": {
+      "detector_version_mismatch": "The detection rules were updated. The contract was split again. Check the replacements again.",
+      "input_not_clean": "The text contains characters that the server removes. Remove the file and add it again.",
+      "invalid_placeholder": "A placeholder in the text is not valid. Check the replacements and try again.",
+      "invalid_request": "The server did not accept the request. Check the replacements and try again.",
+      "request_too_large": "The masked text is too large for the server.",
+      "busy": "The server is busy. Try again in a minute.",
+      "safety_timeout": "The safety check took too long. Try again.",
+      "network_error": "No connection to the server. Check your internet connection and try again.",
+      "invalid_response": "The server gave an unexpected answer. Try again.",
+      "timeout": "The request took too long. Try again.",
+      "unmasked_identifier": "The safety check found more text that looks like an identifier. It is masked now. Check it and confirm again.",
+      "too_many_identifiers": "The contract has too many identifiers. Split it into parts.",
+      "safety_failed": "The safety check failed. Try again.",
+      "unknown_error": "The server gave an unexpected answer. Try again.",
+      "unmapped_span": "The safety check returned text that could not be matched to the contract. Remove the file and add it again.",
+      "too_much_text": "The masked text is too long for the check. Split the contract into parts.",
+      "length_mismatch": "The request did not arrive completely. Try again."
+    }
   }
 }
