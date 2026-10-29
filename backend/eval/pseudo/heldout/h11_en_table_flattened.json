@@ -1,0 +1,39 @@
+{
+  "name": "h11_en_table_flattened",
+  "language": "en",
+  "description": "EN party table flattened to lines. Company names with legal-form suffix and no quotes (Inc., GmbH: normal), names with apostrophe and hyphen, titles after the name, initials in a signing sentence grouped with the full name, addresses with and without a keyword, phone in international format, email, surname Fisher (also a common noun). Negative: a price.",
+  "blocks": [
+    {"text": "MASTER SUPPLY AGREEMENT", "part": "body", "page": null},
+    {"text": "Party A", "part": "body", "page": null},
+    {"text": "Harbourview Foods Inc.", "part": "body", "page": null},
+    {"text": "Represented by", "part": "body", "page": null},
+    {"text": "Margaret O'Neill-Hughes, Chief Executive Officer", "part": "body", "page": null},
+    {"text": "Party B", "part": "body", "page": null},
+    {"text": "Kestrel Components GmbH", "part": "body", "page": null},
+    {"text": "Represented by", "part": "body", "page": null},
+    {"text": "Tobias Wendland, Managing Director", "part": "body", "page": null},
+    {"text": "Registered office: 14 Quayside Road, Bristol BS1 4XT, United Kingdom", "part": "body", "page": null},
+    {"text": "M. O'Neill-Hughes signs for Party A; T. Wendland signs for Party B.", "part": "body", "page": null},
+    {"text": "Delivery address for Party A: Warehouse 5, 22 Mill Lane, Leeds LS2 7DB.", "part": "body", "page": null},
+    {"text": "Questions go to Sam Fisher at sam.fisher@harbourview-foods.example.com.", "part": "body", "page": null},
+    {"text": "Phone: +44 117 496 0845", "part": "body", "page": null},
+    {"text": "Prices are fixed at 4.50 per kg for 12 months.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Harbourview Foods Inc."], "spans": [[2, 0, 22]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Margaret O'Neill-Hughes", "M. O'Neill-Hughes"], "spans": [[4, 0, 23], [10, 0, 17]]},
+      {"class": "ORG", "precision": "normal", "value_forms": ["Kestrel Components GmbH"], "spans": [[6, 0, 23]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Tobias Wendland", "T. Wendland"], "spans": [[8, 0, 15], [10, 37, 48]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["14 Quayside Road, Bristol BS1 4XT, United Kingdom"], "spans": [[9, 19, 68]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["Warehouse 5, 22 Mill Lane, Leeds LS2 7DB"], "spans": [[11, 30, 70]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Sam Fisher"], "spans": [[12, 16, 26]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["sam.fisher@harbourview-foods.example.com"], "spans": [[12, 30, 70]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+44 117 496 0845"], "spans": [[13, 7, 23]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Party A", "Party B", "Represented by", "Chief Executive Officer", "Managing Director", "4.50", "MASTER SUPPLY AGREEMENT"]
+  }
+}

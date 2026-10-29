@@ -1,0 +1,38 @@
+{
+  "name": "h07_ru_tax_accounts",
+  "language": "ru",
+  "description": "RU tax and account data: ИНН-10 / ИНН-12 with context (high), КПП (normal), ОГРН / ОГРНИП (high), р/с, к/с, БИК (normal), bank AO plus quoted name, card (Luhn), an ИНН-12 split by spaces 4+4+4 in its own block after an address line with no keyword (normal), phone, health diagnosis of a person named in dative-like form with initials.",
+  "blocks": [
+    {"text": "8.1. Арендодатель: ИНН 7842105938, КПП 784201001, ОГРН 1157746123457.", "part": "body", "page": null},
+    {"text": "8.2. Арендатор (ИП): ИНН 615829437179, ОГРНИП 304770000012347.", "part": "body", "page": null},
+    {"text": "8.3. Расчётный счёт 40702810500001234567 в АО «Невский Банк», корреспондентский счёт 30101810700000000555, БИК 044030555.", "part": "body", "page": null},
+    {"text": "8.4. Допускается оплата картой 5168 7550 1234 5670 держателя Мельникова Тамара Львовна.", "part": "body", "page": null},
+    {"text": "Адрес: г. Казань, ул. Тихая, д. 14, кв. 9", "part": "body", "page": null},
+    {"text": "7723 9156 4063", "part": "body", "page": null},
+    {"text": "Контакт: Мельникова Т.Л., тел. +7 495 233-18-64.", "part": "body", "page": null},
+    {"text": "9.1. По справке врача у Мельниковой Т.Л. установлен диагноз хронический гастрит.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["7842105938"], "spans": [[0, 23, 33]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["784201001"], "spans": [[0, 39, 48]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["1157746123457"], "spans": [[0, 55, 68]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["615829437179"], "spans": [[1, 25, 37]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["304770000012347"], "spans": [[1, 46, 61]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["40702810500001234567"], "spans": [[2, 20, 40]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["АО «Невский Банк»"], "spans": [[2, 43, 60]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["30101810700000000555"], "spans": [[2, 85, 105]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["044030555"], "spans": [[2, 111, 120]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["5168 7550 1234 5670"], "spans": [[3, 31, 50]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Мельникова Тамара Львовна", "Мельникова Т.Л.", "Мельниковой Т.Л."], "spans": [[3, 61, 86], [6, 9, 24], [7, 24, 40]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["г. Казань, ул. Тихая, д. 14, кв. 9"], "spans": [[4, 7, 41]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["7723 9156 4063"], "spans": [[5, 0, 14]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+7 495 233-18-64"], "spans": [[6, 31, 47]]},
+      {"class": "HEALTH", "precision": "normal", "value_forms": ["хронический гастрит"], "spans": [[7, 60, 79]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Арендодатель", "Расчётный счёт", "Допускается оплата", "По справке врача"]
+  }
+}

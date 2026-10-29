@@ -1,0 +1,163 @@
+{
+  "name": "h04_uk_contacts_amounts_ocr",
+  "language": "uk",
+  "description": "UK contacts (email, URL with path, toll-free and international phones, address with a following contact person, messenger handle) and negatives: checksum-valid ЄДРПОУ-like and РНОКПП-like numbers used as amounts or quantities next to a unit (грн, кг, копійок); OCR-like noise in common words only (1 for і, 0 for о), never in codes.",
+  "blocks": [
+    {
+      "text": "7.1. Зв'язок зі Страховиком: claims.desk@pivdenstrakh.example.ua або через сайт www.pivdenstrakh.example.ua/zayava.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "7.2. Гаряча лінія 0 800 505 123 (безкоштовно), для дзвінків з-за кордону +380 44 390 21 85.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "7.3. Платіж 72941636 грн перераховано за актом, залишок 19406259 кг цукру.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "7.4. Загальна сума 2951374086 копійок, ліміт 1 000 000 грн.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "8.1. Страхувальн1к зобов'язаний повідомити Страх0вика про под1ю протягом 5 днів.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "8.2. Л1міт відповідальності становить 250 000 грн; 0плата здійснюється в 10 днів.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Адреса: м. Харків, пров. Сумський, 3-Б, оф. 12; контактна особа Тищенко Яна Борисівна.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Telegram: @tyshchenko_claims",
+      "part": "body",
+      "page": null
+    }
+  ],
+  "expected": {
+    "entities": [
+      {
+        "class": "EMAIL",
+        "precision": "high",
+        "value_forms": [
+          "claims.desk@pivdenstrakh.example.ua"
+        ],
+        "spans": [
+          [
+            0,
+            29,
+            64
+          ]
+        ]
+      },
+      {
+        "class": "URL",
+        "precision": "high",
+        "value_forms": [
+          "www.pivdenstrakh.example.ua/zayava"
+        ],
+        "spans": [
+          [
+            0,
+            80,
+            114
+          ]
+        ]
+      },
+      {
+        "class": "PHONE",
+        "precision": "high",
+        "value_forms": [
+          "0 800 505 123"
+        ],
+        "spans": [
+          [
+            1,
+            18,
+            31
+          ]
+        ]
+      },
+      {
+        "class": "PHONE",
+        "precision": "high",
+        "value_forms": [
+          "+380 44 390 21 85"
+        ],
+        "spans": [
+          [
+            1,
+            73,
+            90
+          ]
+        ]
+      },
+      {
+        "class": "ADDRESS",
+        "precision": "normal",
+        "value_forms": [
+          "м. Харків, пров. Сумський, 3-Б, оф. 12"
+        ],
+        "spans": [
+          [
+            6,
+            8,
+            46
+          ]
+        ]
+      },
+      {
+        "class": "PERSON",
+        "precision": "normal",
+        "value_forms": [
+          "Тищенко Яна Борисівна"
+        ],
+        "spans": [
+          [
+            6,
+            64,
+            85
+          ]
+        ]
+      },
+      {
+        "class": "URL",
+        "precision": "normal",
+        "value_forms": [
+          "@tyshchenko_claims"
+        ],
+        "spans": [
+          [
+            7,
+            10,
+            28
+          ]
+        ]
+      }
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": [
+      "72941636",
+      "19406259",
+      "2951374086",
+      "1 000 000 грн",
+      "250 000 грн",
+      "Страхувальн1к",
+      "Страх0вика",
+      "Л1міт",
+      "0плата"
+    ]
+  }
+}

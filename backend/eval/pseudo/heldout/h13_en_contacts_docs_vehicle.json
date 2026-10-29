@@ -1,0 +1,285 @@
+{
+  "name": "h13_en_contacts_docs_vehicle",
+  "language": "en",
+  "description": "EN notice block: person plus address without keyword, national and international phones, URL with path and bare domain with path, obfuscated email (at), document numbers (span = number after 'No.'), passport number, date of birth in words, health diagnosis after 'diagnosed with', vehicle plate (UK format) and VIN. The passport issue date stays.",
+  "blocks": [
+    {
+      "text": "Notices to: Priya Raghunathan, 8 Willow Court, Manchester M4 5JD; phone 0161 496 0213; fax +44 161 496 0214.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Website: https://portal.example-harbour.org/notices and mirror example-harbour.org/en.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Email notices to p.raghunathan(at)example-harbour.org are valid.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Policy No. HB-7729-0418, Claim No. CL/2026/00931, Licence No. 10458.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "The claim was filed in Case No. 2026-CV-04418 before the County Court.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Passport No. 533018276 issued 15 May 2019; date of birth: 3 February 1978.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "The insured person has been diagnosed with chronic kidney disease stage 3.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Vehicle: Ford Transit, registration LK21 XYZ, VIN WF0XXXTTGXKY12345.",
+      "part": "body",
+      "page": null
+    }
+  ],
+  "expected": {
+    "entities": [
+      {
+        "class": "PERSON",
+        "precision": "normal",
+        "value_forms": [
+          "Priya Raghunathan"
+        ],
+        "spans": [
+          [
+            0,
+            12,
+            29
+          ]
+        ]
+      },
+      {
+        "class": "ADDRESS",
+        "precision": "normal",
+        "value_forms": [
+          "8 Willow Court, Manchester M4 5JD"
+        ],
+        "spans": [
+          [
+            0,
+            31,
+            64
+          ]
+        ]
+      },
+      {
+        "class": "PHONE",
+        "precision": "high",
+        "value_forms": [
+          "0161 496 0213"
+        ],
+        "spans": [
+          [
+            0,
+            72,
+            85
+          ]
+        ]
+      },
+      {
+        "class": "PHONE",
+        "precision": "high",
+        "value_forms": [
+          "+44 161 496 0214"
+        ],
+        "spans": [
+          [
+            0,
+            91,
+            107
+          ]
+        ]
+      },
+      {
+        "class": "URL",
+        "precision": "high",
+        "value_forms": [
+          "https://portal.example-harbour.org/notices"
+        ],
+        "spans": [
+          [
+            1,
+            9,
+            51
+          ]
+        ]
+      },
+      {
+        "class": "URL",
+        "precision": "high",
+        "value_forms": [
+          "example-harbour.org/en"
+        ],
+        "spans": [
+          [
+            1,
+            63,
+            85
+          ]
+        ]
+      },
+      {
+        "class": "EMAIL",
+        "precision": "high",
+        "value_forms": [
+          "p.raghunathan(at)example-harbour.org"
+        ],
+        "spans": [
+          [
+            2,
+            17,
+            53
+          ]
+        ]
+      },
+      {
+        "class": "DOC_NO",
+        "precision": "normal",
+        "value_forms": [
+          "HB-7729-0418"
+        ],
+        "spans": [
+          [
+            3,
+            11,
+            23
+          ]
+        ]
+      },
+      {
+        "class": "DOC_NO",
+        "precision": "normal",
+        "value_forms": [
+          "CL/2026/00931"
+        ],
+        "spans": [
+          [
+            3,
+            35,
+            48
+          ]
+        ]
+      },
+      {
+        "class": "DOC_NO",
+        "precision": "normal",
+        "value_forms": [
+          "10458"
+        ],
+        "spans": [
+          [
+            3,
+            62,
+            67
+          ]
+        ]
+      },
+      {
+        "class": "DOC_NO",
+        "precision": "normal",
+        "value_forms": [
+          "2026-CV-04418"
+        ],
+        "spans": [
+          [
+            4,
+            32,
+            45
+          ]
+        ]
+      },
+      {
+        "class": "PERSONAL_DOC",
+        "precision": "normal",
+        "value_forms": [
+          "533018276"
+        ],
+        "spans": [
+          [
+            5,
+            13,
+            22
+          ]
+        ]
+      },
+      {
+        "class": "PERSONAL_DOC",
+        "precision": "normal",
+        "value_forms": [
+          "3 February 1978"
+        ],
+        "spans": [
+          [
+            5,
+            58,
+            73
+          ]
+        ]
+      },
+      {
+        "class": "HEALTH",
+        "precision": "normal",
+        "value_forms": [
+          "chronic kidney disease stage 3"
+        ],
+        "spans": [
+          [
+            6,
+            43,
+            73
+          ]
+        ]
+      },
+      {
+        "class": "VEHICLE",
+        "precision": "normal",
+        "value_forms": [
+          "LK21 XYZ"
+        ],
+        "spans": [
+          [
+            7,
+            36,
+            44
+          ]
+        ]
+      },
+      {
+        "class": "VEHICLE",
+        "precision": "normal",
+        "value_forms": [
+          "WF0XXXTTGXKY12345"
+        ],
+        "spans": [
+          [
+            7,
+            50,
+            67
+          ]
+        ]
+      }
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": [
+      "Notices to",
+      "Ford Transit",
+      "County Court",
+      "Policy No.",
+      "15 May 2019"
+    ]
+  }
+}

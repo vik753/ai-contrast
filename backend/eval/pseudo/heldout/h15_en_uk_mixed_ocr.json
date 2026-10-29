@@ -1,0 +1,33 @@
+{
+  "name": "h15_en_uk_mixed_ocr",
+  "language": "en",
+  "description": "EN contract with a Ukrainian party: Latin ORG with 'Ltd.' (normal) and ТОВ plus quoted Cyrillic name (high), EDRPOU with context (high), the representative in Latin, Cyrillic and Cyrillic initials (one entity), signature lines in both scripts, Ukrainian address in English, health diagnosis after 'diagnosis:', date of birth. Negatives: OCR-like noise in common words only (1 for i or l, 0 for o); checksum-valid numbers next to units.",
+  "blocks": [
+    {"text": "This Agreement is entered into by Sunvale Energy Ltd. and ТОВ «Сонячна Долина» (EDRPOU 19406259), represented by Bohdan Yarema (Богдан Ярема).", "part": "body", "page": null},
+    {"text": "Notice address of the Ukrainian party: 17 Shevchenka Street, apt. 9, Kyiv 01001, Ukraine.", "part": "body", "page": null},
+    {"text": "3.1. The Suppl1er shall de1iver the g00ds within 30 days after the 0rder date.", "part": "body", "page": null},
+    {"text": "3.2. The price is 41920653 USD per lot and the cap is 2670419358 cents.", "part": "body", "page": null},
+    {"text": "4.1. Insured: Olena Kravets (born 12.08.1990), diagnosis: type 2 diabetes.", "part": "body", "page": null},
+    {"text": "For Sunvale Energy Ltd.: ____________ /Marcus Ellery/", "part": "body", "page": null},
+    {"text": "For ТОВ «Сонячна Долина»: ____________ /Ярема Б./", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Sunvale Energy Ltd."], "spans": [[0, 34, 53], [5, 4, 23]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Сонячна Долина»"], "spans": [[0, 58, 78], [6, 4, 24]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["19406259"], "spans": [[0, 87, 95]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Bohdan Yarema", "Богдан Ярема", "Ярема Б."], "spans": [[0, 113, 126], [0, 128, 140], [6, 40, 48]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["17 Shevchenka Street, apt. 9, Kyiv 01001, Ukraine"], "spans": [[1, 39, 88]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Olena Kravets"], "spans": [[4, 14, 27]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["12.08.1990"], "spans": [[4, 34, 44]]},
+      {"class": "HEALTH", "precision": "normal", "value_forms": ["type 2 diabetes"], "spans": [[4, 58, 73]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Marcus Ellery/"], "spans": [[5, 25, 53]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Marcus Ellery"], "spans": [[5, 39, 52]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Ярема Б./"], "spans": [[6, 26, 49]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Suppl1er", "de1iver", "g00ds", "0rder", "30 days", "41920653", "2670419358", "Insured"]
+  }
+}

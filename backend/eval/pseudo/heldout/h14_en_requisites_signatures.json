@@ -1,0 +1,58 @@
+{
+  "name": "h14_en_requisites_signatures",
+  "language": "en",
+  "description": "Long EN requisites section (heading 'Signatures and company details', one line per block). Drop: labelled org (Limited, Corp.), VAT, IBAN, SWIFT, email, phone, address, authorised signatory with role, signature line with initials. Keep: 'The Buyer shall pay interest ...' (obligation marker), 'Barnaby Quill acknowledges the terms above' (name + verb), 'Late fee 8 %'. Kept lines give requisites_condition.",
+  "blocks": [
+    {"text": "12.1. Each party shall keep the other party's details confidential.", "part": "body", "page": null},
+    {"text": "Signatures and company details", "part": "body", "page": null},
+    {"text": "Supplier: Ashgrove Mills Limited", "part": "body", "page": null},
+    {"text": "VAT number: GB987654321", "part": "body", "page": null},
+    {"text": "IBAN: ES9121000418450200051332", "part": "body", "page": null},
+    {"text": "SWIFT: CAIXESBB", "part": "body", "page": null},
+    {"text": "Email: legal@ashgrove-mills.example.co.uk", "part": "body", "page": null},
+    {"text": "Tel: +44 161 496 0777", "part": "body", "page": null},
+    {"text": "Address: Unit 4, Ashgrove Trading Estate, York YO1 7ZZ", "part": "body", "page": null},
+    {"text": "Authorised signatory: Rebecca Lindqvist, Finance Director", "part": "body", "page": null},
+    {"text": "____________ /R. Lindqvist/", "part": "body", "page": null},
+    {"text": "Buyer: Tidewater Retail Corp.", "part": "body", "page": null},
+    {"text": "Tax ID: 83-1204567", "part": "body", "page": null},
+    {"text": "The Buyer shall pay interest of 8 % on overdue sums", "part": "body", "page": null},
+    {"text": "Barnaby Quill acknowledges the terms above", "part": "body", "page": null},
+    {"text": "Late fee 8 %", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Ashgrove Mills Limited"], "spans": [[2, 10, 32]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["GB987654321"], "spans": [[3, 12, 23]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["ES9121000418450200051332"], "spans": [[4, 6, 30]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["CAIXESBB"], "spans": [[5, 7, 15]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["legal@ashgrove-mills.example.co.uk"], "spans": [[6, 7, 41]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+44 161 496 0777"], "spans": [[7, 5, 21]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["Unit 4, Ashgrove Trading Estate, York YO1 7ZZ"], "spans": [[8, 9, 54]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Rebecca Lindqvist", "R. Lindqvist"], "spans": [[9, 22, 39], [10, 14, 26]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /R. Lindqvist/"], "spans": [[10, 0, 27]]},
+      {"class": "ORG", "precision": "normal", "value_forms": ["Tidewater Retail Corp."], "spans": [[11, 7, 29]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["83-1204567"], "spans": [[12, 8, 18]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Barnaby Quill"], "spans": [[14, 0, 13]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Supplier: Ashgrove", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "VAT number:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "IBAN:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "SWIFT:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "Email:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "Tel:", "action": "drop"},
+      {"block": 8, "line_text_starts_with": "Address:", "action": "drop"},
+      {"block": 9, "line_text_starts_with": "Authorised signatory", "action": "drop"},
+      {"block": 10, "line_text_starts_with": "____________ /R.", "action": "drop"},
+      {"block": 11, "line_text_starts_with": "Buyer: Tidewater", "action": "drop"},
+      {"block": 12, "line_text_starts_with": "Tax ID:", "action": "drop"},
+      {"block": 13, "line_text_starts_with": "The Buyer shall pay", "action": "keep"},
+      {"block": 14, "line_text_starts_with": "Barnaby Quill acknowledges", "action": "keep"},
+      {"block": 15, "line_text_starts_with": "Late fee 8 %", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["Each party", "Authorised signatory", "Finance Director", "Late fee", "8 %", "The Buyer"]
+  }
+}

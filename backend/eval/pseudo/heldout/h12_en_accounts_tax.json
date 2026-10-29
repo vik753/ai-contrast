@@ -1,0 +1,33 @@
+{
+  "name": "h12_en_accounts_tax",
+  "language": "en",
+  "description": "EN account and tax data: FR and IT IBANs (public documentation examples), BIC (normal), US EIN and state tax id (normal), VAT number (normal), Luhn-valid card number (high), UK sort code and account number with keywords (normal), bank name with PLC suffix. Negatives: checksum-valid numbers used as amounts, weights and quantities next to a unit; a card expiry date.",
+  "blocks": [
+    {"text": "Payment instructions: IBAN FR14 2004 1010 0505 0001 3M02 606, BIC PSSTFRPPSCE.", "part": "body", "page": null},
+    {"text": "Alternative account: IBAN IT60X0542811101000000123456, BIC BCITITMM.", "part": "body", "page": null},
+    {"text": "US tax: Federal EIN 47-3829164, state tax ID 13-0098765.", "part": "body", "page": null},
+    {"text": "Our VAT number NL823456791B01 applies.", "part": "body", "page": null},
+    {"text": "Corporate card 4149 6290 0987 6541 expires 11/28.", "part": "body", "page": null},
+    {"text": "Invoice total 25871405 EUR, shipped weight 2951374086 g, order 72941636 pcs.", "part": "body", "page": null},
+    {"text": "Bank: Meridian Savings Bank PLC, sort code 20-45-61, account 31926819.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["FR14 2004 1010 0505 0001 3M02 606"], "spans": [[0, 27, 60]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["PSSTFRPPSCE"], "spans": [[0, 66, 77]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["IT60X0542811101000000123456"], "spans": [[1, 26, 53]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["BCITITMM"], "spans": [[1, 59, 67]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["47-3829164"], "spans": [[2, 20, 30]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["13-0098765"], "spans": [[2, 45, 55]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["NL823456791B01"], "spans": [[3, 15, 29]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["4149 6290 0987 6541"], "spans": [[4, 15, 34]]},
+      {"class": "ORG", "precision": "normal", "value_forms": ["Meridian Savings Bank PLC"], "spans": [[6, 6, 31]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["20-45-61"], "spans": [[6, 43, 51]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["31926819"], "spans": [[6, 61, 69]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["25871405", "2951374086", "72941636", "11/28", "Payment instructions"]
+  }
+}
