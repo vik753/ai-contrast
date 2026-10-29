@@ -17,7 +17,7 @@ from app.pseudo import tables
 from app.pseudo.confusable_table import UNICODE_VERSION
 from app.pseudo.matching import LATIN_TO_CYRILLIC, SKELETON, fold
 
-RULES_VERSION: Final = "6"
+RULES_VERSION: Final = "8"
 
 
 def _runs(text: str) -> tuple[str, ...]:
@@ -87,6 +87,13 @@ SOLE_TRADER_NOUNS: Final = tuple(fold(word) for word in tables.SOLE_TRADER_NOUNS
 TITLE_STEMS: Final = tuple(sorted({fold(word) for word in tables.TITLE_WORDS}, key=len))
 DOCUMENT_STEMS: Final = frozenset(fold(word) for word in tables.DOCUMENT_WORDS)
 PERSON_TRIGGERS: Final = frozenset(_keyword(t) for t in tables.PERSON_TRIGGERS)
+PERSON_LEADINS: Final = frozenset(_keyword(t) for t in tables.PERSON_LEADINS)
+PERSON_VERBS: Final = frozenset(fold(word) for word in tables.PERSON_VERBS)
+UNIT_PREFIXES: Final = frozenset(fold(word) for word in tables.UNIT_PREFIXES)
+COUNTRIES: Final = tuple(sorted(tables.COUNTRIES, key=len, reverse=True))
+LEGAL_FORMS_LONG: Final = tuple(
+    tuple(fold(word) for word in form) for form in tables.LEGAL_FORMS_LONG
+)
 DEFINITION_OPENERS: Final = frozenset(_keyword(t) for t in tables.DEFINITION_OPENERS)
 DEFINITION_FILLERS: Final = frozenset(fold(word) for word in tables.DEFINITION_FILLERS)
 _EXACT_MARKERS: Final = frozenset({"may", "will", "should", "must", "pays", "shall"})
@@ -104,6 +111,7 @@ AMOUNT_WORDS: Final = frozenset(fold(word) for word in tables.AMOUNT_WORDS)
 _AMBIGUOUS_UNITS: Final = frozenset(
     fold(word) for word in ("кв", "л", "k", "м2", "m2", "м3", "m3", "куб", "мм", "см", "mm", "cm")
 )
+QUANTITY_WORDS: Final = frozenset(fold(word) for word in tables.QUANTITY_WORDS)
 STRONG_AMOUNT_WORDS: Final = AMOUNT_WORDS - _AMBIGUOUS_UNITS
 ABBREVIATIONS: Final = frozenset(fold(word) for word in tables.ADDRESS_ABBREVIATIONS)
 ADDRESS_STARTS: Final = frozenset(fold(word) for word in tables.ADDRESS_STARTS)

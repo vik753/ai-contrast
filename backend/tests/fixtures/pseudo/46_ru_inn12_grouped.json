@@ -1,0 +1,23 @@
+{
+  "name": "46_ru_inn12_grouped",
+  "language": "ru",
+  "description": "Round 3. Checksum-valid 12-digit ИНН split into 4-digit groups, alone in a block, no keyword (normal proposal). 780123456724 and 502987654365 are valid (see README Round 3). Block 5 has a wrong check digit (n12 should be 4): nothing is masked.",
+  "blocks": [
+    {"text": "Приложение 2. Сведения о подрядчике", "part": "body", "page": null},
+    {"text": "7801 2345 6724", "part": "body", "page": null},
+    {"text": "Сведения об исполнителе", "part": "body", "page": null},
+    {"text": "5029 8765 4365", "part": "body", "page": null},
+    {"text": "Сведения о субподрядчике", "part": "body", "page": null},
+    {"text": "7801 2345 6725", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["7801 2345 6724"], "spans": [[1, 0, 14]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["5029 8765 4365"], "spans": [[3, 0, 14]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["7801 2345 6725", "Приложение 2"]
+  }
+}

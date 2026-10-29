@@ -1,0 +1,74 @@
+{
+  "name": "47_ru_accounts_spelled",
+  "language": "ru",
+  "description": "Round 3. 20-digit accounts after spelled-out labels 'Расчётный счёт' and 'корреспондентский счёт' (not р/с, к/с). Digits have no checksum. 'счёт-фактура' is a document word (negative). Invoice number after «счёт-фактура №» is DOC_NO (ADR 0008 point 1); the word itself is not masked.",
+  "blocks": [
+    {
+      "text": "Расчётный счёт 40702810900000045678 в банке.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Через корреспондентский счёт 30101810400000000123 проходят платежи.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Оплата по счёт-фактура № 4521 в срок.",
+      "part": "body",
+      "page": null
+    }
+  ],
+  "expected": {
+    "entities": [
+      {
+        "class": "ACCOUNT",
+        "precision": "normal",
+        "value_forms": [
+          "40702810900000045678"
+        ],
+        "spans": [
+          [
+            0,
+            15,
+            35
+          ]
+        ]
+      },
+      {
+        "class": "ACCOUNT",
+        "precision": "normal",
+        "value_forms": [
+          "30101810400000000123"
+        ],
+        "spans": [
+          [
+            1,
+            29,
+            49
+          ]
+        ]
+      },
+      {
+        "class": "DOC_NO",
+        "precision": "normal",
+        "value_forms": [
+          "4521"
+        ],
+        "spans": [
+          [
+            2,
+            25,
+            29
+          ]
+        ]
+      }
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": [
+      "счёт-фактура"
+    ]
+  }
+}

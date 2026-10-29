@@ -1,0 +1,22 @@
+{
+  "name": "48_en_sortcode_account",
+  "language": "en",
+  "description": "Round 3. UK sort code NN-NN-NN after 'sort code' and an 8-digit account number after the word 'account' / 'account number'. Both ACCOUNT normal. Block 2 has a day range 14-30 (negative).",
+  "blocks": [
+    {"text": "Sort code 20-45-67, account 41234567.", "part": "body", "page": null},
+    {"text": "Pay to sort code 30-91-22 and account number 90817263.", "part": "body", "page": null},
+    {"text": "Payment is due within 14-30 days.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["20-45-67"], "spans": [[0, 10, 18]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["41234567"], "spans": [[0, 28, 36]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["30-91-22"], "spans": [[1, 17, 25]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["90817263"], "spans": [[1, 45, 53]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["14-30"]
+  }
+}

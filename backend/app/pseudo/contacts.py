@@ -240,7 +240,25 @@ def _bare_domain(low: str, begin: int, end: int, hits: Hits) -> None:
     host = low[begin:end]
     if not _valid_host(host) or host.rpartition(".")[2] not in TLDS:
         return
+    stop = _path_end(low, end)
+    if stop > end:
+        # A bare domain with a path is one URL ("example.com/forms").
+        hits.add(URL, HIGH, begin, stop, low[begin:stop].removeprefix("www.").rstrip("/"))
+        return
     hits.add(URL, HIGH, begin, end, host.removeprefix("www."))
+
+
+def _path_end(low: str, end: int) -> int:
+    """End of the path that follows a bare domain at ``end``, or ``end`` when there is none."""
+    if low[end : end + 1] != "/":
+        return end
+    size = len(low)
+    stop = end + 1
+    while stop < size and stop - end <= _MAX_URL and low[stop] not in _URL_STOP:
+        stop += 1
+    while stop > end and low[stop - 1] in _URL_TRAIL:
+        stop -= 1
+    return stop if stop > end + 1 else end
 
 
 def _phones(low: str, hits: Hits) -> None:

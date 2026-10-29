@@ -1,0 +1,20 @@
+{
+  "name": "44_ru_org_full_legal_form",
+  "language": "ru",
+  "description": "Round 3. Spelled-out legal form (full words) plus quoted name: the span covers the words and both guillemets. 'Общество вправе' without quotes is not an organisation (negative).",
+  "blocks": [
+    {"text": "Заказчик — Общество с ограниченной ответственностью «Вектор Плюс», далее Заказчик.", "part": "body", "page": null},
+    {"text": "Исполнитель: Акционерное общество «Горизонт-Сервис» в лице директора.", "part": "body", "page": null},
+    {"text": "Общество вправе расторгнуть договор.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["Общество с ограниченной ответственностью «Вектор Плюс»"], "spans": [[0, 11, 65]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["Акционерное общество «Горизонт-Сервис»"], "spans": [[1, 13, 51]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Общество вправе", "Заказчик —", "в лице директора"]
+  }
+}

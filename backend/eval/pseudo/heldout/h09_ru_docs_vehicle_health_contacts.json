@@ -5,7 +5,7 @@
   "blocks": [
     {"text": "1.1. Застрахованное транспортное средство: Hyundai Solaris, VIN Z94CB41ABGR123456, государственный регистрационный знак К 482 ОР 77.", "part": "body", "page": null},
     {"text": "1.2. ПТС 78 УК 456123 выдан 14.06.2021.", "part": "body", "page": null},
-    {"text": "2.1. Страхователь Лебедева Инна Аркадьевна, паспорт серия 45 12 № 678901, дата рождения 09.07.1983.", "part": "body", "page": null},
+    {"text": "2.1. Страхователь Лебедева Инна Аркадьевна, паспорт серия 36 19 № 905247, дата рождения 09.07.1983.", "part": "body", "page": null},
     {"text": "2.2. СНИЛС 173-409-261 64.", "part": "body", "page": null},
     {"text": "3.1. У застрахованной установлен диагноз острый инфаркт миокарда.", "part": "body", "page": null},
     {"text": "4.1. Полис № ХЕ 7712098, договор № 118-СТ/22, доверенность № 9, дело № А40-123456/2025.", "part": "body", "page": null},
@@ -17,7 +17,7 @@
       {"class": "VEHICLE", "precision": "normal", "value_forms": ["К 482 ОР 77"], "spans": [[0, 120, 131]]},
       {"class": "VEHICLE", "precision": "normal", "value_forms": ["78 УК 456123"], "spans": [[1, 9, 21]]},
       {"class": "PERSON", "precision": "normal", "value_forms": ["Лебедева Инна Аркадьевна"], "spans": [[2, 18, 42]]},
-      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["45 12 № 678901"], "spans": [[2, 58, 72]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["36 19 № 905247"], "spans": [[2, 58, 72]]},
       {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["09.07.1983"], "spans": [[2, 88, 98]]},
       {"class": "TAX_ID", "precision": "high", "value_forms": ["173-409-261 64"], "spans": [[3, 11, 25]]},
       {"class": "HEALTH", "precision": "normal", "value_forms": ["острый инфаркт миокарда"], "spans": [[4, 41, 64]]},

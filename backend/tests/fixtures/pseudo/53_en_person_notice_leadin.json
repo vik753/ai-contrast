@@ -1,0 +1,22 @@
+{
+  "name": "53_en_person_notice_leadin",
+  "language": "en",
+  "description": "Round 3. Person name after a notice or contact lead-in ('Notices to:', 'Questions go to', 'address questions to'), including surnames that are common nouns (Baker, Cook). Block 3 has the same lead-in followed by a team, not a person (negative).",
+  "blocks": [
+    {"text": "Notices to: Helena Brandt, at the address above.", "part": "body", "page": null},
+    {"text": "Questions go to Ruth Baker in Compliance.", "part": "body", "page": null},
+    {"text": "Please address questions to Owen Cook.", "part": "body", "page": null},
+    {"text": "Questions go to the claims team.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Helena Brandt"], "spans": [[0, 12, 25]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Ruth Baker"], "spans": [[1, 16, 26]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Owen Cook"], "spans": [[2, 28, 37]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Questions go", "Compliance", "claims team"]
+  }
+}

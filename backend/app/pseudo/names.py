@@ -21,10 +21,13 @@ from app.pseudo.hits import HIGH, NORMAL, ORG, PERSON, SIGNATURE, Hits
 from app.pseudo.lexicon import (
     DEFINITION_FILLERS,
     DEFINITION_OPENERS,
+    LEGAL_FORMS_LONG,
     LEGAL_PREFIX,
     LEGAL_SUFFIX,
     ORG_NOUNS,
+    PERSON_LEADINS,
     PERSON_TRIGGERS,
+    PERSON_VERBS,
     SOLE_TRADER,
     SOLE_TRADER_LEADS,
     SOLE_TRADER_NOUNS,
@@ -49,6 +52,23 @@ _MAX_RUN_WORDS: Final = 3
 _ROLE_GAP: Final = frozenset(" \t:—–-,")
 _ROLE_PUNCTUATION: Final = frozenset(":—–-,")
 _MIN_ROLE_SURNAME: Final = 4
+_LONG_FIRST: Final = tuple({form[0] for form in LEGAL_FORMS_LONG})
+_LEADIN_LAST: Final = frozenset(key[-1] for key in PERSON_LEADINS)
+_LEADIN_GAP: Final = frozenset(" :")
+_MAX_LEADIN: Final = 4
+_MAX_TITLE_WORDS: Final = 5
+_MAX_BRACKET: Final = 60
+_QUOTE_GAP: Final = frozenset(" :—–-")
+_MAX_QUOTE_GAP: Final = 4
+_MAX_STEM_SUFFIX: Final = 3
+_SHORT_STEM: Final = 2
+
+
+def _stem_of(word: str, stem: str) -> bool:
+    """``word`` is ``stem`` with up to three more letters (one- and two-letter stems: equal)."""
+    if len(stem) <= _SHORT_STEM:
+        return word == stem
+    return word.startswith(stem) and len(word) - len(stem) <= _MAX_STEM_SUFFIX
 
 
 def words_of(text: str, start: int, end: int) -> tuple[array[int], array[int]]:
@@ -75,6 +95,8 @@ class Names:
         self.hits = hits
         self.covered = bytearray(len(view.u))
         self.surnames: dict[str, str] = {}
+        # Second words of a two-word name whose order is unknown: found again, but not a surname.
+        self.aliases: dict[str, str] = {}
         self.firsts: dict[str, set[str]] = {}
         self.org_phrase: dict[str, str] = {}
         self.org_first: dict[str, str] = {}
@@ -82,6 +104,7 @@ class Names:
         self.org_single: dict[str, str] = {}
         self._fold: dict[str, str] = {}
         self._stem: dict[str, str] = {}
+        self._name_word: dict[str, bool] = {}
 
     # ------------------------------------------------------------------ helpers
 
@@ -111,7 +134,13 @@ class Names:
 
     def name_word(self, word: str) -> bool:
         """A capitalised word that may be part of a name."""
-        return word[0].isupper() and len(word) >= 2 and not is_not_name(self.folded(word))  # noqa: PLR2004
+        found = self._name_word.get(word)
+        if found is None:
+            if len(self._name_word) > 100_000:  # noqa: PLR2004
+                self._name_word.clear()
+            found = word[0].isupper() and len(word) >= 2 and not is_not_name(self.folded(word))  # noqa: PLR2004
+            self._name_word[word] = found
+        return found
 
     def adjacent(self, left_end: int, right_start: int) -> bool:
         gap = self.u[left_end:right_start]
@@ -178,6 +207,10 @@ class Names:
         index = 0
         while index < count:
             word = u[ws[index] : we[index]]
+            long_form = self._long_legal(ls, le, ws, we, index)
+            if long_form:
+                index = max(index + 1, long_form)
+                continue
             if self._long_sole_trader(ws, we, index, word):
                 done = self._sole_trader(ls, le, ws, we, index + 1, org_first=index)
                 if done:
@@ -212,10 +245,20 @@ class Names:
                 if done:
                     return done
             if (
-                self._trigger_before(ws, we, index) or self._role_before(ws, we, index)
+                self._trigger_before(ws, we, index)
+                or self._role_before(ws, we, index)
+                or self._leadin_before(ws, we, index)
             ) and self.name_word(word):
                 return self._after_trigger(le, ws, we, index)
             if self.name_word(word):
+                run = self._run(ws, we, index, _MAX_RUN_WORDS)
+                done = (
+                    self._bracket_form(le, ws, we, run)
+                    or self._title_after_name(ls, le, ws, we, run)
+                    or self._subject_before_verb(ls, ws, we, run)
+                )
+                if done:
+                    return done
                 return self._initials_name(ls, le, ws, we, index)
         return index + 1
 
@@ -305,7 +348,7 @@ class Names:
             return
         canon = self.add_person(start, end, surname, first)
         for other in extra:
-            self.surnames.setdefault(self.stem(other), canon)
+            self.aliases.setdefault(self.stem(other), canon)
 
     def _patronymic(self, ls: int, ws: array[int], we: array[int], index: int) -> int:
         u = self.u
@@ -372,11 +415,15 @@ class Names:
         if index < 1:
             return False
         gap = u[we[index - 1] : ws[index]]
+        previous = self.folded(u[ws[index - 1] : we[index - 1]])
+        person_role = is_person_role(previous)
+        # A job title ("Managing Director: ...") needs a full name; a lone word is not enough.
+        title_only = not person_role and is_title(previous)
         if (
             not gap
             or not set(gap) <= _ROLE_GAP
             or not set(gap) & _ROLE_PUNCTUATION
-            or not is_person_role(self.folded(u[ws[index - 1] : we[index - 1]]))
+            or not (person_role or title_only)
         ):
             return False
         skeleton = self.s[ws[index] : we[index]]
@@ -398,6 +445,8 @@ class Names:
                 return False
         if names > 1:
             return True
+        if title_only:
+            return False
         word = u[ws[index] : we[index]]
         if word.isupper():
             return self._comma_given(len(u), ws, we, index) is not None
@@ -484,8 +533,17 @@ class Names:
         ws, we = words_of(self.u, start, end)
         return [self.u[a:b] for a, b in zip(ws, we, strict=True)]
 
-    def _legal_prefix(self, ls: int, le: int, ws: array[int], we: array[int], index: int) -> int:
+    def _legal_prefix(  # noqa: PLR0913, PLR0917
+        self,
+        ls: int,
+        le: int,
+        ws: array[int],
+        we: array[int],
+        index: int,
+        start: int | None = None,
+    ) -> int:
         u = self.u
+        first = ws[index] if start is None else start
         cursor = we[index]
         if cursor < le and u[cursor] == ".":
             cursor += 1
@@ -499,7 +557,7 @@ class Names:
             inner = self._inner_words(cursor + 1, close)
             if not inner:
                 return 0
-            self.add_org(ws[index], close + 1, inner, HIGH)
+            self.add_org(first, close + 1, inner, HIGH)
             return bisect_left(ws, close + 1)
         run_start = bisect_left(ws, cursor)
         if cursor == we[index] or run_start >= len(ws) or ws[run_start] != cursor:
@@ -508,8 +566,142 @@ class Names:
         if not run:
             return 0
         names = [u[ws[k] : we[k]] for k in run]
-        self.add_org(ws[index], we[run[-1]], names, NORMAL)
+        self.add_org(first, we[run[-1]], names, NORMAL)
         return run[-1] + 1
+
+    def _long_legal(self, ls: int, le: int, ws: array[int], we: array[int], index: int) -> int:
+        """A legal form in full words ("Общество с ограниченной ответственностью") and a name."""
+        if self.is_covered(ws[index], we[index]):
+            return 0
+        first = self.folded(self.u[ws[index] : we[index]])
+        if not first.startswith(_LONG_FIRST):
+            return 0
+        for form in LEGAL_FORMS_LONG:
+            last = index + len(form) - 1
+            if last >= len(ws) or not _stem_of(first, form[0]):
+                continue
+            if all(
+                _stem_of(self.folded(self.u[ws[index + k] : we[index + k]]), stem)
+                and (k == 0 or self.adjacent(we[index + k - 1], ws[index + k]))
+                for k, stem in enumerate(form)
+            ):
+                return self._legal_prefix(ls, le, ws, we, last, ws[index])
+        return 0
+
+    def _leadin_before(self, ws: array[int], we: array[int], index: int) -> bool:
+        """ "Notices to: Name" / "Questions go to Name" / "Attention: Name"."""
+        u = self.u
+        if index < 1:
+            return False
+        gap = u[we[index - 1] : ws[index]]
+        if not gap or not set(gap) <= _LEADIN_GAP:
+            return False
+        if self.folded(u[ws[index - 1] : we[index - 1]]) not in _LEADIN_LAST:
+            return False
+        parts: list[str] = []
+        cursor = index - 1
+        while cursor >= 0 and len(parts) < _MAX_LEADIN:
+            if parts and u[we[cursor] : ws[cursor + 1]].strip(" "):
+                break
+            parts.insert(0, self.folded(u[ws[cursor] : we[cursor]]))
+            if tuple(parts) in PERSON_LEADINS:
+                return True
+            cursor -= 1
+        return False
+
+    def _title_after_name(
+        self, ls: int, le: int, ws: array[int], we: array[int], run: list[int]
+    ) -> int:
+        """ "Daniel Marlow, Chief Executive Officer" / "J. Thornberry, Finance Director"."""
+        if not run:
+            return 0
+        last = run[-1]
+        start, count = self._initials_before(ws[run[0]], ls)
+        if (len(run) < 2 and not count) or not self._job_title_follows(le, ws, we, last):  # noqa: PLR2004
+            return 0
+        if self.s[ws[last] : we[last]] in LEGAL_SUFFIX or self.s[ws[run[0]] : we[run[0]]] in (
+            LEGAL_PREFIX
+        ):
+            return 0
+        self._register_run(ws, we, run, start if count else ws[run[0]], we[last], count > 0)
+        return last + 1
+
+    def _job_title_follows(self, le: int, ws: array[int], we: array[int], last: int) -> bool:
+        """ ", " and then a capitalised job title (a title or person-role word within five)."""
+        u = self.u
+        nxt = last + 1
+        if nxt >= len(ws) or ws[nxt] >= le or u[we[last] : ws[nxt]] != ", ":
+            return False
+        for step in range(_MAX_TITLE_WORDS):
+            current = nxt + step
+            if current >= len(ws) or ws[current] >= le:
+                return False
+            word = u[ws[current] : we[current]]
+            if step == 0 and not word[0].isupper():
+                return False
+            folded = self.folded(word)
+            if is_title(folded) or is_person_role(folded):
+                return True
+            if current + 1 < len(ws) and not self.adjacent(we[current], ws[current + 1]):
+                return False
+        return False
+
+    def _subject_before_verb(self, ls: int, ws: array[int], we: array[int], run: list[int]) -> int:
+        """ "Tobias Wren signs ..." at the start of a sentence: a full name and an action verb."""
+        u = self.u
+        if len(run) < 2:  # noqa: PLR2004
+            return 0
+        before = ws[run[0]]
+        while before > ls and u[before - 1] == " ":
+            before -= 1
+        if before > ls and u[before - 1] not in ".!?":
+            return 0
+        last = run[-1]
+        nxt = last + 1
+        if nxt >= len(ws) or not self.adjacent(we[last], ws[nxt]):
+            return 0
+        verb = u[ws[nxt] : we[nxt]]
+        if verb != verb.lower() or self.folded(verb) not in PERSON_VERBS:
+            return 0
+        self._register_run(ws, we, run, ws[run[0]], we[last], False)
+        return last + 1
+
+    def _bracket_form(self, le: int, ws: array[int], we: array[int], run: list[int]) -> int:
+        """ "Iryna Kovalenko (Ірина Коваленко)": one person in two scripts."""
+        u = self.u
+        if len(run) < 2 or u[we[run[-1]] : we[run[-1]] + 2] != " (":  # noqa: PLR2004
+            return 0
+        if not all(u[ws[k] : we[k]].isascii() for k in run):
+            return 0
+        last = run[-1]
+        opening = we[last] + 2
+        close = u.find(")", opening, min(le, opening + _MAX_BRACKET))
+        if close < 0:
+            return 0
+        cws, cwe = words_of(u, opening, close)
+        words = [u[a:b] for a, b in zip(cws, cwe, strict=True)]
+        if (
+            not 2 <= len(words) <= _MAX_RUN_WORDS  # noqa: PLR2004
+            or cws[0] != opening
+            or cwe[-1] != close
+            or not all(w[0].isupper() and len(w) >= 2 and not w.isascii() for w in words)  # noqa: PLR2004
+        ):
+            return 0
+        latin = [u[ws[k] : we[k]] for k in run]
+        wanted = self._loose(latin[-1])
+        match = next((w for w in words if self._loose(w) == wanted), None)
+        if match is None:
+            return 0
+        surname, first, _ = self._classify(latin, False)
+        canon = self.add_person(ws[run[0]], we[last], surname, first)
+        self.surnames.setdefault(self.stem(match), canon)
+        given = next((w for w in words if w is not match), None)
+        self.add_person(cws[0], cwe[-1], match, given)
+        return bisect_left(ws, close + 1)
+
+    def _loose(self, word: str) -> str:
+        """Stem key without "h" and "g": Hnatyuk and Гнатюк, Smith and Сміт meet."""
+        return self.stem(word).replace("h", "").replace("g", "")
 
     def _legal_suffix(self, le: int, ws: array[int], we: array[int], index: int) -> int:
         u = self.u
@@ -555,7 +747,7 @@ class Names:
             return 0
         canon = self.add_person(person_start, end, surname, first)
         for other in extra:
-            self.surnames.setdefault(self.stem(other), canon)
+            self.aliases.setdefault(self.stem(other), canon)
         org_start = ws[index if org_first is None else org_first]
         self.hits.add(ORG, NORMAL, org_start, end, "fop:" + canon)
         return run[-1] + 1
@@ -594,6 +786,8 @@ class Names:
         u = self.u
         # The word before the quote.
         before = bisect_left(we, open_at) - 1
+        if before >= 0 and self._noun_colon_quote(we[before], open_at, u[ws[before] : we[before]]):
+            return True
         if before >= 0 and self.adjacent(we[before], open_at):
             word = u[ws[before] : we[before]]
             folded = self.folded(word)
@@ -612,6 +806,16 @@ class Names:
             if first < len(ws) and (self.folded(u[ws[first] : we[first]]),) in DEFINITION_OPENERS:
                 return True
         return False
+
+    def _noun_colon_quote(self, left_end: int, open_at: int, word: str) -> bool:
+        """``Банк: «Name»``: an organisation noun, a colon or dash, then the quote."""
+        gap = self.u[left_end:open_at]
+        return (
+            0 < len(gap) <= _MAX_QUOTE_GAP
+            and set(gap) <= _QUOTE_GAP
+            and gap.strip(" ") != ""
+            and self.folded(word) in ORG_NOUNS
+        )
 
     # ------------------------------------------------------------ definitions
 
@@ -743,7 +947,7 @@ class Names:
             return
         canon = self.add_person(first, last, surname, first_name)
         for other in extra:
-            self.surnames.setdefault(self.stem(other), canon)
+            self.aliases.setdefault(self.stem(other), canon)
 
     # -------------------------------------------------------------------- pass 2
 
@@ -766,7 +970,7 @@ class Names:
         if is_not_name(self.folded(word)):
             return index + 1
         key = self.stem(word)
-        canon = self.surnames.get(key)
+        canon = self.surnames.get(key) or self.aliases.get(key)
         if canon is not None:
             return self._known_person(ls, le, ws, we, index, canon)
         candidates = self.org_multi.get(key)
@@ -894,7 +1098,7 @@ class Names:
             self.mark(start, end)
             return
         if len(words) == 1:
-            person = self.surnames.get(stems[0])
+            person = self.surnames.get(stems[0]) or self.aliases.get(stems[0])
             if person is not None:
                 self.hits.add(PERSON, NORMAL, start, end, person)
                 self.mark(start, end)

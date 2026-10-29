@@ -12,9 +12,9 @@
     {"text": "Kestrel Components GmbH", "part": "body", "page": null},
     {"text": "Represented by", "part": "body", "page": null},
     {"text": "Tobias Wendland, Managing Director", "part": "body", "page": null},
-    {"text": "Registered office: 14 Quayside Road, Bristol BS1 4XT, United Kingdom", "part": "body", "page": null},
+    {"text": "Principal place of business: 305 Alder Parkway, Toronto ON M5V 2T6, Canada", "part": "body", "page": null},
     {"text": "M. O'Neill-Hughes signs for Party A; T. Wendland signs for Party B.", "part": "body", "page": null},
-    {"text": "Delivery address for Party A: Warehouse 5, 22 Mill Lane, Leeds LS2 7DB.", "part": "body", "page": null},
+    {"text": "Goods to be delivered to Party A at Shed 14, 275 Fenwick Street, Adelaide SA 5000.", "part": "body", "page": null},
     {"text": "Questions go to Sam Fisher at sam.fisher@harbourview-foods.example.com.", "part": "body", "page": null},
     {"text": "Phone: +44 117 496 0845", "part": "body", "page": null},
     {"text": "Prices are fixed at 4.50 per kg for 12 months.", "part": "body", "page": null}
@@ -25,8 +25,8 @@
       {"class": "PERSON", "precision": "normal", "value_forms": ["Margaret O'Neill-Hughes", "M. O'Neill-Hughes"], "spans": [[4, 0, 23], [10, 0, 17]]},
       {"class": "ORG", "precision": "normal", "value_forms": ["Kestrel Components GmbH"], "spans": [[6, 0, 23]]},
       {"class": "PERSON", "precision": "normal", "value_forms": ["Tobias Wendland", "T. Wendland"], "spans": [[8, 0, 15], [10, 37, 48]]},
-      {"class": "ADDRESS", "precision": "normal", "value_forms": ["14 Quayside Road, Bristol BS1 4XT, United Kingdom"], "spans": [[9, 19, 68]]},
-      {"class": "ADDRESS", "precision": "normal", "value_forms": ["Warehouse 5, 22 Mill Lane, Leeds LS2 7DB"], "spans": [[11, 30, 70]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["305 Alder Parkway, Toronto ON M5V 2T6, Canada"], "spans": [[9, 29, 74]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["Shed 14, 275 Fenwick Street, Adelaide SA 5000"], "spans": [[11, 36, 81]]},
       {"class": "PERSON", "precision": "normal", "value_forms": ["Sam Fisher"], "spans": [[12, 16, 26]]},
       {"class": "EMAIL", "precision": "high", "value_forms": ["sam.fisher@harbourview-foods.example.com"], "spans": [[12, 30, 70]]},
       {"class": "PHONE", "precision": "high", "value_forms": ["+44 117 496 0845"], "spans": [[13, 7, 23]]}

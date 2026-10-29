@@ -1,0 +1,20 @@
+{
+  "name": "43_en_url_domain_path",
+  "language": "en",
+  "description": "Round 3. Bare domain followed by a path: the span covers domain and path, up to the final full stop. Block 2 holds clause references with a slash (negative).",
+  "blocks": [
+    {"text": "Claims forms are at northgate-claims.com/forms.", "part": "body", "page": null},
+    {"text": "Track a claim at ironwood-cover.co.uk/help or write to us.", "part": "body", "page": null},
+    {"text": "See clause 4.2/b and annex 3/1 for the procedure.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "URL", "precision": "high", "value_forms": ["northgate-claims.com/forms"], "spans": [[0, 20, 46]]},
+      {"class": "URL", "precision": "high", "value_forms": ["ironwood-cover.co.uk/help"], "spans": [[1, 17, 42]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["4.2/b", "3/1"]
+  }
+}

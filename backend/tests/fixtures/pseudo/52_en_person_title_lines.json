@@ -1,0 +1,25 @@
+{
+  "name": "52_en_person_title_lines",
+  "language": "en",
+  "description": "Round 3. Flattened signature table: each block is a name on its own line followed by ', <job title>'. Full-name and initial+surname forms. Spans cover the name only. The title words stay. Block 5 starts with capitalised role words, not a name (negative).",
+  "blocks": [
+    {"text": "The following people are authorised contacts.", "part": "body", "page": null},
+    {"text": "Daniel Marlow, Chief Executive Officer", "part": "body", "page": null},
+    {"text": "J. Thornberry, Finance Director", "part": "body", "page": null},
+    {"text": "Priya Okonkwo-Hale, Head of Legal", "part": "body", "page": null},
+    {"text": "M. Delacroix, Operations Manager", "part": "body", "page": null},
+    {"text": "Finance Director approves all invoices.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Daniel Marlow"], "spans": [[1, 0, 13]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["J. Thornberry"], "spans": [[2, 0, 13]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Priya Okonkwo-Hale"], "spans": [[3, 0, 18]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["M. Delacroix"], "spans": [[4, 0, 12]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Chief Executive Officer", "Finance Director", "Head of Legal", "Operations Manager"]
+  }
+}

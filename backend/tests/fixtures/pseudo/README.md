@@ -106,3 +106,47 @@ Invalid on purpose: 21045678 (check digit should be 9).
 | 37_uk_negative_controls | roles, city, dates, amounts (UK) |
 | 38_en_negative_controls | same (EN) |
 | 39_ru_negative_controls | same (RU) |
+
+## Round 3 (detector training corpus, files 40-68)
+
+Written from failure categories only. Spans were counted by hand: the test-engineer's one-time check must recompute every span. Span conventions as above. New decisions: a bare domain with a path is one URL span (domain and path); a VAT span is the country prefix and digits without the word `VAT`; a driver licence and a passport span exclude the label; a passport span runs from the first series digit through the number; an address span includes a unit prefix and a trailing country.
+
+### Round 3 checksum values
+
+| Value | Kind | Algorithm |
+| --- | --- | --- |
+| 780123456724 | ИНН-12 (files 46, 64) | n11 weights 7,2,4,10,3,5,9,4,6,8 on 7,8,0,1,2,3,4,5,6,7: sum 244, 244 mod 11 = 2; n12 weights 3,7,2,4,10,3,5,9,4,6,8 on 7,8,0,1,2,3,4,5,6,7,2: sum 257, 257 mod 11 = 4 |
+| 502987654365 | ИНН-12 (file 46) | n11: digits 5,0,2,9,8,7,6,5,4,3: sum 314, mod 11 = 6; n12 on 5,0,2,9,8,7,6,5,4,3,6: sum 313, mod 11 = 5 |
+| 780123456725 | ИНН-12, invalid on purpose (file 46) | n12 should be 4 |
+| 7712345671, 3012345670, 3521741827 | valid 10-digit numbers reused as quantities (files 59-61, 60) | see Generated checksum values above |
+| 21045679 | ЄДРПОУ (file 63) | see above |
+
+Without checksum (format only): accounts 40702810900000045678 and 30101810400000000123, UK sort codes and 8-digit accounts, VAT numbers `DE 812 3456 78`, `PL 526 1234 56`, `GB 123 4567 89`, Tax ID `55-1234567`, plates, driver licence and passport numbers. UK phones are from Ofcom drama ranges; toll-free numbers are fictional.
+
+| File | Covers |
+| --- | --- |
+| 40_uk_phone_tollfree | `0 800 …` in spaced groups after a label |
+| 41_ru_phone_tollfree | `8-800-…` after an imperative verb |
+| 42_en_phone_uk_national | UK `0XXX XXX XXXX` after lower-case "phone" |
+| 43_en_url_domain_path | bare domain plus path |
+| 44_ru_org_full_legal_form | spelled-out legal form plus quoted name |
+| 45_uk_vat_foreign | VAT with country prefix and inner spaces |
+| 46_ru_inn12_grouped | ИНН-12 in 4-digit groups, alone in a block; invalid twin (negative) |
+| 47_ru_accounts_spelled | 20-digit account after spelled-out labels |
+| 48_en_sortcode_account | sort code and 8-digit account |
+| 49_uk_driver_licence | 3 letters + 6 digits after "посвідчення водія" |
+| 50_ru_passport_series_number | `серия NN NN № NNNNNN` |
+| 51_ru_plate_spaced | plate with spaces |
+| 52_en_person_title_lines | name, job title on its own line |
+| 53_en_person_notice_leadin | name after notice lead-ins, common-noun surnames |
+| 54_en_person_authorised_signatory | full name after "Authorised signatory:" |
+| 55_en_person_sentence_subject | name as line-start subject, capitalised-word negatives |
+| 56_en_person_cyrillic_parens | Latin name plus Cyrillic form in brackets |
+| 57_en_address_country_unit | trailing country, "Warehouse N," prefix |
+| 58_en_address_translit_unit | "Unit N," prefix, transliterated foreign address |
+| 59-61 `_quantities_units_neg` | checksum-valid 10-digit quantities with piece/mass units (RU, UK, EN) |
+| 62_en_requisites_heading_variant | invented heading, `E-mail:`, two pairs on a line, second role + name |
+| 63_uk_requisites_bank_email_roles | `Банк: «…»`, `E-mail:`, two pairs, two-word and second role |
+| 64_ru_requisites_two_pairs_roles | same in RU, spelled-out legal form, spelled-out account |
+| 65_en_requisites_second_variant | second heading, two account pairs, VAT, name as subject in section |
+| 66-68 `_negative_controls_r3` | near-miss negatives (EN, UK, RU) |

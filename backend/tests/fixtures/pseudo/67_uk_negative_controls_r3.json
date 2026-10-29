@@ -1,0 +1,20 @@
+{
+  "name": "67_uk_negative_controls_r3",
+  "language": "uk",
+  "description": "Round 3 negative control (UK). 'Банк' and role words as common nouns at sentence start, 'посвідчення водія' without a number, opening hours, 'VAT 20 %' as a rate. Nothing is masked.",
+  "blocks": [
+    {"text": "2.1. Банк зобов'язаний повідомити про зміну реквізитів.", "part": "body", "page": null},
+    {"text": "2.2. Головний бухгалтер підписує акти приймання.", "part": "body", "page": null},
+    {"text": "2.3. Страхувальник надає посвідчення водія на вимогу.", "part": "body", "page": null},
+    {"text": "2.4. Гаряча лінія працює щодня з 9:00 до 18:00.", "part": "body", "page": null},
+    {"text": "2.5. Іноземний контрагент сплачує VAT 20 % від ціни.", "part": "body", "page": null},
+    {"text": "2.6. Генеральний директор має право підпису.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Банк зобов'язаний", "Головний бухгалтер підписує", "посвідчення водія", "9:00", "18:00", "VAT 20 %", "Генеральний директор має"]
+  }
+}

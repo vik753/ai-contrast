@@ -1,0 +1,20 @@
+{
+  "name": "45_uk_vat_foreign",
+  "language": "uk",
+  "description": "Round 3. Foreign VAT number with a country prefix and inner spaces (CC NNN NNNN NN) after 'VAT'. Span = prefix and digits, without the word VAT. Block 2: 'VAT 20 %' is a rate (negative). No checksum for VAT.",
+  "blocks": [
+    {"text": "Постачальник сплачує ПДВ, VAT DE 812 3456 78, у своїй країні.", "part": "body", "page": null},
+    {"text": "Іноземний контрагент має номер VAT PL 526 1234 56.", "part": "body", "page": null},
+    {"text": "Ціна включає VAT 20 %.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["DE 812 3456 78"], "spans": [[0, 30, 44]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["PL 526 1234 56"], "spans": [[1, 35, 49]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["VAT 20 %"]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "56_en_person_cyrillic_parens",
+  "language": "en",
+  "description": "Round 3. Latin name followed by its Cyrillic form in parentheses. Both forms are one PERSON entity, full names in both scripts (not only the surname). Brackets stay outside the spans.",
+  "blocks": [
+    {"text": "Signed by Iryna Kovalenko (Ірина Коваленко) for the Supplier.", "part": "body", "page": null},
+    {"text": "Director Petro Hnatyuk (Петро Гнатюк) approved.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Iryna Kovalenko", "Ірина Коваленко"], "spans": [[0, 10, 25], [0, 27, 42]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Petro Hnatyuk", "Петро Гнатюк"], "spans": [[1, 9, 22], [1, 24, 36]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["for the Supplier", "approved"]
+  }
+}

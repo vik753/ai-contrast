@@ -1,0 +1,18 @@
+{
+  "name": "59_ru_quantities_units_neg",
+  "language": "ru",
+  "description": "Round 3 negative control. Checksum-valid 10-digit numbers (7712345671 as ИНН-10, 3012345670 and 3521741827 as РНОКПП) used as quantities followed by a unit or piece-count word (штук, мг, экз., ед.). Nothing is masked.",
+  "blocks": [
+    {"text": "3.1. Поставщик передает 7712345671 штук комплектующих.", "part": "body", "page": null},
+    {"text": "3.2. Состав: 3012345670 мг действующего вещества на партию.", "part": "body", "page": null},
+    {"text": "3.3. Тираж брошюр — 3521741827 экз.", "part": "body", "page": null},
+    {"text": "3.4. Общий объем партии — 7712345671 ед. продукции.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["7712345671 штук", "3012345670 мг", "3521741827 экз.", "7712345671 ед."]
+  }
+}

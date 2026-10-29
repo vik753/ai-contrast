@@ -1,0 +1,20 @@
+{
+  "name": "68_ru_negative_controls_r3",
+  "language": "ru",
+  "description": "Round 3 negative control (RU). 'Общество' without quotes, 'Расчётный счёт' and 'Позвоните' without numbers, 'Серия платежей' (not a passport series), role words as common nouns. Nothing is masked.",
+  "blocks": [
+    {"text": "6.1. Общество вправе расторгнуть договор в одностороннем порядке.", "part": "body", "page": null},
+    {"text": "6.2. Расчётный счёт указан в приложении к договору.", "part": "body", "page": null},
+    {"text": "6.3. Позвоните нам в рабочее время для уточнения условий.", "part": "body", "page": null},
+    {"text": "6.4. Серия платежей начинается после подписания акта.", "part": "body", "page": null},
+    {"text": "6.5. Главный бухгалтер проверяет отчёты ежемесячно.", "part": "body", "page": null},
+    {"text": "6.6. Номер телефона указан на сайте компании.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Общество вправе", "Расчётный счёт указан", "Позвоните нам", "Серия платежей", "Главный бухгалтер проверяет"]
+  }
+}

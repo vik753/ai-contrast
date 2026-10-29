@@ -1,0 +1,19 @@
+{
+  "name": "42_en_phone_uk_national",
+  "language": "en",
+  "description": "Round 3. UK national numbers with trunk 0 and area code after the lower-case word 'phone' in notice lines. Numbers are from the Ofcom drama ranges.",
+  "blocks": [
+    {"text": "Please phone 0117 496 0842 to report a loss.", "part": "body", "page": null},
+    {"text": "For urgent claims, phone 020 7946 0321 any day.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PHONE", "precision": "high", "value_forms": ["0117 496 0842"], "spans": [[0, 13, 26]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["020 7946 0321"], "spans": [[1, 25, 38]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["to report a loss", "any day"]
+  }
+}
