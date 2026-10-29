@@ -5,6 +5,7 @@ from __future__ import annotations
 import ssl
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import certifi
 import httpcore2
@@ -18,24 +19,29 @@ from tests.netfakes import PUBLIC_V4, ResolverSpy, SpyInner
 PROXY_VARS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy")
 
 
-def _build() -> tuple[httpx2.AsyncClient, ssl.SSLContext]:
-    """Build a client and capture the SSL context that reaches the connection pool."""
-    contexts: list[ssl.SSLContext] = []
+def _build_recording(
+    backend: GuardedNetworkBackend | None,
+) -> tuple[httpx2.AsyncClient, dict[str, Any]]:
+    """Build a client and capture the keyword arguments that reach the connection pool."""
+    seen: list[dict[str, Any]] = []
     original = httpcore2.AsyncConnectionPool
 
     class Recording(original):  # type: ignore[valid-type, misc]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
-            contexts.append(kwargs["ssl_context"])
+            seen.append(kwargs)
             super().__init__(*args, **kwargs)
 
-    httpcore2.AsyncConnectionPool = Recording  # type: ignore[misc]
-    try:
-        backend = GuardedNetworkBackend(resolver=ResolverSpy([PUBLIC_V4]), inner=SpyInner())
+    # `patch.object` restores the attribute even when the build fails.
+    with patch.object(httpcore2, "AsyncConnectionPool", Recording):
         client = outbound_client(connect_timeout=5, read_timeout=10, network_backend=backend)
-    finally:
-        httpcore2.AsyncConnectionPool = original  # type: ignore[misc]
-    assert len(contexts) == 1
-    return client, contexts[0]
+    assert len(seen) == 1
+    return client, seen[0]
+
+
+def _build() -> tuple[httpx2.AsyncClient, ssl.SSLContext]:
+    backend = GuardedNetworkBackend(resolver=ResolverSpy([PUBLIC_V4]), inner=SpyInner())
+    client, kwargs = _build_recording(backend)
+    return client, kwargs["ssl_context"]
 
 
 def _reference_ca_count() -> int:
@@ -103,6 +109,7 @@ def test_client_has_no_proxy_mounts_when_proxy_variable_is_set(
     client, _ = _build()
 
     assert client.trust_env is False
+    # No public accessor for mounts exists in httpx2; this private check is deliberate.
     assert client._mounts == {}
 
 
@@ -123,3 +130,13 @@ def test_ssl_context_is_unchanged_when_all_variables_are_set(
     assert after.verify_mode == before.verify_mode
     assert after.check_hostname == before.check_hostname
     assert after.keylog_filename is None
+
+
+def test_production_factory_uses_guarded_backend_and_certifi_context() -> None:
+    _, kwargs = _build_recording(None)
+
+    assert type(kwargs["network_backend"]) is GuardedNetworkBackend
+    context = kwargs["ssl_context"]
+    assert type(context) is ssl.SSLContext
+    assert context.cert_store_stats()["x509_ca"] == _reference_ca_count() > 0
+    assert context.verify_mode == ssl.CERT_REQUIRED
