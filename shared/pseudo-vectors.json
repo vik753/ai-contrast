@@ -1,0 +1,2131 @@
+{
+ "description": "Shared placeholder vectors (S5b-T4). Input: the wire reply fields of /api/segment (blocks as plain strings, body part), clauses (id, spans), entities, requisites, neutralized, plus unmask decisions. Output: masked clauses and acknowledged spans (clause-relative, masked-text code-point offsets). Used by backend/tests/canary/test_masking_vectors.py and frontend/src/pseudo/masking.vectors.test.ts. Offsets are BMP-only so UTF-16 and code points agree.",
+ "cases": [
+  {
+   "name": "numbering_first_occurrence",
+   "description": "Placeholders are numbered per class in first-occurrence order, not list order.",
+   "label": "A",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days.",
+    "Contact: seller@acme.example, tax code 1234567890.",
+    "Ref code 9876543210 applies to Beta Inc."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       50
+      ]
+     ]
+    },
+    {
+     "id": "c3",
+     "spans": [
+      [
+       2,
+       0,
+       40
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       20,
+       30
+      ],
+      [
+       0,
+       38,
+       48
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       31,
+       39
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       7,
+       15
+      ],
+      [
+       0,
+       54,
+       62
+      ]
+     ]
+    },
+    {
+     "id": "e4",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       9,
+       28
+      ]
+     ]
+    },
+    {
+     "id": "e5",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       39,
+       49
+      ]
+     ]
+    },
+    {
+     "id": "e6",
+     "class": "TAX_ID",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       9,
+       19
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller [A.ORG_1] and [A.PERSON_1] agree. [A.PERSON_1] pays [A.ORG_1] within 30 days."
+     },
+     {
+      "id": "c2",
+      "text": "Contact: [A.EMAIL_1], tax code [A.TAX_ID_1]."
+     },
+     {
+      "id": "c3",
+      "text": "Ref code [A.TAX_ID_2] applies to [A.ORG_2]."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "label_b",
+   "description": "The contract label is part of every placeholder.",
+   "label": "B",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days.",
+    "Contact: seller@acme.example, tax code 1234567890.",
+    "Ref code 9876543210 applies to Beta Inc."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       50
+      ]
+     ]
+    },
+    {
+     "id": "c3",
+     "spans": [
+      [
+       2,
+       0,
+       40
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       20,
+       30
+      ],
+      [
+       0,
+       38,
+       48
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       31,
+       39
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       7,
+       15
+      ],
+      [
+       0,
+       54,
+       62
+      ]
+     ]
+    },
+    {
+     "id": "e4",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       9,
+       28
+      ]
+     ]
+    },
+    {
+     "id": "e5",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       39,
+       49
+      ]
+     ]
+    },
+    {
+     "id": "e6",
+     "class": "TAX_ID",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       9,
+       19
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller [B.ORG_1] and [B.PERSON_1] agree. [B.PERSON_1] pays [B.ORG_1] within 30 days."
+     },
+     {
+      "id": "c2",
+      "text": "Contact: [B.EMAIL_1], tax code [B.TAX_ID_1]."
+     },
+     {
+      "id": "c3",
+      "text": "Ref code [B.TAX_ID_2] applies to [B.ORG_2]."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "unmask_normal_entity",
+   "description": "A normal entity can be unmasked; its occurrences are acknowledged with masked-text offsets.",
+   "label": "A",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days.",
+    "Contact: seller@acme.example, tax code 1234567890.",
+    "Ref code 9876543210 applies to Beta Inc."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       50
+      ]
+     ]
+    },
+    {
+     "id": "c3",
+     "spans": [
+      [
+       2,
+       0,
+       40
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       20,
+       30
+      ],
+      [
+       0,
+       38,
+       48
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       31,
+       39
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       7,
+       15
+      ],
+      [
+       0,
+       54,
+       62
+      ]
+     ]
+    },
+    {
+     "id": "e4",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       9,
+       28
+      ]
+     ]
+    },
+    {
+     "id": "e5",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       39,
+       49
+      ]
+     ]
+    },
+    {
+     "id": "e6",
+     "class": "TAX_ID",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       9,
+       19
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e2"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller [A.ORG_1] and [A.PERSON_1] agree. [A.PERSON_1] pays [A.ORG_1] within 30 days."
+     },
+     {
+      "id": "c2",
+      "text": "Contact: [A.EMAIL_1], tax code [A.TAX_ID_1]."
+     },
+     {
+      "id": "c3",
+      "text": "Ref code [A.TAX_ID_2] applies to Beta Inc."
+     }
+    ],
+    "acknowledged": [
+     [
+      "c3",
+      33,
+      41
+     ]
+    ]
+   }
+  },
+  {
+   "name": "unmask_one_occurrence",
+   "description": "One occurrence unmasked; the other keeps the shared placeholder.",
+   "label": "A",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days.",
+    "Contact: seller@acme.example, tax code 1234567890.",
+    "Ref code 9876543210 applies to Beta Inc."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       50
+      ]
+     ]
+    },
+    {
+     "id": "c3",
+     "spans": [
+      [
+       2,
+       0,
+       40
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       20,
+       30
+      ],
+      [
+       0,
+       38,
+       48
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       31,
+       39
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       7,
+       15
+      ],
+      [
+       0,
+       54,
+       62
+      ]
+     ]
+    },
+    {
+     "id": "e4",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       9,
+       28
+      ]
+     ]
+    },
+    {
+     "id": "e5",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       39,
+       49
+      ]
+     ]
+    },
+    {
+     "id": "e6",
+     "class": "TAX_ID",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       9,
+       19
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": [
+     [
+      "e1",
+      1
+     ]
+    ]
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller [A.ORG_1] and [A.PERSON_1] agree. John Smith pays [A.ORG_1] within 30 days."
+     },
+     {
+      "id": "c2",
+      "text": "Contact: [A.EMAIL_1], tax code [A.TAX_ID_1]."
+     },
+     {
+      "id": "c3",
+      "text": "Ref code [A.TAX_ID_2] applies to [A.ORG_2]."
+     }
+    ],
+    "acknowledged": [
+     [
+      "c1",
+      41,
+      51
+     ]
+    ]
+   }
+  },
+  {
+   "name": "unmask_high_ignored",
+   "description": "A high-precision entity cannot be unmasked.",
+   "label": "A",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days.",
+    "Contact: seller@acme.example, tax code 1234567890.",
+    "Ref code 9876543210 applies to Beta Inc."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       50
+      ]
+     ]
+    },
+    {
+     "id": "c3",
+     "spans": [
+      [
+       2,
+       0,
+       40
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       20,
+       30
+      ],
+      [
+       0,
+       38,
+       48
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       31,
+       39
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       7,
+       15
+      ],
+      [
+       0,
+       54,
+       62
+      ]
+     ]
+    },
+    {
+     "id": "e4",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       9,
+       28
+      ]
+     ]
+    },
+    {
+     "id": "e5",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       39,
+       49
+      ]
+     ]
+    },
+    {
+     "id": "e6",
+     "class": "TAX_ID",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       9,
+       19
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e4"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller [A.ORG_1] and [A.PERSON_1] agree. [A.PERSON_1] pays [A.ORG_1] within 30 days."
+     },
+     {
+      "id": "c2",
+      "text": "Contact: [A.EMAIL_1], tax code [A.TAX_ID_1]."
+     },
+     {
+      "id": "c3",
+      "text": "Ref code [A.TAX_ID_2] applies to [A.ORG_2]."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "unmask_code_class_ignored",
+   "description": "A checksummed code class (TAX_ID) cannot be unmasked even when normal.",
+   "label": "A",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days.",
+    "Contact: seller@acme.example, tax code 1234567890.",
+    "Ref code 9876543210 applies to Beta Inc."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       50
+      ]
+     ]
+    },
+    {
+     "id": "c3",
+     "spans": [
+      [
+       2,
+       0,
+       40
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       20,
+       30
+      ],
+      [
+       0,
+       38,
+       48
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       31,
+       39
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       7,
+       15
+      ],
+      [
+       0,
+       54,
+       62
+      ]
+     ]
+    },
+    {
+     "id": "e4",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       9,
+       28
+      ]
+     ]
+    },
+    {
+     "id": "e5",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       39,
+       49
+      ]
+     ]
+    },
+    {
+     "id": "e6",
+     "class": "TAX_ID",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       9,
+       19
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e6"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller [A.ORG_1] and [A.PERSON_1] agree. [A.PERSON_1] pays [A.ORG_1] within 30 days."
+     },
+     {
+      "id": "c2",
+      "text": "Contact: [A.EMAIL_1], tax code [A.TAX_ID_1]."
+     },
+     {
+      "id": "c3",
+      "text": "Ref code [A.TAX_ID_2] applies to [A.ORG_2]."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "unmask_all_normal",
+   "description": "Several unmasked entities: offsets count the masked text before them.",
+   "label": "A",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days.",
+    "Contact: seller@acme.example, tax code 1234567890.",
+    "Ref code 9876543210 applies to Beta Inc."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       50
+      ]
+     ]
+    },
+    {
+     "id": "c3",
+     "spans": [
+      [
+       2,
+       0,
+       40
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       20,
+       30
+      ],
+      [
+       0,
+       38,
+       48
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       31,
+       39
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       7,
+       15
+      ],
+      [
+       0,
+       54,
+       62
+      ]
+     ]
+    },
+    {
+     "id": "e4",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       9,
+       28
+      ]
+     ]
+    },
+    {
+     "id": "e5",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       39,
+       49
+      ]
+     ]
+    },
+    {
+     "id": "e6",
+     "class": "TAX_ID",
+     "precision": "normal",
+     "spans": [
+      [
+       2,
+       9,
+       19
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e1",
+     "e2",
+     "e3"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days."
+     },
+     {
+      "id": "c2",
+      "text": "Contact: [A.EMAIL_1], tax code [A.TAX_ID_1]."
+     },
+     {
+      "id": "c3",
+      "text": "Ref code [A.TAX_ID_2] applies to Beta Inc."
+     }
+    ],
+    "acknowledged": [
+     [
+      "c1",
+      7,
+      15
+     ],
+     [
+      "c1",
+      20,
+      30
+     ],
+     [
+      "c1",
+      38,
+      48
+     ],
+     [
+      "c1",
+      54,
+      62
+     ],
+     [
+      "c3",
+      33,
+      41
+     ]
+    ]
+   }
+  },
+  {
+   "name": "multi_span_clause_joined_by_newline",
+   "description": "Spans of one clause are joined with a newline; acknowledged offsets count it.",
+   "label": "A",
+   "blocks": [
+    "1. Payment to Carla Dunn",
+    "is due in 30 days; Carla Dunn confirms."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       24
+      ],
+      [
+       1,
+       0,
+       39
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       14,
+       24
+      ],
+      [
+       1,
+       19,
+       29
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e1"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "1. Payment to Carla Dunn\nis due in 30 days; Carla Dunn confirms."
+     }
+    ],
+    "acknowledged": [
+     [
+      "c1",
+      14,
+      24
+     ],
+     [
+      "c1",
+      44,
+      54
+     ]
+    ]
+   }
+  },
+  {
+   "name": "multi_span_clause_masked",
+   "description": "The same clause, masked.",
+   "label": "A",
+   "blocks": [
+    "1. Payment to Carla Dunn",
+    "is due in 30 days; Carla Dunn confirms."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       24
+      ],
+      [
+       1,
+       0,
+       39
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       14,
+       24
+      ],
+      [
+       1,
+       19,
+       29
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "1. Payment to [A.PERSON_1]\nis due in 30 days; [A.PERSON_1] confirms."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "cyrillic_person_forms",
+   "description": "Cyrillic text, two forms of one person.",
+   "label": "A",
+   "blocks": [
+    "Страхувальник — Мирошниченко Святослав Орестович (далі — Страхувальник). Виплата Мирошниченку С.О."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       98
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       16,
+       48
+      ],
+      [
+       0,
+       81,
+       98
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Страхувальник — [A.PERSON_1] (далі — Страхувальник). Виплата [A.PERSON_1]"
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "cyrillic_unmask",
+   "description": "Cyrillic text with the person unmasked.",
+   "label": "A",
+   "blocks": [
+    "Страхувальник — Мирошниченко Святослав Орестович (далі — Страхувальник). Виплата Мирошниченку С.О."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       98
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       16,
+       48
+      ],
+      [
+       0,
+       81,
+       98
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e1"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Страхувальник — Мирошниченко Святослав Орестович (далі — Страхувальник). Виплата Мирошниченку С.О."
+     }
+    ],
+    "acknowledged": [
+     [
+      "c1",
+      16,
+      48
+     ],
+     [
+      "c1",
+      81,
+      98
+     ]
+    ]
+   }
+  },
+  {
+   "name": "overlap_outer_mask_wins",
+   "description": "Overlapping masks: the outer span wins, the inner entity gets no placeholder.",
+   "label": "A",
+   "blocks": [
+    "ФОП Дорошенко Ярема Остапович підписав."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       39
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       0,
+       29
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       4,
+       29
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "[A.ORG_1] підписав."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "overlap_outer_unmasked_inner_masked",
+   "description": "Outer ORG unmasked: the inner PERSON stays masked (a mask beats a plain span).",
+   "label": "A",
+   "blocks": [
+    "ФОП Дорошенко Ярема Остапович підписав."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       39
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "ORG",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       0,
+       29
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       4,
+       29
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e1"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "ФОП [A.PERSON_1] підписав."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "requisites_drop_and_keep",
+   "description": "Dropped requisites lines leave the masked text; a kept line is masked like any text.",
+   "label": "A",
+   "blocks": [
+    "1. Сторони домовились.",
+    "Реквізити та підписи сторін",
+    "ЄДРПОУ: 21045679",
+    "Страхувальник: ____ /Бойчук Д.П./",
+    "Неустойка 50 % та Бойчук Д.П. відмовляється від претензій",
+    "IBAN: UA423052990000262001987654321"
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       22
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       27
+      ],
+      [
+       2,
+       0,
+       16
+      ],
+      [
+       3,
+       0,
+       33
+      ],
+      [
+       4,
+       0,
+       57
+      ],
+      [
+       5,
+       0,
+       35
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       2,
+       8,
+       16
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       3,
+       21,
+       32
+      ],
+      [
+       4,
+       18,
+       29
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ACCOUNT",
+     "precision": "high",
+     "spans": [
+      [
+       5,
+       6,
+       35
+      ]
+     ]
+    }
+   ],
+   "requisites": [
+    {
+     "clause": "c2",
+     "lines": [
+      {
+       "span": [
+        2,
+        0,
+        16
+       ],
+       "action": "drop"
+      },
+      {
+       "span": [
+        3,
+        0,
+        33
+       ],
+       "action": "drop"
+      },
+      {
+       "span": [
+        4,
+        0,
+        57
+       ],
+       "action": "keep"
+      },
+      {
+       "span": [
+        5,
+        0,
+        35
+       ],
+       "action": "drop"
+      }
+     ]
+    }
+   ],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "1. Сторони домовились."
+     },
+     {
+      "id": "c2",
+      "text": "Реквізити та підписи сторін\nНеустойка 50 % та [A.PERSON_1] відмовляється від претензій"
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "requisites_drop_with_unmasked_value_is_kept",
+   "description": "A drop line with an unmasked detected value is kept so the value is reviewed.",
+   "label": "A",
+   "blocks": [
+    "1. Сторони домовились.",
+    "Реквізити та підписи сторін",
+    "ЄДРПОУ: 21045679",
+    "Страхувальник: ____ /Бойчук Д.П./",
+    "Неустойка 50 % та Бойчук Д.П. відмовляється від претензій",
+    "IBAN: UA423052990000262001987654321"
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       22
+      ]
+     ]
+    },
+    {
+     "id": "c2",
+     "spans": [
+      [
+       1,
+       0,
+       27
+      ],
+      [
+       2,
+       0,
+       16
+      ],
+      [
+       3,
+       0,
+       33
+      ],
+      [
+       4,
+       0,
+       57
+      ],
+      [
+       5,
+       0,
+       35
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       2,
+       8,
+       16
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       3,
+       21,
+       32
+      ],
+      [
+       4,
+       18,
+       29
+      ]
+     ]
+    },
+    {
+     "id": "e3",
+     "class": "ACCOUNT",
+     "precision": "high",
+     "spans": [
+      [
+       5,
+       6,
+       35
+      ]
+     ]
+    }
+   ],
+   "requisites": [
+    {
+     "clause": "c2",
+     "lines": [
+      {
+       "span": [
+        2,
+        0,
+        16
+       ],
+       "action": "drop"
+      },
+      {
+       "span": [
+        3,
+        0,
+        33
+       ],
+       "action": "drop"
+      },
+      {
+       "span": [
+        4,
+        0,
+        57
+       ],
+       "action": "keep"
+      },
+      {
+       "span": [
+        5,
+        0,
+        35
+       ],
+       "action": "drop"
+      }
+     ]
+    }
+   ],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e2"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "1. Сторони домовились."
+     },
+     {
+      "id": "c2",
+      "text": "Реквізити та підписи сторін\nСтрахувальник: ____ /Бойчук Д.П./\nНеустойка 50 % та Бойчук Д.П. відмовляється від претензій"
+     }
+    ],
+    "acknowledged": [
+     [
+      "c2",
+      49,
+      60
+     ],
+     [
+      "c2",
+      80,
+      91
+     ]
+    ]
+   }
+  },
+  {
+   "name": "requisites_all_dropped_clause_omitted",
+   "description": "A clause whose every span is dropped has no masked clause.",
+   "label": "A",
+   "blocks": [
+    "Реквізити та підписи сторін",
+    "ЄДРПОУ: 21045679",
+    "IBAN: UA423052990000262001987654321"
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       27
+      ],
+      [
+       1,
+       0,
+       16
+      ],
+      [
+       2,
+       0,
+       35
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "TAX_ID",
+     "precision": "high",
+     "spans": [
+      [
+       1,
+       8,
+       16
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "ACCOUNT",
+     "precision": "high",
+     "spans": [
+      [
+       2,
+       6,
+       35
+      ]
+     ]
+    }
+   ],
+   "requisites": [
+    {
+     "clause": "c1",
+     "lines": [
+      {
+       "span": [
+        0,
+        0,
+        27
+       ],
+       "action": "drop"
+      },
+      {
+       "span": [
+        1,
+        0,
+        16
+       ],
+       "action": "drop"
+      },
+      {
+       "span": [
+        2,
+        0,
+        35
+       ],
+       "action": "drop"
+      }
+     ]
+    }
+   ],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "neutralized_lookalike_kept_as_is",
+   "description": "A neutralized look-alike stays in the text as written; it is never a placeholder.",
+   "label": "A",
+   "blocks": [
+    "Платіж на ⟦ORG_2⟧ сплачується ТОВ «Альфа» вчасно."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       49
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "ORG",
+     "precision": "high",
+     "spans": [
+      [
+       0,
+       30,
+       41
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [
+    [
+     0,
+     10,
+     17
+    ]
+   ],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Платіж на ⟦ORG_2⟧ сплачується [A.ORG_1] вчасно."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "two_classes_numbering_with_unmask",
+   "description": "Two unmasked entities and one masked entity of the same class.",
+   "label": "A",
+   "blocks": [
+    "Підписав Іваненко І.І. (Іваненко І.І.) у присутності Петренка П.П."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       66
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       9,
+       22
+      ],
+      [
+       0,
+       24,
+       37
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "PERSON",
+     "precision": "normal",
+     "spans": [
+      [
+       0,
+       53,
+       66
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [
+     "e1"
+    ],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Підписав Іваненко І.І. (Іваненко І.І.) у присутності [A.PERSON_1]"
+     }
+    ],
+    "acknowledged": [
+     [
+      "c1",
+      9,
+      22
+     ],
+     [
+      "c1",
+      24,
+      37
+     ]
+    ]
+   }
+  },
+  {
+   "name": "no_entities_text_unchanged",
+   "description": "Without entities the clause text is the block text.",
+   "label": "A",
+   "blocks": [
+    "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       78
+      ]
+     ]
+    }
+   ],
+   "entities": [],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Seller ACME LLC and John Smith agree. John Smith pays ACME LLC within 30 days."
+     }
+    ],
+    "acknowledged": []
+   }
+  },
+  {
+   "name": "adjacent_masks",
+   "description": "Two masks side by side keep the separator between them.",
+   "label": "A",
+   "blocks": [
+    "Контакти: a@x.example,b@y.example."
+   ],
+   "clauses": [
+    {
+     "id": "c1",
+     "spans": [
+      [
+       0,
+       0,
+       34
+      ]
+     ]
+    }
+   ],
+   "entities": [
+    {
+     "id": "e1",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       0,
+       10,
+       21
+      ]
+     ]
+    },
+    {
+     "id": "e2",
+     "class": "EMAIL",
+     "precision": "high",
+     "spans": [
+      [
+       0,
+       22,
+       33
+      ]
+     ]
+    }
+   ],
+   "requisites": [],
+   "neutralized": [],
+   "unmask": {
+    "entities": [],
+    "occurrences": []
+   },
+   "expected": {
+    "masked": [
+     {
+      "id": "c1",
+      "text": "Контакти: [A.EMAIL_1],[A.EMAIL_2]."
+     }
+    ],
+    "acknowledged": []
+   }
+  }
+ ]
+}
