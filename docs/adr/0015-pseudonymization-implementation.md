@@ -1,6 +1,6 @@
 # ADR 0015 — Pseudonymization: implementation in stage 5b
 
-- Status: proposed (tech lead, 2026-10-28; `security-reviewer` approved the design after round 2; accepted when stage 5b is merged)
+- Status: accepted (2026-10-29, stage 5b merged; proposed by the tech lead on 2026-10-28, `security-reviewer` approved the design after round 2)
 - Date: 2026-10-28
 - Related: ADR 0008 (design — this ADR only fixes the interfaces), ADR 0009 (Layers 1–2), ADR 0013 (no mapping in storage), ADR 0014 (segmentation), threat model T3, T5, T11
 

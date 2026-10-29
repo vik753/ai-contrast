@@ -12,8 +12,8 @@ How to resume after a break: read this file, then continue with the first unchec
 | 3 | Text extraction | done |
 | 4 | Browser hash and cache | done |
 | 5 | Clause splitting | done |
-| 5b | Pseudonymization | next |
-| 6 | Model connection | planned |
+| 5b | Pseudonymization | done |
+| 6 | Model connection | next |
 | 7 | Topic catalog | planned |
 | 8 | Clause tagging | planned |
 | 9 | Analysis | planned |
@@ -95,3 +95,8 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-28 — Customer now confirms merges in chat ("ask" permission mode). The tech lead merges after two approvals and green CI.
 - Lesson: a 5-hour usage limit stopped agents mid-task. Resuming the same agents kept their work.
 - 2026-10-28 — Stage 5 done. ADR 0014 accepted; threat model T5, T6, T11 updated; finished stage 5 moved to `docs/agent/TASKS-archive.md`; README and `CLAUDE.md` Commands updated.
+- 2026-10-28 — PR #57 merged: stage 5b plan, ADR 0015.
+- 2026-10-28 — PR #58 (S5b-T0 corpus, S5b-T1 detector), #59 (flaky form tests), #60 (S5b-T2 safety check and type gate), #61 (S5b-T3 browser preview and masking), #62 (contained non-high hits count as acknowledged; bisect lookup) merged.
+- 2026-10-29 — PR #63 (address stops before codes), #64 (canary harness, shared masking vectors, held-out corpus), #65 (detector round 2), #66 (eval gates and baseline), #67 (detector round 3: unit words, addresses) merged.
+- Lesson: the held-out split found overfitting (round 2 held-out recall en 0.76). Round 3 used category briefs without values, and near-copies were removed from the held-out split.
+- 2026-10-29 — Stage 5b done: detector in `/api/segment`, mandatory browser preview, `/api/safety-check` with the type gate (`app/pseudo/gate.py`, AST policy test), canary harness (`backend/tests/canary/`) and detector eval. Held-out numbers: recall en 64/66, ru 64/64, uk 57/57; precision 1.000 per language; 0 `must_not_mask` violations; one gate xfail (en PERSON normal 0.929). ADR 0015 accepted; threat model T5, T6, T11 updated; finished stage 5b moved to `docs/agent/TASKS-archive.md`; README updated. `CLAUDE.md` Commands now show detection and `/api/safety-check`. The per-IP limit is still a stage 13 blocker. Next: stage 6 (model connection).

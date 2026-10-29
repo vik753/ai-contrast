@@ -32,6 +32,10 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 
 Data and history: results are saved only in this browser, and only if you turn it on (off by default). Saved results are kept for 90 days. The "Delete all data" button removes them at once.
 
+## Names are replaced before any AI call
+
+Names and other identifiers (companies, people, codes, accounts, addresses, contacts) are replaced by placeholders such as `[A.ORG_1]` before any AI call. You check every replacement in the preview and confirm it. The mapping between placeholders and real values stays in your browser. The result is pseudonymized, not anonymous: check the preview carefully.
+
 ## Tech
 
 React + TypeScript frontend, Python + FastAPI stateless backend, official Anthropic and OpenAI SDKs.
