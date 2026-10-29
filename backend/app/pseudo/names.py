@@ -26,9 +26,12 @@ from app.pseudo.lexicon import (
     ORG_NOUNS,
     PERSON_TRIGGERS,
     SOLE_TRADER,
+    SOLE_TRADER_LEADS,
+    SOLE_TRADER_NOUNS,
     is_not_name,
     is_obligation,
     is_patronymic,
+    is_person_role,
     is_role,
     is_title,
     stem_key,
@@ -43,6 +46,9 @@ _MAX_QUOTE: Final = 80
 _MAX_NAME_WORDS: Final = 4
 _MAX_SIGNATURE_NAME: Final = 60
 _MAX_RUN_WORDS: Final = 3
+_ROLE_GAP: Final = frozenset(" \t:—–-,")
+_ROLE_PUNCTUATION: Final = frozenset(":—–-,")
+_MIN_ROLE_SURNAME: Final = 4
 
 
 def words_of(text: str, start: int, end: int) -> tuple[array[int], array[int]]:
@@ -172,6 +178,11 @@ class Names:
         index = 0
         while index < count:
             word = u[ws[index] : we[index]]
+            if self._long_sole_trader(ws, we, index, word):
+                done = self._sole_trader(ls, le, ws, we, index + 1, org_first=index)
+                if done:
+                    index = max(index + 1, done)
+                    continue
             if word[0].isupper() and not self.is_covered(ws[index], we[index]):
                 advance = self._word_rules(ls, le, ws, we, index, word)
                 index = max(index + 1, advance)
@@ -200,7 +211,9 @@ class Names:
                 done = self._patronymic(ls, ws, we, index)
                 if done:
                     return done
-            if self._trigger_before(ws, we, index) and self.name_word(word):
+            if (
+                self._trigger_before(ws, we, index) or self._role_before(ws, we, index)
+            ) and self.name_word(word):
                 return self._after_trigger(le, ws, we, index)
             if self.name_word(word):
                 return self._initials_name(ls, le, ws, we, index)
@@ -335,6 +348,54 @@ class Names:
             steps += 1
         return False
 
+    def _long_sole_trader(self, ws: array[int], we: array[int], index: int, word: str) -> bool:
+        """``индивидуальный предприниматель`` / ``індивідуальний підприємець`` at ``index``."""
+        if index + 1 >= len(ws) or self.is_covered(ws[index], we[index]):
+            return False
+        if not self.folded(word).startswith(SOLE_TRADER_LEADS):
+            return False
+        following = self.folded(self.u[ws[index + 1] : we[index + 1]])
+        return following.startswith(SOLE_TRADER_NOUNS) and self.adjacent(we[index], ws[index + 1])
+
+    def _role_before(self, ws: array[int], we: array[int], index: int) -> bool:  # noqa: PLR0911
+        """A role of a person, then a colon, a dash or a comma, then this word: a name.
+
+        Not for organisations (legal forms, organisation nouns) and not for a lone short
+        word or a lone word in capitals.
+        """
+        u = self.u
+        if index < 1:
+            return False
+        gap = u[we[index - 1] : ws[index]]
+        if (
+            not gap
+            or not set(gap) <= _ROLE_GAP
+            or not set(gap) & _ROLE_PUNCTUATION
+            or not is_person_role(self.folded(u[ws[index - 1] : we[index - 1]]))
+        ):
+            return False
+        skeleton = self.s[ws[index] : we[index]]
+        if skeleton in LEGAL_PREFIX or skeleton in LEGAL_SUFFIX or skeleton in SOLE_TRADER:
+            return False
+        if self.folded(u[ws[index] : we[index]]) in ORG_NOUNS:
+            return False
+        names = 1
+        cursor = index
+        while (
+            cursor + 1 < len(ws)
+            and names <= _MAX_NAME_WORDS
+            and self.adjacent(we[cursor], ws[cursor + 1])
+            and self.name_word(u[ws[cursor + 1] : we[cursor + 1]])
+        ):
+            cursor += 1
+            names += 1
+            if self.s[ws[cursor] : we[cursor]] in LEGAL_SUFFIX | LEGAL_PREFIX:
+                return False
+        if names > 1:
+            return True
+        word = u[ws[index] : we[index]]
+        return len(word) >= _MIN_ROLE_SURNAME and not word.isupper()
+
     def _after_trigger(self, le: int, ws: array[int], we: array[int], index: int) -> int:
         run = self._run(ws, we, index, _MAX_NAME_WORDS)
         if not run:
@@ -456,7 +517,15 @@ class Names:
         self.add_org(ws[run[0]], end, names, NORMAL)
         return index + 1
 
-    def _sole_trader(self, ls: int, le: int, ws: array[int], we: array[int], index: int) -> int:
+    def _sole_trader(  # noqa: PLR0913, PLR0917
+        self,
+        ls: int,
+        le: int,
+        ws: array[int],
+        we: array[int],
+        index: int,
+        org_first: int | None = None,
+    ) -> int:
         if index + 1 >= len(ws) or not self.adjacent(we[index], ws[index + 1]):
             return 0
         run = self._run(ws, we, index + 1, _MAX_RUN_WORDS)
@@ -472,7 +541,8 @@ class Names:
         canon = self.add_person(person_start, end, surname, first)
         for other in extra:
             self.surnames.setdefault(self.stem(other), canon)
-        self.hits.add(ORG, NORMAL, ws[index], end, "fop:" + canon)
+        org_start = ws[index if org_first is None else org_first]
+        self.hits.add(ORG, NORMAL, org_start, end, "fop:" + canon)
         return run[-1] + 1
 
     def _quoted(self, ls: int, le: int, ws: array[int], we: array[int]) -> None:

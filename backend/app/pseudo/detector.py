@@ -99,6 +99,23 @@ class _ClauseIndex:
             return self.ids[block][index]
         return None
 
+    def split(self, block: int, start: int, end: int) -> list[tuple[int, int, int]]:
+        """``(block, start, end)`` cut at the borders of the clause spans it crosses.
+
+        A line break inside a block can start a new clause ("\\n12. ..."); a mask must not
+        cross that border, or the review cannot place it. Text outside every clause span
+        (a break between two clauses) is dropped; a piece outside all of them is kept.
+        """
+        starts, ends = self.starts[block], self.ends[block]
+        found: list[tuple[int, int, int]] = []
+        i = max(0, bisect_right(starts, start) - 1)
+        while i < len(starts) and starts[i] < end:
+            lo, hi = max(start, starts[i]), min(end, ends[i])
+            if lo < hi and (not found or found[-1][2] <= lo):
+                found.append((block, lo, hi))
+            i += 1
+        return found or [(block, start, end)]
+
 
 def detect(texts: Sequence[str], clauses: Sequence[Clause]) -> Detection:
     index = _ClauseIndex(clauses, len(texts))
@@ -113,7 +130,7 @@ def detect(texts: Sequence[str], clauses: Sequence[Clause]) -> Detection:
     names.pass_one()
     names.pass_two()
     accepted = _resolve(view, hits.items)
-    entities = _group(view, accepted)
+    entities = _group(view, accepted, index)
     result.entities = entities
     _warn_amounts(view, accepted, index, result)
     _decide_requisites(view, clauses, entities, index, result)
@@ -285,7 +302,7 @@ def _address_pieces(view: View, hit: Hit, gs: int, ge: int, layer: bytearray) ->
 # ----------------------------------------------------------------------- group
 
 
-def _group(view: View, accepted: list[_Accepted]) -> list[DetectedEntity]:
+def _group(view: View, accepted: list[_Accepted], index: _ClauseIndex) -> list[DetectedEntity]:
     groups: dict[tuple[str, str], list[_Accepted]] = {}
     spans_total = 0
     for item in accepted:
@@ -298,7 +315,8 @@ def _group(view: View, accepted: list[_Accepted]) -> list[DetectedEntity]:
         items.sort(key=lambda i: (i.gs, i.ge))
         spans: list[tuple[int, int, int]] = []
         for item in items:
-            spans.extend(view.g_pieces(item.gs, item.ge))
+            for block, start, end in view.g_pieces(item.gs, item.ge):
+                spans.extend(index.split(block, start, end))
         spans_total += len(spans)
         if spans_total > MAX_SPANS:
             raise TooManyIdentifiersError

@@ -17,7 +17,7 @@ from app.pseudo import tables
 from app.pseudo.confusable_table import UNICODE_VERSION
 from app.pseudo.matching import LATIN_TO_CYRILLIC, SKELETON, fold
 
-RULES_VERSION: Final = "5"
+RULES_VERSION: Final = "6"
 
 
 def _runs(text: str) -> tuple[str, ...]:
@@ -69,6 +69,11 @@ SOLE_TRADER: Final = frozenset(skeleton(form) for form in tables.SOLE_TRADER_FOR
 ORG_NOUNS: Final = frozenset(fold(word) for word in tables.ORG_NOUNS)
 ROLE_STEMS: Final = tuple(sorted({fold(word) for word in tables.ROLE_WORDS}, key=len))
 NOT_NAMES: Final = frozenset(fold(word) for word in tables.NOT_NAMES)
+PERSON_ROLE_STEMS: Final = tuple(sorted({fold(word) for word in tables.PERSON_ROLE_WORDS}, key=len))
+STREET_SUFFIXES: Final = frozenset(fold(word) for word in tables.STREET_SUFFIXES)
+MONTHS: Final = frozenset(fold(word) for word in tables.MONTHS)
+SOLE_TRADER_LEADS: Final = tuple(fold(word) for word in tables.SOLE_TRADER_LEADS)
+SOLE_TRADER_NOUNS: Final = tuple(fold(word) for word in tables.SOLE_TRADER_NOUNS)
 TITLE_STEMS: Final = tuple(sorted({fold(word) for word in tables.TITLE_WORDS}, key=len))
 DOCUMENT_STEMS: Final = frozenset(fold(word) for word in tables.DOCUMENT_WORDS)
 PERSON_TRIGGERS: Final = frozenset(_keyword(t) for t in tables.PERSON_TRIGGERS)
@@ -110,6 +115,16 @@ def is_role(word: str) -> bool:
     return any(
         word.startswith(stem) and len(word) - len(stem) <= _MAX_SUFFIX
         for stem in ROLE_STEMS
+        if stem[0] == word[:1]
+    )
+
+
+@lru_cache(maxsize=_CACHE)
+def is_person_role(word: str) -> bool:
+    """``word`` (folded) is a role of a natural person, also in a case form."""
+    return any(
+        word.startswith(stem) and len(word) - len(stem) <= _MAX_SUFFIX
+        for stem in PERSON_ROLE_STEMS
         if stem[0] == word[:1]
     )
 

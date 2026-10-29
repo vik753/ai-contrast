@@ -153,6 +153,9 @@ CONTEXT: Final[dict[str, tuple[str | tuple[str, ...], ...]]] = {
         "родился",
         "родилась",
         "born",
+        "dob",
+        ("birth", "date"),
+        "birthdate",
     ),
     "regcert": (
         "птс",
@@ -174,7 +177,18 @@ CONTEXT: Final[dict[str, tuple[str | tuple[str, ...], ...]]] = {
         "местонахождение",
         "прописки",
     ),
-    "health": ("діагноз", "диагноз", "diagnosis"),
+    "health": (
+        "діагноз",
+        "диагноз",
+        "diagnosis",
+        ("diagnosed", "with"),
+        ("suffers", "from"),
+        ("suffering", "from"),
+        ("suffered", "from"),
+    ),
+    # "medical condition" only counts with a colon, a dash or "of" after it.
+    "condition": (("medical", "condition"), ("health", "condition")),
+    "plate": ("plate", "plates", "registration", ("reg", "no"), "reg"),
     "serial": (
         ("серійний", "номер", "сертифіката"),
         ("серийный", "номер", "сертификата"),
@@ -216,8 +230,21 @@ ROLE_WORDS: Final = (
     "представник", "представитель", "representative", "підписант", "signatory",
     "страхов", "застрахован", "insurance",
 )  # fmt: skip
+# Roles that name a natural person; a capitalised word after one of them, a colon, a dash or a
+# comma is a name ("Страхувальник — Коваль", "The insured, Jane Rose"). Prefix match like
+# ROLE_WORDS.
+PERSON_ROLE_WORDS: Final = (
+    "страхувальник", "вигодонабувач", "застрахован", "замовник", "виконавець", "покупець",
+    "продавець", "орендар", "наймач", "позичальник", "клієнт", "особа", "страхователь",
+    "выгодоприобретател", "заказчик", "исполнител", "покупател", "арендатор", "наниматель",
+    "заемщик", "клиент", "лицо", "insured", "policyholder", "beneficiary", "customer", "buyer",
+    "seller", "tenant", "lessee", "borrower", "employee", "patient", "applicant", "claimant",
+    "cardholder", "passenger", "driver", "client", "consultant", "contractor", "owner",
+)  # fmt: skip
 # Words that start a sentence or a list item and are not names (exact, folded).
 NOT_NAMES: Final = (
+    "yes", "none", "other", "others", "same", "above", "below", "tbd", "applicable",
+    "included", "excluded", "unknown", "optional", "required", "mandatory",
     "шановна", "шановний", "шановні", "вельмишановний", "вельмишановна", "dear",
     "уважаемый", "уважаемая", "уважаемые", "громадянин", "громадянка", "гражданин",
     "гражданка", "пан", "пані", "mr", "mrs", "ms", "dr", "статут", "статуту", "устав",
@@ -306,6 +333,21 @@ ADDRESS_ABBREVIATIONS: Final = (
     "с", "смт", "обл", "р", "ст", "st", "ave", "rd", "blvd", "no", "apt", "fl", "bldg", "пер",
     "наб", "ш", "к", "корп", "літ", "під", "пом", "тел", "ід", "стр", "помещ", "комн", "п",
 )  # fmt: skip
+# English street suffixes (folded): "221 Larkspur Lane", "10 Downing Street".
+STREET_SUFFIXES: Final = (
+    "street", "st", "road", "rd", "avenue", "ave", "lane", "ln", "drive", "dr", "boulevard",
+    "blvd", "court", "ct", "way", "place", "pl", "square", "sq", "close", "crescent", "terrace",
+    "gardens", "row", "hill", "mews", "walk", "highway", "hwy", "parkway", "pkwy", "circle",
+    "grove", "alley", "path", "park",
+)  # fmt: skip
+MONTHS: Final = (
+    "january", "february", "march", "april", "may", "june", "july", "august", "september",
+    "october", "november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep",
+    "sept", "oct", "nov", "dec",
+)  # fmt: skip
+# "індивідуальний підприємець" / "индивидуальный предприниматель" (sole trader, long form).
+SOLE_TRADER_LEADS: Final = ("індивідуальн", "индивидуальн")
+SOLE_TRADER_NOUNS: Final = ("підприємец", "підприємц", "предпринимател")
 # First word after an address keyword that starts an address when there is no colon.
 ADDRESS_STARTS: Final = ("м", "г", "вул", "ул", "пр", "просп", "бул", "пров", "смт", "с")
 
@@ -319,6 +361,15 @@ PATRONYMIC_ENDINGS: Final = (
     "овной", "евной", "івно", "ївно", "овно", "евно", "ичны", "ичне", "ичну", "ичной",
     "ovych", "ovich", "evych", "evich", "yovych", "ivna", "ovna", "evna", "yivna", "ievna",
     "ovych", "ovycha", "ovychu", "ivny", "ivni", "ivnu", "ivnoyu", "ivno",
+    # Male patronymics of a-stems (Ильич, Кузьмич, Фомич, Лукич, Никитич) in all case forms.
+    *(
+        stem + case
+        for stem in (
+            "ьмич", "ильич", "ілліч", "фомич", "хомич", "лукич", "никитич", "микитич",
+            "kuzmich", "ilyich", "fomich", "lukich", "nikitich",
+        )
+        for case in ("", "а", "у", "ем", "е", "a", "u", "em", "e")
+    ),
 )  # fmt: skip
 # Endings of case forms in Latin transliteration, longest first is applied by the code.
 STEM_ENDINGS: Final = (

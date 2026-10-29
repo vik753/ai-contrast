@@ -37,6 +37,8 @@ from app.pseudo.lexicon import (
     AMOUNT_WORDS,
     CONTEXT_KINDS,
     DEFINITION_OPENERS,
+    MONTHS,
+    STREET_SUFFIXES,
     STRONG_AMOUNT_WORDS,
     is_document_word,
     is_obligation,
@@ -54,6 +56,28 @@ _MAX_TAIL: Final = 80
 _TAX_LENGTHS: Final = frozenset({8, 10, 12, 13, 15})
 _MAX_TAX: Final = 15
 _MAX_GROUPS: Final = 8
+_MAX_ROLE_SKIP: Final = 3
+_MONTH_RE: Final = "(?:" + "|".join(sorted(MONTHS, key=len, reverse=True)) + ")"
+_DOB_TEXT: Final = re.compile(
+    rf"[0-9]{{1,2}}(?:st|nd|rd|th)? {_MONTH_RE}\.?,? [0-9]{{4}}"
+    rf"|{_MONTH_RE}\.? [0-9]{{1,2}}(?:st|nd|rd|th)?,? [0-9]{{4}}"
+)
+_PLATE_EN: Final = re.compile(
+    r"[a-z]{1,3}[0-9]{1,4}(?: ?[a-z]{1,3})?|[a-z]{1,3} ?[0-9]{1,4}(?: ?[a-z]{1,3})?"
+)
+_FILL_PLATE: Final = frozenset(
+    fold(word) for word in ("no", "number", "plate", "plates", "mark", "reg", "registration", "is")
+)
+_FILL_DOB: Final = frozenset(fold(word) for word in ("on", "is", "of"))
+_UK_POSTCODE: Final = re.compile(r"[a-z]{1,2}[0-9][a-z0-9]? ?[0-9][a-z]{2}(?![a-z0-9])")
+_US_ZIP: Final = re.compile(r"(?:[a-z]{2} )?[0-9]{5}(?:-[0-9]{4})?(?![0-9a-z])")
+_US_STATE_ZIP: Final = re.compile(r"[a-z]{2} [0-9]{5}(?:-[0-9]{4})?(?![0-9a-z])")
+_MAX_STREET_WORDS: Final = 3
+_MAX_STREET_TAIL: Final = 4
+_MIN_PLATE_CHARS: Final = 5
+_MAX_PLATE_CHARS: Final = 8
+_MAX_STREET_NUMBER: Final = 5
+_MAX_OUTWARD: Final = 4
 _IBAN_GAPS: Final = (" ", "-")
 _UA_MOBILE: Final = frozenset(
     (
@@ -205,6 +229,7 @@ class _Line:
         end: int,
     ) -> None:
         self.low = view.low
+        self.u = view.u
         self.hits = hits
         self.in_requisites = in_requisites
         self.same_clause = same_clause
@@ -309,6 +334,10 @@ class _Line:
             return consumed
         if self.joined(index) or self.is_amount(index, index):
             return index + 1
+        if length <= _MAX_STREET_NUMBER:
+            done = self._street(index)
+            if done:
+                return done
         self._code(index, word, length)
         return index + 1
 
@@ -324,7 +353,11 @@ class _Line:
             return self._snils(index)
         if length == 3 and index + 3 < n and self._lens(index, (3, 3, 2, 2)):  # noqa: PLR2004
             return self._domestic_phone(index, word)
-        if length == 2 and index + 2 < n and self._lens(index, (2, 2, 4), "."):  # noqa: PLR2004
+        if length == 4 and index + 2 < n and self._lens(index, (4, 2, 2), "-./"):  # noqa: PLR2004
+            if self.near("dob", index, 8):
+                return self._add_range(PERSONAL_DOC, NORMAL, index, index + 2)
+            return 0
+        if length == 2 and index + 2 < n and self._lens(index, (2, 2, 4), "./-"):  # noqa: PLR2004
             if self.near("dob", index, 8):
                 return self._add_range(PERSONAL_DOC, NORMAL, index, index + 2)
             return index + 3
@@ -432,6 +465,12 @@ class _Line:
     # -------------------------------------------------------------------- words
 
     def _word(self, index: int, word: str) -> None:
+        if (
+            len(word) <= _MAX_OUTWARD
+            and (self.near("address", index, 8) or self.in_requisites(self.st[index]))
+            and self._postcode(index)
+        ):
+            return
         if word == "no" or (word.startswith("no") and word[2:3].isdigit()):
             self._doc_no(index, word)
             return
@@ -572,6 +611,103 @@ class _Line:
             if len(text) == need:
                 return text, end
         return None
+
+    # ------------------------------------------------------------ English address
+
+    def _street(self, index: int) -> int:
+        """``221 Larkspur Lane, Springfield, IL 62704``: number, capitalised words, a street
+        suffix, then optional capitalised town words and a postcode. Returns the next run."""
+        u = self.u
+        if self.gap(index) != " ":
+            return 0
+        end = -1
+        for step in range(1, _MAX_STREET_WORDS + 2):
+            current = index + step
+            if current >= self.n:
+                return 0
+            start, stop = self.st[current], self.en[current]
+            word = self.low[start:stop]
+            if not word.isalpha() or not u[start].isupper():
+                return 0
+            if step >= 2 and word in STREET_SUFFIXES:  # noqa: PLR2004
+                end = stop + 1 if self.low[stop : stop + 1] == "." else stop
+                break
+            if step > _MAX_STREET_WORDS or self.gap(current) != " ":
+                return 0
+        if end < 0:
+            return 0
+        end = self._street_tail(end)
+        key = "".join(c for c in self.low[self.st[index] : end] if c.isalnum())
+        self.hits.add(ADDRESS, NORMAL, self.st[index], end, key)
+        following = bisect_left(self.st, end)
+        self.skip_to = max(self.skip_to, following - 1)
+        return following
+
+    def _street_tail(self, end: int) -> int:
+        """Town and postcode words after the street: ``, Springfield, IL 62704``."""
+        low, u = self.low, self.u
+        for _ in range(_MAX_STREET_TAIL):
+            if low[end : end + 2] != ", ":
+                break
+            begin = end + 2
+            code = self._postcode_at(begin)
+            if code:
+                return code
+            cursor = begin
+            words = 0
+            while words < _MAX_STREET_WORDS and cursor < self.le and u[cursor].isupper():
+                stop = cursor
+                while stop < self.le and low[stop].isalpha():
+                    stop += 1
+                if stop == cursor:
+                    break
+                cursor = stop
+                words += 1
+                if (
+                    low[cursor : cursor + 1] == " "
+                    and cursor + 1 < self.le
+                    and u[cursor + 1].isupper()
+                ):
+                    code = self._postcode_at(cursor + 1)
+                    if code:
+                        return code
+                    cursor += 1
+                elif low[cursor : cursor + 1] == "-" and low[cursor + 1 : cursor + 2].isalpha():
+                    cursor += 1
+                else:
+                    break
+            while cursor > begin and low[cursor - 1] in " -":
+                cursor -= 1
+            if words == 0 or cursor <= begin:
+                break
+            end = cursor
+        return end
+
+    def _postcode_at(self, position: int) -> int:
+        """End of a UK postcode or a US state and ZIP at ``position``, or 0."""
+        low = self.low
+        for pattern in (_UK_POSTCODE, _US_STATE_ZIP, _US_ZIP):
+            matched = pattern.match(low, position, self.le)
+            if matched is not None:
+                return matched.end()
+        return 0
+
+    def _postcode(self, index: int) -> bool:
+        """A postcode after an address keyword or in the requisites."""
+        if not self.low[self.st[index]].isalpha():
+            return False
+        end = 0
+        for pattern in (_UK_POSTCODE, _US_STATE_ZIP):
+            matched = pattern.match(self.low, self.st[index], self.le)
+            if matched is not None:
+                end = matched.end()
+                break
+        if not end:
+            return False
+        key = "".join(c for c in self.low[self.st[index] : end] if c.isalnum())
+        self.hits.add(ADDRESS, NORMAL, self.st[index], end, key)
+        self.skip_to = max(self.skip_to, bisect_left(self.st, end) - 1)
+        return True
 
     # ---------------------------------------------------------- document number
 
@@ -794,12 +930,12 @@ class _Line:
         while word_start > start and low[word_start - 1].isalnum():
             word_start -= 1
         word = low[word_start:index]
-        if word in ABBREVIATIONS or len(word) <= 1:
+        if word and (word in ABBREVIATIONS or len(word) <= 1):
             return False
         after = index + 1
         while after < self.le and low[after] == " ":
             after += 1
-        return after >= self.le or not low[after].islower()
+        return after >= self.le or not self.u[after].islower()
 
     def _health(self, index: int) -> None:
         low = self.low
@@ -822,10 +958,73 @@ class _Line:
         )
         self.skip_to = max(self.skip_to, bisect_left(self.st, end) - 1)
 
+    def _health_condition(self, index: int) -> None:
+        """``medical condition: asthma`` / ``medical condition of asthma``; not the bare words."""
+        position = self.en[index]
+        while position < self.le and self.low[position] == " ":
+            position += 1
+        if position < self.le and self.low[position] in ":—–-":
+            self._health(index)
+        elif index + 1 < self.n and self.text(index + 1) == "of":
+            self._health(index + 1)
+
+    def _plate_label(self, index: int) -> None:
+        """``registration plate KDL 4471`` / ``reg. no. AB12 CDE``."""
+        position = index + 1
+        limit = min(self.n, index + 5)
+        while position < limit and self.text(position) in _FILL_PLATE:
+            position += 1
+        if position >= self.n:
+            return
+        start = self.st[position]
+        matched = _PLATE_EN.match(self.low, start, self.le)
+        if matched is None:
+            return
+        value = matched.group()
+        letters = sum(1 for c in value if c.isalpha())
+        digits = sum(1 for c in value if c.isdigit())
+        count = letters + digits
+        end = matched.end()
+        if (
+            not letters
+            or not digits
+            or not _MIN_PLATE_CHARS <= count <= _MAX_PLATE_CHARS
+            or (end < self.le and self.low[end].isalnum())
+        ):
+            return
+        key = "".join(c for c in value if c.isalnum())
+        self.hits.add(VEHICLE, NORMAL, start, end, key)
+        self.skip_to = max(self.skip_to, bisect_left(self.st, end) - 1)
+
+    def _dob_text(self, index: int) -> None:
+        """``born on 17 April 1982`` / ``date of birth: April 17, 1982``."""
+        position = index + 1
+        limit = min(self.n, index + 3)
+        while position < limit and self.text(position) in _FILL_DOB:
+            position += 1
+        if position >= self.n:
+            return
+        start = self.st[position]
+        matched = _DOB_TEXT.match(self.low, start, self.le)
+        if matched is None:
+            return
+        key = "".join(c for c in matched.group() if c.isalnum())
+        self.hits.add(PERSONAL_DOC, NORMAL, start, matched.end(), key)
+        self.skip_to = max(self.skip_to, bisect_left(self.st, matched.end()) - 1)
+
     def _tax_groups(self, index: int) -> None:
         """A tax code in digit groups after its keyword: ``34 12 34 56``, ``31234-56789``."""
         first = index + 1
-        while first < self.n and self.text(first) in _FILL_NUMBER:
+        skipped = 0
+        while first < self.n and (
+            self.text(first) in _FILL_NUMBER
+            or (
+                skipped < _MAX_ROLE_SKIP
+                and self.text(first).isalpha()
+                and is_role(self.text(first))
+            )
+        ):
+            skipped += 0 if self.text(first) in _FILL_NUMBER else 1
             first += 1
         if first + 1 >= self.n or not self.text(first).isdigit():
             return
@@ -886,4 +1085,7 @@ _LABELS: Final[dict[str, Callable[[_Line, int], None]]] = {
     "health": _Line._health,
     "serial": _Line._serial,
     "tax": _Line._tax_groups,
+    "condition": _Line._health_condition,
+    "plate": _Line._plate_label,
+    "dob": _Line._dob_text,
 }
