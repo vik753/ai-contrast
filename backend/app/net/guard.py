@@ -1,12 +1,12 @@
-"""SSRF guard as an ``httpcore`` network backend (ADR 0012 point 3, threat model T2).
+"""SSRF guard as an ``httpcore2`` network backend (ADR 0012 point 3, threat model T2).
 
 Rules for ``GuardedNetworkBackend.connect_tcp``: port 443 only; a DNS hostname only (no
 IP literal in any notation, no single-label name); the name is resolved once, inside the
 connect timeout; the whole result is refused if any address is not public; the checked IP
-is what is connected to (TLS and SNI use the original host, set by ``httpcore``).
+is what is connected to (TLS and SNI use the original host, set by ``httpcore2``).
 
 Errors carry fixed texts. They never contain the host, the port or an address. A resolver
-``OSError`` (``socket.gaierror`` included) becomes ``httpcore.ConnectError``.
+``OSError`` (``socket.gaierror`` included) becomes ``httpcore2.ConnectError``.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import socket
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from typing import Final
 
-import httpcore
+import httpcore2
 
 HTTPS_PORT: Final = 443
 _MAX_HOST_LENGTH: Final = 253
@@ -103,15 +103,15 @@ async def system_resolver(host: str, port: int) -> list[str]:
     return list(seen)
 
 
-class GuardedNetworkBackend(httpcore.AsyncNetworkBackend):
+class GuardedNetworkBackend(httpcore2.AsyncNetworkBackend):
     def __init__(
         self,
         *,
         resolver: Resolver | None = None,
-        inner: httpcore.AsyncNetworkBackend | None = None,
+        inner: httpcore2.AsyncNetworkBackend | None = None,
     ) -> None:
         self._resolver: Resolver = resolver or system_resolver
-        self._inner: httpcore.AsyncNetworkBackend = inner or httpcore.AnyIOBackend()
+        self._inner: httpcore2.AsyncNetworkBackend = inner or httpcore2.AnyIOBackend()
 
     async def connect_tcp(
         self,
@@ -119,8 +119,8 @@ class GuardedNetworkBackend(httpcore.AsyncNetworkBackend):
         port: int,
         timeout: float | None = None,
         local_address: str | None = None,
-        socket_options: Iterable[httpcore.SOCKET_OPTION] | None = None,
-    ) -> httpcore.AsyncNetworkStream:
+        socket_options: Iterable[httpcore2.SOCKET_OPTION] | None = None,
+    ) -> httpcore2.AsyncNetworkStream:
         if port != HTTPS_PORT:
             raise BlockedHostError("port is not allowed")  # noqa: TRY003
         name = check_hostname(host)
@@ -130,10 +130,10 @@ class GuardedNetworkBackend(httpcore.AsyncNetworkBackend):
             async with asyncio.timeout_at(deadline):
                 resolved = await self._resolver(name, port)
         except TimeoutError:
-            raise httpcore.ConnectTimeout("connect timeout") from None  # noqa: TRY003
+            raise httpcore2.ConnectTimeout("connect timeout") from None  # noqa: TRY003
         except OSError:
             # ``socket.gaierror`` is an ``OSError``; its text holds the host name.
-            raise httpcore.ConnectError("name resolution failed") from None  # noqa: TRY003
+            raise httpcore2.ConnectError("name resolution failed") from None  # noqa: TRY003
         addresses = check_addresses(list(resolved))
 
         timed_out = False
@@ -150,20 +150,20 @@ class GuardedNetworkBackend(httpcore.AsyncNetworkBackend):
                     local_address=local_address,
                     socket_options=socket_options,
                 )
-            except httpcore.ConnectTimeout:
+            except httpcore2.ConnectTimeout:
                 timed_out = True
-            except httpcore.ConnectError:
+            except httpcore2.ConnectError:
                 timed_out = False
         if timed_out:
-            raise httpcore.ConnectTimeout("connect timeout")  # noqa: TRY003
-        raise httpcore.ConnectError("connect failed")  # noqa: TRY003
+            raise httpcore2.ConnectTimeout("connect timeout")  # noqa: TRY003
+        raise httpcore2.ConnectError("connect failed")  # noqa: TRY003
 
     async def connect_unix_socket(
         self,
         path: str,
         timeout: float | None = None,
-        socket_options: Iterable[httpcore.SOCKET_OPTION] | None = None,
-    ) -> httpcore.AsyncNetworkStream:
+        socket_options: Iterable[httpcore2.SOCKET_OPTION] | None = None,
+    ) -> httpcore2.AsyncNetworkStream:
         raise BlockedHostError("unix sockets are not allowed")  # noqa: TRY003
 
     async def sleep(self, seconds: float) -> None:

@@ -1,7 +1,7 @@
 """S3-T6a item 6: ``POST /api/extract/google-doc`` (app/api/google_doc.py).
 
 Override mechanism chosen for the client factory (the developer follows it): the endpoint
-reads ``request.app.state.google_client_factory``, a ``Callable[[], httpx.AsyncClient]``.
+reads ``request.app.state.google_client_factory``, a ``Callable[[], httpx2.AsyncClient]``.
 ``create_app`` sets the production factory
 (``outbound_client(connect_timeout=settings.google_connect_timeout_seconds,
 read_timeout=10)``); these tests replace the attribute after ``create_app``.
@@ -17,6 +17,7 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
+import httpx2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -31,24 +32,24 @@ DOCX_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.docume
 DOCX = body_docx(para(CLAUSE))
 JSON_HEADERS = {"Content-Type": "application/json"}
 
-Handler = Callable[[httpx.Request], Any]
+Handler = Callable[[httpx2.Request], Any]
 
 
 class Setup:
     def __init__(self, app: FastAPI, client: TestClient) -> None:
         self.app = app
         self.client = client
-        self.requests: list[httpx.Request] = []
+        self.requests: list[httpx2.Request] = []
         self.factory_calls = 0
 
     def use(self, handler: Handler) -> None:
-        def handle(request: httpx.Request) -> Any:
+        def handle(request: httpx2.Request) -> Any:
             self.requests.append(request)
             return handler(request)
 
-        def factory() -> httpx.AsyncClient:
+        def factory() -> httpx2.AsyncClient:
             self.factory_calls += 1
-            return httpx.AsyncClient(transport=StreamingTransport(handle))
+            return httpx2.AsyncClient(transport=StreamingTransport(handle))
 
         self.app.state.google_client_factory = factory
 
@@ -63,14 +64,14 @@ def setup(make_app: Callable[..., FastAPI]) -> Callable[..., Setup]:
     def build(**settings: Any) -> Setup:
         app = make_app(**settings)
         s = Setup(app, TestClient(app, raise_server_exceptions=False))
-        s.use(lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=DOCX))
+        s.use(lambda r: httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=DOCX))
         return s
 
     return build
 
 
 def ok_docx(data: bytes) -> Handler:
-    return lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=data)
+    return lambda r: httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=data)
 
 
 # --- success ----------------------------------------------------------------------------
@@ -300,12 +301,12 @@ def test_google_doc_slot_is_held_during_the_fetch_and_freed_after(
     s = setup(max_concurrent_extractions=1)
     free_during_fetch: list[bool] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx.Response:
         got = s.app.state.extraction_limiter.try_acquire()
         free_during_fetch.append(got)
         if got:
             s.app.state.extraction_limiter.release()
-        return httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=DOCX)
+        return httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=DOCX)
 
     s.use(handler)
 
@@ -321,7 +322,7 @@ def test_google_doc_slot_is_freed_after_a_fetch_error(
     setup: Callable[..., Setup], status: int
 ) -> None:
     s = setup(max_concurrent_extractions=1)
-    s.use(lambda r: httpx.Response(status))
+    s.use(lambda r: httpx2.Response(status))
 
     s.post({"document_id": DOC_ID})
 
@@ -334,23 +335,23 @@ def test_google_doc_slot_is_freed_after_a_fetch_error(
 @pytest.mark.parametrize(
     ("handler", "status", "code"),
     [
-        (lambda r: httpx.Response(403), 422, "google_doc_not_public"),
-        (lambda r: httpx.Response(401), 422, "google_doc_not_public"),
+        (lambda r: httpx2.Response(403), 422, "google_doc_not_public"),
+        (lambda r: httpx2.Response(401), 422, "google_doc_not_public"),
         (
-            lambda r: httpx.Response(302, headers={"Location": "https://accounts.google.com/x"}),
+            lambda r: httpx2.Response(302, headers={"Location": "https://accounts.google.com/x"}),
             422,
             "google_doc_not_public",
         ),
         (
-            lambda r: httpx.Response(200, headers={"Content-Type": "text/html"}, content=b"<p>"),
+            lambda r: httpx2.Response(200, headers={"Content-Type": "text/html"}, content=b"<p>"),
             422,
             "google_doc_not_public",
         ),
-        (lambda r: httpx.Response(404), 422, "google_doc_not_found"),
-        (lambda r: httpx.Response(500), 502, "google_doc_unavailable"),
-        (lambda r: httpx.Response(429), 502, "google_doc_unavailable"),
+        (lambda r: httpx2.Response(404), 422, "google_doc_not_found"),
+        (lambda r: httpx2.Response(500), 502, "google_doc_unavailable"),
+        (lambda r: httpx2.Response(429), 502, "google_doc_unavailable"),
         (
-            lambda r: httpx.Response(302, headers={"Location": "https://evil.example/"}),
+            lambda r: httpx2.Response(302, headers={"Location": "https://evil.example/"}),
             502,
             "google_doc_unavailable",
         ),
@@ -389,9 +390,9 @@ def test_google_doc_timeout_504(setup: Callable[..., Setup]) -> None:
 
     s = setup(google_fetch_timeout_seconds=1)
 
-    async def slow(request: httpx.Request) -> httpx.Response:
+    async def slow(request: httpx2.Request) -> httpx.Response:
         await asyncio.sleep(10)
-        return httpx.Response(200)
+        return httpx2.Response(200)
 
     s.use(slow)
 

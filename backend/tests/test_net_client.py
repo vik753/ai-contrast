@@ -5,7 +5,7 @@ in ``app/net/client.py``; ``None`` builds a default ``GuardedNetworkBackend()``.
 Must fail before the implementation exists (module ``app.net.client`` is missing).
 
 The "production factory uses the guard" test is implementation-agnostic: it replaces the
-event loop DNS lookup and the real ``httpcore`` backends, so a default client resolves a
+event loop DNS lookup and the real ``httpcore2`` backends, so a default client resolves a
 host to ``127.0.0.1`` and must fail with ``BlockedAddressError`` before any socket opens.
 """
 
@@ -16,8 +16,8 @@ import inspect
 import socket
 from typing import Any
 
-import httpcore
-import httpx
+import httpcore2
+import httpx2
 import pytest
 
 from app.net.client import outbound_client
@@ -25,7 +25,7 @@ from app.net.guard import BlockedAddressError, GuardedNetworkBackend
 from tests.netfakes import PUBLIC_V4, ResolverSpy, SpyInner
 
 
-def _client(inner: SpyInner | None = None, **kwargs: Any) -> httpx.AsyncClient:
+def _client(inner: SpyInner | None = None, **kwargs: Any) -> httpx2.AsyncClient:
     backend = GuardedNetworkBackend(resolver=ResolverSpy([PUBLIC_V4]), inner=inner or SpyInner())
     return outbound_client(connect_timeout=5, read_timeout=10, network_backend=backend, **kwargs)
 
@@ -46,7 +46,7 @@ def test_outbound_client_forbidden_parameter_rejected(forbidden: str) -> None:
 def test_outbound_client_settings_are_locked_down() -> None:
     client = _client()
 
-    assert isinstance(client, httpx.AsyncClient)
+    assert isinstance(client, httpx2.AsyncClient)
     assert client.trust_env is False
     assert client.follow_redirects is False
     assert client.timeout.connect == 5
@@ -148,9 +148,9 @@ def test_outbound_client_production_default_uses_the_guard(
 
     monkeypatch.setattr(asyncio.BaseEventLoop, "getaddrinfo", fake_loop_getaddrinfo)
     monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
-    monkeypatch.setattr(httpcore.AnyIOBackend, "connect_tcp", refuse_connect)
-    monkeypatch.setattr(httpcore.AnyIOBackend, "connect_unix_socket", refuse_connect)
-    from httpcore._backends.auto import AutoBackend  # noqa: PLC0415 - private, patched on purpose
+    monkeypatch.setattr(httpcore2.AnyIOBackend, "connect_tcp", refuse_connect)
+    monkeypatch.setattr(httpcore2.AnyIOBackend, "connect_unix_socket", refuse_connect)
+    from httpcore2._backends.auto import AutoBackend  # noqa: PLC0415 - private, patched on purpose
 
     monkeypatch.setattr(AutoBackend, "connect_tcp", refuse_connect)
 

@@ -12,8 +12,8 @@ import typing
 from collections.abc import Callable
 from typing import Any
 
-import httpcore
-import httpx
+import httpcore2
+import httpx2
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
@@ -35,7 +35,7 @@ def _request(app: FastAPI) -> Request:
     return Request({"type": "http", "app": app, "headers": []})
 
 
-def _client(inner: SpyInner) -> httpx.AsyncClient:
+def _client(inner: SpyInner) -> httpx2.AsyncClient:
     backend = GuardedNetworkBackend(resolver=ResolverSpy([PUBLIC_V4]), inner=inner)
     return outbound_client(connect_timeout=5, read_timeout=10, network_backend=backend)
 
@@ -88,18 +88,18 @@ def test_fetch_google_doc_client_factory_is_annotated_with_the_alias() -> None:
     hints = typing.get_type_hints(fetch_google_doc)
 
     assert hints["client_factory"] == ClientFactory
-    assert typing.get_args(ClientFactory) == ([], httpx.AsyncClient)
+    assert typing.get_args(ClientFactory) == ([], httpx2.AsyncClient)
 
 
 def test_the_alias_matches_what_outbound_client_returns() -> None:
-    def factory() -> httpx.AsyncClient:
+    def factory() -> httpx2.AsyncClient:
         return _client(SpyInner())
 
     typed: ClientFactory = factory
 
     async def go() -> None:
         async with typed() as client:
-            assert isinstance(client, httpx.AsyncClient)
+            assert isinstance(client, httpx2.AsyncClient)
 
     asyncio.run(go())
 
@@ -109,8 +109,8 @@ def test_google_client_factory_returns_the_factory_of_the_app(
 ) -> None:
     app = make_app()
 
-    def factory() -> httpx.AsyncClient:
-        return httpx.AsyncClient()
+    def factory() -> httpx2.AsyncClient:
+        return httpx2.AsyncClient()
 
     app.state.google_client_factory = factory
 
@@ -140,7 +140,7 @@ def test_the_default_factory_of_the_app_is_valid(make_app: Callable[..., FastAPI
 
     async def go() -> None:
         async with factory() as client:
-            assert isinstance(client, httpx.AsyncClient)
+            assert isinstance(client, httpx2.AsyncClient)
 
     asyncio.run(go())
 
@@ -193,12 +193,12 @@ def test_ssl_context_ignores_sslkeylogfile(
     assert ssl.create_default_context().keylog_filename == str(keylog)
     contexts: list[ssl.SSLContext] = []
 
-    class Recording(httpcore.AsyncConnectionPool):
+    class Recording(httpcore2.AsyncConnectionPool):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             contexts.append(kwargs["ssl_context"])
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(httpcore, "AsyncConnectionPool", Recording)
+    monkeypatch.setattr(httpcore2, "AsyncConnectionPool", Recording)
 
     _client(SpyInner())
 
@@ -206,11 +206,11 @@ def test_ssl_context_ignores_sslkeylogfile(
     assert contexts[0].keylog_filename is None
 
 
-# --- 8. every httpx timeout is google_doc_timeout -------------------------------------------
+# --- 8. every httpx2 timeout is google_doc_timeout -------------------------------------------
 
 
 def _fetch_raising(error: Exception) -> str:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         raise error
 
     async def go() -> str:
@@ -219,7 +219,7 @@ def _fetch_raising(error: Exception) -> str:
                 DOC_ID,
                 max_bytes=1000,
                 timeout_seconds=5,
-                client_factory=lambda: httpx.AsyncClient(transport=StreamingTransport(handler)),
+                client_factory=lambda: httpx2.AsyncClient(transport=StreamingTransport(handler)),
             )
         except GoogleDocError as exc:
             return exc.code
@@ -230,14 +230,16 @@ def _fetch_raising(error: Exception) -> str:
 
 @pytest.mark.parametrize(
     "error",
-    [httpx.ConnectTimeout, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout],
+    [httpx2.ConnectTimeout, httpx2.ReadTimeout, httpx2.WriteTimeout, httpx2.PoolTimeout],
 )
-def test_every_httpx_timeout_is_google_doc_timeout(error: type[httpx.TimeoutException]) -> None:
+def test_every_httpx_timeout_is_google_doc_timeout(error: type[httpx2.TimeoutException]) -> None:
     assert _fetch_raising(error("t")) == "google_doc_timeout"
 
 
-@pytest.mark.parametrize("error", [httpx.ConnectError, httpx.ReadError, httpx.WriteError])
-def test_other_network_errors_are_google_doc_unavailable(error: type[httpx.TransportError]) -> None:
+@pytest.mark.parametrize("error", [httpx2.ConnectError, httpx2.ReadError, httpx2.WriteError])
+def test_other_network_errors_are_google_doc_unavailable(
+    error: type[httpx2.TransportError],
+) -> None:
     assert _fetch_raising(error("t")) == "google_doc_unavailable"
 
 
