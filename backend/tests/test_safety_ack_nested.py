@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import importlib
 import json
+import time
 from collections.abc import Callable
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.pseudo.gate import _is_acknowledged
 from tests.pseudo_helpers import RNOKPP
 from tests.safety_helpers import detector_version, doc, find_untrusted_model, hit_spans, post_doc
 
@@ -113,10 +115,6 @@ def test_high_hit_fully_inside_an_acknowledged_span_stays_refused(
 
 def test_containment_lookup_is_fast_and_exact_at_the_caps() -> None:
     """50,000 acknowledged spans and 100,000 hits: bisect, not a linear scan per hit."""
-    import time
-
-    from app.pseudo.gate import _is_acknowledged
-
     acknowledged = sorted((0, i * 10, i * 10 + 5) for i in range(50_000))
     started = time.process_time()
     inside = sum(_is_acknowledged(0, i * 10 + 1, i * 10 + 3, acknowledged) for i in range(50_000))
