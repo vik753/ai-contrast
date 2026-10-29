@@ -1,0 +1,48 @@
+{
+  "name": "63_uk_requisites_bank_email_roles",
+  "language": "uk",
+  "description": "Round 3. UK requisites section under the heading 'Адреси, реквізити та підписи'. Covers 'Банк:' with a quoted bank name without a legal form (ORG normal, span inside the guillemets), the 'E-mail:' spelling, one line with two label/value pairs (Тел. and e-mail), and lines with a two-word role title or a second role (Генеральний директор, Головний бухгалтер) plus a full name. Dropped: lines 2-8 and 10. Kept: 9 and 11. ЄДРПОУ 21045679 is valid.",
+  "blocks": [
+    {"text": "5.1. Страховик виплачує відшкодування протягом 15 днів.", "part": "body", "page": null},
+    {"text": "Адреси, реквізити та підписи", "part": "body", "page": null},
+    {"text": "Страховик: ТОВ «Гарант Центр»", "part": "body", "page": null},
+    {"text": "ЄДРПОУ: 21045679", "part": "body", "page": null},
+    {"text": "Банк: «Південний кредит»", "part": "body", "page": null},
+    {"text": "E-mail: office@garant-centr.com.ua", "part": "body", "page": null},
+    {"text": "Тел.: +380 44 555 01 23, e-mail: claims@garant-centr.com.ua", "part": "body", "page": null},
+    {"text": "Генеральний директор: Олег Бондаренко", "part": "body", "page": null},
+    {"text": "Головний бухгалтер: Ірина Савчук", "part": "body", "page": null},
+    {"text": "Страховик має право відмовити у виплаті", "part": "body", "page": null},
+    {"text": "Генеральний директор ____________ /Бондаренко О.М./", "part": "body", "page": null},
+    {"text": "Франшиза 5 % від суми збитку", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Гарант Центр»"], "spans": [[2, 11, 29]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["21045679"], "spans": [[3, 8, 16]]},
+      {"class": "ORG", "precision": "normal", "value_forms": ["Південний кредит"], "spans": [[4, 7, 23]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["office@garant-centr.com.ua"], "spans": [[5, 8, 34]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+380 44 555 01 23"], "spans": [[6, 6, 23]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["claims@garant-centr.com.ua"], "spans": [[6, 33, 59]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Олег Бондаренко"], "spans": [[7, 22, 37]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Ірина Савчук"], "spans": [[8, 20, 32]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Бондаренко О.М."], "spans": [[10, 35, 50]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Бондаренко О.М./"], "spans": [[10, 21, 51]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Страховик: ТОВ", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "ЄДРПОУ:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "Банк:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "E-mail:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "Тел.:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "Генеральний директор: Олег", "action": "drop"},
+      {"block": 8, "line_text_starts_with": "Головний бухгалтер:", "action": "drop"},
+      {"block": 9, "line_text_starts_with": "Страховик має право", "action": "keep"},
+      {"block": 10, "line_text_starts_with": "Генеральний директор ____", "action": "drop"},
+      {"block": 11, "line_text_starts_with": "Франшиза", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["Страховик виплачує", "5 %", "має право відмовити"]
+  }
+}

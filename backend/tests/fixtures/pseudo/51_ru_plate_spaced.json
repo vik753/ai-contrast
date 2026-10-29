@@ -1,0 +1,62 @@
+{
+  "name": "51_ru_plate_spaced",
+  "language": "ru",
+  "description": "Round 3. RU plate written with spaces between the letter, digit, letter and region groups. VEHICLE normal. Block 2 is a negative: 'Кабина 3' and weights are not plates.",
+  "blocks": [
+    {
+      "text": "Автомобиль с госномером К 482 МР 77 передан в аренду.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Транспортное средство (номер А 905 ОН 199) возвращено.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Кабина 3 рассчитана на нагрузку 482 кг.",
+      "part": "body",
+      "page": null
+    }
+  ],
+  "expected": {
+    "entities": [
+      {
+        "class": "VEHICLE",
+        "precision": "normal",
+        "value_forms": [
+          "К 482 МР 77"
+        ],
+        "spans": [
+          [
+            0,
+            24,
+            35
+          ]
+        ]
+      },
+      {
+        "class": "VEHICLE",
+        "precision": "normal",
+        "value_forms": [
+          "А 905 ОН 199"
+        ],
+        "spans": [
+          [
+            1,
+            29,
+            41
+          ]
+        ]
+      }
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": [
+      "Кабина 3",
+      "482 кг",
+      "передан в аренду"
+    ]
+  }
+}

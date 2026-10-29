@@ -1,0 +1,19 @@
+{
+  "name": "58_en_address_translit_unit",
+  "language": "en",
+  "description": "Round 3. Unit prefix 'Unit 7,' before the street number, and a transliterated foreign address 'N <Name> Street, apt. N, <City> <postcode>, <country>': the whole address is one span, up to the final full stop.",
+  "blocks": [
+    {"text": "Premises: Unit 7, 18 Mill Lane, Cardiff CF10 3AT.", "part": "body", "page": null},
+    {"text": "Buyer address: 27 Shevchenko Street, apt. 12, Kharkiv 61001, Ukraine.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["Unit 7, 18 Mill Lane, Cardiff CF10 3AT"], "spans": [[0, 10, 48]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["27 Shevchenko Street, apt. 12, Kharkiv 61001, Ukraine"], "spans": [[1, 15, 68]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Premises", "Buyer address"]
+  }
+}

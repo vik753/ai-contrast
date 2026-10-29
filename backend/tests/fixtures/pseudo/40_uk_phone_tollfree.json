@@ -1,0 +1,20 @@
+{
+  "name": "40_uk_phone_tollfree",
+  "language": "uk",
+  "description": "Round 3. Toll-free 0 800 numbers in spaced groups after a plain label ('Гаряча лінія', 'за номером'), no +380 and no 'тел.'. Opening hours in block 2 are not a phone (negative).",
+  "blocks": [
+    {"text": "Гаряча лінія страховика: 0 800 507 321.", "part": "body", "page": null},
+    {"text": "Звертайтеся за номером 0 800 600 111 щодня.", "part": "body", "page": null},
+    {"text": "Лінія працює з 9:00 до 18:00.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PHONE", "precision": "high", "value_forms": ["0 800 507 321"], "spans": [[0, 25, 38]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["0 800 600 111"], "spans": [[1, 23, 36]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["9:00", "18:00"]
+  }
+}

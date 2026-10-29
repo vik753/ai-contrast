@@ -1,0 +1,19 @@
+{
+  "name": "61_en_quantities_units_neg",
+  "language": "en",
+  "description": "Round 3 negative control. Checksum-valid 10-digit numbers (3012345670, 3521741827, 7712345671) used as quantities followed by g, pcs, mg, units, pieces, kg. Nothing is masked.",
+  "blocks": [
+    {"text": "5.1. The Supplier delivers 3012345670 g of powder per batch.", "part": "body", "page": null},
+    {"text": "5.2. Each lot contains 7712345671 pcs of fasteners.", "part": "body", "page": null},
+    {"text": "5.3. The dose is 3521741827 mg per tablet.", "part": "body", "page": null},
+    {"text": "5.4. Total order: 3012345670 units or 7712345671 pieces.", "part": "body", "page": null},
+    {"text": "5.5. Packaging weight is 3521741827 kg.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["3012345670 g", "7712345671 pcs", "3521741827 mg", "3012345670 units", "7712345671 pieces", "3521741827 kg"]
+  }
+}

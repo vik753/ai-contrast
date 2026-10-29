@@ -1,0 +1,41 @@
+{
+  "name": "64_ru_requisites_two_pairs_roles",
+  "language": "ru",
+  "description": "Round 3. RU requisites section under 'Банковские реквизиты и подписи'. Covers spelled-out legal form, ИНН-12 with label, 'Расчётный счёт:' label, one line with two label/value pairs (Тел. and e-mail), and lines with a two-word role title (Генеральный директор) and a second role (Главный бухгалтер) plus a full name. Dropped: lines 2-7. Kept: 8 and 9. ИНН 780123456724 is valid.",
+  "blocks": [
+    {"text": "8.1. Исполнитель оказывает услуги в течение 10 дней.", "part": "body", "page": null},
+    {"text": "Банковские реквизиты и подписи", "part": "body", "page": null},
+    {"text": "Заказчик: Общество с ограниченной ответственностью «Орбита Групп»", "part": "body", "page": null},
+    {"text": "ИНН: 780123456724", "part": "body", "page": null},
+    {"text": "Расчётный счёт: 40702810900000045678", "part": "body", "page": null},
+    {"text": "Тел.: +7 495 555-01-23, e-mail: info@orbita-group.ru", "part": "body", "page": null},
+    {"text": "Генеральный директор: Павел Орлов", "part": "body", "page": null},
+    {"text": "Главный бухгалтер: Мария Лебедева", "part": "body", "page": null},
+    {"text": "Исполнитель вправе приостановить работы", "part": "body", "page": null},
+    {"text": "Неустойка 0,1 % за каждый день", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["Общество с ограниченной ответственностью «Орбита Групп»"], "spans": [[2, 10, 65]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["780123456724"], "spans": [[3, 5, 17]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["40702810900000045678"], "spans": [[4, 16, 36]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+7 495 555-01-23"], "spans": [[5, 6, 22]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["info@orbita-group.ru"], "spans": [[5, 32, 52]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Павел Орлов"], "spans": [[6, 22, 33]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Мария Лебедева"], "spans": [[7, 19, 33]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Заказчик: Общество", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "ИНН:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "Расчётный счёт:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "Тел.:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "Генеральный директор:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "Главный бухгалтер:", "action": "drop"},
+      {"block": 8, "line_text_starts_with": "Исполнитель вправе", "action": "keep"},
+      {"block": 9, "line_text_starts_with": "Неустойка", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["Исполнитель оказывает", "0,1 %", "вправе приостановить"]
+  }
+}

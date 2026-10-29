@@ -1,0 +1,21 @@
+{
+  "name": "55_en_person_sentence_subject",
+  "language": "en",
+  "description": "Round 3. Name as the sentence subject at the start of a line, no role word before it. Blocks 2 and 3 start with ordinary capitalised words (negative, not names).",
+  "blocks": [
+    {"text": "Tobias Wren signs on behalf of the Supplier.", "part": "body", "page": null},
+    {"text": "Lena Voss confirms receipt of the goods.", "part": "body", "page": null},
+    {"text": "Receipt is confirmed by the Buyer.", "part": "body", "page": null},
+    {"text": "Delivery follows payment.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Tobias Wren"], "spans": [[0, 0, 11]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Lena Voss"], "spans": [[1, 0, 9]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Receipt is confirmed", "Delivery follows", "the Supplier", "the Buyer"]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "49_uk_driver_licence",
+  "language": "uk",
+  "description": "Round 3. Driver licence number: three Cyrillic capitals, a space, six digits, after 'посвідчення водія' (also in the instrumental case form 'за посвідченням водія'). PERSONAL_DOC normal, span = series and number.",
+  "blocks": [
+    {"text": "Орендар пред'явив посвідчення водія ХМК 305172 при підписанні.", "part": "body", "page": null},
+    {"text": "Водій діє за посвідченням водія ЛАВ 220915.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["ХМК 305172"], "spans": [[0, 36, 46]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["ЛАВ 220915"], "spans": [[1, 32, 42]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["при підписанні"]
+  }
+}

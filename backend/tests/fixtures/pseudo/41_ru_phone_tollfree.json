@@ -1,0 +1,19 @@
+{
+  "name": "41_ru_phone_tollfree",
+  "language": "ru",
+  "description": "Round 3. Toll-free 8-800 numbers with hyphens after an imperative verb ('позвоните'), no 'тел.' label.",
+  "blocks": [
+    {"text": "Для заявки позвоните 8-800-100-24-77 в рабочее время.", "part": "body", "page": null},
+    {"text": "Позвоните: 8-800-200-31-90, мы ответим.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PHONE", "precision": "high", "value_forms": ["8-800-100-24-77"], "spans": [[0, 21, 36]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["8-800-200-31-90"], "spans": [[1, 11, 26]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["рабочее время"]
+  }
+}

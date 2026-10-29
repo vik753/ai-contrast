@@ -1,0 +1,41 @@
+{
+  "name": "65_en_requisites_second_variant",
+  "language": "en",
+  "description": "Round 3. Second EN requisites variant, heading 'Final particulars of the parties'. Covers a two-pair line (Sort code and Account), foreign VAT with prefix, a second role (Head of Finance) plus full name, and a name as sentence subject inside the section (kept line, name still masked). Dropped: lines 2-6. Kept: 7, 8, 9.",
+  "blocks": [
+    {"text": "3.2. Notices are valid if sent to the addresses below.", "part": "body", "page": null},
+    {"text": "Final particulars of the parties", "part": "body", "page": null},
+    {"text": "Licensor: Kestrel Media Group Limited", "part": "body", "page": null},
+    {"text": "VAT: GB 123 4567 89", "part": "body", "page": null},
+    {"text": "Sort code: 40-55-12 Account: 70234981", "part": "body", "page": null},
+    {"text": "Director: Gordon Hale", "part": "body", "page": null},
+    {"text": "Head of Finance: Alice Prentiss", "part": "body", "page": null},
+    {"text": "The Licensor may terminate this licence on 30 days' notice", "part": "body", "page": null},
+    {"text": "Licence fee 4 % of net revenue", "part": "body", "page": null},
+    {"text": "Tobias Wren signs on behalf of the Licensor", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Kestrel Media Group Limited"], "spans": [[2, 10, 37]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["GB 123 4567 89"], "spans": [[3, 5, 19]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["40-55-12"], "spans": [[4, 11, 19]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["70234981"], "spans": [[4, 29, 37]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Gordon Hale"], "spans": [[5, 10, 21]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Alice Prentiss"], "spans": [[6, 17, 31]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Tobias Wren"], "spans": [[9, 0, 11]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Licensor: Kestrel", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "VAT:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "Sort code:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "Director:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "Head of Finance:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "The Licensor may terminate", "action": "keep"},
+      {"block": 8, "line_text_starts_with": "Licence fee", "action": "keep"},
+      {"block": 9, "line_text_starts_with": "Tobias Wren signs", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["The Licensor", "4 %", "30 days' notice", "signs on behalf"]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "50_ru_passport_series_number",
+  "language": "ru",
+  "description": "Round 3. Passport written as 'серия NN NN № NNNNNN' (series in two spaced pairs, then the number sign and the number). Span = from the first series digit to the last digit of the number; the word 'серия' stays.",
+  "blocks": [
+    {"text": "Паспорт гражданина РФ серия 45 12 № 678901 выдан отделом.", "part": "body", "page": null},
+    {"text": "Представитель предъявил паспорт, серия 03 19 № 241150.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["45 12 № 678901"], "spans": [[0, 28, 42]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["03 19 № 241150"], "spans": [[1, 39, 53]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Паспорт гражданина РФ", "выдан отделом"]
+  }
+}

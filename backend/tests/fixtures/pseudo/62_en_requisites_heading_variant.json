@@ -1,0 +1,49 @@
+{
+  "name": "62_en_requisites_heading_variant",
+  "language": "en",
+  "description": "Round 3. EN requisites section under an unusual heading ('Corporate particulars and execution'). Also: 'E-mail:' spelling, one line with two label/value pairs (Phone and email), a second role title (Chief Financial Officer) plus full name. Dropped: lines 2-8 and 10. Kept: obligation and non-identifier lines 9, 11, 12. Phone is an Ofcom drama number.",
+  "blocks": [
+    {"text": "9.1. The Customer shall pay each invoice within 14 days.", "part": "body", "page": null},
+    {"text": "Corporate particulars and execution", "part": "body", "page": null},
+    {"text": "Customer: Birchfield Systems Ltd.", "part": "body", "page": null},
+    {"text": "Tax ID: 55-1234567", "part": "body", "page": null},
+    {"text": "IBAN: GB82 WEST 1234 5698 7654 32", "part": "body", "page": null},
+    {"text": "E-mail: accounts@birchfield-sys.com", "part": "body", "page": null},
+    {"text": "Phone: 0161 496 0555, email: legal@birchfield-sys.com", "part": "body", "page": null},
+    {"text": "Managing Director: Stephen Oakley", "part": "body", "page": null},
+    {"text": "Chief Financial Officer: Nora Whitfield", "part": "body", "page": null},
+    {"text": "The Customer agrees to pay a late fee of 2 % per month", "part": "body", "page": null},
+    {"text": "Authorised signatory: ____________ /Nora Whitfield/", "part": "body", "page": null},
+    {"text": "Late fee 2 % per month", "part": "body", "page": null},
+    {"text": "Governing law applies as set out in clause 12", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "normal", "value_forms": ["Birchfield Systems Ltd."], "spans": [[2, 10, 33]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["55-1234567"], "spans": [[3, 8, 18]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["GB82 WEST 1234 5698 7654 32"], "spans": [[4, 6, 33]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["accounts@birchfield-sys.com"], "spans": [[5, 8, 35]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["0161 496 0555"], "spans": [[6, 7, 20]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["legal@birchfield-sys.com"], "spans": [[6, 29, 53]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Stephen Oakley"], "spans": [[7, 19, 33]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Nora Whitfield"], "spans": [[8, 25, 39], [10, 36, 50]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Nora Whitfield/"], "spans": [[10, 22, 51]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Customer: Birchfield", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "Tax ID:", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "IBAN:", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "E-mail:", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "Phone:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "Managing Director:", "action": "drop"},
+      {"block": 8, "line_text_starts_with": "Chief Financial Officer:", "action": "drop"},
+      {"block": 9, "line_text_starts_with": "The Customer agrees", "action": "keep"},
+      {"block": 10, "line_text_starts_with": "Authorised signatory", "action": "drop"},
+      {"block": 11, "line_text_starts_with": "Late fee", "action": "keep"},
+      {"block": 12, "line_text_starts_with": "Governing law", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["The Customer", "2 %", "Governing law", "Late fee"]
+  }
+}

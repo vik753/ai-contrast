@@ -1,0 +1,19 @@
+{
+  "name": "57_en_address_country_unit",
+  "language": "en",
+  "description": "Round 3. Address ending in ', <country>' after the postcode (country inside the span) and address starting with a unit prefix 'Warehouse 5,' (prefix inside the span). Spans end before the final full stop.",
+  "blocks": [
+    {"text": "Registered office: 14 Linden Road, Bristol BS1 4XY, United Kingdom.", "part": "body", "page": null},
+    {"text": "Delivery to: Warehouse 5, 220 Quay Street, Leeds LS2 7EQ.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["14 Linden Road, Bristol BS1 4XY, United Kingdom"], "spans": [[0, 19, 66]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["Warehouse 5, 220 Quay Street, Leeds LS2 7EQ"], "spans": [[1, 13, 56]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Registered office", "Delivery to"]
+  }
+}

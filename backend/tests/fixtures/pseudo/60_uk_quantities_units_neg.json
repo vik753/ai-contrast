@@ -1,0 +1,18 @@
+{
+  "name": "60_uk_quantities_units_neg",
+  "language": "uk",
+  "description": "Round 3 negative control. Checksum-valid 10-digit numbers (3012345670, 3521741827 as РНОКПП; 7712345671 as ИНН-10) used as quantities with units (шт., штук, мг, од.). Nothing is masked.",
+  "blocks": [
+    {"text": "4.1. Постачальник передає 3012345670 шт. деталей.", "part": "body", "page": null},
+    {"text": "4.2. Партія містить 3521741827 штук товару.", "part": "body", "page": null},
+    {"text": "4.3. Вага добавки — 7712345671 мг на партію.", "part": "body", "page": null},
+    {"text": "4.4. Кількість — 3012345670 од. продукції.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["3012345670 шт.", "3521741827 штук", "7712345671 мг", "3012345670 од."]
+  }
+}

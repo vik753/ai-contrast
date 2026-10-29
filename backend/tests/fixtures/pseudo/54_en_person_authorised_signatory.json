@@ -1,0 +1,19 @@
+{
+  "name": "54_en_person_authorised_signatory",
+  "language": "en",
+  "description": "Round 3. 'Authorised signatory:' followed by a full name and then a title or bracketed role. The span covers the whole name (first name and surname), not only the surname. Titles stay.",
+  "blocks": [
+    {"text": "Authorised signatory: Marcus Delgado, Managing Director", "part": "body", "page": null},
+    {"text": "Authorised signatory: Ingrid Holm (Director)", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Marcus Delgado"], "spans": [[0, 22, 36]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Ingrid Holm"], "spans": [[1, 22, 33]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Managing Director", "(Director)"]
+  }
+}
