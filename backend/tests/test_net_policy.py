@@ -19,6 +19,8 @@ ALLOWED: frozenset[str] = frozenset()
 BANNED_MODULES = {
     "httpx",
     "httpcore",
+    "httpx2",
+    "httpcore2",
     "urllib3",
     "requests",
     "aiohttp",
@@ -36,7 +38,12 @@ def violations(source: str) -> list[str]:
             found += [a.name for a in node.names if a.name == "socket"]
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            if module in BANNED_MODULES or module.split(".")[0] in {"httpx", "httpcore"}:
+            if module in BANNED_MODULES or module.split(".")[0] in {
+                "httpx",
+                "httpcore",
+                "httpx2",
+                "httpcore2",
+            }:
                 found.append(module)
             if module == "urllib" and any(a.name in {"request"} for a in node.names):
                 found.append("urllib.request")
