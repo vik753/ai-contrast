@@ -16,10 +16,15 @@ class FakeClock:
 
 
 def make(
-    limit: int = 3, window: float = 60, max_keys: int = 10
+    limit: int = 3,
+    window: float = 60,
+    max_keys: int = 10,
+    *,
+    aligned: bool = False,
+    now: float = 1000.0,
 ) -> tuple[FixedWindowLimiter, FakeClock]:
-    clock = FakeClock()
-    return FixedWindowLimiter(limit, window, max_keys, clock), clock
+    clock = FakeClock(now)
+    return FixedWindowLimiter(limit, window, max_keys, clock, aligned=aligned), clock
 
 
 def test_hit_under_limit_is_allowed() -> None:
