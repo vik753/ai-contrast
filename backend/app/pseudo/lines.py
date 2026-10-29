@@ -40,6 +40,7 @@ from app.pseudo.lexicon import (
     MONTHS,
     STREET_SUFFIXES,
     STRONG_AMOUNT_WORDS,
+    WRAP_STOP_WORDS,
     is_document_word,
     is_obligation,
     is_role,
@@ -77,6 +78,7 @@ _MAX_STREET_TAIL: Final = 4
 _MIN_PLATE_CHARS: Final = 5
 _MAX_PLATE_CHARS: Final = 8
 _MAX_STREET_NUMBER: Final = 5
+_CLAUSE_NUMBER: Final = re.compile(r"[0-9][0-9.]{0,15}|[0-9]{1,4}\)")
 _MAX_OUTWARD: Final = 4
 _IBAN_GAPS: Final = (" ", "-")
 _UA_MOBILE: Final = frozenset(
@@ -206,6 +208,7 @@ def scan_lines(
     hits: Hits,
     in_requisites: Callable[[int], bool],
     same_clause: Callable[[int, int], bool],
+    other_clause: Callable[[int, int], bool],
 ) -> None:
     low = view.low
     size = len(low)
@@ -214,7 +217,7 @@ def scan_lines(
         newline = low.find("\n", position)
         end = size if newline < 0 else newline
         if end > position:
-            _Line(view, hits, in_requisites, same_clause, position, end).run()
+            _Line(view, hits, in_requisites, same_clause, other_clause, position, end).run()
         position = end + 1
 
 
@@ -225,6 +228,7 @@ class _Line:
         hits: Hits,
         in_requisites: Callable[[int], bool],
         same_clause: Callable[[int, int], bool],
+        other_clause: Callable[[int, int], bool],
         start: int,
         end: int,
     ) -> None:
@@ -234,6 +238,7 @@ class _Line:
         self.hits = hits
         self.in_requisites = in_requisites
         self.same_clause = same_clause
+        self.other_clause = other_clause
         self.ls = start
         self.le = end
         self.st, self.en = runs_of(self.low, start, end)
@@ -868,7 +873,7 @@ class _Line:
             at += 1
         return limit
 
-    def _wrap_goes_on(self, position: int) -> bool:
+    def _wrap_goes_on(self, position: int) -> bool:  # noqa: PLR0911
         low = self.low
         before = position
         while before > 0 and low[before - 1] == " ":
@@ -876,8 +881,20 @@ class _Line:
         after = position + 1
         while after < self.le and low[after] == " ":
             after += 1
-        if after >= self.le:
+        if after >= self.le or self.other_clause(before - 1, after):
             return False
+        number = _CLAUSE_NUMBER.match(low, after, self.le)
+        if number is not None and (
+            number.group().endswith(")")
+            or (number.group().endswith(".") and low[number.end() : number.end() + 1] in ("", " "))
+        ):
+            return False  # a clause number or a numbered heading
+        stop = after
+        while stop < self.le and low[stop].isalnum():
+            stop += 1
+        word = low[after:stop]
+        if word in WRAP_STOP_WORDS or is_obligation(word) or word in AMOUNT_WORDS or is_role(word):
+            return False  # a condition, an obligation or a role starts the next item
         if low[before - 1 : before] in (",", ":"):
             return True
         if low[before - 1 : before] == ".":
@@ -888,10 +905,6 @@ class _Line:
                 return True
         if self.u[after].islower():
             return True
-        stop = after
-        while stop < self.le and low[stop].isalnum():
-            stop += 1
-        word = low[after:stop]
         return low[stop : stop + 1] == "." and (word in ABBREVIATIONS or word in ADDRESS_STARTS)
 
     def _address_end(self, start: int) -> int:

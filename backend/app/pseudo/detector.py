@@ -125,7 +125,8 @@ def detect(texts: Sequence[str], clauses: Sequence[Clause]) -> Detection:
     requisites = _requisites_ranges(view, clauses)
     hits = Hits()
     contacts.scan_all(view.low, hits)
-    lines.scan_lines(view, hits, _in_ranges(view, requisites), _same_clause(view, index))
+    same, other = _same_clause(view, index)
+    lines.scan_lines(view, hits, _in_ranges(view, requisites), same, other)
     names = Names(view, hits)
     names.pass_one()
     names.pass_two()
@@ -214,7 +215,12 @@ def _in_ranges(view: View, ranges: tuple[list[int], list[int]]) -> Callable[[int
     return inside
 
 
-def _same_clause(view: View, index: _ClauseIndex) -> Callable[[int, int], bool]:
+def _same_clause(
+    view: View, index: _ClauseIndex
+) -> tuple[Callable[[int, int], bool], Callable[[int, int], bool]]:
+    """``same(a, b)``: both positions are in one clause; ``other(a, b)``: both are in
+    clauses, and in different ones."""
+
     def clause_at(position: int) -> str | None:
         g = view.g_start(position)
         block = bisect_right(view.bases, g) - 1
@@ -224,7 +230,11 @@ def _same_clause(view: View, index: _ClauseIndex) -> Callable[[int, int], bool]:
         clause = clause_at(first)
         return clause is not None and clause == clause_at(second)
 
-    return same
+    def other(first: int, second: int) -> bool:
+        one, two = clause_at(first), clause_at(second)
+        return one is not None and two is not None and one != two
+
+    return same, other
 
 
 # --------------------------------------------------------------------- resolve

@@ -290,3 +290,74 @@ def test_address_goes_on_after_a_wrap_behind_an_abbreviation() -> None:
 def test_rnokpp_in_two_groups_of_five_without_a_keyword_is_proposed() -> None:
     assert texts("Також 31826 40979.", cls="TAX_ID") == ["31826 40979"]
     assert texts("Також 12345 67890 грн.", cls="TAX_ID") == []
+
+
+# ------------------------------------------- an address never runs into the next clause
+
+CLAUSE_CASES = [
+    ("Адреса: м. Київ, вул. Зелена, 12,\n2.1. Страховик сплачує внесок.", "2.1"),
+    ("Адреса: м. Київ, вул.\n3.1. Неустойка за прострочення.", "Неустойка"),
+    ("Адреса: м. Київ, вул. Зелена, 12:\n4. Відповідальність сторін", "Відповідальність"),
+    ("Адреса: м. Київ, вул. Зелена, 12\nнеустойка складає п'ять відсотків", "неустойка"),
+]
+
+
+@pytest.mark.parametrize(("line", "leak"), CLAUSE_CASES)
+def test_address_stops_at_a_break_into_the_next_item_detect(line: str, leak: str) -> None:
+    result = texts(line)
+    assert result
+    assert not any(leak in t for t in result), result
+
+
+@pytest.mark.parametrize(("line", "leak"), CLAUSE_CASES)
+def test_address_stops_at_a_break_into_the_next_item_segment(
+    make_client: Callable[..., TestClient], line: str, leak: str
+) -> None:
+    data = detect_api(make_client(), "1. Загальні положення.\n" + line)
+
+    covered = [span_text(data, sp) for e in data["entities"] for sp in e["spans"]]
+    assert covered
+    assert not any(leak in t for t in covered), covered
+
+
+def test_address_goes_on_over_a_wrap_into_an_address_word() -> None:
+    assert texts("Адреса: Одеська\nобласть, м. Одеса, вул. Зелена, 8.", cls="ADDRESS") == [
+        "Одеська\nобласть, м. Одеса, вул. Зелена, 8"
+    ]
+
+
+# ---------------------------------------------------- name forms, real detector path
+
+
+def test_surname_comma_given_with_two_given_names_in_capitals() -> None:
+    assert texts("represented by DOE, JANE MARIE", cls="PERSON") == ["DOE, JANE MARIE"]
+
+
+def test_title_with_a_full_stop_is_a_trigger() -> None:
+    assert texts("Mr. Smith signs.", cls="PERSON") == ["Smith"]
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["1. Customer: DOE, JANE pays.", "1. represented by DOE, JANE", "1. Mr. DOE, JANE signs."],
+)
+def test_surname_comma_given_is_one_span_through_the_api(
+    make_client: Callable[..., TestClient], line: str
+) -> None:
+    data = detect_api(make_client(), line)
+
+    covered = [span_text(data, sp) for e in data["entities"] for sp in e["spans"]]
+    assert "DOE, JANE" in covered, covered
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["1. Mr Smith-\nJones signs", "1. represented by Smith-\nJones, director"],
+)
+def test_wrapped_double_surname_is_one_span_through_the_api(
+    make_client: Callable[..., TestClient], line: str
+) -> None:
+    data = detect_api(make_client(), line)
+
+    covered = [span_text(data, sp) for e in data["entities"] for sp in e["spans"]]
+    assert "Smith-\nJones" in covered, covered

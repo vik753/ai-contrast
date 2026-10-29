@@ -69,6 +69,16 @@ SOLE_TRADER: Final = frozenset(skeleton(form) for form in tables.SOLE_TRADER_FOR
 ORG_NOUNS: Final = frozenset(fold(word) for word in tables.ORG_NOUNS)
 ROLE_STEMS: Final = tuple(sorted({fold(word) for word in tables.ROLE_WORDS}, key=len))
 NOT_NAMES: Final = frozenset(fold(word) for word in tables.NOT_NAMES)
+# Words that begin a new item or a condition, never the rest of a wrapped address. The words
+# of an address itself ("область", "район", "місто") are left out.
+_ADDRESS_WORDS: Final = frozenset(
+    fold(word)
+    for word in (
+        *("місто", "город", "city", "область", "oblast", "район"),
+        *("територія", "територия", "territory"),
+    )
+)
+WRAP_STOP_WORDS: Final = NOT_NAMES - _ADDRESS_WORDS
 PERSON_ROLE_STEMS: Final = tuple(sorted({fold(word) for word in tables.PERSON_ROLE_WORDS}, key=len))
 STREET_SUFFIXES: Final = frozenset(fold(word) for word in tables.STREET_SUFFIXES)
 MONTHS: Final = frozenset(fold(word) for word in tables.MONTHS)

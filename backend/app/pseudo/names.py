@@ -326,19 +326,24 @@ class Names:
         self._register_run(ws, we, run, ws[run[0]], we[index], False)
         return index + 1
 
+    def _title_gap(self, left_end: int, right_start: int) -> bool:
+        """Spaces, or a full stop and spaces ("Mr. Smith")."""
+        gap = self.u[left_end:right_start]
+        return bool(gap) and (gap.isspace() or (gap[0] == "." and gap[1:].isspace()))
+
     def _trigger_before(self, ws: array[int], we: array[int], index: int) -> bool:
         u = self.u
         cursor = index - 1
         steps = 0
         while cursor >= 0 and steps < 6:  # noqa: PLR2004
-            if not self.adjacent(we[cursor], ws[cursor + 1]):
+            if not self._title_gap(we[cursor], ws[cursor + 1]):
                 return False
             word = self.folded(u[ws[cursor] : we[cursor]])
             if (word,) in PERSON_TRIGGERS:
                 return True
             if (
                 cursor >= 1
-                and self.adjacent(we[cursor - 1], ws[cursor])
+                and self._title_gap(we[cursor - 1], ws[cursor])
                 and (self.folded(u[ws[cursor - 1] : we[cursor - 1]]), word) in PERSON_TRIGGERS
             ):
                 return True
@@ -439,7 +444,15 @@ class Names:
             and self.adjacent(we[nxt], ws[after])
             and self.name_word(u[ws[after] : we[after]])
         ):
-            return None  # a longer run of words: not "Surname, Given"
+            # "DOE, JANE MARIE": a given name of up to two words, all in capitals.
+            given = u[ws[nxt] : we[nxt]].isupper() and u[ws[after] : we[after]].isupper()
+            further = after + 1
+            more = (
+                further < len(ws)
+                and self.adjacent(we[after], ws[further])
+                and self.name_word(u[ws[further] : we[further]])
+            )
+            return after if given and not more else None  # not "Surname, Given"
         return nxt
 
     def _initials_name(self, ls: int, le: int, ws: array[int], we: array[int], index: int) -> int:
