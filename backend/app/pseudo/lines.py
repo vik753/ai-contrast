@@ -36,10 +36,12 @@ from app.pseudo.lexicon import (
     ADDRESS_STARTS,
     AMOUNT_WORDS,
     CONTEXT_KINDS,
+    COUNTRIES,
     DEFINITION_OPENERS,
     MONTHS,
     STREET_SUFFIXES,
     STRONG_AMOUNT_WORDS,
+    UNIT_PREFIXES,
     WRAP_STOP_WORDS,
     is_document_word,
     is_obligation,
@@ -130,6 +132,13 @@ _DOMESTIC_PHONE: Final = re.compile(r"0[0-9]{2}[ -][0-9]{3}[ -][0-9]{2}[ -][0-9]
 _PLATE_SPACED: Final = re.compile(
     r"[abcehkmoptxyавекмнопстух]{2} [0-9]{4} [abcehkmoptxyавекмнопстух]{2}(?![a-zа-я0-9])"
 )
+_UNIT_SEGMENT: Final = re.compile(
+    r"(?:apt|apartment|flat|suite|unit|office|room|floor|fl)\.? ?[0-9][0-9a-z]{0,4}(?![0-9a-z])"
+)
+_MAX_NATIONAL: Final = 11
+_MAX_PHONE_RUN: Final = 5
+_MIN_NATIONAL: Final = 10
+_MAX_UNIT_GAP: Final = 2
 _SERIAL_MIN_VIN: Final = 17
 _MIN_PLATE: Final = 7
 _MIN_CODE_DIGITS: Final = 8
@@ -152,6 +161,8 @@ _MIN_IBAN_RUN: Final = 4
 _SWIFT_SHORT: Final = 8
 _SWIFT_LONG: Final = 11
 _VAT_MIN: Final = 10
+_VAT_DIGITS_MIN: Final = 8
+_VAT_DIGITS_MAX: Final = 12
 _VAT_MAX: Final = 14
 _PHONE_LOCAL: Final = 10
 _DAY_MAX: Final = 31
@@ -349,6 +360,28 @@ class _Line:
 
     def _structured(self, index: int, word: str, length: int) -> int:  # noqa: PLR0911, PLR0912
         n = self.n
+        if word[0] in "08" and length <= _MAX_PHONE_RUN:
+            consumed = self._toll_free(index, word, length) or self._national_phone(
+                index, word, length
+            )
+            if consumed:
+                return consumed
+        if (
+            length == 2  # noqa: PLR2004
+            and index + 2 < n
+            and self.near("sortcode", index, 3)
+            and self._lens(index, (2, 2, 2))
+        ):
+            return self._add_range(ACCOUNT, NORMAL, index, index + 2)
+        if (
+            length == _CARD_GROUP
+            and index + 2 < n
+            and self._lens(index, (4, 4, 4), " -")
+            and not (index + 3 < n and self._lens(index, (4, 4, 4, 4), " -"))
+        ):
+            consumed = self._inn12_groups(index)
+            if consumed:
+                return consumed
         if length == 10 and index + 3 < n and self._lens(index, (10, 2, 3, 4), ":"):  # noqa: PLR2004
             return self._add_range(ADDRESS, NORMAL, index, index + 3)
         if length == 8 and index + 1 < n and self.gap(index) == "-" and self._lens(index, (8, 5)):  # noqa: PLR2004
@@ -410,6 +443,79 @@ class _Line:
         self.hits.add(PHONE, HIGH, self.st[index], self.en[index + 3], digits[-9:])
         return index + 4
 
+    def _digit_groups(self, first: int, limit: int, wanted: tuple[int, ...]) -> int:
+        """Last run of the groups from ``first`` whose digit count is in ``wanted``, or -1.
+
+        Groups are digit runs joined by one space or hyphen; the longest fit wins.
+        """
+        digits = 0
+        best = -1
+        current = first
+        while current < self.n and digits < limit:
+            piece = self.text(current)
+            if not piece.isdigit() or (current > first and self.gap(current - 1) not in (" ", "-")):
+                break
+            digits += len(piece)
+            if digits in wanted:
+                best = current
+            current += 1
+        return best
+
+    def _glued_to_number(self, index: int) -> bool:
+        low = self.low
+        start = self.st[index]
+        return start - 2 >= self.ls and low[start - 1] in ".,/-" and low[start - 2].isalnum()
+
+    def _phone_range(self, first: int, last: int) -> int:
+        if self.is_amount(first, last):
+            return 0
+        digits = "".join(self.text(k) for k in range(first, last + 1))
+        self.hits.add(PHONE, HIGH, self.st[first], self.en[last], digits[-9:])
+        return last + 1
+
+    def _toll_free(self, index: int, word: str, length: int) -> int:
+        """``0 800 507 321`` / ``0800 123 4567`` / ``8-800-100-24-77``: no keyword needed."""
+        if self._glued_to_number(index):
+            return 0
+        if length == 1 and index + 1 < self.n and self.text(index + 1) == "800":
+            if self.gap(index) not in (" ", "-"):
+                return 0
+            head, first = word + "800", index + 2
+        elif word in ("0800", "8800"):
+            head, first = word, index + 1
+        else:
+            return 0
+        if head[0] == "8" and head != "8800":
+            return 0
+        wanted = (6, 7) if head[0] == "0" else (7,)
+        if first >= self.n or self.gap(first - 1) not in (" ", "-"):
+            return 0
+        last = self._digit_groups(first, max(wanted), wanted)
+        return self._phone_range(index, last) if last >= 0 else 0
+
+    def _national_phone(self, index: int, word: str, length: int) -> int:
+        """``0117 496 0842`` / ``020 7946 0321`` after a phone keyword or in the requisites."""
+        if (
+            word[0] != "0"
+            or not 3 <= length <= _MAX_PHONE_RUN  # noqa: PLR2004
+            or index + 1 >= self.n
+            or self._glued_to_number(index)
+            or not (self.near("phone", index) or self.in_requisites(self.st[index]))
+        ):
+            return 0
+        last = self._digit_groups(index, _MAX_NATIONAL, (_MIN_NATIONAL, _MAX_NATIONAL))
+        return self._phone_range(index, last) if last > index else 0
+
+    def _inn12_groups(self, index: int) -> int:
+        """An ИНН-12 in three groups of four digits, kept only when the check digits fit."""
+        digits = "".join(self.text(index + k) for k in range(3))
+        if not checksums.inn12_valid(digits) or self.is_amount(index, index + 2):
+            return 0
+        precision = HIGH if self.context("tax", index) else NORMAL
+        start, end = self.st[index], self.en[index + 2]
+        self.hits.add(TAX_ID, precision, start, end, digits)
+        return index + 3
+
     def _snils(self, index: int) -> int:
         digits = "".join(self.text(index + k) for k in range(4))
         if not self.near("snils", index) and not self.in_requisites(self.st[index]):
@@ -438,7 +544,15 @@ class _Line:
     def _code(self, index: int, word: str, length: int) -> None:  # noqa: PLR0912
         start, end = self.st[index], self.en[index]
         add = self.hits.add
-        if length == 8:  # noqa: PLR2004
+        if (length == 8 and self.near("sortcode", index, 8)) or (  # noqa: PLR2004
+            length == 6 and self.near("sortcode", index, 2)  # noqa: PLR2004
+        ):
+            add(ACCOUNT, NORMAL, start, end, word)
+        elif length == _MAX_NATIONAL and (
+            word.startswith(("8800", "0800")) or (word[0] in "078" and self.near("phone", index))
+        ):
+            add(PHONE, HIGH, start, end, word[-9:])
+        elif length == 8:  # noqa: PLR2004
             if checksums.edrpou_valid(word):
                 add(TAX_ID, HIGH if self.context("tax", index) else NORMAL, start, end, word)
             elif self.near("tax", index):
@@ -506,6 +620,8 @@ class _Line:
             self._add(VEHICLE, NORMAL, index, index, word)
             return
         self._plate(index, word, length)
+        if length == 2 and self._vat_prefix(index):  # noqa: PLR2004
+            return
         if (
             length in (_SWIFT_SHORT, _SWIFT_LONG)
             and word[:6].isalpha()
@@ -519,6 +635,40 @@ class _Line:
             and self.near("vat", index, 3)
         ):
             self._add(TAX_ID, NORMAL, index, index, word)
+
+    def _vat_prefix(self, index: int) -> bool:
+        """``VAT DE 812 3456 78``: a capital country prefix and digit groups after "VAT"."""
+        start = self.st[index]
+        if (
+            not self.near("vat", index, 3)
+            or not self.u[start : start + 2].isupper()
+            or not self.u[start : start + 2].isalpha()
+            or index + 1 >= self.n
+            or self.gap(index) not in (" ", "-", "")
+            or not self.text(index + 1).isdigit()
+        ):
+            return False
+        digits = 0
+        last = index
+        best = -1
+        current = index + 1
+        while current < self.n and digits < _VAT_DIGITS_MAX:
+            piece = self.text(current)
+            if not piece.isdigit() or (
+                current > index + 1 and self.gap(current - 1) not in (" ", "-")
+            ):
+                break
+            digits += len(piece)
+            if _VAT_DIGITS_MIN <= digits <= _VAT_DIGITS_MAX:
+                best = current
+            last = current
+            current += 1
+        if best < 0 or last < 0:
+            return False
+        key = self.text(index) + "".join(self.text(k) for k in range(index + 1, best + 1))
+        self._add(TAX_ID, NORMAL, index, best, key)
+        self.skip_to = best
+        return True
 
     def _add(self, cls: str, precision: str, first: int, last: int, key: str) -> None:
         self.hits.add(cls, precision, self.st[first], self.en[last], key)
@@ -544,6 +694,9 @@ class _Line:
                 )
                 self.skip_to = third
             return
+        if length == 1 and word in _PLATE_LETTERS:
+            self._plate_ru_spaced(index)
+            return
         if length >= 6 and _PLATE_RU.fullmatch(word):  # noqa: PLR2004
             if length == 6:  # noqa: PLR2004
                 following = index + 1
@@ -557,6 +710,27 @@ class _Line:
                     self.skip_to = following
                 return
             self._add(VEHICLE, NORMAL, index, index, word)
+
+    def _plate_ru_spaced(self, index: int) -> None:
+        """A plate with spaces (letter, three digits, two letters, region); capitals only."""
+        digits, letters, region = index + 1, index + 2, index + 3
+        if region >= self.n or any(self.gap(k) != " " for k in (index, digits, letters)):
+            return
+        group = self.text(letters)
+        if (
+            len(self.text(digits)) != 3  # noqa: PLR2004
+            or not self.text(digits).isdigit()
+            or len(group) != 2  # noqa: PLR2004
+            or not set(group) <= _PLATE_LETTERS
+            or not self.text(region).isdigit()
+            or len(self.text(region)) not in (2, 3)
+            or not self.u[self.st[index]].isupper()
+            or not self.u[self.st[letters] : self.en[letters]].isupper()
+        ):
+            return
+        key = "".join(self.text(k) for k in range(index, region + 1))
+        self.hits.add(VEHICLE, NORMAL, self.st[index], self.en[region], key)
+        self.skip_to = region
 
     def _iban(self, index: int, word: str) -> bool:
         country = word[:2].upper()
@@ -648,13 +822,44 @@ class _Line:
         if end < 0:
             return 0
         end = self._street_tail(end)
-        key = "".join(c for c in self.low[self.st[index] : end] if c.isalnum())
-        self.hits.add(ADDRESS, NORMAL, self.st[index], end, key)
+        begin = self.st[self._unit_prefix(index)]
+        key = "".join(c for c in self.low[begin:end] if c.isalnum())
+        self.hits.add(ADDRESS, NORMAL, begin, end, key)
         following = bisect_left(self.st, end)
         self.skip_to = max(self.skip_to, following - 1)
         return following
 
-    def _street_tail(self, end: int) -> int:
+    def _unit_prefix(self, index: int) -> int:
+        """Run of a ``Unit 7,`` / ``Warehouse 5,`` prefix before the street number, or ``index``."""
+        if (
+            index >= _MAX_UNIT_GAP
+            and self.gap(index - 1) == ", "
+            and self.gap(index - 2) == " "
+            and self.low[self.st[index - 2] : self.en[index - 2]] in UNIT_PREFIXES
+            and self.u[self.st[index - 2]].isupper()
+            and self.text(index - 1)[0].isdigit()
+            and len(self.text(index - 1)) <= _MAX_STREET_NUMBER
+        ):
+            return index - 2
+        return index
+
+    def _with_country(self, end: int) -> int:
+        """``end``, or the end of a country name that follows after a comma."""
+        low, u = self.low, self.u
+        if low[end : end + 2] != ", ":
+            return end
+        begin = end + 2
+        for name in COUNTRIES:
+            cursor = begin + len(name)
+            if (
+                u.startswith(name, begin)
+                and cursor <= self.le
+                and not low[cursor : cursor + 1].isalnum()
+            ):
+                return cursor
+        return end
+
+    def _street_tail(self, end: int) -> int:  # noqa: PLR0912
         """Town and postcode words after the street: ``, Springfield, IL 62704``."""
         low, u = self.low, self.u
         for _ in range(_MAX_STREET_TAIL):
@@ -663,7 +868,11 @@ class _Line:
             begin = end + 2
             code = self._postcode_at(begin)
             if code:
-                return code
+                return self._with_country(code)
+            unit = _UNIT_SEGMENT.match(low, begin, self.le)
+            if unit is not None:
+                end = unit.end()
+                continue
             cursor = begin
             words = 0
             while words < _MAX_STREET_WORDS and cursor < self.le and u[cursor].isupper():
@@ -677,11 +886,13 @@ class _Line:
                 if (
                     low[cursor : cursor + 1] == " "
                     and cursor + 1 < self.le
-                    and u[cursor + 1].isupper()
+                    and (u[cursor + 1].isupper() or low[cursor + 1].isdigit())
                 ):
                     code = self._postcode_at(cursor + 1)
                     if code:
-                        return code
+                        return self._with_country(code)
+                    if not u[cursor + 1].isupper():
+                        break
                     cursor += 1
                 elif low[cursor : cursor + 1] == "-" and low[cursor + 1 : cursor + 2].isalpha():
                     cursor += 1
@@ -724,9 +935,10 @@ class _Line:
 
     def _doc_no(self, index: int, word: str) -> None:
         if not any(
-            is_document_word(self.text(previous)) for previous in range(max(0, index - 3), index)
+            is_document_word(self.text(previous)) and self.gap(previous) != "-"
+            for previous in range(max(0, index - 3), index)
         ):
-            return
+            return  # a compound such as "счёт-фактура" is not a document word here
         low = self.low
         if len(word) > 2:  # noqa: PLR2004 - "no45": the numero sign glued to the number
             position = self.st[index] + 2
@@ -761,6 +973,28 @@ class _Line:
 
     def _passport(self, index: int) -> None:
         self._series_number(index, _FILL_PASSPORT, PERSONAL_DOC, (6, 9), True)
+
+    def _series(self, index: int) -> None:
+        """``серия 45 12 № 678901`` / ``серия 4512 № 678901``: a passport without its keyword."""
+        first = index + 1
+        if first + 1 >= self.n or not self.text(first).isdigit():
+            return
+        if len(self.text(first)) == _CARD_GROUP:
+            number = first + 1
+        elif (
+            len(self.text(first)) == 2  # noqa: PLR2004
+            and self.gap(first) == " "
+            and len(self.text(first + 1)) == 2  # noqa: PLR2004
+            and self.text(first + 1).isdigit()
+        ):
+            number = first + 2
+        else:
+            return
+        if number < self.n and self.text(number) in _FILL_NUMBER:
+            number += 1
+        if number < self.n and self.text(number).isdigit() and len(self.text(number)) == 6:  # noqa: PLR2004
+            self._add_range(PERSONAL_DOC, NORMAL, first, number)
+            self.skip_to = number
 
     def _idcard(self, index: int) -> None:
         self._series_number(index, _FILL_NUMBER, PERSONAL_DOC, (9, 9), False)
@@ -1140,6 +1374,7 @@ class _Line:
 
 _LABELS: Final[dict[str, Callable[[_Line, int], None]]] = {
     "passport": _Line._passport,
+    "series": _Line._series,
     "idcard": _Line._idcard,
     "driver": _Line._driver,
     "regcert": _Line._regcert,

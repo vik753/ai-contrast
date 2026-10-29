@@ -56,10 +56,14 @@ def upper_same_length(text: str) -> str:
     return "".join(c.upper() if len(c.upper()) == 1 else c for c in text)
 
 
+# The letter yo folds to ie (one word for both spellings of "расчётный"); same length.
+_FOLD_MAP: Final = {**SKELETON, 0x401: SKELETON.get(0x415, 0x415)}
+
+
 def fold_view(text: str) -> str:
     """Upper case, skeleton, lower case: capital Cyrillic look-alikes map to Latin before the
     case is dropped, so ``В`` and ``в`` both match ``B``/``b``. Same length as ``text``."""
-    return lower_same_length(upper_same_length(text).translate(SKELETON))
+    return lower_same_length(upper_same_length(text).translate(_FOLD_MAP))
 
 
 def fold(text: str) -> str:

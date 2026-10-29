@@ -26,6 +26,25 @@ LEGAL_FORMS_SUFFIX: Final = (
     "Ltd", "Inc", "LLC", "LLP", "GmbH", "AG", "PLC", "Corp", "SA", "BV", "NV", "Limited",
     "Pty", "OOO", "TOV",
 )  # fmt: skip
+# Legal forms written in full words before a name. Each form is a tuple of word stems
+# (prefix match, up to three more letters for case endings; one- and two-letter words exact).
+LEGAL_FORMS_LONG: Final = (
+    ("общест", "с", "ограниченн", "ответственност"),
+    ("акционерн", "общест"),
+    ("публичн", "акционерн", "общест"),
+    ("непубличн", "акционерн", "общест"),
+    ("закрыт", "акционерн", "общест"),
+    ("открыт", "акционерн", "общест"),
+    ("товариств", "з", "обмежен", "відповідальніст"),
+    ("товариств", "з", "додатков", "відповідальніст"),
+    ("акціонерн", "товариств"),
+    ("приватн", "акціонерн", "товариств"),
+    ("публічн", "акціонерн", "товариств"),
+    ("limited", "liability", "company"),
+    ("limited", "liability", "partnership"),
+    ("public", "limited", "company"),
+    ("private", "limited", "company"),
+)  # fmt: skip
 # Sole proprietors: ORG (form and name) and PERSON (name only).
 SOLE_TRADER_FORMS: Final = ("ФОП", "ФЛП", "ІП", "ИП")
 # A quoted name after one of these words (or after an all-capitals word) is an ORG.
@@ -78,6 +97,8 @@ CONTEXT: Final[dict[str, tuple[str | tuple[str, ...], ...]]] = {
     "ein": ("tax", "ein", "tin", "податковий", "налоговый"),
     "iban": ("iban",),
     "swift": ("swift", "bic"),
+    "sortcode": (("sort", "code"),),
+    "series": ("серия", "серія", "серии", "серії"),
     "mfo": ("мфо", "mfo"),
     "bik": ("бик", "bik"),
     "account": (
@@ -97,6 +118,9 @@ CONTEXT: Final[dict[str, tuple[str | tuple[str, ...], ...]]] = {
         ("р", "сч"),
         "корр",
         "кореспондентський",
+        "кореспондентського",
+        "корреспондентский",
+        "корреспондентского",
     ),
     "card": (
         "картка",
@@ -126,6 +150,13 @@ CONTEXT: Final[dict[str, tuple[str | tuple[str, ...], ...]]] = {
         "whatsapp",
         "viber",
         "telegram",
+        "call",
+        "calls",
+        "позвоните",
+        "звоните",
+        "зателефонуйте",
+        "телефонуйте",
+        "дзвоніть",
     ),
     "passport": ("паспорт", "паспорта", "passport"),
     "idcard": (
@@ -139,8 +170,19 @@ CONTEXT: Final[dict[str, tuple[str | tuple[str, ...], ...]]] = {
         ("посвідчення", "водія"),
         ("водійське", "посвідчення"),
         ("водительское", "удостоверение"),
+        ("посвідченням", "водія"),
+        ("посвідченні", "водія"),
+        ("посвідченню", "водія"),
+        ("посвідчення", "водія"),
+        ("водійського", "посвідчення"),
+        ("водительского", "удостоверения"),
+        ("водительским", "удостоверением"),
+        ("водительском", "удостоверении"),
+        ("водительскому", "удостоверению"),
         ("driver", "licence"),
         ("driver", "license"),
+        ("driver", "s", "licence"),
+        ("driver", "s", "license"),
         ("driving", "licence"),
         ("driving", "license"),
     ),
@@ -240,6 +282,7 @@ PERSON_ROLE_WORDS: Final = (
     "заемщик", "клиент", "лицо", "insured", "policyholder", "beneficiary", "customer", "buyer",
     "seller", "tenant", "lessee", "borrower", "employee", "patient", "applicant", "claimant",
     "cardholder", "passenger", "contact", "driver", "client", "consultant", "contractor", "owner",
+    "бухгалтер", "accountant", "signatory", "authorised", "authorized",
 )  # fmt: skip
 # Words that start a sentence or a list item and are not names (exact, folded).
 NOT_NAMES: Final = (
@@ -267,13 +310,46 @@ TITLE_WORDS: Final = (
     "representative", "authori", "signatory", "owner", "founder", "head", "ceo", "cfo",
     "руководител", "генеральный", "уполномоченн", "учредитель", "владелец", "громадянин",
     "громадянк", "гражданин", "гражданк", "пан", "пані", "mr", "mrs", "ms", "dr", "sir",
-    "фізичн", "особ", "физическ", "лиц",
+    "фізичн", "особ", "физическ", "лиц", "главн", "financ", "фінансов", "финансов", "operat",
+    "комерційн", "коммерческ", "технічн", "технич", "заместител", "vice", "deputy", "senior",
+    "managing", "general",
 )  # fmt: skip
 # Triggers before a representative's name (runs).
 PERSON_TRIGGERS: Final = (
     ("в", "особі"), ("в", "лице"), ("represented", "by"), ("acting", "through"),
     ("громадянин",), ("громадянка",), ("гражданин",), ("гражданка",), ("пан",), ("пані",),
     ("mr",), ("mrs",), ("ms",), ("dr",),
+)  # fmt: skip
+# Words before a name that introduce a notice or contact person (runs).
+PERSON_LEADINS: Final = (
+    ("notices", "to"), ("notice", "to"), ("questions", "to"), ("questions", "go", "to"),
+    ("queries", "to"), ("queries", "go", "to"), ("enquiries", "to"), ("inquiries", "to"),
+    ("attention",), ("attn",), ("for", "the", "attention", "of"), ("copy", "to"), ("cc",),
+    ("contact", "person"), ("c", "o"), ("addressed", "to"), ("directed", "to"),
+    ("увага",), ("уваги",), ("внимание",), ("внимания",),
+)  # fmt: skip
+# Verbs that follow the name of a person who acts ("Tobias Wren signs ..."). Exact, folded.
+PERSON_VERBS: Final = (
+    "signs", "confirms", "approves", "agrees", "acknowledges", "accepts", "certifies",
+    "represents", "authorises", "authorizes", "undertakes", "warrants", "attests",
+    "countersigns", "notifies", "receives", "reviews", "declares", "guarantees", "consents",
+    "executes", "witnesses", "verifies",
+)  # fmt: skip
+# Words that start a unit or an office before a street number ("Unit 7, 18 Mill Lane").
+UNIT_PREFIXES: Final = (
+    "unit", "units", "warehouse", "suite", "floor", "building", "office", "block", "flat",
+    "apartment", "apt", "room", "studio", "depot", "hangar", "plot", "lot",
+)  # fmt: skip
+# Countries that end an English address ("..., United Kingdom"). Short forms in capitals.
+COUNTRIES: Final = (
+    "United Kingdom", "UK", "Great Britain", "England", "Scotland", "Wales", "Northern Ireland",
+    "Ireland", "United States", "United States of America", "USA", "US", "Ukraine", "Poland",
+    "Germany", "France", "Spain", "Italy", "Netherlands", "Belgium", "Austria", "Switzerland",
+    "Sweden", "Norway", "Denmark", "Finland", "Czech Republic", "Slovakia", "Hungary", "Romania",
+    "Bulgaria", "Lithuania", "Latvia", "Estonia", "Moldova", "Georgia", "Turkey", "Canada",
+    "Australia", "New Zealand", "United Arab Emirates", "UAE", "Israel", "Cyprus", "Portugal",
+    "Greece", "Croatia", "Serbia", "Kazakhstan", "Belarus", "India", "China", "Japan",
+    "Singapore", "Luxembourg", "Malta", "Slovenia",
 )  # fmt: skip
 # Opens a definition: (далі — X), (the "X"). Runs.
 DEFINITION_OPENERS: Final = (
@@ -307,6 +383,7 @@ REQUISITES_LABELS: Final = (
     "посада", "должность", "position", "title", "ім", "я", "фіо", "піб", "фио",
     "банківський", "банковский", "банківські", "банковские", "реквізити", "реквизиты",
     "банківські", "розрахунковий", "расчетный", "кореспондентський", "корреспондентский",
+    "e", "sort", "of", "bank", "details",
 )  # fmt: skip
 # Role words in requisites lines: ROLE_WORDS above.
 
@@ -323,6 +400,11 @@ AMOUNT_WORDS: Final = (
     "m2", "шт", "pcs", "тонн", "тонни", "тон", "куб", "м3", "m3", "л", "мм", "см", "mm", "cm",
     "робочих", "рабочих", "календарних", "календарных", "working", "calendar", "банківських",
     "банковских", "banking", "тис", "млн", "млрд", "k", "mln",
+    # Pieces, mass and volume: a number before them is a quantity, never an identifier.
+    "штук", "штуки", "штука", "шт", "одиниць", "одиниці", "од", "единиц", "единицы", "ед",
+    "экз", "pieces", "piece", "pc", "units", "mg", "мг", "g", "ml", "мл",
+    "lb", "lbs", "oz", "kgs", "tons", "tonnes", "tonne", "packs", "pack", "упаковок", "уп",
+    "boxes", "items", "литров", "літрів", "liters", "litres", "meters", "metres", "sqm",
 )  # fmt: skip
 CURRENCY_SIGNS: Final = "$€£₴₽¥%"
 

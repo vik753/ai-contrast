@@ -35,6 +35,7 @@ from app.pseudo.lexicon import (
     REQUISITES_LABELS,
     is_obligation,
     is_role,
+    is_title,
 )
 from app.pseudo.lines import amount_or_date_follows
 from app.pseudo.matching import View, build_view, fold
@@ -479,7 +480,9 @@ def _droppable(text: str, first: int, last: int, mask: bytearray) -> bool:
         end = matched.end()
         if not all(mask[position:end]):
             word = fold(text[position:end])
-            if is_obligation(word) or not (word in REQUISITES_LABELS or is_role(word)):
+            if is_obligation(word) or not (
+                word in REQUISITES_LABELS or is_role(word) or is_title(word)
+            ):
                 return False
         position = end
     return True
