@@ -100,6 +100,12 @@ _CODE_KINDS: Final = _STOP_KINDS | {
 _CODE_WORDS: Final = frozenset(
     key[0] for key, kinds in CONTEXT_KINDS.items() if len(key) == 1 and kinds & _CODE_KINDS
 )
+_DOMESTIC_PHONE: Final = re.compile(r"0[0-9]{2}[ -][0-9]{3}[ -][0-9]{2}[ -][0-9]{2}(?![0-9])")
+_PLATE_SPACED: Final = re.compile(
+    r"[abcehkmoptxyавекмнопстух]{2} [0-9]{4} [abcehkmoptxyавекмнопстух]{2}(?![a-zа-я0-9])"
+)
+_SERIAL_MIN_VIN: Final = 17
+_MIN_PLATE: Final = 7
 _MIN_CODE_DIGITS: Final = 8
 _MIN_CODE_WORD: Final = 3
 _ADDRESS_STOP: Final = frozenset(
@@ -124,6 +130,16 @@ _VAT_MAX: Final = 14
 _PHONE_LOCAL: Final = 10
 _DAY_MAX: Final = 31
 _MONTH_MAX: Final = 12
+
+
+def _is_vin(word: str) -> bool:
+    return (
+        len(word) == _SERIAL_MIN_VIN
+        and word.isalnum()
+        and not word.isdigit()
+        and not word.isalpha()
+        and not set(word) & set("ioq")
+    )
 
 
 def amount_or_date_follows(low: str, start: int, end: int, limit: int) -> bool:
@@ -238,7 +254,7 @@ class _Line:
         return (
             previous >= 0
             and len(self.gap(previous)) <= 2  # noqa: PLR2004
-            and self.text(previous) in AMOUNT_WORDS
+            and self.text(previous) in STRONG_AMOUNT_WORDS
         )
 
     def joined(self, index: int) -> bool:
@@ -340,15 +356,14 @@ class _Line:
 
     def _domestic_phone(self, index: int, word: str) -> int:
         """``050 123 45 67``: a local mobile number written in groups."""
-        near = self.near("phone", index)
-        if word[0] != "0" or not (near or word in _UA_MOBILE or self.in_requisites(self.st[index])):
+        if word[0] != "0" or not (
+            self.near("phone", index) or word in _UA_MOBILE or self.in_requisites(self.st[index])
+        ):
             return 0
         if self.is_amount(index, index + 3):
             return 0
         digits = "".join(self.text(index + k) for k in range(4))
-        self.hits.add(
-            PHONE, HIGH if near else NORMAL, self.st[index], self.en[index + 3], digits[-9:]
-        )
+        self.hits.add(PHONE, HIGH, self.st[index], self.en[index + 3], digits[-9:])
         return index + 4
 
     def _snils(self, index: int) -> int:
@@ -711,14 +726,22 @@ class _Line:
         while end < limit and low[end].isalnum():
             end += 1
         word = low[index:end]
-        if self._code_starts(word, end):
+        if self._code_starts(word, index, end):
             return True
         if word.isdigit():
             return amount_or_date_follows(low, index, end, self.le)
         return is_obligation(word) or is_role(word)
 
-    def _code_starts(self, word: str, end: int) -> bool:
-        """The token starts a code: a long number, an IBAN, a card, or a code keyword."""
+    def _code_starts(self, word: str, start: int, end: int) -> bool:  # noqa: PLR0911
+        """The token starts a code: a long number, IBAN, card, phone, plate, VIN or keyword."""
+        if _DOMESTIC_PHONE.match(self.low, start, self.le) or _PLATE_SPACED.match(
+            self.low, start, self.le
+        ):
+            return True
+        if len(word) >= _SERIAL_MIN_VIN and _is_vin(word):
+            return True
+        if len(word) >= _MIN_PLATE and (_PLATE_UA.fullmatch(word) or _PLATE_RU.fullmatch(word)):
+            return True
         if word.isdigit():
             if len(word) >= _MIN_CODE_DIGITS:
                 return True
