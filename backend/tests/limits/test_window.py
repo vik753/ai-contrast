@@ -143,5 +143,5 @@ def test_table_never_accepts_more_fresh_keys_than_max_keys() -> None:
     [(0, 60, 10), (-1, 60, 10), (1, 0, 10), (1, -5, 10), (1, 60, 0), (1, 60, -1)],
 )
 def test_constructor_rejects_non_positive_values(limit: int, window: float, max_keys: int) -> None:
-    with pytest.raises(ValueError, match=".+"):
+    with pytest.raises(ValueError, match=r"\S"):
         FixedWindowLimiter(limit, window, max_keys, FakeClock())
