@@ -16,7 +16,9 @@ offsets only, never text.
 
 from __future__ import annotations
 
+import sys
 from bisect import bisect_right
+from collections.abc import Sequence
 from dataclasses import InitVar, dataclass
 from itertools import pairwise
 from typing import Final, NoReturn, final
@@ -232,6 +234,21 @@ def _acknowledged(
     return set(result)
 
 
+def _is_acknowledged(
+    block: int, start: int, end: int, acknowledged: Sequence[tuple[int, int, int]]
+) -> bool:
+    """A hit equal to an acknowledged span, or fully contained in one (caller: not high).
+
+    ``acknowledged`` is sorted and non-overlapping (checked by ``_acknowledged``), so the only
+    candidate container is the last span that starts at or before ``start``: O(log n) per hit.
+    """
+    index = bisect_right(acknowledged, (block, start, sys.maxsize)) - 1
+    if index < 0:
+        return False
+    b, s, e = acknowledged[index]
+    return b == block and s <= start and end <= e
+
+
 def safety_pass(
     untrusted: UntrustedMaskedDocument, *, max_clauses: int = MAX_CLAUSES
 ) -> PseudonymizedDocument:
@@ -257,11 +274,12 @@ def safety_pass(
         raise SafetyError("invalid_placeholder") from None
     found, known = _leftovers(texts, placeholders)
     acknowledged = _acknowledged(untrusted, known)
+    acknowledged_sorted = sorted(acknowledged)
     leftover = (
         {
             (block, start, end)
             for block, start, end, high in found
-            if high or (block, start, end) not in acknowledged
+            if high or not _is_acknowledged(block, start, end, acknowledged_sorted)
         }
         | partial_spans(texts, placeholders)
         | keyword_digit_spans(texts, placeholders)
