@@ -2,7 +2,7 @@
 
 ``fetch_google_doc`` builds the export URL from a validated ID only, sends a fixed set of
 headers, follows at most three redirects itself (each target is checked), reads the body
-raw with a size cap, and has one total deadline. Every ``httpx`` and guard error becomes a
+raw with a size cap, and has one total deadline. Every ``httpx2`` and guard error becomes a
 ``GoogleDocError`` with a fixed code (``raise ... from None``). The text of such an error
 can hold the URL or an IP address, so it is never logged or returned. The ID is a
 password for the document: it is in no log and no error.
@@ -14,7 +14,7 @@ import asyncio
 import re
 from typing import Final
 
-import httpx
+import httpx2
 
 from app.net.client import ClientFactory
 from app.net.guard import BlockedAddressError, BlockedHostError
@@ -58,13 +58,13 @@ def _media_type(value: str | None) -> str:
     return "" if value is None else value.split(";", 1)[0].strip().lower()
 
 
-def _next_url(response: httpx.Response) -> httpx.URL:
+def _next_url(response: httpx2.Response) -> httpx2.URL:
     location = response.headers.get("location")
     if not location:
         raise GoogleDocError(UNAVAILABLE)
     try:
         target = response.request.url.join(location)
-    except httpx.InvalidURL:
+    except httpx2.InvalidURL:
         raise GoogleDocError(UNAVAILABLE) from None
     if target.scheme != "https" or target.userinfo or target.port not in (None, _HTTPS_PORT):
         raise GoogleDocError(UNAVAILABLE)
@@ -75,7 +75,7 @@ def _next_url(response: httpx.Response) -> httpx.URL:
     return target
 
 
-def _check_status(response: httpx.Response) -> None:
+def _check_status(response: httpx2.Response) -> None:
     status = response.status_code
     if status != _OK:
         if status in (_UNAUTHORIZED, _FORBIDDEN):
@@ -93,7 +93,7 @@ def _check_status(response: httpx.Response) -> None:
         raise GoogleDocError(UNAVAILABLE)
 
 
-async def _read_body(response: httpx.Response, max_bytes: int) -> bytes:
+async def _read_body(response: httpx2.Response, max_bytes: int) -> bytes:
     declared = response.headers.get("content-length", "").strip()
     if declared.isascii() and declared.isdigit() and int(declared) > max_bytes:
         raise GoogleDocError(TOO_LARGE)
@@ -105,8 +105,8 @@ async def _read_body(response: httpx.Response, max_bytes: int) -> bytes:
     return bytes(body)
 
 
-async def _fetch(client: httpx.AsyncClient, document_id: str, max_bytes: int) -> bytes:
-    url = httpx.URL(f"https://{DOCS_HOST}/document/d/{document_id}/export?format=docx")
+async def _fetch(client: httpx2.AsyncClient, document_id: str, max_bytes: int) -> bytes:
+    url = httpx2.URL(f"https://{DOCS_HOST}/document/d/{document_id}/export?format=docx")
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": DOCX_MEDIA_TYPE,
@@ -143,7 +143,7 @@ async def fetch_google_doc(
             return await _fetch(client, document_id, max_bytes)
     except TimeoutError:
         raise GoogleDocError(TIMEOUT) from None
-    except httpx.TimeoutException:
+    except httpx2.TimeoutException:
         raise GoogleDocError(TIMEOUT) from None
-    except (httpx.HTTPError, httpx.InvalidURL, BlockedHostError, BlockedAddressError):
+    except (httpx2.HTTPError, httpx2.InvalidURL, BlockedHostError, BlockedAddressError):
         raise GoogleDocError(UNAVAILABLE) from None

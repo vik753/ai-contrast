@@ -5,9 +5,13 @@ description = "AI Contrast backend: stateless API that compares contracts clause
 requires-python = ">=3.13"
 license = "AGPL-3.0-only"
 dependencies = [
+    "anthropic==1.15.0",
+    "certifi==2026.7.22",
     "defusedxml==0.7.1",
     "fastapi>=0.143.0",
-    "httpx==0.28.1",
+    "httpcore2==2.13.1",
+    "httpx2==2.13.1",
+    "openai==3.31.0",
     "pdfminer.six==20260107",
     "pydantic-settings>=2.15.0",
     "uvicorn>=0.54.0",
@@ -15,6 +19,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx==0.28.1",
     "mypy>=2.4.0",
     "pip-audit>=2.10.1",
     "pytest>=9.1.1",
@@ -24,6 +29,10 @@ dev = [
 [tool.uv]
 # The backend is an application, not a library: do not build or install it.
 package = false
+# Never build from source: only wheels (supply chain, ADR 0016).
+no-build = true
+# jiter 0.18.0 is younger than 14 days; 0.17.0 is approved.
+constraint-dependencies = ["jiter==0.17.0"]
 
 [tool.ruff]
 line-length = 100

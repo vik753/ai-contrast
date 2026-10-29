@@ -45,7 +45,7 @@ TELEMETRY_DISABLED: TelemetryConfig = {
 
 # `httpx` logs every request URL at INFO. The Google Docs ID is a password for the
 # document, so both loggers stay at WARNING (ADR 0012 point 5).
-NET_LOGGERS = ("httpx", "httpcore")
+NET_LOGGERS = ("httpx", "httpcore", "httpx2", "httpcore2")
 GOOGLE_READ_TIMEOUT_SECONDS = 10.0
 
 
