@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import unicodedata
 from array import array
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Final
@@ -77,6 +77,7 @@ class View:
     low: str  # lower-case skeleton
     src: array[int] | None
     extra: dict[int, int] = field(default_factory=dict)  # view index -> end after dropped marks
+    breaks: list[int] = field(default_factory=list)  # view indexes of line breaks inside a block
 
     def g_start(self, index: int) -> int:
         """Start in ``g`` of the view character ``index`` (``0 <= index < len(u)``)."""
@@ -182,22 +183,44 @@ def build_view(texts: list[str], clause_of: Callable[[int, int], str | None] | N
         return clause is not None and clause == clause_of(two, second - bases[two])
 
     joins = _joins(g, same_clause if clause_of is not None else None)
-    changes = _changes(g)
+    # A line break inside a block (OCR soft wrap, PDF line wrap) is a space in the view;
+    # the break between two blocks stays a hard "\n". Same length: offsets stay valid.
+    flat = "\n".join(text.replace("\n", " ") for text in texts)
+    changes = _changes(flat)
     extra: dict[int, int] = {}
-    if not joins and not changes and unicodedata.is_normalized("NFKC", g):
-        view = g
+    if not joins and not changes and unicodedata.is_normalized("NFKC", flat):
+        view = flat
         src = None
     else:
         pieces: list[str] = []
         src = array("i")
         previous = 0
         for cut, resume in [*joins, (len(g), len(g))]:
-            _append_chunk(g[previous:cut], previous, changes, pieces, src, extra)
+            _append_chunk(flat[previous:cut], previous, changes, pieces, src, extra)
             previous = resume
         view = "".join(pieces)
     view = view.translate(DASH_FOLD)
     skeleton = view.translate(SKELETON)
-    return View(g, bases, sizes, view, skeleton, fold_view(view), src, extra)
+    result = View(g, bases, sizes, view, skeleton, fold_view(view), src, extra)
+    result.breaks = _soft_breaks(g, bases, src)
+    return result
+
+
+def _soft_breaks(g: str, bases: list[int], src: array[int] | None) -> list[int]:
+    """View indexes of the line breaks inside a block (spaces in the view)."""
+    separators = {base - 1 for base in bases[1:]}
+    found: list[int] = []
+    position = g.find("\n")
+    while position != -1:
+        if position not in separators:
+            if src is None:
+                found.append(position)
+            else:
+                index = bisect_left(src, position)
+                if index < len(src) and src[index] == position:
+                    found.append(index)
+        position = g.find("\n", position + 1)
+    return found
 
 
 def _append_chunk(  # noqa: PLR0913, PLR0917

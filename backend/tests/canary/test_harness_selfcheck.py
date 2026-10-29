@@ -56,6 +56,44 @@ def test_matcher_ignores_masked_and_unrelated_text(needle: str, haystack: str) -
     assert find_leaks([needle], haystack) == []
 
 
+@pytest.mark.parametrize(
+    ("needle", "haystack"),
+    [
+        ("Мельник", "Кадастровий номер земельної ділянки"),  # 'мельн' inside a word
+        ("Кравець", "[A.ORG_6] діє як виконавець за договором"),  # 'авець' inside a word
+        ("Коваль", "Страхувальник підписав"),  # 'вальн'/'льник' inside a word
+        ("15-К/2031", "('docx', 'ok', 203.1257)"),  # timing digits in a log tuple
+    ],
+)
+def test_matcher_ignores_fragment_inside_ordinary_word(needle: str, haystack: str) -> None:
+    assert find_leaks([needle], haystack) == []
+
+
+@pytest.mark.parametrize(
+    ("needle", "haystack"),
+    [
+        ("UA113052990000026003345678901", "рахунок [A.ACCOUNT_1]UA11305299000002600334"),
+        ("UA113052990000026003345678901", "IBAN №UA11305299000002600334 вказано"),
+        ("UA113052990000026003345678901", "рахунок-UA11305299000002600334"),
+        ("UA113052990000026003345678901", "рахунок/UA11305299000002600334"),
+        ("UA113052990000026003345678901", "рахунок:UA11305299000002600334"),
+        ("UA113052990000026003345678901", "IBAN UA 113052990000026003345"),
+        ("Левченко", "[A.PERSON_1]евченко підписав"),
+        ("oleksandr.shevchenko@example.com", "[A.EMAIL_1]oleksandr.shevchenko@exa"),
+        ("Мирошниченко", "Страхувальник:Мирошниченк"),
+        ("Мирошниченко", "ПІБ(Мирошниченк)"),
+    ],
+)
+def test_matcher_flags_partial_mask_after_placeholder_or_punctuation(
+    needle: str, haystack: str
+) -> None:
+    assert find_leaks([needle], haystack) == [needle]
+
+
+def test_matcher_still_flags_a_fragment_at_a_word_start() -> None:
+    assert find_leaks(["Мельник"], "підписав Мельни та інші") == ["Мельник"]
+
+
 def test_key_is_stable_and_alphanumeric_only() -> None:
     assert key("A-b\u200b c_1") == key("ａ B C 1") == "abc1"
 

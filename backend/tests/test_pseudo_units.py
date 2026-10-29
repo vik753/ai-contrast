@@ -73,7 +73,14 @@ def test_view_line_end_hyphen_is_removed_and_the_span_covers_it() -> None:
 def test_view_hyphen_before_an_upper_case_letter_is_kept() -> None:
     view = build_view(["ab-\nCd"])
 
-    assert view.u == "ab-\nCd"
+    assert view.u == "ab- Cd"  # a line break inside a block is a space in the view
+
+
+def test_view_keeps_the_break_between_blocks_hard() -> None:
+    view = build_view(["ab\ncd", "ef"])
+
+    assert view.u == "ab cd\nef"
+    assert len(view.u) == len(view.g)
 
 
 def test_view_hyphen_at_block_end_joins_the_next_block() -> None:
