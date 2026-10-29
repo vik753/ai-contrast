@@ -222,11 +222,7 @@ function cpLength(text: string): number {
 }
 
 /** Non-overlapping annotations per block, in document order. */
-function annotations(review: Review): {
-  main: Map<number, Annot[]>;
-  /** Unmasked occurrences inside another unmasked occurrence (a person in a signature line). */
-  nested: Map<number, Annot[]>;
-} {
+function annotations(review: Review): Map<number, Annot[]> {
   const masked: Annot[][] = [];
   const others: Annot[][] = [];
   const byBlock = (target: Annot[][], block: number): Annot[] => (target[block] ??= []);
@@ -253,7 +249,6 @@ function annotations(review: Review): {
   }
   const order = (a: Annot, b: Annot): number => a.start - b.start || b.end - a.end;
   const result = new Map<number, Annot[]>();
-  const nested = new Map<number, Annot[]>();
   const blockCount = Math.max(masked.length, others.length);
   for (let block = 0; block < blockCount; block += 1) {
     const chosen: Annot[] = [];
@@ -276,13 +271,6 @@ function annotations(review: Review): {
       const lastFree = free.at(-1);
       if (!clash && (lastFree === undefined || annot.start >= lastFree.end)) {
         free.push(annot);
-      } else if (
-        !clash &&
-        annot.kind === "plain" &&
-        lastFree?.kind === "plain" &&
-        annot.end <= lastFree.end
-      ) {
-        nested.set(block, [...(nested.get(block) ?? []), annot]);
       }
     }
     const all = [...chosen, ...free].sort(order);
@@ -290,7 +278,7 @@ function annotations(review: Review): {
       result.set(block, all);
     }
   }
-  return { main: result, nested };
+  return result;
 }
 
 /** The annotations of `list` that lie inside `[from, to)`. */
@@ -321,10 +309,27 @@ function within(list: readonly Annot[] | undefined, from: number, to: number): A
   return out;
 }
 
+/**
+ * Sorted by (clause order, start) and without overlap, like the server's check: a span
+ * inside another (a person in a signature line) is left out; the server counts a normal hit
+ * inside an acknowledged span as acknowledged.
+ */
+function outermost(spans: readonly ClauseSpan[]): ClauseSpan[] {
+  const out: ClauseSpan[] = [];
+  for (const span of spans) {
+    const last = out.at(-1);
+    if (last?.[0] === span[0] && span[1] < last[2]) {
+      continue;
+    }
+    out.push(span);
+  }
+  return out;
+}
+
 function buildView(review: Review): View {
   const { segmentation } = review;
   const { blocks, clauses } = segmentation;
-  const { main: annots, nested } = annotations(review);
+  const annots = annotations(review);
   const linesOf = new Map<string, RequisitesClause["lines"]>();
   for (const entry of segmentation.requisites) {
     linesOf.set(entry.clause, [...(linesOf.get(entry.clause) ?? []), ...entry.lines]);
@@ -454,17 +459,6 @@ function buildView(review: Review): View {
             const owner = review.entities[piece.occ.entity];
             if (owner !== undefined && !owner.manual) {
               acknowledged.push([clause.id, mpos, mpos + length]);
-              // Unmasked values inside this one are hits of the detector too.
-              for (const inner of within(
-                nested.get(piece.block),
-                piece.start,
-                piece.start + length,
-              )) {
-                if (review.entities[inner.entity]?.manual === false) {
-                  const at = mpos + inner.start - piece.start;
-                  acknowledged.push([clause.id, at, at + inner.end - inner.start]);
-                }
-              }
             }
           }
         }
@@ -494,7 +488,14 @@ function buildView(review: Review): View {
       masked.push({ id: clause.id, text: parts.join("\n") });
     }
   }
-  return { clauses: viewClauses, placeholders, mapping, masked, acknowledged, segments };
+  return {
+    clauses: viewClauses,
+    placeholders,
+    mapping,
+    masked,
+    acknowledged: outermost(acknowledged),
+    segments,
+  };
 }
 
 export function viewOf(review: Review): View {

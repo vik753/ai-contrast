@@ -26,4 +26,19 @@ describe("masked-text offsets", () => {
     const at = (EXPECTED_MASKED[0] ?? "").indexOf("30 days");
     expect(masking.unmappedSpans(r, [["c1", at, at + 7]])).toEqual([]);
   });
+
+  it("test_acknowledged_list_is_sorted_and_without_overlap", async () => {
+    let r = await start();
+    for (const id of ["e1", "e2", "e3"]) r = masking.unmaskEntity(r, id);
+    const list = masking.acknowledgedUnmasked(r);
+    expect(list.length).toBeGreaterThan(3);
+    // The server's rule: sorted by (clause order, start), each start at or after the last end.
+    const order = (id: string) => Number(id.slice(1));
+    for (let i = 1; i < list.length; i += 1) {
+      const [a, b] = [list[i - 1], list[i]];
+      if (a === undefined || b === undefined) throw new Error("hole");
+      expect(order(b[0])).toBeGreaterThanOrEqual(order(a[0]));
+      if (a[0] === b[0]) expect(b[1]).toBeGreaterThanOrEqual(a[2]);
+    }
+  });
 });

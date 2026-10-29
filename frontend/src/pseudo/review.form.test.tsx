@@ -690,7 +690,7 @@ describe("languages", () => {
 
 describe("signature container with the person inside", () => {
   const SIG: WireBlock[] = [body("Страхувальник: ____________ /Іваненко І.І./")];
-  it("test_unmask_all_sends_container_and_inner_spans_as_acknowledged", async () => {
+  it("test_unmask_all_sends_only_the_container_span_as_acknowledged", async () => {
     reply = (blocks) => ({
       ...segmentReply(blocks),
       detector_version: DETECTOR_VERSION,
@@ -710,9 +710,7 @@ describe("signature container with the person inside", () => {
     await confirm(review);
     const sent = safetyBodies[0];
     expect((sent?.clauses as { text: string }[])[0]?.text).toBe(SIG[0]?.text);
-    expect(sent?.acknowledged_unmasked).toEqual([
-      ["c1", 15, 43],
-      ["c1", 29, 42],
-    ]);
+    // Decided spec change: only the outermost span; the server counts the hit inside it.
+    expect(sent?.acknowledged_unmasked).toEqual([["c1", 15, 43]]);
   });
 });
