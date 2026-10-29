@@ -637,16 +637,21 @@ def test_dependabot_docker_covers_frontend_when_frontend_dockerfile_exists() -> 
 
 
 @pytest.mark.parametrize("ecosystem", sorted({e for e, _ in DEPENDABOT_REQUIRED}))
-def test_dependabot_ecosystem_has_cooldown_seven_days(ecosystem: str) -> None:
+def test_dependabot_ecosystem_has_cooldown_fourteen_days(ecosystem: str) -> None:
     for block in _dependabot_blocks(ecosystem):
         assert re.search(r"^\s*cooldown:\s*$", block, re.M), block
-        assert re.search(r"default-days:\s*7\b", block), block
+        assert re.search(r"default-days:\s*14\b", block), block
 
 
 @pytest.mark.parametrize("ecosystem", sorted({e for e, _ in DEPENDABOT_REQUIRED}))
-def test_dependabot_ecosystem_weekly(ecosystem: str) -> None:
+def test_dependabot_ecosystem_monthly_and_grouped(ecosystem: str) -> None:
     for block in _dependabot_blocks(ecosystem):
-        assert re.search(r"interval:\s*['\"]?weekly['\"]?", block), block
+        assert re.search(r"interval:\s*['\"]?monthly['\"]?", block), block
+        # One grouped PR per ecosystem for version updates only; security updates
+        # stay separate and immediate.
+        assert re.search(r"^\s*groups:\s*$", block, re.M), block
+        assert re.search(r"applies-to:\s*version-updates\b", block), block
+        assert "security-updates" not in block, block
 
 
 def _ignore_entries(ecosystem: str | None = None, directory: str | None = None) -> dict[str, str]:
