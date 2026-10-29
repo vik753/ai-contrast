@@ -12,6 +12,7 @@ import functools
 import json
 import logging
 import math
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -43,26 +44,36 @@ def key(value: str) -> str:
     return "".join(ch for ch in fold(value) if ch.isalnum())
 
 
-def spaced_key(value: str) -> str:
-    """Like ``key`` but words stay apart: whitespace runs become one space, every other
-    non-alphanumeric character (hyphen, zero-width, punctuation) is dropped."""
-    out: list[str] = []
-    for ch in fold(value):
-        if ch.isalnum():
-            out.append(ch)
-        elif ch.isspace() and out and out[-1] != " ":
-            out.append(" ")
-    return " " + "".join(out)
+PLACEHOLDER = re.compile(r"\[[A-Z]\.[A-Z_]+_[0-9]+\]")
 
 
-def leaked_part(needle: str, haystack_key: str, haystack_words: str) -> str | None:
+def analyse(value: str) -> tuple[str, list[bool]]:
+    """``key(value)`` plus, for every character of it, whether it starts a word.
+
+    Placeholders and every non-alphanumeric character (whitespace, punctuation, brackets,
+    hyphens, zero-width, ``№``) are word breaks; a letter/digit change is a boundary too.
+    """
+    chars: list[str] = []
+    starts: list[bool] = []
+    previous = ""  # last character seen; "" after a break
+    for ch in fold(PLACEHOLDER.sub(" ", value).replace("№", " ")):
+        if not ch.isalnum():
+            previous = ""
+            continue
+        chars.append(ch)
+        starts.append(previous == "" or previous.isdigit() != ch.isdigit())
+        previous = ch
+    return "".join(chars), starts
+
+
+def leaked_part(needle: str, haystack_key: str, starts: list[bool]) -> str | None:
     """The part of ``needle`` found in the text, or ``None``.
 
-    The whole value counts anywhere (``haystack_key``: separators removed). A fragment of
-    at least 70 % of one word of the needle (and at least 5 characters) counts as a partial
-    mask, but only at the start of a word of the text (``haystack_words``): inside an
-    ordinary word (``льник`` in "Страхувальник") or across digits of a log line it is not a
-    leak.
+    The whole value counts anywhere. A fragment of at least 70 % of one word of the needle
+    (and at least 5 characters) counts as a partial mask when it begins at a word start or
+    at a letter/digit boundary of the text (so also right after a placeholder, ``№``, ``-``,
+    ``/`` or ``:``). Inside an ordinary word (``льник`` in "Страхувальник") or across the
+    digits of a log line it is not a leak.
     """
     k = key(needle)
     if k and k in haystack_key:
@@ -74,15 +85,18 @@ def leaked_part(needle: str, haystack_key: str, haystack_words: str) -> str | No
         window = max(MIN_FRAGMENT, math.ceil(len(wk) * FRAGMENT_RATIO))
         for start in range(len(wk) - window + 1):
             fragment = wk[start : start + window]
-            if " " + fragment in haystack_words:
-                return fragment
+            at = haystack_key.find(fragment)
+            while at >= 0:
+                if starts[at]:
+                    return fragment
+                at = haystack_key.find(fragment, at + 1)
     return None
 
 
 def find_leaks(needles: Iterable[str], *texts: str) -> list[str]:
     text = "\n".join(texts)
-    full, words = key(text), spaced_key(text)
-    return [n for n in needles if leaked_part(n, full, words) is not None]
+    full, starts = analyse(text)
+    return [n for n in needles if leaked_part(n, full, starts) is not None]
 
 
 # --------------------------------------------------------------------------------- logs
