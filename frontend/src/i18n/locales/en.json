@@ -334,7 +334,9 @@
       "too_many_identifiers": "The contract has too many identifiers. Split it into parts.",
       "safety_failed": "The safety check failed. Try again.",
       "unknown_error": "The server gave an unexpected answer. Try again.",
-      "unmapped_span": "The safety check returned text that could not be matched to the contract. Remove the file and add it again."
+      "unmapped_span": "The safety check returned text that could not be matched to the contract. Remove the file and add it again.",
+      "too_much_text": "The masked text is too long for the check. Split the contract into parts.",
+      "length_mismatch": "The request did not arrive completely. Try again."
     }
   }
 }

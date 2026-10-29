@@ -23,6 +23,8 @@ const ERROR_CODES = [
   "too_many_identifiers",
   "safety_failed",
   "unmapped_span",
+  "too_much_text",
+  "length_mismatch",
 ] as const;
 type ErrorCode = (typeof ERROR_CODES)[number];
 

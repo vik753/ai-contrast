@@ -319,14 +319,10 @@ function parseClause(
   if (!inOrder(spans)) {
     return null;
   }
-  let headingSpan: Span | null = null;
-  if (value.heading_span !== null) {
-    const found = parseSpan(value.heading_span, lengths);
-    // The heading is part of the clause text: it lies inside one of its spans.
-    if (found === null || !spans.some((span) => within(found, span))) {
-      return null;
-    }
-    headingSpan = found;
+  // The heading may belong to the section: it lies inside a span of some clause (checked later).
+  const headingSpan = value.heading_span === null ? null : parseSpan(value.heading_span, lengths);
+  if (value.heading_span !== null && headingSpan === null) {
+    return null;
   }
   return {
     id,
@@ -575,8 +571,14 @@ function parseSegmentation(
     }
     clauses.push(clause);
   }
+  const headingsInside = clauses.every((clause) => {
+    const heading = clause.headingSpan;
+    return (
+      heading === null || clauses.some((other) => other.spans.some((span) => within(heading, span)))
+    );
+  });
   const warnings = parseWarnings(body.warnings, clauses);
-  if (warnings === null || !disjoint(clauses) || !covers(clauses, indexes)) {
+  if (!headingsInside || warnings === null || !disjoint(clauses) || !covers(clauses, indexes)) {
     return null;
   }
   const version = body.detector_version;

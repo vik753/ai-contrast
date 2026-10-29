@@ -186,8 +186,8 @@ export interface ViewClause {
 
 interface Segment {
   /** Offsets in the masked clause text (what the server sees), in code points. */
-  readonly origStart: number;
-  readonly origEnd: number;
+  readonly maskedStart: number;
+  readonly maskedEnd: number;
   readonly block: number;
   readonly start: number;
   readonly masked: boolean;
@@ -222,7 +222,11 @@ function cpLength(text: string): number {
 }
 
 /** Non-overlapping annotations per block, in document order. */
-function annotations(review: Review): Map<number, Annot[]> {
+function annotations(review: Review): {
+  main: Map<number, Annot[]>;
+  /** Unmasked occurrences inside another unmasked occurrence (a person in a signature line). */
+  nested: Map<number, Annot[]>;
+} {
   const masked: Annot[][] = [];
   const others: Annot[][] = [];
   const byBlock = (target: Annot[][], block: number): Annot[] => (target[block] ??= []);
@@ -249,6 +253,7 @@ function annotations(review: Review): Map<number, Annot[]> {
   }
   const order = (a: Annot, b: Annot): number => a.start - b.start || b.end - a.end;
   const result = new Map<number, Annot[]>();
+  const nested = new Map<number, Annot[]>();
   const blockCount = Math.max(masked.length, others.length);
   for (let block = 0; block < blockCount; block += 1) {
     const chosen: Annot[] = [];
@@ -271,6 +276,13 @@ function annotations(review: Review): Map<number, Annot[]> {
       const lastFree = free.at(-1);
       if (!clash && (lastFree === undefined || annot.start >= lastFree.end)) {
         free.push(annot);
+      } else if (
+        !clash &&
+        annot.kind === "plain" &&
+        lastFree?.kind === "plain" &&
+        annot.end <= lastFree.end
+      ) {
+        nested.set(block, [...(nested.get(block) ?? []), annot]);
       }
     }
     const all = [...chosen, ...free].sort(order);
@@ -278,7 +290,7 @@ function annotations(review: Review): Map<number, Annot[]> {
       result.set(block, all);
     }
   }
-  return result;
+  return { main: result, nested };
 }
 
 /** The annotations of `list` that lie inside `[from, to)`. */
@@ -312,7 +324,7 @@ function within(list: readonly Annot[] | undefined, from: number, to: number): A
 function buildView(review: Review): View {
   const { segmentation } = review;
   const { blocks, clauses } = segmentation;
-  const annots = annotations(review);
+  const { main: annots, nested } = annotations(review);
   const linesOf = new Map<string, RequisitesClause["lines"]>();
   for (const entry of segmentation.requisites) {
     linesOf.set(entry.clause, [...(linesOf.get(entry.clause) ?? []), ...entry.lines]);
@@ -416,7 +428,7 @@ function buildView(review: Review): View {
   for (const { clause, spans } of viewClauses) {
     const parts: string[] = [];
     const clauseSegments: Segment[] = [];
-    let orig = 0;
+    let mpos = 0;
     const emit = (pieces: readonly Piece[], out: { text: string }): void => {
       for (const piece of pieces) {
         if (piece.kind === "line") {
@@ -430,8 +442,8 @@ function buildView(review: Review): View {
         const shown = piece.kind === "mark" ? assign(piece.entity, piece.text) : piece.text;
         const width = piece.kind === "mark" ? cpLength(shown) : length;
         clauseSegments.push({
-          origStart: orig,
-          origEnd: orig + width,
+          maskedStart: mpos,
+          maskedEnd: mpos + width,
           block: piece.block,
           start: piece.start,
           masked: piece.kind === "mark",
@@ -441,25 +453,36 @@ function buildView(review: Review): View {
           if (piece.kind === "text" && piece.occ !== undefined) {
             const owner = review.entities[piece.occ.entity];
             if (owner !== undefined && !owner.manual) {
-              acknowledged.push([clause.id, orig, orig + length]);
+              acknowledged.push([clause.id, mpos, mpos + length]);
+              // Unmasked values inside this one are hits of the detector too.
+              for (const inner of within(
+                nested.get(piece.block),
+                piece.start,
+                piece.start + length,
+              )) {
+                if (review.entities[inner.entity]?.manual === false) {
+                  const at = mpos + inner.start - piece.start;
+                  acknowledged.push([clause.id, at, at + inner.end - inner.start]);
+                }
+              }
             }
           }
         }
-        orig += width;
+        mpos += width;
       }
     };
     for (const pieces of spans) {
       const out = { text: "" };
-      const before = orig;
+      const before = mpos;
       // The line break comes before the span; it is undone if the span is dropped.
       if (parts.length > 0) {
-        orig += 1;
+        mpos += 1;
       }
       emit(pieces, out);
       if (out.text.trim() === "") {
         // The span was dropped: nothing of it counts.
-        orig = before;
-        while ((clauseSegments.at(-1)?.origStart ?? -1) >= before) {
+        mpos = before;
+        while ((clauseSegments.at(-1)?.maskedStart ?? -1) >= before) {
           clauseSegments.pop();
         }
         continue;
@@ -754,18 +777,18 @@ export function applyUnmaskedIdentifiers(review: Review, spans: readonly ClauseS
     if (segments === undefined) {
       continue;
     }
-    const first = segments.find((s) => s.origStart <= start && start < s.origEnd);
+    const first = segments.find((s) => s.maskedStart <= start && start < s.maskedEnd);
     if (first === undefined || first.masked) {
       continue;
     }
-    const last = segments.find((s) => s.origStart < end && end <= s.origEnd);
+    const last = segments.find((s) => s.maskedStart < end && end <= s.maskedEnd);
     const stop = last?.block === first.block ? last : first;
-    const to = Math.min(end, stop.origEnd) - stop.origStart + stop.start;
+    const to = Math.min(end, stop.maskedEnd) - stop.maskedStart + stop.start;
     const block = next.segmentation.blocks[first.block];
     if (block === undefined) {
       continue;
     }
-    const target: Span = [first.block, start - first.origStart + first.start, to];
+    const target: Span = [first.block, start - first.maskedStart + first.start, to];
     // Every unmasked occurrence the span touches is masked again, whole.
     const touched: [number, number][] = [];
     for (const [entity, item] of next.entities.entries()) {
@@ -794,7 +817,9 @@ export function applyUnmaskedIdentifiers(review: Review, spans: readonly ClauseS
 export function unmappedSpans(review: Review, spans: readonly ClauseSpan[]): ClauseSpan[] {
   const segments = viewOf(review).segments;
   return spans.filter(([clauseId, start]) => {
-    const found = segments.get(clauseId)?.find((s) => s.origStart <= start && start < s.origEnd);
+    const found = segments
+      .get(clauseId)
+      ?.find((s) => s.maskedStart <= start && start < s.maskedEnd);
     return found === undefined || found.masked;
   });
 }
