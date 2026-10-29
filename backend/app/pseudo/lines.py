@@ -39,11 +39,13 @@ from app.pseudo.lexicon import (
     COUNTRIES,
     DEFINITION_OPENERS,
     MONTHS,
+    QUANTITY_WORDS,
     STREET_SUFFIXES,
     STRONG_AMOUNT_WORDS,
     UNIT_PREFIXES,
     WRAP_STOP_WORDS,
     is_document_word,
+    is_not_name,
     is_obligation,
     is_role,
 )
@@ -74,6 +76,9 @@ _FILL_PLATE: Final = frozenset(
 _FILL_DOB: Final = frozenset(fold(word) for word in ("on", "is", "of"))
 _UK_POSTCODE: Final = re.compile(r"[a-z]{1,2}[0-9][a-z0-9]? ?[0-9][a-z]{2}(?![a-z0-9])")
 _US_ZIP: Final = re.compile(r"(?:[a-z]{2} )?[0-9]{5}(?:-[0-9]{4})?(?![0-9a-z])")
+_CA_POSTCODE: Final = re.compile(r"(?:[a-z]{2},? )?[a-z][0-9][a-z] ?[0-9][a-z][0-9](?![a-z0-9])")
+_AU_POSTCODE: Final = re.compile(r"(?:nsw|vic|qld|sa|wa|tas|act|nt) [0-9]{4}(?![0-9a-z])")
+_EU_POSTCODE: Final = re.compile(r"[0-9]{4,5}(?: ?[a-z]{2})?(?![0-9a-z])")
 _US_STATE_ZIP: Final = re.compile(r"[a-z]{2} [0-9]{5}(?:-[0-9]{4})?(?![0-9a-z])")
 _MAX_STREET_WORDS: Final = 3
 _MAX_STREET_TAIL: Final = 4
@@ -125,6 +130,7 @@ _CODE_KINDS: Final = _STOP_KINDS | {
     "snils",
     "ein",
 }
+_KEYWORD_KINDS: Final = _CODE_KINDS | {"kpp", "unzr", "mfo", "bik", "vat", "sortcode"}
 _CODE_WORDS: Final = frozenset(
     key[0] for key, kinds in CONTEXT_KINDS.items() if len(key) == 1 and kinds & _CODE_KINDS
 )
@@ -137,6 +143,15 @@ _UNIT_SEGMENT: Final = re.compile(
 )
 _MAX_NATIONAL: Final = 11
 _MAX_PHONE_RUN: Final = 5
+_MIN_PREFIX: Final = 3
+_NOT_PREFIX: Final = frozenset(
+    fold(word)
+    for word in (
+        *("paragraph", "schedule", "page", "item", "exhibit", "appendix", "table", "figure"),
+        *("note", "part", "chapter", "point", "clause", "article", "section", "annex", "order"),
+    )
+)
+_MAX_GLUED: Final = 12
 _MIN_HASH_NUMBER: Final = 2
 _MIN_NATIONAL: Final = 10
 _MAX_UNIT_GAP: Final = 2
@@ -180,7 +195,9 @@ def _is_vin(word: str) -> bool:
     )
 
 
-def amount_or_date_follows(low: str, start: int, end: int, limit: int) -> bool:
+def amount_or_date_follows(
+    low: str, start: int, end: int, limit: int, *, quantities: bool = True
+) -> bool:
     """The number ``low[start:end]`` starts a date or is followed by a percent, a currency
     sign or a money, time or weight word."""
     if _DATE.match(low, start, limit) is not None:
@@ -195,7 +212,8 @@ def amount_or_date_follows(low: str, start: int, end: int, limit: int) -> bool:
     stop = after
     while stop < limit and stop - after < _MAX_TOKEN and low[stop].isalnum():
         stop += 1
-    return low[after:stop] in STRONG_AMOUNT_WORDS
+    word = low[after:stop]
+    return word in STRONG_AMOUNT_WORDS and (quantities or word not in QUANTITY_WORDS)
 
 
 def runs_of(text: str, start: int, end: int) -> tuple[array[int], array[int]]:
@@ -276,8 +294,17 @@ class _Line:
     def context(self, kind: str, index: int) -> bool:
         return self.near(kind, index) or self.in_requisites(self.st[index])
 
-    def is_amount(self, first: int, last: int) -> bool:
-        """The runs ``first..last`` are next to a currency, a unit or a percent sign."""
+    def code_keyword_before(self, index: int) -> bool:
+        """A code keyword stands within five runs before the run ``index``."""
+        return any(self.near(kind, index) for kind in _KEYWORD_KINDS)
+
+    def is_amount(self, first: int, last: int, *, quantities: bool = True) -> bool:
+        """The runs ``first..last`` are next to a currency, a unit or a percent sign.
+
+        A quantity word (pieces, mass) does not count with ``quantities=False`` or when a code
+        keyword stands before the number.
+        """
+        quantities = quantities and not self.code_keyword_before(first)
         low = self.low
         after = low[self.en[last] : self.en[last] + 3].lstrip()
         if after and after[0] in CURRENCY_SIGNS:
@@ -285,7 +312,7 @@ class _Line:
         following = last + 1
         if following < self.n and len(self.gap(last)) <= 2:  # noqa: PLR2004
             word = self.text(following)
-            if word in AMOUNT_WORDS:
+            if word in AMOUNT_WORDS and (quantities or word not in QUANTITY_WORDS):
                 return True
             if word.isdigit() and len(word) == 3 and self.gap(last) == " ":  # noqa: PLR2004
                 return True
@@ -350,7 +377,8 @@ class _Line:
         consumed = self._structured(index, word, length)
         if consumed:
             return consumed
-        if self.joined(index) or self.is_amount(index, index):
+        card = _MIN_CARD <= length <= _MAX_CARD and checksums.luhn_valid(word)
+        if self.joined(index) or self.is_amount(index, index, quantities=not card):
             return index + 1
         if self._hash_number(index, word):
             return index + 1
@@ -440,7 +468,7 @@ class _Line:
             self.near("phone", index) or word in _UA_MOBILE or self.in_requisites(self.st[index])
         ):
             return 0
-        if self.is_amount(index, index + 3):
+        if self.is_amount(index, index + 3, quantities=False):
             return 0
         digits = "".join(self.text(index + k) for k in range(4))
         self.hits.add(PHONE, HIGH, self.st[index], self.en[index + 3], digits[-9:])
@@ -470,7 +498,7 @@ class _Line:
         return start - 2 >= self.ls and low[start - 1] in ".,/-" and low[start - 2].isalnum()
 
     def _phone_range(self, first: int, last: int) -> int:
-        if self.is_amount(first, last):
+        if self.is_amount(first, last, quantities=False):
             return 0
         digits = "".join(self.text(k) for k in range(first, last + 1))
         self.hits.add(PHONE, HIGH, self.st[first], self.en[last], digits[-9:])
@@ -530,9 +558,9 @@ class _Line:
 
     def _card(self, first: int, last: int) -> int:
         digits = "".join(self.text(k) for k in range(first, last + 1))
-        if self.is_amount(first, last):
-            return last + 1
         luhn = checksums.luhn_valid(digits)
+        if self.is_amount(first, last, quantities=not luhn):
+            return last + 1
         near = self.near("card", first)
         if luhn or near:
             self.hits.add(
@@ -738,8 +766,10 @@ class _Line:
     def _iban(self, index: int, word: str) -> bool:
         country = word[:2].upper()
         expected = IBAN_LENGTHS.get(country)
-        if expected is None or len(word) > expected:
+        if expected is None:
             return False
+        if len(word) > expected:
+            return self._glued_iban(index, word, expected)
         compact = word
         last = index
         while len(compact) < expected and last + 1 < self.n and self.gap(last) in _IBAN_GAPS:
@@ -771,6 +801,19 @@ class _Line:
         else:
             return False
         self.skip_to = self.n if crossed else last
+        return True
+
+    def _glued_iban(self, index: int, word: str, expected: int) -> bool:
+        """A valid IBAN with letters glued to it (``…001шт``): the IBAN part is masked."""
+        tail = word[expected:]
+        if (
+            len(tail) > _MAX_GLUED
+            or not tail.isalpha()
+            or not checksums.iban_valid(word[:expected].upper())
+        ):
+            return False
+        start = self.st[index]
+        self.hits.add(ACCOUNT, HIGH, start, start + expected, word[:expected].upper())
         return True
 
     def _next_line_tail(self, last: int, need: int) -> tuple[str, int] | None:
@@ -838,13 +881,22 @@ class _Line:
             index >= _MAX_UNIT_GAP
             and self.gap(index - 1) == ", "
             and self.gap(index - 2) == " "
-            and self.low[self.st[index - 2] : self.en[index - 2]] in UNIT_PREFIXES
-            and self.u[self.st[index - 2]].isupper()
+            and self._prefix_word(index - 2)
             and self.text(index - 1)[0].isdigit()
             and len(self.text(index - 1)) <= _MAX_STREET_NUMBER
         ):
             return index - 2
         return index
+
+    def _prefix_word(self, index: int) -> bool:
+        """A capitalised word before ``N,`` and the house number: ``Shed 14,``, ``Dock 7,``."""
+        word = self.low[self.st[index] : self.en[index]]
+        return (
+            self.u[self.st[index]].isupper()
+            and word.isalpha()
+            and (word in UNIT_PREFIXES or (len(word) >= _MIN_PREFIX and not is_not_name(word)))
+            and word not in _NOT_PREFIX
+        )
 
     def _with_country(self, end: int) -> int:
         """``end``, or the end of a country name that follows after a comma."""
@@ -891,7 +943,7 @@ class _Line:
                     and cursor + 1 < self.le
                     and (u[cursor + 1].isupper() or low[cursor + 1].isdigit())
                 ):
-                    code = self._postcode_at(cursor + 1)
+                    code = self._postcode_at(cursor + 1, after_town=True)
                     if code:
                         return self._with_country(code)
                     if not u[cursor + 1].isupper():
@@ -908,10 +960,16 @@ class _Line:
             end = cursor
         return end
 
-    def _postcode_at(self, position: int) -> int:
-        """End of a UK postcode or a US state and ZIP at ``position``, or 0."""
+    def _postcode_at(self, position: int, *, after_town: bool = False) -> int:
+        """End of a UK, Canadian, Australian, US or EU postcode at ``position``, or 0.
+
+        A bare 4-digit EU code needs a town word before it (``after_town``).
+        """
         low = self.low
-        for pattern in (_UK_POSTCODE, _US_STATE_ZIP, _US_ZIP):
+        patterns = [_UK_POSTCODE, _CA_POSTCODE, _AU_POSTCODE, _US_STATE_ZIP, _US_ZIP]
+        if after_town:
+            patterns.append(_EU_POSTCODE)
+        for pattern in patterns:
             matched = pattern.match(low, position, self.le)
             if matched is not None:
                 return matched.end()

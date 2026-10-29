@@ -17,7 +17,7 @@ from app.pseudo import tables
 from app.pseudo.confusable_table import UNICODE_VERSION
 from app.pseudo.matching import LATIN_TO_CYRILLIC, SKELETON, fold
 
-RULES_VERSION: Final = "7"
+RULES_VERSION: Final = "8"
 
 
 def _runs(text: str) -> tuple[str, ...]:
@@ -111,6 +111,7 @@ AMOUNT_WORDS: Final = frozenset(fold(word) for word in tables.AMOUNT_WORDS)
 _AMBIGUOUS_UNITS: Final = frozenset(
     fold(word) for word in ("кв", "л", "k", "м2", "m2", "м3", "m3", "куб", "мм", "см", "mm", "cm")
 )
+QUANTITY_WORDS: Final = frozenset(fold(word) for word in tables.QUANTITY_WORDS)
 STRONG_AMOUNT_WORDS: Final = AMOUNT_WORDS - _AMBIGUOUS_UNITS
 ABBREVIATIONS: Final = frozenset(fold(word) for word in tables.ADDRESS_ABBREVIATIONS)
 ADDRESS_STARTS: Final = frozenset(fold(word) for word in tables.ADDRESS_STARTS)

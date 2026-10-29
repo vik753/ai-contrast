@@ -44,8 +44,6 @@ def test_toll_free_phone_needs_no_keyword(text: str, phone: str) -> None:
     "text",
     [
         "Сума 0 800 507 321 грн.",
-        "Партія 0 800 507 321 штук.",
-        "Позиція 8 800 100 шт.",
         "Number 1.0 800 507 321 here.",
         "Ціна 0 800 5 грн.",
     ],
@@ -472,3 +470,86 @@ def test_second_role_title_and_full_name_is_dropped_but_a_condition_is_kept() ->
 def test_more_requisites_headings_open_the_section(heading: str) -> None:
     assert patterns.is_requisites_title(heading)
     assert not patterns.is_requisites_title(heading + " and more words")
+
+
+# ------------------------------------------------- review follow-up (postcodes, prefixes)
+
+
+@pytest.mark.parametrize(
+    ("text", "address"),
+    [
+        (
+            "Seat: 88 Maple Avenue, Toronto ON M5V 2T6, Canada.",
+            "88 Maple Avenue, Toronto ON M5V 2T6, Canada",
+        ),
+        ("Seat: 9 Birch Road, Ottawa K1A 0B1.", "9 Birch Road, Ottawa K1A 0B1"),
+        (
+            "Seat: 31 Wattle Street, Adelaide SA 5000, Australia.",
+            "31 Wattle Street, Adelaide SA 5000, Australia",
+        ),
+        ("Seat: 5 Oak Lane, Austin TX 78701-1234.", "5 Oak Lane, Austin TX 78701-1234"),
+        ("Seat: 5 Oak Lane, Boston 02108.", "5 Oak Lane, Boston 02108"),
+        ("Seat: 12 Mill Road, Munich 80331, Germany.", "12 Mill Road, Munich 80331, Germany"),
+        ("Seat: 7 Canal Street, Utrecht 3511 AB.", "7 Canal Street, Utrecht 3511 AB"),
+    ],
+)
+def test_street_address_with_non_uk_postcode(text: str, address: str) -> None:
+    assert texts(text, cls="ADDRESS") == [address]
+
+
+def test_street_address_does_not_swallow_a_year() -> None:
+    assert texts("Seat: 5 Oak Lane, 2024 was the year.", cls="ADDRESS") == ["5 Oak Lane"]
+
+
+@pytest.mark.parametrize(
+    ("text", "address"),
+    [
+        (
+            "Pick up at Shed 14, 20 Dock Road, Leeds LS1 4AB.",
+            "Shed 14, 20 Dock Road, Leeds LS1 4AB",
+        ),
+        (
+            "Deliver to Bay 3, 8 Wharf Lane, Cardiff CF10 3AT.",
+            "Bay 3, 8 Wharf Lane, Cardiff CF10 3AT",
+        ),
+        ("Go to Level 2, 41 King Street, Leeds LS2 7EQ.", "Level 2, 41 King Street, Leeds LS2 7EQ"),
+    ],
+)
+def test_unknown_unit_prefix_before_a_house_number(text: str, address: str) -> None:
+    assert texts(text, cls="ADDRESS") == [address]
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["See Clause 5, 14 Linden Road, Bristol BS1 4XY.", "Annex 2, 14 Linden Road, Bristol BS1 4XY."],
+)
+def test_clause_words_are_not_unit_prefixes(text: str) -> None:
+    result = texts(text, cls="ADDRESS")
+    assert result == ["14 Linden Road, Bristol BS1 4XY"]
+
+
+def test_latin_name_with_transliterated_cyrillic_form() -> None:
+    result = detect(["Signed: John Smith (Джон Сміт) today."], [])
+    assert [e.cls for e in result.entities] == ["PERSON"]
+    assert len(result.entities[0].spans) == 2
+    assert texts("Signed: John Smith (Іван Петренко) today.", cls="PERSON") == []
+
+
+# ------------------------------------------------- unit words and codes
+
+
+def test_keyword_beats_a_unit_word_but_a_quantity_stays() -> None:
+    assert texts("РНОКПП 3012345670 шт.", cls="TAX_ID") == ["3012345670"]
+    assert texts("Партія 3012345670 шт.", cls="TAX_ID") == []
+    assert texts("Tax ID 3012345670 kg", cls="TAX_ID") == ["3012345670"]
+    assert texts("Оплата 4000001234567899 kg", cls="ACCOUNT") == ["4000001234567899"]
+
+
+def test_unit_glued_to_an_iban_does_not_hide_it() -> None:
+    iban = "UA863204782600123456789012345"
+    assert texts(f"IBAN {iban}шт", cls="ACCOUNT") == [iban]
+
+
+def test_phone_pattern_is_never_a_quantity() -> None:
+    assert texts("Партія 050 123 45 67 штук.", cls="PHONE") == ["050 123 45 67"]
+    assert texts("Номер 0 800 507 321 штук.", cls="PHONE") == ["0 800 507 321"]

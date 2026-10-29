@@ -52,6 +52,8 @@ _MAX_RUN_WORDS: Final = 3
 _ROLE_GAP: Final = frozenset(" \t:—–-,")
 _ROLE_PUNCTUATION: Final = frozenset(":—–-,")
 _MIN_ROLE_SURNAME: Final = 4
+_LONG_FIRST: Final = tuple({form[0] for form in LEGAL_FORMS_LONG})
+_LEADIN_LAST: Final = frozenset(key[-1] for key in PERSON_LEADINS)
 _LEADIN_GAP: Final = frozenset(" :")
 _MAX_LEADIN: Final = 4
 _MAX_TITLE_WORDS: Final = 5
@@ -102,6 +104,7 @@ class Names:
         self.org_single: dict[str, str] = {}
         self._fold: dict[str, str] = {}
         self._stem: dict[str, str] = {}
+        self._name_word: dict[str, bool] = {}
 
     # ------------------------------------------------------------------ helpers
 
@@ -131,7 +134,13 @@ class Names:
 
     def name_word(self, word: str) -> bool:
         """A capitalised word that may be part of a name."""
-        return word[0].isupper() and len(word) >= 2 and not is_not_name(self.folded(word))  # noqa: PLR2004
+        found = self._name_word.get(word)
+        if found is None:
+            if len(self._name_word) > 100_000:  # noqa: PLR2004
+                self._name_word.clear()
+            found = word[0].isupper() and len(word) >= 2 and not is_not_name(self.folded(word))  # noqa: PLR2004
+            self._name_word[word] = found
+        return found
 
     def adjacent(self, left_end: int, right_start: int) -> bool:
         gap = self.u[left_end:right_start]
@@ -242,10 +251,11 @@ class Names:
             ) and self.name_word(word):
                 return self._after_trigger(le, ws, we, index)
             if self.name_word(word):
+                run = self._run(ws, we, index, _MAX_RUN_WORDS)
                 done = (
-                    self._bracket_form(le, ws, we, index)
-                    or self._title_after_name(ls, le, ws, we, index)
-                    or self._subject_before_verb(ls, ws, we, index)
+                    self._bracket_form(le, ws, we, run)
+                    or self._title_after_name(ls, le, ws, we, run)
+                    or self._subject_before_verb(ls, ws, we, run)
                 )
                 if done:
                     return done
@@ -564,6 +574,8 @@ class Names:
         if self.is_covered(ws[index], we[index]):
             return 0
         first = self.folded(self.u[ws[index] : we[index]])
+        if not first.startswith(_LONG_FIRST):
+            return 0
         for form in LEGAL_FORMS_LONG:
             last = index + len(form) - 1
             if last >= len(ws) or not _stem_of(first, form[0]):
@@ -584,6 +596,8 @@ class Names:
         gap = u[we[index - 1] : ws[index]]
         if not gap or not set(gap) <= _LEADIN_GAP:
             return False
+        if self.folded(u[ws[index - 1] : we[index - 1]]) not in _LEADIN_LAST:
+            return False
         parts: list[str] = []
         cursor = index - 1
         while cursor >= 0 and len(parts) < _MAX_LEADIN:
@@ -596,10 +610,9 @@ class Names:
         return False
 
     def _title_after_name(
-        self, ls: int, le: int, ws: array[int], we: array[int], index: int
+        self, ls: int, le: int, ws: array[int], we: array[int], run: list[int]
     ) -> int:
         """ "Daniel Marlow, Chief Executive Officer" / "J. Thornberry, Finance Director"."""
-        run = self._run(ws, we, index, _MAX_RUN_WORDS)
         if not run:
             return 0
         last = run[-1]
@@ -633,10 +646,9 @@ class Names:
                 return False
         return False
 
-    def _subject_before_verb(self, ls: int, ws: array[int], we: array[int], index: int) -> int:
+    def _subject_before_verb(self, ls: int, ws: array[int], we: array[int], run: list[int]) -> int:
         """ "Tobias Wren signs ..." at the start of a sentence: a full name and an action verb."""
         u = self.u
-        run = self._run(ws, we, index, _MAX_RUN_WORDS)
         if len(run) < 2:  # noqa: PLR2004
             return 0
         before = ws[run[0]]
@@ -654,16 +666,15 @@ class Names:
         self._register_run(ws, we, run, ws[run[0]], we[last], False)
         return last + 1
 
-    def _bracket_form(self, le: int, ws: array[int], we: array[int], index: int) -> int:
+    def _bracket_form(self, le: int, ws: array[int], we: array[int], run: list[int]) -> int:
         """ "Iryna Kovalenko (Ірина Коваленко)": one person in two scripts."""
         u = self.u
-        run = self._run(ws, we, index, _MAX_RUN_WORDS)
-        if len(run) < 2 or not all(u[ws[k] : we[k]].isascii() for k in run):  # noqa: PLR2004
+        if len(run) < 2 or u[we[run[-1]] : we[run[-1]] + 2] != " (":  # noqa: PLR2004
+            return 0
+        if not all(u[ws[k] : we[k]].isascii() for k in run):
             return 0
         last = run[-1]
         opening = we[last] + 2
-        if u[we[last] : opening] != " (":
-            return 0
         close = u.find(")", opening, min(le, opening + _MAX_BRACKET))
         if close < 0:
             return 0
@@ -689,8 +700,8 @@ class Names:
         return bisect_left(ws, close + 1)
 
     def _loose(self, word: str) -> str:
-        """Stem key with "h" as "g": Hnatyuk and Гнатюк meet."""
-        return self.stem(word).replace("h", "g")
+        """Stem key without "h" and "g": Hnatyuk and Гнатюк, Smith and Сміт meet."""
+        return self.stem(word).replace("h", "").replace("g", "")
 
     def _legal_suffix(self, le: int, ws: array[int], we: array[int], index: int) -> int:
         u = self.u

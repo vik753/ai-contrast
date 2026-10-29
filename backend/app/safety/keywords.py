@@ -70,7 +70,7 @@ def keyword_digit_spans(
                 fraction = _FRACTION.match(text, end)
                 after = fraction.end() if fraction else end
                 if digits >= MIN_DIGITS and not amount_or_date_follows(
-                    folded, start, after, len(text)
+                    folded, start, after, len(text), quantities=False
                 ):
                     result.add((index, start, end))
                 break

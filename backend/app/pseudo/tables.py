@@ -407,6 +407,15 @@ AMOUNT_WORDS: Final = (
     "lb", "lbs", "oz", "kgs", "tons", "tonnes", "tonne", "packs", "pack", "упаковок", "уп",
     "boxes", "items", "литров", "літрів", "liters", "litres", "meters", "metres", "sqm",
 )  # fmt: skip
+# Quantity words (pieces, mass, volume, thousands): a number before one is a quantity unless a
+# code keyword stands before it. Money, time and percent words are not in this list.
+QUANTITY_WORDS: Final = (
+    "кг", "kg", "км", "km", "тонн", "тонни", "тон", "шт", "pcs", "тис", "млн", "млрд", "k", "mln",
+    "л", "мм", "см", "mm", "cm", "штук", "штуки", "штука", "одиниць", "одиниці", "од",
+    "единиц", "единицы", "ед", "экз", "pieces", "piece", "pc", "units", "mg", "мг", "g", "ml",
+    "мл", "lb", "lbs", "oz", "kgs", "tons", "tonnes", "tonne", "packs", "pack", "упаковок", "уп",
+    "boxes", "items", "литров", "літрів", "liters", "litres", "meters", "metres", "sqm",
+)  # fmt: skip
 CURRENCY_SIGNS: Final = "$€£₴₽¥%"
 
 # --- addresses ---------------------------------------------------------------------------
