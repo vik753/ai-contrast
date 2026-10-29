@@ -17,7 +17,7 @@ from app.pseudo import tables
 from app.pseudo.confusable_table import UNICODE_VERSION
 from app.pseudo.matching import LATIN_TO_CYRILLIC, SKELETON, fold
 
-RULES_VERSION: Final = "3"
+RULES_VERSION: Final = "4"
 
 
 def _runs(text: str) -> tuple[str, ...]:

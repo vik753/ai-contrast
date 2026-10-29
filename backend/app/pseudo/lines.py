@@ -88,6 +88,20 @@ _FILL_NUMBER: Final = frozenset(
 )
 _MULTI_LAST: Final = frozenset(key[-1] for key in CONTEXT_KINDS if len(key) > 1)
 _STOP_KINDS: Final = frozenset({"phone", "email", "tax", "iban", "account", "swift", "mfo", "bik"})
+_CODE_KINDS: Final = _STOP_KINDS | {
+    "passport",
+    "idcard",
+    "driver",
+    "regcert",
+    "card",
+    "snils",
+    "ein",
+}
+_CODE_WORDS: Final = frozenset(
+    key[0] for key, kinds in CONTEXT_KINDS.items() if len(key) == 1 and kinds & _CODE_KINDS
+)
+_MIN_CODE_DIGITS: Final = 8
+_MIN_CODE_WORD: Final = 3
 _ADDRESS_STOP: Final = frozenset(
     key[0] for key, kinds in CONTEXT_KINDS.items() if len(key) == 1 and kinds & _STOP_KINDS
 )
@@ -697,9 +711,37 @@ class _Line:
         while end < limit and low[end].isalnum():
             end += 1
         word = low[index:end]
+        if self._code_starts(word, end):
+            return True
         if word.isdigit():
             return amount_or_date_follows(low, index, end, self.le)
         return is_obligation(word) or is_role(word)
+
+    def _code_starts(self, word: str, end: int) -> bool:
+        """The token starts a code: a long number, an IBAN, a card, or a code keyword."""
+        if word.isdigit():
+            if len(word) >= _MIN_CODE_DIGITS:
+                return True
+            return len(word) == _CARD_GROUP and self._digits_follow(end, _CARD_GROUP)
+        if len(word) >= _MIN_CODE_WORD and word in _CODE_WORDS:
+            return True
+        country = IBAN_LENGTHS.get(word[:2].upper())
+        if country is None or not word[:2].isalpha() or not word[2:4].isdigit():
+            return False
+        return len(word) >= _MIN_CARD or (
+            len(word) == _CARD_GROUP and self._digits_follow(end, _CARD_GROUP)
+        )
+
+    def _digits_follow(self, end: int, count: int) -> bool:
+        """A space or hyphen and then ``count`` digits."""
+        low = self.low
+        start = end + 1
+        return (
+            low[end : end + 1] in (" ", "-")
+            and start + count <= self.le
+            and low[start : start + count].isdigit()
+            and not low[start + count : start + count + 1].isalnum()
+        )
 
     def _address_stops_at(self, index: int, start: int) -> bool:
         low = self.low
