@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from app.limits.client_ip import client_key
 
+from app.limits.client_ip import client_key
 from app.settings import Settings
 from tests.helpers import ALLOWED_ORIGIN
 
@@ -165,3 +165,51 @@ def test_different_ipv4_mapped_addresses_do_not_share_a_key() -> None:
     b = client_key(scope(xff=["::ffff:198.51.100.8"]), prod())
 
     assert a != b
+
+
+def test_6to4_address_is_keyed_by_the_embedded_ipv4() -> None:
+    key = client_key(scope(xff=["2002:c633:6407::1"]), prod())
+
+    assert key == "198.51.100.7"
+
+
+def test_6to4_addresses_with_one_embedded_ipv4_share_a_key() -> None:
+    a = client_key(scope(xff=["2002:c633:6407:1::1"]), prod())
+    b = client_key(scope(xff=["2002:c633:6407:ffff:aaaa:bbbb:cccc:dddd"]), prod())
+
+    assert a == b == "198.51.100.7"
+
+
+def test_6to4_addresses_with_different_embedded_ipv4_differ() -> None:
+    a = client_key(scope(xff=["2002:c633:6407::1"]), prod())
+    b = client_key(scope(xff=["2002:c633:6408::1"]), prod())
+
+    assert a != b
+
+
+def test_teredo_address_is_keyed_by_the_client_ipv4() -> None:
+    # Client 198.51.100.7 = c633:6407; Teredo stores it inverted: 39cc:9bf8.
+    key = client_key(scope(xff=["2001:0:4136:e378:8000:63bf:39cc:9bf8"]), prod())
+
+    assert key == "198.51.100.7"
+
+
+def test_teredo_addresses_with_other_server_and_port_share_the_client_key() -> None:
+    a = client_key(scope(xff=["2001:0:4136:e378:8000:63bf:39cc:9bf8"]), prod())
+    b = client_key(scope(xff=["2001:0:5555:6666:0000:1234:39cc:9bf8"]), prod())
+
+    assert a == b == "198.51.100.7"
+
+
+def test_teredo_addresses_with_different_clients_differ() -> None:
+    a = client_key(scope(xff=["2001:0:4136:e378:8000:63bf:39cc:9bf8"]), prod())
+    b = client_key(scope(xff=["2001:0:4136:e378:8000:63bf:39cc:9bf7"]), prod())
+
+    assert a != b
+
+
+def test_2001_db8_documentation_prefix_is_still_keyed_by_slash_64() -> None:
+    a = client_key(scope(xff=["2001:db8:1:2::1"]), prod())
+    b = client_key(scope(xff=["2001:db8:1:2::2"]), prod())
+
+    assert a == b != "198.51.100.7"
