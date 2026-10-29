@@ -232,6 +232,15 @@ def _acknowledged(
     return set(result)
 
 
+def _is_acknowledged(
+    block: int, start: int, end: int, acknowledged: set[tuple[int, int, int]]
+) -> bool:
+    """A hit equal to an acknowledged span, or fully contained in one (caller: not high)."""
+    return (block, start, end) in acknowledged or any(
+        b == block and s <= start and end <= e for b, s, e in acknowledged
+    )
+
+
 def safety_pass(
     untrusted: UntrustedMaskedDocument, *, max_clauses: int = MAX_CLAUSES
 ) -> PseudonymizedDocument:
@@ -261,7 +270,7 @@ def safety_pass(
         {
             (block, start, end)
             for block, start, end, high in found
-            if high or (block, start, end) not in acknowledged
+            if high or not _is_acknowledged(block, start, end, acknowledged)
         }
         | partial_spans(texts, placeholders)
         | keyword_digit_spans(texts, placeholders)
