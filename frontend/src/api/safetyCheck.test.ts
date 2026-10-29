@@ -109,18 +109,26 @@ describe("answers", () => {
     expect(await result).toEqual({ ok: false, code: "invalid_response" });
   });
 
+  it("test_length_mismatch_400_is_mapped", async () => {
+    const { result } = run(400, { error: "length_mismatch" });
+    expect(await result).toEqual({ ok: false, code: "length_mismatch" });
+  });
+
   it("test_version_mismatch_409_is_mapped", async () => {
     const { result } = run(409, { error: "detector_version_mismatch" });
     expect(await result).toEqual({ ok: false, code: "detector_version_mismatch" });
   });
 
-  it.each(["input_not_clean", "invalid_placeholder", "invalid_request"])(
-    "test_422_%s_is_mapped",
-    async (code) => {
-      const { result } = run(422, { error: code });
-      expect(await result).toEqual({ ok: false, code });
-    },
-  );
+  it.each([
+    "input_not_clean",
+    "invalid_placeholder",
+    "invalid_request",
+    "too_much_text",
+    "too_many_identifiers",
+  ])("test_422_%s_is_mapped", async (code) => {
+    const { result } = run(422, { error: code });
+    expect(await result).toEqual({ ok: false, code });
+  });
 
   it.each([
     [413, "request_too_large"],

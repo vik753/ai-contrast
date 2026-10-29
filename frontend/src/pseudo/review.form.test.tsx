@@ -546,6 +546,9 @@ describe("safety-check flow", () => {
     [413, "request_too_large"],
     [503, "busy"],
     [504, "safety_timeout"],
+    [422, "too_much_text"],
+    [422, "too_many_identifiers"],
+    [400, "length_mismatch"],
   ];
   it.each(ERROR_CASES)("test_error_%i_%s_is_shown_with_its_own_message", async (status_, code) => {
     safety = () => jsonResponse(status_, { error: code });
@@ -565,6 +568,9 @@ describe("safety-check flow", () => {
       "request_too_large",
       "busy",
       "safety_timeout",
+      "too_much_text",
+      "too_many_identifiers",
+      "length_mismatch",
       "detector_version_mismatch",
       "network_error",
       "invalid_response",
@@ -679,5 +685,34 @@ describe("languages", () => {
     ).toBeTruthy();
     expect(review.textContent).toContain(must(flat["pseudo.class.ORG"]));
     expect(ENTITIES.length).toBeGreaterThan(0);
+  });
+});
+
+describe("signature container with the person inside", () => {
+  const SIG: WireBlock[] = [body("Страхувальник: ____________ /Іваненко І.І./")];
+  it("test_unmask_all_sends_container_and_inner_spans_as_acknowledged", async () => {
+    reply = (blocks) => ({
+      ...segmentReply(blocks),
+      detector_version: DETECTOR_VERSION,
+      entities: [
+        { id: "e1", class: "SIGNATURE", precision: "normal", spans: [[0, 15, 43]] },
+        { id: "e2", class: "PERSON", precision: "normal", spans: [[0, 29, 42]] },
+      ],
+      requisites: [],
+      neutralized: [],
+    });
+    await renderForm();
+    await load("A", SIG);
+    const review = await open();
+    // Both are masked at first: the person is nested in the signature (inner placeholder).
+    click(button(within(review).getByTestId("pseudo-entity-e1"), "pseudo.unmaskAll"));
+    click(button(within(review).getByTestId("pseudo-entity-e2"), "pseudo.unmaskAll"));
+    await confirm(review);
+    const sent = safetyBodies[0];
+    expect((sent?.clauses as { text: string }[])[0]?.text).toBe(SIG[0]?.text);
+    expect(sent?.acknowledged_unmasked).toEqual([
+      ["c1", 15, 43],
+      ["c1", 29, 42],
+    ]);
   });
 });

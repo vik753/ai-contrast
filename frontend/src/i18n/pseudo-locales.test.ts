@@ -33,6 +33,8 @@ const ERRORS = [
   "timeout",
   "unmasked_identifier",
   "too_many_identifiers",
+  "too_much_text",
+  "length_mismatch",
 ];
 export const KEYS = [
   "pseudo.checkReplacements",
