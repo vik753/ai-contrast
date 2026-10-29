@@ -426,6 +426,9 @@ def _bare_app(**settings: Any) -> FastAPI:
     app.state.extraction_limiter = _limiter_module().ExtractionLimiter(
         resolved.max_concurrent_extractions
     )
+    app.state.client_slots = importlib.import_module("app.limits.slots").ClientSlots(
+        resolved.max_extractions_per_client
+    )
     return app
 
 
