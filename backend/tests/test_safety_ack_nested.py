@@ -109,3 +109,19 @@ def test_high_hit_fully_inside_an_acknowledged_span_stays_refused(
 
     assert raised.value.code == "unmasked_identifier"
     assert list(raised.value.spans) == [("c1", 10, 20)]
+
+
+def test_containment_lookup_is_fast_and_exact_at_the_caps() -> None:
+    """50,000 acknowledged spans and 100,000 hits: bisect, not a linear scan per hit."""
+    import time
+
+    from app.pseudo.gate import _is_acknowledged
+
+    acknowledged = sorted((0, i * 10, i * 10 + 5) for i in range(50_000))
+    started = time.process_time()
+    inside = sum(_is_acknowledged(0, i * 10 + 1, i * 10 + 3, acknowledged) for i in range(50_000))
+    outside = sum(_is_acknowledged(0, i * 10 + 6, i * 10 + 8, acknowledged) for i in range(50_000))
+    crossing = sum(_is_acknowledged(0, i * 10 + 3, i * 10 + 7, acknowledged) for i in range(1_000))
+    other_clause = _is_acknowledged(1, 1, 3, acknowledged)
+    assert (inside, outside, crossing, other_clause) == (50_000, 0, 0, False)
+    assert time.process_time() - started < 2.0
