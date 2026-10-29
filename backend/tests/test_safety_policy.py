@@ -249,8 +249,9 @@ def test_policy_no_gate_type_in_pydantic_models_or_route_parameters() -> None:
     assert request_model_problems(APP_DIR) == []
 
 
-def test_policy_app_ai_modules_accept_only_gate_types_enums_and_constants() -> None:
-    assert ai_module_problems(APP_DIR) == []
+# S6-T2: the real-repository check of ``app/ai/`` moved to ``tests/ai/test_ai_policy.py``
+# (public surface only; connection-settings modules are exempt). The checker above stays, with
+# its planted-module tests, as the strict reference rule.
 
 
 def test_policy_safety_pass_is_defined_in_gate_py_only() -> None:
