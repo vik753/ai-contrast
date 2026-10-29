@@ -1,0 +1,34 @@
+{
+  "name": "h05_uk_en_mixed",
+  "language": "uk",
+  "description": "Mixed UK contract with an English counterparty: Latin company name with 'Ltd.' (normal) and ТОВ plus quoted Cyrillic name (high), Latin person name with the Cyrillic and Latin spelling of the other person grouped, contract number with letters, UK address with postcode, +44 phone, foreign IBAN (public example), BIC, VAT, email, signature line in English.",
+  "blocks": [
+    {"text": "ДОГОВІР № 12/ENG-2026 про надання послуг", "part": "body", "page": null},
+    {"text": "Цей Договір укладено між Brightline Software Ltd. (далі — Замовник), в особі Arthur Kellman, та ТОВ «Софтлайн Україна» (далі — Виконавець), в особі Бойко Дарини Вікторівни (Darina Boyko).", "part": "body", "page": null},
+    {"text": "Адреса Замовника: 25 Old Street, London EC1V 9HL, United Kingdom; тел. +44 20 7946 0123.", "part": "body", "page": null},
+    {"text": "Оплата на IBAN GB29 NWBK 6016 1331 9268 19 (BIC NWBKGB2L), VAT GB 123 4567 89.", "part": "body", "page": null},
+    {"text": "Контактна особа з боку Замовника — Arthur Kellman, a.kellman@brightline-soft.example.com.", "part": "body", "page": null},
+    {"text": "Ставка 85 EUR на годину, мінімальний обсяг 160 год.", "part": "body", "page": null},
+    {"text": "For the Customer: ____________ /Arthur Kellman/", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["12/ENG-2026"], "spans": [[0, 10, 21]]},
+      {"class": "ORG", "precision": "normal", "value_forms": ["Brightline Software Ltd."], "spans": [[1, 25, 49]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Arthur Kellman"], "spans": [[1, 77, 91], [4, 35, 49], [6, 32, 46]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["ТОВ «Софтлайн Україна»"], "spans": [[1, 96, 118]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Бойко Дарини Вікторівни", "Darina Boyko"], "spans": [[1, 148, 171], [1, 173, 185]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["25 Old Street, London EC1V 9HL, United Kingdom"], "spans": [[2, 18, 64]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+44 20 7946 0123"], "spans": [[2, 71, 87]]},
+      {"class": "ACCOUNT", "precision": "high", "value_forms": ["GB29 NWBK 6016 1331 9268 19"], "spans": [[3, 15, 42]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["NWBKGB2L"], "spans": [[3, 48, 56]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["GB 123 4567 89"], "spans": [[3, 63, 77]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["a.kellman@brightline-soft.example.com"], "spans": [[4, 51, 88]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["____________ /Arthur Kellman/"], "spans": [[6, 18, 47]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Замовник", "Виконавець", "Договір", "85 EUR", "160 год.", "Customer"]
+  }
+}

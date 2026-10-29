@@ -1,0 +1,31 @@
+{
+  "name": "h06_ru_preamble_person_org",
+  "language": "ru",
+  "description": "RU preamble with the spelled-out legal form 'Акционерное общество' plus quoted name (high, span covers the whole legal form), ИП as ORG plus PERSON (like ФОП), genitive / dative / instrumental forms, initials after the full name, surname Сорока (also a common noun), ООО with a hyphenated quoted name. Defined terms in guillemets stay.",
+  "blocks": [
+    {"text": "ДОГОВОР АРЕНДЫ НЕЖИЛОГО ПОМЕЩЕНИЯ", "part": "body", "page": null},
+    {"text": "Акционерное общество «Балтийская Мануфактура», именуемое в дальнейшем «Арендодатель», в лице генерального директора Ермолаева Кирилла Семёновича, действующего на основании Устава, и ИП Фомина Алла Георгиевна (далее — «Арендатор»), заключили настоящий договор.", "part": "body", "page": null},
+    {"text": "3.1. Арендатор уплачивает Ермолаеву К.С. неустойку.", "part": "body", "page": null},
+    {"text": "3.2. Претензии Фоминой А.Г. рассматриваются в течение 10 дней.", "part": "body", "page": null},
+    {"text": "3.3. Приёмку помещения проводит Сорока Игорь Павлович или иное уполномоченное лицо.", "part": "body", "page": null},
+    {"text": "3.4. Уведомления направляются Сороке И.П. по адресу, указанному в разделе 8.", "part": "body", "page": null},
+    {"text": "4.1. Спорные вопросы согласуются с Лаврентьевой Натальей Степановной.", "part": "body", "page": null},
+    {"text": "5.1. Арендатор несёт ответственность перед Арендодателем.", "part": "body", "page": null},
+    {"text": "5.2. Субарендатор — ООО «Прибой-Сервис» — не допускается без согласия.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["Акционерное общество «Балтийская Мануфактура»"], "spans": [[1, 0, 45]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Ермолаева Кирилла Семёновича", "Ермолаеву К.С."], "spans": [[1, 116, 144], [2, 26, 40]]},
+      {"class": "ORG", "precision": "normal", "value_forms": ["ИП Фомина Алла Георгиевна"], "spans": [[1, 182, 207]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Фомина Алла Георгиевна", "Фоминой А.Г."], "spans": [[1, 185, 207], [3, 15, 27]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Сорока Игорь Павлович", "Сороке И.П."], "spans": [[4, 32, 53], [5, 30, 41]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Лаврентьевой Натальей Степановной"], "spans": [[6, 35, 68]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["ООО «Прибой-Сервис»"], "spans": [[8, 20, 39]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Арендодатель", "Арендатор", "Арендодателем", "Устава", "ДОГОВОР АРЕНДЫ", "10 дней", "Субарендатор"]
+  }
+}

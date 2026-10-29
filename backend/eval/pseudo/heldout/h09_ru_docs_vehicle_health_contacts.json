@@ -1,0 +1,37 @@
+{
+  "name": "h09_ru_docs_vehicle_health_contacts",
+  "language": "ru",
+  "description": "RU vehicle (VIN, plate with spaces, ПТС series and number), passport series and number (label 'серия' excluded), date of birth, СНИЛС (high), diagnosis after 'диагноз', document numbers (span = number after №), 8-800 phone, email, bare domain. The ПТС issue date stays.",
+  "blocks": [
+    {"text": "1.1. Застрахованное транспортное средство: Hyundai Solaris, VIN Z94CB41ABGR123456, государственный регистрационный знак К 482 ОР 77.", "part": "body", "page": null},
+    {"text": "1.2. ПТС 78 УК 456123 выдан 14.06.2021.", "part": "body", "page": null},
+    {"text": "2.1. Страхователь Лебедева Инна Аркадьевна, паспорт серия 45 12 № 678901, дата рождения 09.07.1983.", "part": "body", "page": null},
+    {"text": "2.2. СНИЛС 173-409-261 64.", "part": "body", "page": null},
+    {"text": "3.1. У застрахованной установлен диагноз острый инфаркт миокарда.", "part": "body", "page": null},
+    {"text": "4.1. Полис № ХЕ 7712098, договор № 118-СТ/22, доверенность № 9, дело № А40-123456/2025.", "part": "body", "page": null},
+    {"text": "5.1. Звоните: 8-800-555-01-47 или пишите на claims@lebed-assist.example.ru, сайт lebed-assist.example.ru.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["Z94CB41ABGR123456"], "spans": [[0, 64, 81]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["К 482 ОР 77"], "spans": [[0, 120, 131]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["78 УК 456123"], "spans": [[1, 9, 21]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Лебедева Инна Аркадьевна"], "spans": [[2, 18, 42]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["45 12 № 678901"], "spans": [[2, 58, 72]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["09.07.1983"], "spans": [[2, 88, 98]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["173-409-261 64"], "spans": [[3, 11, 25]]},
+      {"class": "HEALTH", "precision": "normal", "value_forms": ["острый инфаркт миокарда"], "spans": [[4, 41, 64]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["ХЕ 7712098"], "spans": [[5, 13, 23]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["118-СТ/22"], "spans": [[5, 35, 44]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["9"], "spans": [[5, 61, 62]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["А40-123456/2025"], "spans": [[5, 71, 86]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["8-800-555-01-47"], "spans": [[6, 14, 29]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["claims@lebed-assist.example.ru"], "spans": [[6, 44, 74]]},
+      {"class": "URL", "precision": "high", "value_forms": ["lebed-assist.example.ru"], "spans": [[6, 81, 104]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Hyundai Solaris", "Застрахованное транспортное средство", "14.06.2021", "Страхователь", "Полис"]
+  }
+}

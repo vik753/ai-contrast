@@ -1,0 +1,30 @@
+{
+  "name": "h10_ru_amounts_ocr_signature",
+  "language": "ru",
+  "description": "RU negatives: checksum-valid ИНН-10, ОГРН-like and quantity numbers next to a unit (копеек, штук, мг, руб., рублей). OCR-like noise only in common words (1 for и, 0 for о). Positives: contact person with phone, signature with spaces inside the slashes (initials first), multi-part address, obfuscated email (at), long URL with path.",
+  "blocks": [
+    {"text": "6.1. Стоимость услуг составляет 7842105938 копеек, т.е. 78 421 059,38 руб.", "part": "body", "page": null},
+    {"text": "6.2. Объём поставки 2670419358 штук, вес 5026379142 мг, резерв 1025020012346 руб.", "part": "body", "page": null},
+    {"text": "6.3. Заказчик оплачивает сч1т в течен1е 5 банковских дней после получен1я акта.", "part": "body", "page": null},
+    {"text": "7.1. Контактное лицо: Яковлев Григорий Данилович, тел. +7 (812) 740-33-19.", "part": "body", "page": null},
+    {"text": "Заказчик: ______ / Д.А. Прокофьев /", "part": "body", "page": null},
+    {"text": "Адрес доставки: Республика Татарстан, г. Набережные Челны, пр-кт Мира, д. 7, кв. 51.", "part": "body", "page": null},
+    {"text": "Электронная почта: yakovlev(at)logistika-nord.example.ru", "part": "body", "page": null},
+    {"text": "Ссылка на форму: https://forms.logistika-nord.example.ru/claim", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Яковлев Григорий Данилович"], "spans": [[3, 22, 48]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+7 (812) 740-33-19"], "spans": [[3, 55, 73]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["______ / Д.А. Прокофьев /"], "spans": [[4, 10, 35]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Д.А. Прокофьев"], "spans": [[4, 19, 33]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["Республика Татарстан, г. Набережные Челны, пр-кт Мира, д. 7, кв. 51"], "spans": [[5, 16, 83]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["yakovlev(at)logistika-nord.example.ru"], "spans": [[6, 19, 56]]},
+      {"class": "URL", "precision": "high", "value_forms": ["https://forms.logistika-nord.example.ru/claim"], "spans": [[7, 17, 62]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["7842105938", "2670419358", "5026379142", "1025020012346", "78 421 059,38", "сч1т", "течен1е", "получен1я", "Заказчик оплачивает"]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "h03_uk_docs_vehicle_health",
+  "language": "uk",
+  "description": "UK vehicle (VIN, plate, registration certificate), passport with series and number (label 'серія' excluded), date of birth, health diagnosis, policy / contract / power of attorney / court case numbers (span = number after №), driver licence. Insured amount and deductible are negatives.",
+  "blocks": [
+    {"text": "2.1. Застрахований автомобіль Renault Duster, VIN VF1HJD40765432109, номерний знак ВН 5821 КМ.", "part": "body", "page": null},
+    {"text": "2.2. Свідоцтво про реєстрацію ТВК 482915.", "part": "body", "page": null},
+    {"text": "3.1. Страхувальник Гайдамака Остап Левкович, паспорт серія КН № 654321, народився 02.11.1976 р.", "part": "body", "page": null},
+    {"text": "3.2. Страхувальник має діагноз гіпертонічна хвороба II стадії.", "part": "body", "page": null},
+    {"text": "4.1. Поліс № ЕК 3047821, договір № 56-К/2026 від 05.03.2026, довіреність № 17.", "part": "body", "page": null},
+    {"text": "4.2. Справа № 910/2845/26 розглядається Господарським судом Одеської області.", "part": "body", "page": null},
+    {"text": "5.1. Страхова сума 480 000 грн, франшиза 5 %.", "part": "body", "page": null},
+    {"text": "6.1. Водій керує за посвідченням водія РЕК 305127.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["VF1HJD40765432109"], "spans": [[0, 50, 67]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["ВН 5821 КМ"], "spans": [[0, 83, 93]]},
+      {"class": "VEHICLE", "precision": "normal", "value_forms": ["ТВК 482915"], "spans": [[1, 30, 40]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Гайдамака Остап Левкович"], "spans": [[2, 19, 43]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["КН № 654321"], "spans": [[2, 59, 70]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["02.11.1976"], "spans": [[2, 82, 92]]},
+      {"class": "HEALTH", "precision": "normal", "value_forms": ["гіпертонічна хвороба II стадії"], "spans": [[3, 31, 61]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["ЕК 3047821"], "spans": [[4, 13, 23]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["56-К/2026"], "spans": [[4, 35, 44]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["17"], "spans": [[4, 75, 77]]},
+      {"class": "DOC_NO", "precision": "normal", "value_forms": ["910/2845/26"], "spans": [[5, 14, 25]]},
+      {"class": "PERSONAL_DOC", "precision": "normal", "value_forms": ["РЕК 305127"], "spans": [[7, 39, 49]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Застрахований автомобіль", "Renault Duster", "Страхувальник", "Страхова сума", "480 000", "5 %", "Господарським судом", "05.03.2026"]
+  }
+}

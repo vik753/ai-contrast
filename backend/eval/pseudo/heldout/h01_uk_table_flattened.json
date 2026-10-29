@@ -1,0 +1,35 @@
+{
+  "name": "h01_uk_table_flattened",
+  "language": "uk",
+  "description": "UK party table flattened to lines (label line, value line). Names, initials after a role, a split РНОКПП (5+5 digits) in its own block after an address line with no keyword, a standalone checksum-valid ЄДРПОУ under a label line (normal proposals), legal form AT plus quoted name, HEALTH, initials grouped with the full name.",
+  "blocks": [
+    {"text": "Додаток 1. Дані сторін", "part": "body", "page": null},
+    {"text": "Страхувальник", "part": "body", "page": null},
+    {"text": "Мазур Леся Тарасівна", "part": "body", "page": null},
+    {"text": "Адреса: м. Львів, вул. Зелена, 5, кв. 3", "part": "body", "page": null},
+    {"text": "33108 52645", "part": "body", "page": null},
+    {"text": "Страховик", "part": "body", "page": null},
+    {"text": "АТ «Українська Страхова Спілка»", "part": "body", "page": null},
+    {"text": "ЄДРПОУ", "part": "body", "page": null},
+    {"text": "41920653", "part": "body", "page": null},
+    {"text": "Представник: заступник голови правління Остапчук Р.В.", "part": "body", "page": null},
+    {"text": "Остапчук Роман Віталійович діє на підставі Статуту.", "part": "body", "page": null},
+    {"text": "Страхувальник Мазур Л.Т. підтверджує отримання поліса.", "part": "body", "page": null},
+    {"text": "Застрахована особа Мазур Л.Т. має діагноз бронхіальна астма.", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Мазур Леся Тарасівна", "Мазур Л.Т."], "spans": [[2, 0, 20], [11, 14, 24], [12, 19, 29]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["м. Львів, вул. Зелена, 5, кв. 3"], "spans": [[3, 8, 39]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["33108 52645"], "spans": [[4, 0, 11]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["АТ «Українська Страхова Спілка»"], "spans": [[6, 0, 31]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["41920653"], "spans": [[8, 0, 8]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Остапчук Р.В.", "Остапчук Роман Віталійович"], "spans": [[9, 40, 53], [10, 0, 26]]},
+      {"class": "HEALTH", "precision": "normal", "value_forms": ["бронхіальна астма"], "spans": [[12, 42, 59]]}
+    ],
+    "requisites": [],
+    "neutralized": [],
+    "warnings": [],
+    "must_not_mask": ["Страхувальник", "Страховик", "Статуту", "Додаток 1", "Застрахована особа"]
+  }
+}

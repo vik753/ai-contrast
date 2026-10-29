@@ -1,0 +1,340 @@
+{
+  "name": "h02_uk_requisites_long",
+  "language": "uk",
+  "description": "Long UK requisites section (heading 'Адреса та реквізити сторін', one line per block). Drop: labelled org, ЄДРПОУ, IBAN, bank in quotes, МФО, phone, email, address, role plus person, signature, role plus person. Keep: an obligation sentence (Обов'язок ... сплатити), a name plus a verb (Гнатюк С.І. підтверджує, ...), 'Неустойка 0,1 %'. Each kept line gives requisites_condition. The bank name in quotes has no legal form: ORG normal, span inside the guillemets.",
+  "blocks": [
+    {
+      "text": "9.1. Сторони погоджують порядок розрахунків за Договором.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Адреса та реквізити сторін",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Виконавець: ПрАТ «Карпатський Експрес»",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "ЄДРПОУ 25871405",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "р/р UA473003460000260045678123900",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Банк: «Південний Капітал»",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "МФО 300346",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Тел.: +380 (67) 345-78-12",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "E-mail: accounting@kpx-express.example.ua",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Юридична адреса: 76018, м. Івано-Франківськ, вул. Незалежності, 47.",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Обов'язок сплатити неустойку 0,1 % за кожен день прострочення",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Директор Лозинський Орест Йосипович",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "_______ /Лозинський О.Й./",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Головний бухгалтер Гнатюк Соломія Ігорівна",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Гнатюк С.І. підтверджує, що зауважень немає",
+      "part": "body",
+      "page": null
+    },
+    {
+      "text": "Неустойка 0,1 %",
+      "part": "body",
+      "page": null
+    }
+  ],
+  "expected": {
+    "entities": [
+      {
+        "class": "ORG",
+        "precision": "high",
+        "value_forms": [
+          "ПрАТ «Карпатський Експрес»"
+        ],
+        "spans": [
+          [
+            2,
+            12,
+            38
+          ]
+        ]
+      },
+      {
+        "class": "TAX_ID",
+        "precision": "high",
+        "value_forms": [
+          "25871405"
+        ],
+        "spans": [
+          [
+            3,
+            7,
+            15
+          ]
+        ]
+      },
+      {
+        "class": "ACCOUNT",
+        "precision": "high",
+        "value_forms": [
+          "UA473003460000260045678123900"
+        ],
+        "spans": [
+          [
+            4,
+            4,
+            33
+          ]
+        ]
+      },
+      {
+        "class": "ORG",
+        "precision": "normal",
+        "value_forms": [
+          "Південний Капітал"
+        ],
+        "spans": [
+          [
+            5,
+            7,
+            24
+          ]
+        ]
+      },
+      {
+        "class": "ACCOUNT",
+        "precision": "normal",
+        "value_forms": [
+          "300346"
+        ],
+        "spans": [
+          [
+            6,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "class": "PHONE",
+        "precision": "high",
+        "value_forms": [
+          "+380 (67) 345-78-12"
+        ],
+        "spans": [
+          [
+            7,
+            6,
+            25
+          ]
+        ]
+      },
+      {
+        "class": "EMAIL",
+        "precision": "high",
+        "value_forms": [
+          "accounting@kpx-express.example.ua"
+        ],
+        "spans": [
+          [
+            8,
+            8,
+            41
+          ]
+        ]
+      },
+      {
+        "class": "ADDRESS",
+        "precision": "normal",
+        "value_forms": [
+          "76018, м. Івано-Франківськ, вул. Незалежності, 47"
+        ],
+        "spans": [
+          [
+            9,
+            17,
+            66
+          ]
+        ]
+      },
+      {
+        "class": "PERSON",
+        "precision": "normal",
+        "value_forms": [
+          "Лозинський Орест Йосипович",
+          "Лозинський О.Й."
+        ],
+        "spans": [
+          [
+            11,
+            9,
+            35
+          ],
+          [
+            12,
+            9,
+            24
+          ]
+        ]
+      },
+      {
+        "class": "SIGNATURE",
+        "precision": "normal",
+        "value_forms": [
+          "_______ /Лозинський О.Й./"
+        ],
+        "spans": [
+          [
+            12,
+            0,
+            25
+          ]
+        ]
+      },
+      {
+        "class": "PERSON",
+        "precision": "normal",
+        "value_forms": [
+          "Гнатюк Соломія Ігорівна",
+          "Гнатюк С.І."
+        ],
+        "spans": [
+          [
+            13,
+            19,
+            42
+          ],
+          [
+            14,
+            0,
+            11
+          ]
+        ]
+      }
+    ],
+    "requisites": [
+      {
+        "block": 2,
+        "line_text_starts_with": "Виконавець: ПрАТ",
+        "action": "drop"
+      },
+      {
+        "block": 3,
+        "line_text_starts_with": "ЄДРПОУ",
+        "action": "drop"
+      },
+      {
+        "block": 4,
+        "line_text_starts_with": "р/р",
+        "action": "drop"
+      },
+      {
+        "block": 5,
+        "line_text_starts_with": "Банк:",
+        "action": "drop"
+      },
+      {
+        "block": 6,
+        "line_text_starts_with": "МФО",
+        "action": "drop"
+      },
+      {
+        "block": 7,
+        "line_text_starts_with": "Тел.:",
+        "action": "drop"
+      },
+      {
+        "block": 8,
+        "line_text_starts_with": "E-mail:",
+        "action": "drop"
+      },
+      {
+        "block": 9,
+        "line_text_starts_with": "Юридична адреса:",
+        "action": "drop"
+      },
+      {
+        "block": 10,
+        "line_text_starts_with": "Обов'язок сплатити",
+        "action": "keep"
+      },
+      {
+        "block": 11,
+        "line_text_starts_with": "Директор Лозинський",
+        "action": "drop"
+      },
+      {
+        "block": 12,
+        "line_text_starts_with": "_______ /Лозинський",
+        "action": "drop"
+      },
+      {
+        "block": 13,
+        "line_text_starts_with": "Головний бухгалтер",
+        "action": "drop"
+      },
+      {
+        "block": 14,
+        "line_text_starts_with": "Гнатюк С.І. підтверджує",
+        "action": "keep"
+      },
+      {
+        "block": 15,
+        "line_text_starts_with": "Неустойка 0,1 %",
+        "action": "keep"
+      }
+    ],
+    "neutralized": [],
+    "warnings": [
+      "requisites_condition"
+    ],
+    "must_not_mask": [
+      "Сторони погоджують",
+      "Директор",
+      "Головний бухгалтер",
+      "0,1 %",
+      "Неустойка"
+    ]
+  }
+}

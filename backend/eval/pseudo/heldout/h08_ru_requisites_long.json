@@ -1,0 +1,57 @@
+{
+  "name": "h08_ru_requisites_long",
+  "language": "ru",
+  "description": "Long RU requisites section (heading 'Юридические адреса и реквизиты сторон', one line per block). Drop: role + org, ИНН + КПП on one line, ОГРН, р/с, bank (ПАО + quoted name), БИК, phone + e-mail, address, role + person, signature, role + person. Keep: 'Нестерова О.В. вправе подписывать первичные документы' (person + words), 'Пени 0,1 % за каждый день просрочки' and any line with a non-identifier phrase. Kept lines give requisites_condition.",
+  "blocks": [
+    {"text": "9.1. Стороны согласовали порядок взаимодействия.", "part": "body", "page": null},
+    {"text": "Юридические адреса и реквизиты сторон", "part": "body", "page": null},
+    {"text": "Заказчик: ООО «Вектор Плюс»", "part": "body", "page": null},
+    {"text": "ИНН 5026379142 КПП 502601001", "part": "body", "page": null},
+    {"text": "ОГРН 1025020012346", "part": "body", "page": null},
+    {"text": "р/с 40702810200100098765", "part": "body", "page": null},
+    {"text": "Банк: ПАО «Каспий Финанс»", "part": "body", "page": null},
+    {"text": "БИК 044525777", "part": "body", "page": null},
+    {"text": "Тел.: +7 (916) 555-01-38, e-mail: office@vektor-plus.example.ru", "part": "body", "page": null},
+    {"text": "Адрес: 125009, г. Москва, Газетный пер., д. 3, стр. 2, офис 405", "part": "body", "page": null},
+    {"text": "Генеральный директор Ермаков Павел Сергеевич", "part": "body", "page": null},
+    {"text": "_________ /Ермаков П.С./", "part": "body", "page": null},
+    {"text": "Главный бухгалтер Нестерова Ольга Викторовна", "part": "body", "page": null},
+    {"text": "Нестерова О.В. вправе подписывать первичные документы", "part": "body", "page": null},
+    {"text": "Пени 0,1 % за каждый день просрочки", "part": "body", "page": null}
+  ],
+  "expected": {
+    "entities": [
+      {"class": "ORG", "precision": "high", "value_forms": ["ООО «Вектор Плюс»"], "spans": [[2, 10, 27]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["5026379142"], "spans": [[3, 4, 14]]},
+      {"class": "TAX_ID", "precision": "normal", "value_forms": ["502601001"], "spans": [[3, 19, 28]]},
+      {"class": "TAX_ID", "precision": "high", "value_forms": ["1025020012346"], "spans": [[4, 5, 18]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["40702810200100098765"], "spans": [[5, 4, 24]]},
+      {"class": "ORG", "precision": "high", "value_forms": ["ПАО «Каспий Финанс»"], "spans": [[6, 6, 25]]},
+      {"class": "ACCOUNT", "precision": "normal", "value_forms": ["044525777"], "spans": [[7, 4, 13]]},
+      {"class": "PHONE", "precision": "high", "value_forms": ["+7 (916) 555-01-38"], "spans": [[8, 6, 24]]},
+      {"class": "EMAIL", "precision": "high", "value_forms": ["office@vektor-plus.example.ru"], "spans": [[8, 34, 63]]},
+      {"class": "ADDRESS", "precision": "normal", "value_forms": ["125009, г. Москва, Газетный пер., д. 3, стр. 2, офис 405"], "spans": [[9, 7, 63]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Ермаков Павел Сергеевич", "Ермаков П.С."], "spans": [[10, 21, 44], [11, 11, 23]]},
+      {"class": "SIGNATURE", "precision": "normal", "value_forms": ["_________ /Ермаков П.С./"], "spans": [[11, 0, 24]]},
+      {"class": "PERSON", "precision": "normal", "value_forms": ["Нестерова Ольга Викторовна", "Нестерова О.В."], "spans": [[12, 18, 44], [13, 0, 14]]}
+    ],
+    "requisites": [
+      {"block": 2, "line_text_starts_with": "Заказчик: ООО", "action": "drop"},
+      {"block": 3, "line_text_starts_with": "ИНН 5026379142", "action": "drop"},
+      {"block": 4, "line_text_starts_with": "ОГРН", "action": "drop"},
+      {"block": 5, "line_text_starts_with": "р/с", "action": "drop"},
+      {"block": 6, "line_text_starts_with": "Банк:", "action": "drop"},
+      {"block": 7, "line_text_starts_with": "БИК", "action": "drop"},
+      {"block": 8, "line_text_starts_with": "Тел.:", "action": "drop"},
+      {"block": 9, "line_text_starts_with": "Адрес:", "action": "drop"},
+      {"block": 10, "line_text_starts_with": "Генеральный директор", "action": "drop"},
+      {"block": 11, "line_text_starts_with": "_________ /Ермаков", "action": "drop"},
+      {"block": 12, "line_text_starts_with": "Главный бухгалтер", "action": "drop"},
+      {"block": 13, "line_text_starts_with": "Нестерова О.В. вправе", "action": "keep"},
+      {"block": 14, "line_text_starts_with": "Пени 0,1 %", "action": "keep"}
+    ],
+    "neutralized": [],
+    "warnings": ["requisites_condition"],
+    "must_not_mask": ["Стороны согласовали", "Генеральный директор", "Главный бухгалтер", "0,1 %", "Пени"]
+  }
+}
