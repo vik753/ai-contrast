@@ -241,20 +241,32 @@ class SlotResponse(Response):
         if not isinstance(client_slots, ClientSlots):
             msg = "app state is not configured"
             raise TypeError(msg)
-        client_slot = client_slots.try_slot(client_key(scope, self._settings))
-        pool_slot = self._limiter.try_slot() if client_slot is not None else None
-        if client_slot is None or pool_slot is None:
-            for taken in (client_slot, pool_slot):
-                if taken is not None:
-                    with taken:  # enter and leave at once: gives the slot back
-                        pass
-            busy = early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
-            await busy(scope, receive, send)
+        key = client_key(scope, self._settings)
+        # Explicit acquire/release in one try/finally: nothing is held between them
+        # that a dropped object could leak.
+        if not client_slots.try_acquire(key):
+            await self._busy(scope, receive, send)
             return
-        with client_slot, pool_slot:
-            response = await self._work()
+        try:
+            if not self._limiter.try_acquire():
+                await self._busy(scope, receive, send)
+                return
             try:
-                async with asyncio.timeout(self._settings.extract_send_timeout_seconds):
-                    await send_in_chunks(response, send)
-            except TimeoutError:
-                self._logger.info(self._send_timeout_event)
+                await self._run(send)
+            finally:
+                self._limiter.release()
+        finally:
+            client_slots.release(key)
+
+    @staticmethod
+    async def _busy(scope: Scope, receive: Receive, send: Send) -> None:
+        busy = early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
+        await busy(scope, receive, send)
+
+    async def _run(self, send: Send) -> None:
+        response = await self._work()
+        try:
+            async with asyncio.timeout(self._settings.extract_send_timeout_seconds):
+                await send_in_chunks(response, send)
+        except TimeoutError:
+            self._logger.info(self._send_timeout_event)

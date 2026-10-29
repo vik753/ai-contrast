@@ -20,6 +20,20 @@ UNKNOWN: Final = "unknown"
 _IPV6_PREFIX: Final = 64
 
 
+_SIX_TO_FOUR: Final = ipaddress.IPv6Network("2002::/16")
+_TEREDO: Final = ipaddress.IPv6Network("2001::/32")
+_BITS_32: Final = 0xFFFFFFFF
+
+
+def _embedded_ipv4(address: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
+    """6to4 (bits 16-47) and Teredo (last 32 bits, inverted) carry the client IPv4."""
+    if address in _SIX_TO_FOUR:
+        return ipaddress.IPv4Address((int(address) >> 80) & _BITS_32)
+    if address in _TEREDO:
+        return ipaddress.IPv4Address((int(address) & _BITS_32) ^ _BITS_32)
+    return None
+
+
 def _key_of(text: str) -> str:
     if not text.isascii() or "%" in text or any(char.isspace() for char in text):
         return UNKNOWN
@@ -30,6 +44,9 @@ def _key_of(text: str) -> str:
     if isinstance(address, ipaddress.IPv6Address):
         if address.ipv4_mapped is not None:
             return str(address.ipv4_mapped)
+        embedded = _embedded_ipv4(address)
+        if embedded is not None:
+            return str(embedded)
         return str(ipaddress.IPv6Network((address, _IPV6_PREFIX), strict=False))
     return str(address)
 

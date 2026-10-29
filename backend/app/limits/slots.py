@@ -1,13 +1,10 @@
 """Extraction slots held per client key (threat model T6 control 4).
 
 Counts only slots in use, so the table is bounded by the shared pool. Taken without
-waiting; the context manager releases exactly once on every exit path.
+waiting. The caller pairs ``try_acquire`` with ``release`` in one ``try``/``finally``.
 """
 
 from __future__ import annotations
-
-from collections.abc import Iterator
-from contextlib import AbstractContextManager, contextmanager
 
 
 class ClientSlots:
@@ -18,21 +15,24 @@ class ClientSlots:
         self._max = max_per_client
         self._held: dict[str, int] = {}
 
-    def try_slot(self, key: str) -> AbstractContextManager[None] | None:
-        """Take a slot for ``key`` now, or return ``None``. Enter the result at once."""
+    def try_acquire(self, key: str) -> bool:
+        """Take a slot for ``key`` now. Never waits."""
         count = self._held.get(key, 0)
         if count >= self._max:
-            return None
+            return False
         self._held[key] = count + 1
-        return self._release_on_exit(key)
+        return True
 
-    @contextmanager
-    def _release_on_exit(self, key: str) -> Iterator[None]:
-        try:
-            yield
-        finally:
-            count = self._held[key] - 1
-            if count == 0:
-                del self._held[key]
-            else:
-                self._held[key] = count
+    def release(self, key: str) -> None:
+        """Give back a slot taken by ``try_acquire``; ``RuntimeError`` if none is held."""
+        count = self._held.get(key, 0)
+        if count == 0:
+            msg = "release() without a held slot"
+            raise RuntimeError(msg)
+        if count == 1:
+            del self._held[key]
+        else:
+            self._held[key] = count - 1
+
+    def in_use(self, key: str) -> int:
+        return self._held.get(key, 0)

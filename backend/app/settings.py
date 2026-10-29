@@ -95,6 +95,8 @@ class Settings(BaseSettings):
     - ``TRUSTED_PROXY_HOPS``: proxies in front of the server (1 to 10). In production the
       client key is the Nth entry from the right of ``X-Forwarded-For``; in development it
       is the socket peer.
+      Rate limiters built on ``FixedWindowLimiter`` (rolling mode) need a monotonic
+      clock (``time.monotonic``); only aligned daily windows use wall time.
     - ``MAX_ZIP_ENTRIES``: entries in one ZIP (DOCX) archive.
     - ``MAX_ZIP_UNCOMPRESSED_BYTES``: declared uncompressed size of one archive.
     - ``MAX_ZIP_RATIO``: uncompressed / compressed size of one archive entry.
