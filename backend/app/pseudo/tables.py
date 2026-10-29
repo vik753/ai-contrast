@@ -239,7 +239,7 @@ PERSON_ROLE_WORDS: Final = (
     "выгодоприобретател", "заказчик", "исполнител", "покупател", "арендатор", "наниматель",
     "заемщик", "клиент", "лицо", "insured", "policyholder", "beneficiary", "customer", "buyer",
     "seller", "tenant", "lessee", "borrower", "employee", "patient", "applicant", "claimant",
-    "cardholder", "passenger", "driver", "client", "consultant", "contractor", "owner",
+    "cardholder", "passenger", "contact", "driver", "client", "consultant", "contractor", "owner",
 )  # fmt: skip
 # Words that start a sentence or a list item and are not names (exact, folded).
 NOT_NAMES: Final = (

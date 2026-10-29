@@ -394,7 +394,9 @@ class Names:
         if names > 1:
             return True
         word = u[ws[index] : we[index]]
-        return len(word) >= _MIN_ROLE_SURNAME and not word.isupper()
+        if word.isupper():
+            return self._comma_given(len(u), ws, we, index) is not None
+        return len(word) >= _MIN_ROLE_SURNAME
 
     def _after_trigger(self, le: int, ws: array[int], we: array[int], index: int) -> int:
         run = self._run(ws, we, index, _MAX_NAME_WORDS)
@@ -676,7 +678,11 @@ class Names:
                 position = u.find("___", end, le)
                 continue
             inner_start = matched.end()
-            close = u.find("/", inner_start, min(le, inner_start + _MAX_SIGNATURE_NAME))
+            limit = min(le, inner_start + _MAX_SIGNATURE_NAME)
+            at = bisect_left(self.view.breaks, inner_start)
+            if at < len(self.view.breaks) and self.view.breaks[at] < limit:
+                limit = self.view.breaks[at]  # a signature line ends at its line break
+            close = u.find("/", inner_start, limit)
             if close > inner_start:
                 self._signature_name(position, inner_start, close)
                 position = u.find("___", close + 1, le)

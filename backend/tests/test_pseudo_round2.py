@@ -226,3 +226,56 @@ def test_double_surname_wrapped_at_its_own_hyphen_is_one_person(
 
 def test_rnokpp_with_a_space_and_a_role_word_after_the_keyword() -> None:
     assert texts("РНОКПП Виконавця: 31826 40979.", cls="TAX_ID") == ["31826 40979"]
+
+
+# --------------------------------------------------- line-scoped rules stop at the break
+
+
+def test_address_stops_at_a_break_before_a_clause_number() -> None:
+    result = texts("Адреса: м. Київ, вул. Зелена, 12\n2.1. Страховик сплачує внесок.")
+    assert result
+    assert not any("2.1" in t or "Страховик" in t for t in result)
+
+
+def test_address_stops_at_a_break_before_a_new_item_in_requisites() -> None:
+    result = texts("Адреса: м. Київ, вул. Зелена, 12\nНеустойка за прострочення")
+    assert result
+    assert not any("Неустойка" in t for t in result)
+
+
+def test_address_goes_on_over_a_wrap_after_a_comma_or_before_an_abbreviation() -> None:
+    assert texts("Адреса: м. Київ, вул. Зелена,\nбуд. 8, кв. 2.", cls="ADDRESS") == [
+        "м. Київ, вул. Зелена,\nбуд. 8, кв. 2"
+    ]
+    assert texts("Адреса: м. Київ, вул. Зелена\nбуд. 8, кв. 2.", cls="ADDRESS") == [
+        "м. Київ, вул. Зелена\nбуд. 8, кв. 2"
+    ]
+
+
+def test_health_stops_at_a_break_before_a_new_item() -> None:
+    assert texts("Діагноз: астма\nШтраф сплачується", cls="HEALTH") == ["астма"]
+
+
+def test_signature_line_ends_at_its_break() -> None:
+    assert not any("Next" in t for t in texts("____ /\nNext line /", cls="SIGNATURE"))
+
+
+# --------------------------------------------------------------------- name forms
+
+
+def test_en_contact_name_with_apostrophe_and_hyphen() -> None:
+    assert texts("Contact: Mary O'Neil-Brown", cls="PERSON") == ["Mary O'Neil-Brown"]
+
+
+def test_en_surname_comma_given_name_in_capitals_is_one_person() -> None:
+    assert texts("Customer: DOE, JANE pays.", cls="PERSON") == ["DOE, JANE"]
+    assert texts("represented by DOE, JANE, and", cls="PERSON") == ["DOE, JANE"]
+
+
+def test_en_double_surname_wrapped_at_its_own_hyphen(
+    make_client: Callable[..., TestClient],
+) -> None:
+    data = detect_api(make_client(), "1. The Insured, Anna Smith-\nJones, signs the policy.")
+
+    covered = [span_text(data, sp) for e in data["entities"] for sp in e["spans"]]
+    assert any("Smith" in t and "Jones" in t for t in covered), covered

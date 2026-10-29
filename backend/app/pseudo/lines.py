@@ -230,6 +230,7 @@ class _Line:
     ) -> None:
         self.low = view.low
         self.u = view.u
+        self.breaks = view.breaks
         self.hits = hits
         self.in_requisites = in_requisites
         self.same_clause = same_clause
@@ -845,8 +846,44 @@ class _Line:
         self.hits.add(ADDRESS, NORMAL, start, end, key)
         self.skip_to = max(self.skip_to, bisect_left(self.st, end) - 1)
 
+    def _line_limit(self, start: int, limit: int) -> int:
+        """``limit``, or the first line break in ``[start, limit)`` that ends the line.
+
+        A break goes on when the text before it ends with a comma or a colon, or the next
+        line starts in lower case or with an address abbreviation ("буд.", "кв."): a wrapped
+        value. Any other break (a new item, a clause number, a label) ends the line.
+        """
+        breaks = self.breaks
+        at = bisect_left(breaks, start)
+        while at < len(breaks) and breaks[at] < limit:
+            position = breaks[at]
+            if not self._wrap_goes_on(position):
+                return position
+            at += 1
+        return limit
+
+    def _wrap_goes_on(self, position: int) -> bool:
+        low = self.low
+        before = position
+        while before > 0 and low[before - 1] == " ":
+            before -= 1
+        after = position + 1
+        while after < self.le and low[after] == " ":
+            after += 1
+        if after >= self.le:
+            return False
+        if low[before - 1 : before] in (",", ":"):
+            return True
+        if self.u[after].islower():
+            return True
+        stop = after
+        while stop < self.le and low[stop].isalnum():
+            stop += 1
+        word = low[after:stop]
+        return low[stop : stop + 1] == "." and (word in ABBREVIATIONS or word in ADDRESS_STARTS)
+
     def _address_end(self, start: int) -> int:
-        limit = min(self.le, start + _MAX_ADDRESS)
+        limit = self._line_limit(start, min(self.le, start + _MAX_ADDRESS))
         for index in range(start, limit):
             if self._address_stops_at(index, start) or self._token_stops_at(index, start):
                 return index
@@ -942,7 +979,7 @@ class _Line:
         position = self.en[index]
         while position < self.le and low[position] in " :—-":
             position += 1
-        limit = min(self.le, position + _MAX_HEALTH)
+        limit = self._line_limit(position, min(self.le, position + _MAX_HEALTH))
         end = position
         while end < limit:
             char = low[end]
