@@ -688,3 +688,63 @@ Order: S5-T0 (fixtures) and the S5-T1 tests in parallel; then S5-T1 (backend); S
 
 - Owner: `docs-writer`. After S5-T1 and S5-T2 are merged.
 - Threat model: T5 control 6 (segmentation in the sandbox, linear-time patterns and algorithm, clause caps, running-line and requisites abuse rules, running clauses rated like body clauses), T6 controls 3–4 (new endpoint: body limit, slot, deadline and minimum rate; add `/api/segment` to the stage 13 per-IP slot blocker), T11 (headings are copied text and are masked in stage 5b). Stage 11 eval case: a harmful sentence repeated on every page. ADR 0014 → accepted. `CLAUDE.md` Commands: a `curl` check for `/api/segment`. README status.
+
+## Stage 5b — Pseudonymization
+
+Design: ADR 0008 (what is masked, pipeline, type gate, tests) and ADR 0015 (interfaces for this stage). Threats: T3, T5, T11. Every task here is security-critical: `security-reviewer` reviews every PR.
+
+Order: S5b-T0 (corpus) first, in parallel with the S5b-T1 tests; S5b-T1 (detector in `/api/segment`); then S5b-T2 (safety check and type gate, backend) and S5b-T3 (preview and masking, frontend) in parallel; S5b-T4 (canary harness and eval) after T1–T3; S5b-T5 docs last.
+
+### S5b-T0 Identifier corpus
+
+- Owner: `domain-analyst`. Branch: `feat/s5b-detect` (corpus only, `backend/tests/fixtures/pseudo/`).
+- Synthetic contracts (fictional values only; checksummed codes and IBANs must be **valid by checksum** but fictional) in UK, RU and EN, as `/api/segment` input blocks, each with the expected entities: class, `precision`, every span (block, start, end) of every occurrence, grouping of forms of the same value into one entity, requisites line decisions (`drop`/`keep`) and expected warnings. Cover every class of ADR 0008 point 1 and every location of ADR 0008 point 6 that exists as text (preamble, body, headings, footnotes, running headers, requisites, text boxes); UK/RU case forms, initials both orders, transliteration, female forms, non-declining surnames, double surnames, common-word surnames (Коваль, Мельник, Rose); ФОП (ORG and PERSON); quoted product names; defined terms equal to a masked name; obfuscated emails; IBAN with and without spaces; numbers that pass a checksum but are amounts (`12 345 678,00 грн`, `25 %`, `30 днів`) and must **not** be masked; a requisites section with identifier-only lines and one obligation line; placeholder look-alikes; zero-width-split, hyphen-split and homoglyph variants (after Layer 1 cleaning, homoglyphs remain). Also **negative controls**: role words (Страховик, Орендар, Buyer), city-level territory, dates of obligations, amounts. At least 25 files. `README.md` lists them.
+
+### S5b-T1 Detector in `/api/segment` (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s5b-detect` (worktree `/home/claude/wt/s5b-detect`).
+- Threats: T5, T6, T11.
+
+1. `app/pseudo/` per ADR 0015 point 2: preamble definitions and later occurrences (stem matching for UK/RU cases), legal forms + quoted names, "в особі / в лице / represented by", signature lines, format rules with checksums (ЄДРПОУ, РНОКПП, IBAN, Luhn) **only with a context keyword within 5 tokens or inside the requisites section**; amounts (currency, `%`, units, thousand separators, decimals) never match a code rule; a checksum match without context is a `normal` proposal; emails (incl. `(at)`/`[at]`), phones (UA/RU/intl formats), URLs and bare domains, VIN, UA/RU plates, passport/ID formats with context, document numbers after `№`/`No.` with a document word, cadastral numbers, addresses after address keywords up to the end of the line or sentence.
+2. Matching view: de-hyphenated (line-end hyphens), NFKC + generated confusable skeleton (Latin/Cyrillic/Greek/digits; checked-in table, generator with `--check`, like Layer 1), with an exact offset map back to the cleaned blocks; masks always point to cleaned-block offsets.
+3. Reply fields exactly as ADR 0015 point 1 (`detector_version`, `entities` with grouped spans and no value strings, `requisites`, `neutralized`, new clause warnings). Placeholder look-alikes (also on the skeleton) are neutralized in the returned cleaned blocks (`[`→`⟦`, `]`→`⟧`, same length). Headings and running clauses are detected like other text. Boundary snapping test: a match that ends inside an NFKC-expanded character covers the whole source character. Grouping uses a hashed stem index (linear); caps are checked during detection.
+4. Requisites section (clauses with `section_kind: "requisites"`): line by line; a line is dropped **only when every token is classed** as an identifier (inside a detected entity), a label from the closed checked-in list (`ЄДРПОУ:`, `IBAN:`, `Адреса:`…), a role word or part of a signature line. Any amount, `%`, date, unit, obligation marker or unclassified word keeps the line (kept → clause warning `requisites_condition`). If the client unmasks a value in a dropped line, the line is kept. Tests: "Іваненко І.І. відмовляється від претензій" and "Неустойка 50 %" in the requisites section are kept.
+5. Caps: 5,000 entities and 50,000 spans per file → `422 too_many_identifiers`; the result-size test at the caps is extended with entities.
+6. Linear time: patterns per line with `match` at token starts, no nested quantifiers (existing policy test extended to `app/pseudo/`); adversarial tests at the caps within the CPU limit.
+7. Logging: counts only (entities per class), never values. Log canary extended: an identifier canary never in logs.
+8. Corpus: every S5b-T0 fixture gives exactly the expected entities (class, precision, spans, grouping), requisites decisions and warnings; negative controls give no entity.
+
+### S5b-T2 Safety check and type gate (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s5b-safety` (worktree `/home/claude/wt/s5b-safety`). After S5b-T1 is merged.
+- Threats: T5, T11.
+
+1. `app/pseudo/gate.py`: gate types per ADR 0015 point 5 (frozen, slots, `InitVar` sentinel without default, immutable fields only, `__copy__`/`__deepcopy__`/`__reduce__`/`__reduce_ex__` raise); `safety_pass(untrusted: UntrustedMaskedDocument) -> PseudonymizedDocument` raising `SafetyError(code, spans)`. Tests: `dataclasses.replace`, `copy.copy`, `copy.deepcopy`, `pickle.dumps` and construction without the sentinel all fail.
+2. `POST /api/safety-check` per ADR 0015 point 4 (grammar, caps for masked input, `acknowledged_unmasked`): same transport rules as `/api/segment` (JSON, per-path body limit 4 MiB, slot before read, deadline and minimum rate, sandbox child, strict parsing). Checks in order: `409 detector_version_mismatch`; `422 input_not_clean`; `422 invalid_placeholder` (grammar, label, known class, numbering from 1 without gaps, also on the confusable skeleton); then the **whole detector** re-runs on the masked text and every hit must be inside a placeholder or in `acknowledged_unmasked` (an acknowledged span that hits a `high` rule is refused) → else `422 unmasked_identifier` with clause-relative spans only; each acknowledged span must equal one detector hit span exactly, sorted, no overlaps, at most 50,000 (else `422 invalid_request`); placeholder grammar is checked on the literal `[` only; `200 {"ok": true, "detector_version", "digest"}`. Error bodies never contain text.
+3. AST policy test (ADR 0008 point 3): outside `app/pseudo/gate.py`, no constructor call, `cast`, `__new__`, `object.__setattr__`, `dataclasses.replace`, `copy.copy`/`copy.deepcopy`, `pickle` or sentinel use for gate types; no gate type in any Pydantic request model; every module under `app/ai/` (by glob; the test passes vacuously until stage 6 adds them) may accept only gate types, enums and constants.
+4. Tests for every check, for clause-relative span correctness, and that a masked document whose placeholders hide a high-precision value passes.
+
+### S5b-T3 Preview and masking (frontend)
+
+- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s5b-preview` (worktree `/home/claude/wt/s5b-preview`). After S5b-T1 is merged; the safety-check call is wired when S5b-T2 is merged (mock until then).
+- Threats: T3, T11.
+
+1. Contract labels A, B, C… follow contract order in the form; file names never leave the browser and never appear in masked text.
+2. Mandatory "Check replacements" step per contract after every row has clauses: the clause list with each entity highlighted (plain text, class label, placeholder preview), requisites lines that will be dropped shown struck through, kept requisites lines and other warnings shown; `high` entities and checksum-code entities (also `normal` ones without context) cannot be unmasked (control disabled with an explanation); `normal` entities can be unmasked (all occurrences of that entity, or one occurrence); the client can select text inside a clause and mask it with a class (all equal occurrences in that document are offered).
+3. Placeholders assigned in the browser in first-occurrence order per document and class (`[A.ORG_1]`); masked clauses built from cleaned blocks and spans; the mapping lives only in memory, dropped with the contract (ADR 0013 point 9a); never in storage, URL, console, announcements or any request.
+3a. The preview shows neutralized look-alikes (`⟦…⟧`) with an explanation.
+4. "Everything is correct" calls `/api/safety-check` per contract, sending `acknowledged_unmasked` for the occurrences the client unmasked; on `unmasked_identifier` the returned spans are pre-masked, highlighted and the client must confirm again; on `detector_version_mismatch` the contract is re-segmented and the review starts again; other errors shown with their own messages. A contract is "ready for analysis" only after `ok`; any later edit resets it.
+5. Tests: highlight rendering, unmask rules, manual masking, placeholder numbering, masked text equals the expected text, the mapping and original values never in any `fetch` body (intercept all requests), the safety-check flow for every code, readiness reset, en/uk/ru.
+
+### S5b-T4 Canary harness and detector eval
+
+- Owner: `test-engineer` (harness) and `ai-eval-engineer` (eval). Branch: `feat/s5b-canary`. After S5b-T1–T3 are merged.
+- Threats: T11.
+
+1. Harness per ADR 0015 point 6 (every class × location × input path: PDF, DOCX, TXT, OCR-like blocks, Google export DOCX; text outside content: file name, DOCX `docProps`, PDF Info/XMP never reach blocks); the browser-equivalent masking in Python uses the same placeholder rules as S5b-T3 (shared JSON test vectors used by both Vitest and pytest).
+2. Eval per ADR 0015 point 7 with a report script: per class and per language, partial mask = miss, held-out split, committed baseline; gates enforced in CI; numbers recorded in the PR and in `docs/agent/PROGRESS.md`. `domain-analyst` writes the held-out split into `backend/eval/pseudo/heldout/` after S5b-T1 is merged; developer tasks must not read that folder. The held-out report shows only aggregate numbers per class and language, never failing values or spans.
+
+### S5b-T5 Docs for stage 5b
+
+- Owner: `docs-writer`. After S5b-T1–T4 are merged.
+- ADR 0015 → accepted; threat model T11 (controls as implemented, eval numbers, residual risk), T5 (placeholder look-alikes), T6 (`/api/safety-check` in the per-IP slot blocker); `CLAUDE.md` Commands (`/api/segment` example with entities, `/api/safety-check`); README ("names are replaced before any AI call; you check every replacement").

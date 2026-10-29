@@ -173,8 +173,41 @@ Check the clause splitting endpoint:
 curl -sS -X POST -H 'Content-Type: application/json' -d '{"blocks":[{"text":"1. Subject","part":"body","page":null},{"text":"1.1. The insurer pays within 10 days.","part":"body","page":null}]}' http://127.0.0.1:8000/api/segment
 ```
 
-Expected: `{"clauses":[{"id":"c1","number":"1","level":1,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[0,0,10]],"heading_span":[0,3,10]},{"id":"c2","number":"1.1","level":2,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[1,0,37]],"heading_span":[0,3,10]}],"blocks":[{"text":"1. Subject","part":"body","page":null},{"text":"1.1. The insurer pays within 10 days.","part":"body","page":null}],"removed":[],"warnings":[]}`.
+Expected: `{"clauses":[{"id":"c1","number":"1","level":1,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[0,0,10]],"heading_span":[0,3,10]},{"id":"c2","number":"1.1","level":2,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[1,0,37]],"heading_span":[0,3,10]}],"blocks":[{"text":"1. Subject","part":"body","page":null},{"text":"1.1. The insurer pays within 10 days.","part":"body","page":null}],"removed":[],"warnings":[],"detector_version":"pseudo-…","entities":[],"requisites":[],"neutralized":[]}`.
 A span is `[block, start, end]` into `blocks`. Clause 1.1 carries the heading of section 1.
+`detector_version` changes whenever the detector rules change.
+Check identifier detection (the email is fictional):
+
+```bash
+curl -sS -X POST -H 'Content-Type: application/json' -d '{"blocks":[{"text":"1. Contacts","part":"body","page":null},{"text":"1.1. Notices go to jane.doe@example.com.","part":"body","page":null}]}' http://127.0.0.1:8000/api/segment
+```
+
+Expected: the reply ends with `"entities":[{"id":"e1","class":"EMAIL","precision":"high","spans":[[1,19,39]]}],"requisites":[],"neutralized":[]}`.
+The reply holds spans only, never the value. The browser reads the value from the blocks.
+Check the safety check. First save the current detector version:
+
+```bash
+V=$(curl -sS -X POST -H 'Content-Type: application/json' -d '{"blocks":[{"text":"x","part":"body","page":null}]}' http://127.0.0.1:8000/api/segment | python3 -c 'import json,sys; print(json.load(sys.stdin)["detector_version"])')
+echo "$V"
+```
+
+Expected: one line like `pseudo-662d4611a8ffd7d5`.
+Send a correctly masked document:
+
+```bash
+curl -sS -X POST -H 'Content-Type: application/json' -d '{"label":"A","detector_version":"'"$V"'","clauses":[{"id":"c1","text":"1. Contacts"},{"id":"c2","text":"1.1. Notices go to [A.EMAIL_1]."}],"acknowledged_unmasked":[]}' http://127.0.0.1:8000/api/safety-check
+```
+
+Expected: status `200` and `{"ok":true,"detector_version":"pseudo-…","digest":"<64 hex characters>"}`.
+Send a document with an unmasked email:
+
+```bash
+curl -sS -i -X POST -H 'Content-Type: application/json' -d '{"label":"A","detector_version":"'"$V"'","clauses":[{"id":"c1","text":"1. Contacts"},{"id":"c2","text":"1.1. Notices go to jane.doe@example.com."}],"acknowledged_unmasked":[]}' http://127.0.0.1:8000/api/safety-check
+```
+
+Expected: status `422` and `{"error":"unmasked_identifier","spans":[["c2",19,39]]}`.
+The error gives offsets only, never the value. A wrong `detector_version` gives `409` and `{"error":"detector_version_mismatch"}`.
+The log shows `safety outcome=... unmasked=<count>` and never the text.
 
 Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
 
