@@ -4,6 +4,7 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { RatingIcon, type Rating } from "./components/RatingIcon";
 import { SOURCE_CODE_URL } from "./config";
+import { ProviderSettings } from "./provider/ProviderSettings";
 import { SettingsPanel } from "./settings/SettingsPanel";
 import { startupCleanup } from "./storage/historySetting";
 import { UploadForm } from "./upload/UploadForm";
@@ -50,6 +51,8 @@ function Shell() {
         </section>
 
         {settingsOpen ? <SettingsPanel id={panelId} /> : null}
+
+        <ProviderSettings />
 
         <UploadForm />
 

@@ -2,6 +2,7 @@
  * History setting, store factory, start-up cleanup and "clear all" (ADR 0013 points 1, 2, 2a, 7).
  * History is off by default. Off means nothing is stored. The setting is `localStorage["aic.history"] === "on"`.
  */
+import { notifyKeysCleared } from "../provider/keyStore";
 import type { CacheStore } from "./cacheStore";
 import { DisabledCacheStore } from "./disabledCacheStore";
 import { DB_NAME, HISTORY_KEY, IndexedDbCacheStore } from "./indexedDbCacheStore";
@@ -175,6 +176,7 @@ function removeAicKeys(storage: () => Storage): boolean {
 /** Removes `aic.*` keys (not the language), then deletes every IndexedDB database of the origin. */
 export async function clearAllData(): Promise<ClearResult> {
   const keysOk = [removeAicKeys(() => localStorage), removeAicKeys(() => sessionStorage)];
+  notifyKeysCleared();
   const factory = getFactory();
   if (factory === null) {
     return keysOk.includes(false) ? "failed" : "cleared";

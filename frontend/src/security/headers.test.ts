@@ -206,9 +206,7 @@ describe("exact CSP directives (S1-T2b AC4)", () => {
     expect(directive("script-src")).not.toContain("'unsafe-eval'");
   });
 
-  it("test_csp_frame_src_is_none", () => {
-    expect(directive("frame-src")).toEqual(["'none'"]);
-  });
+  // S6-T5: frame-src is no longer 'none'; see src/provider/headers.provider.test.ts.
 
   it("test_csp_has_upgrade_insecure_requests_without_sources", () => {
     expect(directive("upgrade-insecure-requests")).toEqual([]);

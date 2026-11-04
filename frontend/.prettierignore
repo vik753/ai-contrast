@@ -1,4 +1,5 @@
 dist/
+dist-turnstile/
 public/ocr/
 coverage/
 node_modules/

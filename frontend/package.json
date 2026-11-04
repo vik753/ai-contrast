@@ -11,6 +11,8 @@
   "scripts": {
     "dev": "node scripts/copy-ocr-assets.mjs && vite",
     "build": "node scripts/copy-ocr-assets.mjs && tsc -b && vite build",
+    "dev:turnstile": "vite --config vite.turnstile.config.ts",
+    "build:turnstile": "tsc -b && vite build --config vite.turnstile.config.ts",
     "preview": "vite preview",
     "lint": "eslint --max-warnings=0 .",
     "typecheck": "tsc -b --noEmit",
