@@ -82,7 +82,14 @@
         "ru": ["франшиз", "собственн участи", "размер франшиз"]
       },
       "attributes": [
-        {"id": "deductible_amount", "labels": {"en": "Deductible per event", "uk": "Франшиза за подію", "ru": "Франшиза за событие"}, "type": "amount", "units": ["UAH", "USD", "EUR", "percent_of_sum"], "directions": {"insured": "lower_better", "insurer": "higher_better"}}
+        {"id": "deductible_amount", "labels": {"en": "Deductible per event", "uk": "Франшиза за подію", "ru": "Франшиза за событие"}, "type": "amount", "units": ["UAH", "USD", "EUR", "percent_of_sum", "percent_of_loss"], "directions": {"insured": "lower_better", "insurer": "higher_better"}},
+        {"id": "deductible_scope", "labels": {"en": "Deductible applies", "uk": "Франшиза застосовується", "ru": "Франшиза применяется"}, "type": "enum",
+          "values": [
+            {"id": "annual_aggregate", "labels": {"en": "Once per policy year (aggregate)", "uk": "Раз на рік дії полісу (агрегатна)", "ru": "Раз в год действия полиса (агрегатная)"}},
+            {"id": "per_event", "labels": {"en": "Per event", "uk": "За кожною подією", "ru": "За каждым событием"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"insured": ["annual_aggregate", "per_event", "not_stated"], "insurer": ["per_event", "annual_aggregate", "not_stated"]}}
       ]
     },
     {
@@ -115,7 +122,15 @@
         "ru": ["срок выплат", "страхов выплат", "страхов возмещен", "в течение рабочих дней", "решение о выплат"]
       },
       "attributes": [
-        {"id": "payout_days", "labels": {"en": "Days to pay", "uk": "Строк виплати", "ru": "Срок выплаты"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "lower_better", "insurer": "higher_better"}}
+        {"id": "payout_days", "labels": {"en": "Days to pay", "uk": "Строк виплати", "ru": "Срок выплаты"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "lower_better", "insurer": "higher_better"}},
+        {"id": "payout_start_event", "labels": {"en": "Payout term starts from", "uk": "Строк рахується з", "ru": "Срок считается с"}, "type": "enum",
+          "values": [
+            {"id": "event_notice", "labels": {"en": "Notice of the event", "uk": "Повідомлення про подію", "ru": "Уведомление о событии"}},
+            {"id": "documents_received", "labels": {"en": "All documents received", "uk": "Отримання всіх документів", "ru": "Получение всех документов"}},
+            {"id": "decision_made", "labels": {"en": "Decision to pay", "uk": "Рішення про виплату", "ru": "Решение о выплате"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"insured": ["event_notice", "documents_received", "decision_made", "not_stated"], "insurer": ["decision_made", "documents_received", "event_notice", "not_stated"]}}
       ]
     },
     {
@@ -128,7 +143,7 @@
         "ru": ["уведомить страховщик", "уведомлен о событии", "в течение часов", "документы для выплат", "акт о заливе", "справк"]
       },
       "attributes": [
-        {"id": "notice_deadline", "labels": {"en": "Deadline to notify", "uk": "Строк повідомлення", "ru": "Срок уведомления"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "higher_better", "insurer": "lower_better"}},
+        {"id": "notice_deadline", "labels": {"en": "Deadline to notify", "uk": "Строк повідомлення", "ru": "Срок уведомления"}, "type": "duration", "units": ["hours", "days", "working_days"], "directions": {"insured": "higher_better", "insurer": "lower_better"}},
         {"id": "required_documents", "labels": {"en": "Required documents", "uk": "Обов'язкові документи", "ru": "Обязательные документы"}, "type": "categories",
           "values": [
             {"id": "authority_report", "labels": {"en": "Report of emergency or police service", "uk": "Довідка аварійної служби чи поліції", "ru": "Справка аварийной службы или полиции"}},

@@ -160,7 +160,7 @@
         "ru": ["доступ", "осмотр", "вход в помещ", "предварительн уведомлен", "проверк состоян"]
       },
       "attributes": [
-        {"id": "access_notice", "labels": {"en": "Notice before entry", "uk": "Попередження перед входом", "ru": "Уведомление перед входом"}, "type": "duration", "units": ["days", "working_days"], "directions": {"tenant": "higher_better", "landlord": "lower_better"}}
+        {"id": "access_notice", "labels": {"en": "Notice before entry", "uk": "Попередження перед входом", "ru": "Уведомление перед входом"}, "type": "duration", "units": ["hours", "days", "working_days"], "directions": {"tenant": "higher_better", "landlord": "lower_better"}}
       ]
     },
     {
