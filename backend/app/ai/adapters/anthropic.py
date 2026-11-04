@@ -16,30 +16,30 @@ from app.ai.adapters._common import (
     COMPLETE_TIMEOUT_SECONDS,
     CONNECT_TIMEOUT_SECONDS,
     _bad_response,
-    _error_for,
+    _code_for,
     _load_object,
     _model_json,
     _quiet_sdk_loggers,
 )
-from app.ai.port import AIRequest, CheckResult, ModelJson
+from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson
 from app.ai.prompting import CHECK_MAX_TOKENS, CHECK_PROBE, build_messages
 from app.net.ai_client import AITransport, ai_client
 
 _quiet_sdk_loggers()
 
 
-def _text_of(payload: dict[str, object]) -> str:
+def _text_of(payload: dict[str, object], *, require_text: bool) -> str:
     content = payload.get("content")
     if not isinstance(content, list):
         _bad_response()
     parts = [
-        block["text"]
+        text
         for block in content
         if isinstance(block, dict)
         and block.get("type") == "text"
-        and isinstance(block["text"], str)
+        and isinstance(text := block.get("text"), str)
     ]
-    if not parts:
+    if require_text and not parts:
         _bad_response()
     return "".join(parts)
 
@@ -61,6 +61,7 @@ class AnthropicAdapter:
         timeout: float,
     ) -> dict[str, object]:
         _quiet_sdk_loggers()
+        code = AIErrorCode.PROVIDER_UNAVAILABLE
         try:
             async with asyncio.timeout(timeout):
                 http = ai_client(
@@ -88,15 +89,19 @@ class AnthropicAdapter:
                     await client.close()
                     await http.aclose()
         except Exception as error:  # noqa: BLE001 - every error becomes an AIError (T1)
-            raise _error_for(error) from None
+            code = _code_for(error)
+        # Raised outside the handler: the error keeps no cause and no context (the SDK error
+        # holds the request with the key header).
+        raise AIError(code)
 
     async def check(self) -> CheckResult:
-        await self._post(
+        payload = await self._post(
             [{"role": "user", "content": CHECK_PROBE}],
             anthropic.omit,
             CHECK_MAX_TOKENS,
             CHECK_TIMEOUT_SECONDS,
         )
+        _text_of(payload, require_text=False)  # the shape test; empty text is allowed
         return CheckResult(ok=True)
 
     async def complete_json(self, request: AIRequest) -> ModelJson:
@@ -108,4 +113,4 @@ class AnthropicAdapter:
             request.max_tokens,
             COMPLETE_TIMEOUT_SECONDS,
         )
-        return _model_json(_text_of(payload))
+        return _model_json(_text_of(payload, require_text=True))

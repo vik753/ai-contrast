@@ -13,7 +13,12 @@ from typing import Final, Protocol, runtime_checkable
 from pydantic import BaseModel
 
 from app.ai.prompts import PromptTemplate
-from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument, PseudonymizedText
+from app.pseudo.gate import (
+    ConfirmedTopic,
+    PseudonymizedDocument,
+    PseudonymizedText,
+    document_digest,
+)
 
 __all__ = ["AIError", "AIErrorCode", "AIProvider", "AIRequest", "CheckResult", "ModelJson"]
 
@@ -39,6 +44,7 @@ class AIError(Exception):
     def __init__(self, code: AIErrorCode) -> None:
         super().__init__(code.value)
         self.code = code
+        self.__suppress_context__ = True  # also when raised inside a handler
 
 
 @dataclass(frozen=True)
@@ -65,6 +71,8 @@ class AIRequest:
             raise TypeError("template or document has a wrong type")  # noqa: TRY003
         if not all(value is None or isinstance(value, kind) for value, kind in optional):
             raise TypeError("text or topic has a wrong type")  # noqa: TRY003
+        if self.text is not None and self.text.source != document_digest(self.document):
+            raise ValueError("text belongs to another document")  # noqa: TRY003
         if not (isinstance(self.schema, type) and issubclass(self.schema, BaseModel)):
             raise TypeError("schema must be a pydantic model class")  # noqa: TRY003
         if type(self.max_tokens) is not int or not 1 <= self.max_tokens <= MAX_OUTPUT_TOKENS:

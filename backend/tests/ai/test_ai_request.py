@@ -95,7 +95,9 @@ def test_prompt_template_cannot_be_built_from_a_runtime_string(text: str) -> Non
 
 def test_prompt_template_cannot_be_extended() -> None:
     with pytest.raises(TypeError):
-        type("Evil", (PromptTemplate,), {})
+
+        class Evil(PromptTemplate):  # type: ignore[misc]
+            pass
 
 
 def test_check_result_holds_only_a_success_flag() -> None:
@@ -135,7 +137,7 @@ def test_build_messages_instructions_are_one_system_message_and_data_is_user_mes
     messages = build_messages(make_request())
 
     assert messages[0].role == "system"
-    assert messages[0].content == first_template().value
+    assert messages[0].content.startswith(first_template().value)  # then the schema
     assert len(messages) >= 2
     assert all(m.role == "user" for m in messages[1:])
 

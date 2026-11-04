@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
 
+from app.net.guard import BlockedHostError, check_hostname
+
 __all__ = [
     "PRESETS",
     "AdapterKind",
@@ -23,12 +25,6 @@ __all__ = [
 ]
 
 _MODEL_RE: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}", re.ASCII)
-# Syntax only: at least two labels, a TLD that starts with a letter (so no IP form such as
-# ``127.1``). The guard applies the full host rules (ADR 0012) at connect time.
-_HOST_RE: Final = re.compile(
-    r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}", re.ASCII
-)
-_MAX_HOST: Final = 253
 _PRINTABLE_RE: Final = re.compile(r"[\x21-\x7e]+", re.ASCII)
 _PATH_RE: Final = re.compile(r"(?:/[A-Za-z0-9._~-]*)*", re.ASCII)
 _MAX_PATH: Final = 256
@@ -127,11 +123,13 @@ def checked_base_url(url: str | None) -> str:
     path = slash + tail
     host, colon, port = authority.partition(":")
     segments = path.split("/")[1:]
-    name = host.lower()
+    try:
+        # The same host rule as the guard (labels, TLD, length); addresses are checked at connect.
+        name = check_hostname(host)
+    except BlockedHostError:
+        raise ConnectionConfigError("invalid_base_url") from None
     if (
-        len(name) > _MAX_HOST
-        or not _HOST_RE.fullmatch(name)
-        or (colon and port != _HTTPS_PORT)
+        (colon and port != _HTTPS_PORT)
         or len(path) > _MAX_PATH
         or not _PATH_RE.fullmatch(path)
         or any(segment in {".", ".."} for segment in segments)

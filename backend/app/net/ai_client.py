@@ -31,7 +31,6 @@ _POOL_TIMEOUT_SECONDS: Final = 5.0
 _ALLOWED_HEADERS: Final = frozenset(
     {
         "accept",
-        "accept-encoding",
         "authorization",
         "anthropic-version",
         "connection",
@@ -51,6 +50,10 @@ class RedirectRefusedError(Exception):
 
 class ResponseTooLargeError(Exception):
     """The response body is larger than the cap."""
+
+
+class ResponseEncodingError(Exception):
+    """The response has a Content-Encoding other than identity."""
 
 
 class _CappedStream(httpx2.AsyncByteStream):
@@ -85,7 +88,8 @@ class _AITransport(httpx2.AsyncBaseTransport):
             url=request.url,
             headers=[
                 (k, v) for k, v in request.headers.raw if k.decode().lower() in _ALLOWED_HEADERS
-            ],
+            ]
+            + [(b"accept-encoding", b"identity")],
             stream=request.stream,
             extensions=request.extensions,
         )
@@ -107,6 +111,11 @@ class _AITransport(httpx2.AsyncBaseTransport):
     def _check(self, response: httpx2.Response) -> None:
         if 300 <= response.status_code < 400:  # noqa: PLR2004 - the 3xx class
             raise RedirectRefusedError("redirect is refused")  # noqa: TRY003
+        # Never decode: a small compressed body could be a huge one (decompression bomb), and
+        # the size cap counts the bytes that are read, so they must be the bytes that count.
+        codings = response.headers.get("content-encoding", "identity").lower().split(",")
+        if any(coding.strip() not in {"", "identity"} for coding in codings):
+            raise ResponseEncodingError("response encoding is not allowed")  # noqa: TRY003
         length = response.headers.get("content-length", "")
         if length.isascii() and length.isdigit() and int(length) > self._max_bytes:
             raise ResponseTooLargeError("response is too large")  # noqa: TRY003

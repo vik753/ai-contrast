@@ -7,6 +7,7 @@ after the block text is known and is drawn again when it occurs in any block tex
 
 from __future__ import annotations
 
+import json
 import re
 import secrets
 from dataclasses import dataclass
@@ -39,6 +40,12 @@ def _document_text(request: AIRequest) -> str:
     return "\n\n".join(lines)
 
 
+def _instructions(request: AIRequest) -> str:
+    """The template text and the JSON schema of the answer (from the class, never a string)."""
+    schema = json.dumps(request.schema.model_json_schema(), sort_keys=True, separators=(",", ":"))
+    return f"{request.template.value}\n\nJSON schema of the answer:\n{schema}"
+
+
 def _blocks(request: AIRequest) -> list[tuple[str, str]]:
     blocks = [("DOCUMENT", _document_text(request))]
     if request.text is not None:
@@ -51,7 +58,7 @@ def _blocks(request: AIRequest) -> list[tuple[str, str]]:
 def build_messages(request: AIRequest) -> tuple[Message, ...]:
     blocks = _blocks(request)
     texts = [text for _, text in blocks]
-    messages = [Message("system", request.template.value)]
+    messages = [Message("system", _instructions(request))]
     for kind, text in blocks:
         for _ in range(_MAX_DRAWS):
             nonce = secrets.token_hex(_NONCE_BYTES)

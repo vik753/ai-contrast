@@ -16,27 +16,31 @@ from app.ai.adapters._common import (
     COMPLETE_TIMEOUT_SECONDS,
     CONNECT_TIMEOUT_SECONDS,
     _bad_response,
-    _error_for,
+    _code_for,
     _load_object,
     _model_json,
     _quiet_sdk_loggers,
 )
-from app.ai.port import AIRequest, CheckResult, ModelJson
+from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson
 from app.ai.prompting import CHECK_MAX_TOKENS, CHECK_PROBE, Message, build_messages
 from app.net.ai_client import AITransport, ai_client
 
 _quiet_sdk_loggers()
 
 
-def _text_of(payload: dict[str, object]) -> str:
+def _text_of(payload: dict[str, object], *, require_text: bool) -> str:
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
         _bad_response()
     message = choices[0].get("message")
-    content = message.get("content") if isinstance(message, dict) else None
-    if not isinstance(content, str):
+    if not isinstance(message, dict):
         _bad_response()
-    return content
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if require_text or content is not None:
+        _bad_response()
+    return ""
 
 
 class OpenAICompatibleAdapter:
@@ -66,8 +70,7 @@ class OpenAICompatibleAdapter:
             else {"role": "user", "content": m.content}
             for m in messages
         ]
-        legacy = None if self._completion_tokens_field else max_tokens
-        modern = max_tokens if self._completion_tokens_field else None
+        code = AIErrorCode.PROVIDER_UNAVAILABLE
         try:
             async with asyncio.timeout(timeout):
                 http = ai_client(
@@ -86,23 +89,29 @@ class OpenAICompatibleAdapter:
                     raw = await client.chat.completions.with_raw_response.create(
                         model=self._model,
                         messages=wire,
-                        max_tokens=legacy if legacy is not None else openai.omit,
-                        max_completion_tokens=modern if modern is not None else openai.omit,
+                        max_tokens=openai.omit if self._completion_tokens_field else max_tokens,
+                        max_completion_tokens=(
+                            max_tokens if self._completion_tokens_field else openai.omit
+                        ),
                     )
                     return _load_object(await raw.http_response.aread())
                 finally:
                     await client.close()
                     await http.aclose()
         except Exception as error:  # noqa: BLE001 - every error becomes an AIError (T1)
-            raise _error_for(error) from None
+            code = _code_for(error)
+        # Raised outside the handler: the error keeps no cause and no context (the SDK error
+        # holds the request with the key header).
+        raise AIError(code)
 
     async def check(self) -> CheckResult:
         probe = (Message("user", CHECK_PROBE),)
-        await self._post(probe, CHECK_MAX_TOKENS, CHECK_TIMEOUT_SECONDS)
+        payload = await self._post(probe, CHECK_MAX_TOKENS, CHECK_TIMEOUT_SECONDS)
+        _text_of(payload, require_text=False)  # the shape test; empty text is allowed
         return CheckResult(ok=True)
 
     async def complete_json(self, request: AIRequest) -> ModelJson:
         payload = await self._post(
             build_messages(request), request.max_tokens, COMPLETE_TIMEOUT_SECONDS
         )
-        return _model_json(_text_of(payload))
+        return _model_json(_text_of(payload, require_text=True))

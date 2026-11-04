@@ -7,7 +7,11 @@ import logging
 from typing import Final, NoReturn
 
 from app.ai.port import AIError, AIErrorCode, ModelJson
-from app.net.ai_client import RedirectRefusedError, ResponseTooLargeError
+from app.net.ai_client import (
+    RedirectRefusedError,
+    ResponseEncodingError,
+    ResponseTooLargeError,
+)
 from app.net.guard import BlockedAddressError, BlockedHostError
 
 CONNECT_TIMEOUT_SECONDS: Final = 5.0
@@ -25,7 +29,9 @@ _HTTP_SERVER_ERROR: Final = 500
 
 
 def _quiet_sdk_loggers() -> None:
-    """The SDKs raise their log level when ``ANTHROPIC_LOG`` / ``OPENAI_LOG`` is set (T1)."""
+    """Called once at import (the SDKs read the variable at import) and again before each call.
+
+    The SDKs raise their log level when ``ANTHROPIC_LOG`` / ``OPENAI_LOG`` is set (T1)."""
     for name in _SDK_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
 
@@ -57,7 +63,8 @@ def _map_error(error: BaseException) -> AIErrorCode:
     if any(isinstance(e, BlockedHostError | BlockedAddressError) for e in chain):
         return AIErrorCode.PROVIDER_BLOCKED_HOST
     if any(
-        isinstance(e, RedirectRefusedError | ResponseTooLargeError)
+        isinstance(e, RedirectRefusedError | ResponseTooLargeError | ResponseEncodingError)
+        # By name: the SDKs have two classes of this name, and this module imports neither.
         or type(e).__name__ == "APIResponseValidationError"
         for e in chain
     ):
@@ -66,15 +73,13 @@ def _map_error(error: BaseException) -> AIErrorCode:
     return _status_code(status)
 
 
-def _error_for(error: BaseException) -> AIError:
-    """The ``AIError`` to raise for ``error`` (raise it ``from None``)."""
-    if isinstance(error, AIError):
-        return error
-    return AIError(_map_error(error))
+def _code_for(error: BaseException) -> AIErrorCode:
+    return error.code if isinstance(error, AIError) else _map_error(error)
 
 
 def _bad_response() -> NoReturn:
-    raise AIError(AIErrorCode.PROVIDER_BAD_RESPONSE) from None
+    # Never call this inside an ``except`` block: the new error would keep it as ``__context__``.
+    raise AIError(AIErrorCode.PROVIDER_BAD_RESPONSE)
 
 
 def _reject_constant(name: str) -> NoReturn:
@@ -83,10 +88,11 @@ def _reject_constant(name: str) -> NoReturn:
 
 def _load_object(data: bytes | str) -> dict[str, object]:
     """Parse a JSON object (strict: no NaN, no other top-level type)."""
+    value: object = None
     try:
         value = json.loads(data, parse_constant=_reject_constant)
     except (ValueError, RecursionError):
-        _bad_response()
+        value = None
     if not isinstance(value, dict):
         _bad_response()
     return value
