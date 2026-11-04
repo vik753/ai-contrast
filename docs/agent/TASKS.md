@@ -33,7 +33,7 @@ Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety 
 
 1. Prompts and strict output schemas for `SUGGEST_TOPICS`, `PROPOSE_ATTRIBUTES`, `EXPAND_SYNONYMS` (point 5): caps, one repair attempt without the previous output, `ai_bad_output`.
 2. Endpoints of point 6 with the provider selection, server-side safety passes (suggest: masked document as in `/api/safety-check`; others: topic definition), body caps, per-IP limits, 1 AI call in flight per client and 2 per server (shared with `/api/provider/check`), every model text through the topic safety pass; one document per call (wire canary).
-3. Free pass (point 6): per-process HMAC key, `aud=topics`, 15 min, same /48, at most 20 calls, bounded nonce table that fails closed, `X-Free-Pass` header only, `compare_digest`; per-IP free topic quota (40/day) and Neuron budget reserved before the call.
+3. Free pass (point 6): per-process HMAC key, `aud=topics`, 15 min, same /48, at most 20 calls, bounded nonce table that fails closed, `X-Free-Pass` header only, `compare_digest`; per-IP free topic quota (40/day) and Neuron budget reserved before the call; topic calls use at most 30 % of the daily Neuron budget.
 3a. ADR 0017 point 3 cross-document rules: 4 KiB cap on non-catalog `ConfirmedTopic`, suggestion descriptions never in prompts, synonyms never sent to a model, model-proposed directions start as `none` (`direction_source`), catalog topics by id + `catalog_version`, caps per request; suggest input cap and extraction slot released before the AI call; 60 s AI deadline.
 4. Log canary: no topic text, model output, key or pass in logs.
 5. `CLAUDE.md` Commands: `GET /api/topics/catalog` and one refused topic (`topic_flagged`) without any AI call.
@@ -43,6 +43,7 @@ Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety 
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s7-topic-ui`. After S7-T2's API is merged. Threats: T1, T3, T5.
 
 1. Topic panel per ADR 0017 point 7 (domain, side, template topics, suggested topics, own topics with attribute proposal and editing, confirm); every string in `en`/`uk`/`ru`; plain-text rendering of every model-provided string.
+1a. Accepting a suggestion never copies its description into the client description field (test).
 2. Own topics: memory by default, opt-in `localStorage` `aic.topics.v1`, removed by Clear all; export/import JSON with a 256 KiB cap and strict validation.
 3. Errors `topic_contains_identifier` (highlight spans), `topic_flagged`, `ai_bad_output`, quota and busy codes mapped to messages.
 
