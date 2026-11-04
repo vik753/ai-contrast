@@ -100,7 +100,7 @@ describe("frame page headers (S6-T5 AC3)", () => {
 
   it("test_frame_page_has_no_inline_script_and_no_foreign_url", () => {
     const html = readFileSync(FRAME_HTML, "utf8");
-    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
     expect(scripts.length).toBeGreaterThan(0);
     for (const s of scripts) {
       expect(s[1]).toMatch(/\bsrc=/);
