@@ -41,7 +41,9 @@ describe("turnstile frame build (S6-T5 AC3)", () => {
   it("test_app_source_never_references_a_cloudflare_script_url", () => {
     for (const f of ["src/provider/TurnstileFrame.tsx", "src/provider/ProviderSettings.tsx"]) {
       const src = readFileSync(root(f), "utf8");
-      expect(src.includes("challenges.cloudflare.com"), f).toBe(false);
+      // Compare whole host-like tokens for equality (no substring match on a URL).
+      const tokens = src.toLowerCase().split(/[^a-z0-9.-]+/);
+      expect(tokens.includes("challenges.cloudflare.com"), f).toBe(false);
       expect(src, f).not.toMatch(/createElement\(\s*["']script["']/);
     }
   });
