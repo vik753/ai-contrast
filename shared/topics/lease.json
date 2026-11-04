@@ -1,0 +1,181 @@
+{
+  "id": "lease",
+  "names": {"en": "Lease of premises", "uk": "Оренда приміщення", "ru": "Аренда помещения"},
+  "sides": [
+    {"id": "tenant", "names": {"en": "Tenant", "uk": "Орендар (наймач)", "ru": "Арендатор (наниматель)"}},
+    {"id": "landlord", "names": {"en": "Landlord", "uk": "Орендодавець (наймодавець)", "ru": "Арендодатель (наймодатель)"}}
+  ],
+  "topics": [
+    {
+      "id": "rent_amount",
+      "names": {"en": "Rent", "uk": "Орендна плата", "ru": "Арендная плата"},
+      "descriptions": {"en": "Monthly rent and how it may change during the term.", "uk": "Щомісячна орендна плата та як вона може змінюватися протягом строку.", "ru": "Ежемесячная арендная плата и как она может меняться в течение срока."},
+      "synonyms": {
+        "en": ["rent", "monthly rent", "rental fee", "indexation", "rent increase", "payment date"],
+        "uk": ["орендн плат", "оренд плат", "плата за найм", "індексац", "підвищен плат", "строк оплат"],
+        "ru": ["арендн плат", "аренд плат", "плата за найм", "индексац", "повышен плат", "срок оплат"]
+      },
+      "attributes": [
+        {"id": "monthly_rent", "labels": {"en": "Monthly rent", "uk": "Щомісячна плата", "ru": "Ежемесячная плата"}, "type": "amount", "units": ["UAH", "USD", "EUR"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}},
+        {"id": "indexation_rate", "labels": {"en": "Annual rent increase", "uk": "Щорічне підвищення плати", "ru": "Ежегодное повышение платы"}, "type": "percentage", "directions": {"tenant": "lower_better", "landlord": "higher_better"}}
+      ]
+    },
+    {
+      "id": "deposit",
+      "names": {"en": "Security deposit", "uk": "Забезпечувальний депозит", "ru": "Обеспечительный депозит"},
+      "descriptions": {"en": "Size of the deposit, grounds to keep it and the return term.", "uk": "Розмір депозиту, підстави утримання та строк повернення.", "ru": "Размер депозита, основания удержания и срок возврата."},
+      "synonyms": {
+        "en": ["deposit", "security deposit", "guarantee payment", "return of deposit", "withhold"],
+        "uk": ["депозит", "завдат", "гарантійн плат", "забезпечувальн", "повернен депозит", "утрим"],
+        "ru": ["депозит", "залог", "гарантийн плат", "обеспечительн", "возврат депозит", "удержан"]
+      },
+      "attributes": [
+        {"id": "deposit_amount", "labels": {"en": "Deposit", "uk": "Депозит", "ru": "Депозит"}, "type": "amount", "units": ["UAH", "USD", "EUR"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}},
+        {"id": "deposit_return_days", "labels": {"en": "Days to return deposit", "uk": "Строк повернення депозиту", "ru": "Срок возврата депозита"}, "type": "duration", "units": ["days", "working_days"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}}
+      ]
+    },
+    {
+      "id": "term_renewal",
+      "names": {"en": "Term and renewal", "uk": "Строк та продовження", "ru": "Срок и продление"},
+      "descriptions": {"en": "Length of the lease and the right to extend it.", "uk": "Тривалість оренди та право її продовжити.", "ru": "Длительность аренды и право её продлить."},
+      "synonyms": {
+        "en": ["term of lease", "lease term", "renewal", "extension", "pre-emptive right", "expiry"],
+        "uk": ["строк оренд", "строк дії договор", "продовжен", "пролонгац", "переважне право", "закінченн строк"],
+        "ru": ["срок аренд", "срок действия договор", "продлен", "пролонгац", "преимущественн право", "окончани срок"]
+      },
+      "attributes": [
+        {"id": "lease_term", "labels": {"en": "Lease term", "uk": "Строк оренди", "ru": "Срок аренды"}, "type": "duration", "units": ["months", "years"], "directions": {"tenant": "none", "landlord": "none"}},
+        {"id": "renewal_option", "labels": {"en": "Renewal", "uk": "Продовження", "ru": "Продление"}, "type": "enum",
+          "values": [
+            {"id": "automatic", "labels": {"en": "Automatic", "uk": "Автоматичне", "ru": "Автоматическое"}},
+            {"id": "tenant_option", "labels": {"en": "At tenant's request", "uk": "На вимогу орендаря", "ru": "По требованию арендатора"}},
+            {"id": "by_agreement", "labels": {"en": "Only by new agreement", "uk": "Лише за новою угодою", "ru": "Только по новому соглашению"}}
+          ],
+          "directions": {"tenant": ["automatic", "tenant_option", "by_agreement"], "landlord": ["by_agreement", "tenant_option", "automatic"]}}
+      ]
+    },
+    {
+      "id": "utilities",
+      "names": {"en": "Utilities and extra costs", "uk": "Комунальні та додаткові витрати", "ru": "Коммунальные и дополнительные расходы"},
+      "descriptions": {"en": "Who pays utilities, service charges and taxes.", "uk": "Хто платить комунальні послуги, обслуговування та податки.", "ru": "Кто платит коммунальные услуги, обслуживание и налоги."},
+      "synonyms": {
+        "en": ["utilities", "service charge", "electricity", "heating", "operating costs", "taxes"],
+        "uk": ["комунальн", "комунальні послуг", "електроенергі", "опалення", "експлуатаційн витрат", "податк"],
+        "ru": ["коммунальн", "коммунальные услуг", "электроэнерги", "отоплен", "эксплуатационн расход", "налог"]
+      },
+      "attributes": [
+        {"id": "utilities_payer", "labels": {"en": "Who pays utilities", "uk": "Хто оплачує комунальні", "ru": "Кто оплачивает коммунальные"}, "type": "enum",
+          "values": [
+            {"id": "landlord", "labels": {"en": "Landlord", "uk": "Орендодавець", "ru": "Арендодатель"}},
+            {"id": "shared", "labels": {"en": "Shared", "uk": "Спільно", "ru": "Совместно"}},
+            {"id": "tenant", "labels": {"en": "Tenant", "uk": "Орендар", "ru": "Арендатор"}}
+          ],
+          "directions": {"tenant": ["landlord", "shared", "tenant"], "landlord": ["tenant", "shared", "landlord"]}}
+      ]
+    },
+    {
+      "id": "repairs_maintenance",
+      "names": {"en": "Repairs and maintenance", "uk": "Ремонт і утримання", "ru": "Ремонт и содержание"},
+      "descriptions": {"en": "Who does and pays for current and major repairs.", "uk": "Хто виконує та оплачує поточний і капітальний ремонт.", "ru": "Кто выполняет и оплачивает текущий и капитальный ремонт."},
+      "synonyms": {
+        "en": ["repairs", "maintenance", "major repairs", "current repairs", "wear and tear", "improvements"],
+        "uk": ["ремонт", "капітальн ремонт", "поточн ремонт", "утримання", "поліпшенн", "амортизац"],
+        "ru": ["ремонт", "капитальн ремонт", "текущ ремонт", "содержани", "улучшен", "амортизац"]
+      },
+      "attributes": [
+        {"id": "major_repairs_by", "labels": {"en": "Major repairs by", "uk": "Капітальний ремонт виконує", "ru": "Капитальный ремонт выполняет"}, "type": "enum",
+          "values": [
+            {"id": "landlord", "labels": {"en": "Landlord", "uk": "Орендодавець", "ru": "Арендодатель"}},
+            {"id": "shared", "labels": {"en": "Shared", "uk": "Спільно", "ru": "Совместно"}},
+            {"id": "tenant", "labels": {"en": "Tenant", "uk": "Орендар", "ru": "Арендатор"}}
+          ],
+          "directions": {"tenant": ["landlord", "shared", "tenant"], "landlord": ["tenant", "shared", "landlord"]}},
+        {"id": "repair_response_days", "labels": {"en": "Days to fix urgent defects", "uk": "Строк усунення термінових дефектів", "ru": "Срок устранения срочных дефектов"}, "type": "duration", "units": ["days", "working_days"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}}
+      ]
+    },
+    {
+      "id": "termination_notice",
+      "names": {"en": "Termination and notice", "uk": "Розірвання та попередження", "ru": "Расторжение и уведомление"},
+      "descriptions": {"en": "Notice periods and costs when either party ends the lease early.", "uk": "Строки попередження та витрати, коли сторона достроково припиняє оренду.", "ru": "Сроки уведомления и расходы, когда сторона досрочно прекращает аренду."},
+      "synonyms": {
+        "en": ["termination", "early termination", "notice period", "terminate the lease", "move out", "eviction"],
+        "uk": ["розірванн", "дострокове", "попередж", "припиненн договор", "виселенн", "звільненн приміщ"],
+        "ru": ["расторжен", "досрочн", "предупрежд", "уведомлен", "прекращен договор", "выселен", "освобожден помещ"]
+      },
+      "attributes": [
+        {"id": "tenant_notice_days", "labels": {"en": "Tenant's notice to leave", "uk": "Попередження орендаря про виїзд", "ru": "Уведомление арендатора о выезде"}, "type": "duration", "units": ["days", "months"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}},
+        {"id": "landlord_notice_days", "labels": {"en": "Landlord's notice to end", "uk": "Попередження орендодавця про припинення", "ru": "Уведомление арендодателя о прекращении"}, "type": "duration", "units": ["days", "months"], "directions": {"tenant": "higher_better", "landlord": "lower_better"}},
+        {"id": "early_exit_fee", "labels": {"en": "Fee for early exit", "uk": "Плата за дострокове припинення", "ru": "Плата за досрочное прекращение"}, "type": "amount", "units": ["UAH", "USD", "EUR"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}}
+      ]
+    },
+    {
+      "id": "late_penalties",
+      "names": {"en": "Late payment and penalties", "uk": "Прострочення та штрафи", "ru": "Просрочка и штрафы"},
+      "descriptions": {"en": "Penalty rate, grace period and other contractual penalties.", "uk": "Розмір пені, пільговий строк та інші договірні штрафи.", "ru": "Размер пени, льготный срок и другие договорные штрафы."},
+      "synonyms": {
+        "en": ["penalty", "late fee", "interest on arrears", "grace period", "fine", "liquidated damages"],
+        "uk": ["пен", "штраф", "неустойк", "прострочен", "пільговий період", "відсотки за"],
+        "ru": ["пен", "штраф", "неустойк", "просрочк", "льготный период", "проценты за"]
+      },
+      "attributes": [
+        {"id": "late_penalty_rate", "labels": {"en": "Penalty per day of delay", "uk": "Пеня за день прострочення", "ru": "Пеня за день просрочки"}, "type": "percentage", "directions": {"tenant": "lower_better", "landlord": "higher_better"}},
+        {"id": "grace_days", "labels": {"en": "Grace period", "uk": "Пільговий період", "ru": "Льготный период"}, "type": "duration", "units": ["days", "working_days"], "directions": {"tenant": "higher_better", "landlord": "lower_better"}}
+      ]
+    },
+    {
+      "id": "sublease_use",
+      "names": {"en": "Sublease and use", "uk": "Суборенда та використання", "ru": "Субаренда и использование"},
+      "descriptions": {"en": "Whether subletting and pets are allowed and for what purpose the premises may be used.", "uk": "Чи дозволені суборенда та тварини і для чого можна використовувати приміщення.", "ru": "Разрешены ли субаренда и животные и для чего можно использовать помещение."},
+      "synonyms": {
+        "en": ["sublease", "sublet", "assignment", "permitted use", "pets", "purpose of use"],
+        "uk": ["суборенд", "передач у користуван", "цільове призначен", "тварин", "використання приміщ"],
+        "ru": ["субаренд", "передач в пользовани", "целевое назначен", "животн", "использован помещ"]
+      },
+      "attributes": [
+        {"id": "sublease_allowed", "labels": {"en": "Sublease", "uk": "Суборенда", "ru": "Субаренда"}, "type": "enum",
+          "values": [
+            {"id": "covered", "labels": {"en": "Allowed", "uk": "Дозволена", "ru": "Разрешена"}},
+            {"id": "not_covered", "labels": {"en": "Forbidden", "uk": "Заборонена", "ru": "Запрещена"}},
+            {"id": "conditional", "labels": {"en": "With consent", "uk": "Зі згоди орендодавця", "ru": "С согласия арендодателя"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"tenant": ["covered", "conditional", "not_stated", "not_covered"], "landlord": ["not_covered", "conditional", "not_stated", "covered"]}},
+        {"id": "pets_allowed", "labels": {"en": "Pets", "uk": "Тварини", "ru": "Животные"}, "type": "enum",
+          "values": [
+            {"id": "covered", "labels": {"en": "Allowed", "uk": "Дозволені", "ru": "Разрешены"}},
+            {"id": "not_covered", "labels": {"en": "Forbidden", "uk": "Заборонені", "ru": "Запрещены"}},
+            {"id": "conditional", "labels": {"en": "With consent", "uk": "Зі згоди", "ru": "С согласия"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"tenant": ["covered", "conditional", "not_stated", "not_covered"], "landlord": ["not_covered", "conditional", "not_stated", "covered"]}}
+      ]
+    },
+    {
+      "id": "landlord_access",
+      "names": {"en": "Landlord access and inspection", "uk": "Доступ орендодавця та огляд", "ru": "Доступ арендодателя и осмотр"},
+      "descriptions": {"en": "When and with what notice the landlord may enter the premises.", "uk": "Коли та з яким попередженням орендодавець може входити в приміщення.", "ru": "Когда и с каким уведомлением арендодатель может входить в помещение."},
+      "synonyms": {
+        "en": ["access", "inspection", "enter the premises", "viewing", "prior notice"],
+        "uk": ["доступ", "огляд", "огляду", "вхід до приміщ", "попереднє повідомлен", "перевірк стану"],
+        "ru": ["доступ", "осмотр", "вход в помещ", "предварительн уведомлен", "проверк состоян"]
+      },
+      "attributes": [
+        {"id": "access_notice", "labels": {"en": "Notice before entry", "uk": "Попередження перед входом", "ru": "Уведомление перед входом"}, "type": "duration", "units": ["hours", "days", "working_days"], "directions": {"tenant": "higher_better", "landlord": "lower_better"}}
+      ]
+    },
+    {
+      "id": "damage_liability",
+      "names": {"en": "Liability for damage and handover", "uk": "Відповідальність за шкоду та передача", "ru": "Ответственность за ущерб и передача"},
+      "descriptions": {"en": "Condition at handover and who bears damage and losses.", "uk": "Стан приміщення при передачі та хто несе шкоду і збитки.", "ru": "Состояние помещения при передаче и кто несёт ущерб и убытки."},
+      "synonyms": {
+        "en": ["damage", "handover", "acceptance certificate", "inventory", "liability", "return of premises"],
+        "uk": ["шкод", "акт приймання", "опис майна", "відповідальн", "повернен приміщ", "пошкодженн"],
+        "ru": ["ущерб", "акт приём", "опись имущества", "ответственн", "возврат помещ", "поврежден"]
+      },
+      "attributes": [
+        {"id": "damage_cap", "labels": {"en": "Cap on tenant's liability", "uk": "Ліміт відповідальності орендаря", "ru": "Лимит ответственности арендатора"}, "type": "amount", "units": ["UAH", "USD", "EUR"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}},
+        {"id": "handover_notes", "labels": {"en": "Handover conditions", "uk": "Умови передачі", "ru": "Условия передачи"}, "type": "text", "directions": {"tenant": "none", "landlord": "none"}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "blocks": [
+    {"text": "RESIDENTIAL LEASE AGREEMENT", "part": "body", "page": null},
+    {"text": "1. Rent and deposit", "part": "body", "page": null},
+    {"text": "1.1. The monthly rent is USD 600, payable by the 5th day of each month. The Landlord may increase the rent by up to 8% once a year.", "part": "body", "page": null},
+    {"text": "1.2. The Tenant pays a security deposit of USD 1,200. The Landlord returns it within 30 days after the end of the lease, less proven damage.", "part": "body", "page": null},
+    {"text": "2. Term", "part": "body", "page": null},
+    {"text": "2.1. The lease term is 12 months. The lease is renewed only by a new written agreement.", "part": "body", "page": null},
+    {"text": "3. Utilities and repairs", "part": "body", "page": null},
+    {"text": "3.1. The Tenant pays all utilities and service charges.", "part": "body", "page": null},
+    {"text": "3.2. Major repairs are carried out by the Landlord. The Landlord fixes urgent defects within 7 days after notice.", "part": "body", "page": null},
+    {"text": "4. Termination", "part": "body", "page": null},
+    {"text": "4.1. The Tenant may terminate the lease with 60 days' notice. The Landlord may terminate it with 30 days' notice.", "part": "body", "page": null},
+    {"text": "4.2. If the Tenant leaves early, the Tenant pays a fee of USD 600.", "part": "body", "page": null},
+    {"text": "5. Penalties", "part": "body", "page": null},
+    {"text": "5.1. A late payment bears a penalty of 0.5% of the amount per day after a grace period of 3 days.", "part": "body", "page": null},
+    {"text": "6. Use", "part": "body", "page": null},
+    {"text": "6.1. Subletting is forbidden. Pets are allowed only with the Landlord's written consent.", "part": "body", "page": null},
+    {"text": "7. Access", "part": "body", "page": null},
+    {"text": "7.1. The Landlord may inspect the premises with 1 day's notice.", "part": "body", "page": null},
+    {"text": "8. Damage", "part": "body", "page": null},
+    {"text": "8.1. The Tenant is liable for damage caused by the Tenant without a cap on the amount.", "part": "body", "page": null}
+  ]
+}
