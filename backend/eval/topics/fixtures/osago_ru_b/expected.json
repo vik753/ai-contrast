@@ -1,0 +1,16 @@
+{
+  "domain": "osago",
+  "language": "ru",
+  "topics": [
+    {"topic_id": "liability_limits", "clauses": ["1.1"], "attributes": {"limit_property": {"value": 160000, "unit": "UAH", "clause": "1.1"}, "limit_life_health": {"value": 320000, "unit": "UAH", "clause": "1.1"}}},
+    {"topic_id": "deductible", "clauses": ["1.2"], "attributes": {"deductible_amount": {"value": 5000, "unit": "UAH", "clause": "1.2"}}},
+    {"topic_id": "policy_territory", "clauses": ["2.1"], "attributes": {"territory_scope": {"value": ["ukraine"], "clause": "2.1"}, "policy_term": {"value": 6, "unit": "months", "clause": "2.1"}}},
+    {"topic_id": "accident_notice", "clauses": ["3.1"], "attributes": {"notice_deadline": {"value": 3, "unit": "working_days", "clause": "3.1"}}},
+    {"topic_id": "payout_term", "clauses": ["4.1"], "attributes": {"payout_days": {"value": 90, "unit": "days", "clause": "4.1"}}},
+    {"topic_id": "direct_settlement", "clauses": ["4.2"], "attributes": {"direct_settlement_available": {"value": "not_covered", "clause": "4.2"}}},
+    {"topic_id": "recourse", "clauses": ["5.1"], "attributes": {"recourse_grounds": {"value": ["intoxication", "no_licence", "left_scene", "no_inspection", "late_notice"], "clause": "5.1"}}},
+    {"topic_id": "premium_bonus_malus", "clauses": ["6.1"], "attributes": {"premium_amount": {"value": 3900, "unit": "UAH", "clause": "6.1"}, "bonus_discount": {"value": 0, "clause": "6.1"}}},
+    {"topic_id": "termination_refund", "clauses": ["7.1"], "attributes": {"refund_share": {"value": 40, "clause": "7.1"}}}
+  ],
+  "absent_topics": []
+}

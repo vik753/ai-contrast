@@ -1,0 +1,17 @@
+{
+  "domain": "lease",
+  "language": "en",
+  "topics": [
+    {"topic_id": "rent_amount", "clauses": ["1.1"], "attributes": {"monthly_rent": {"value": 600, "unit": "USD", "clause": "1.1"}, "indexation_rate": {"value": 8, "clause": "1.1"}}},
+    {"topic_id": "deposit", "clauses": ["1.2"], "attributes": {"deposit_amount": {"value": 1200, "unit": "USD", "clause": "1.2"}, "deposit_return_days": {"value": 30, "unit": "days", "clause": "1.2"}}},
+    {"topic_id": "term_renewal", "clauses": ["2.1"], "attributes": {"lease_term": {"value": 12, "unit": "months", "clause": "2.1"}, "renewal_option": {"value": "by_agreement", "clause": "2.1"}}},
+    {"topic_id": "utilities", "clauses": ["3.1"], "attributes": {"utilities_payer": {"value": "tenant", "clause": "3.1"}}},
+    {"topic_id": "repairs_maintenance", "clauses": ["3.2"], "attributes": {"major_repairs_by": {"value": "landlord", "clause": "3.2"}, "repair_response_days": {"value": 7, "unit": "days", "clause": "3.2"}}},
+    {"topic_id": "termination_notice", "clauses": ["4.1", "4.2"], "attributes": {"tenant_notice_days": {"value": 60, "unit": "days", "clause": "4.1"}, "landlord_notice_days": {"value": 30, "unit": "days", "clause": "4.1"}, "early_exit_fee": {"value": 600, "unit": "USD", "clause": "4.2"}}},
+    {"topic_id": "late_penalties", "clauses": ["5.1"], "attributes": {"late_penalty_rate": {"value": 0.5, "clause": "5.1"}, "grace_days": {"value": 3, "unit": "days", "clause": "5.1"}}},
+    {"topic_id": "sublease_use", "clauses": ["6.1"], "attributes": {"sublease_allowed": {"value": "not_covered", "clause": "6.1"}, "pets_allowed": {"value": "conditional", "clause": "6.1"}}},
+    {"topic_id": "landlord_access", "clauses": ["7.1"], "attributes": {"access_notice": {"value": 1, "unit": "days", "clause": "7.1"}}},
+    {"topic_id": "damage_liability", "clauses": ["8.1"], "attributes": {"handover_notes": {"value": "tenant liable without cap", "clause": "8.1"}}}
+  ],
+  "absent_topics": []
+}
