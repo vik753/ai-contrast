@@ -187,10 +187,25 @@ def test_check_slot_is_released_after_a_provider_error() -> None:
     assert rig.check(ip="198.51.100.40").status_code == 200
 
 
-def test_check_failed_turnstile_does_not_consume_the_check_limit() -> None:
-    rig = free_rig(check_per_minute=2, check_per_day=2)
+def test_check_failed_turnstile_is_not_refunded_and_ends_in_rate_limited() -> None:
+    rig = free_rig(check_per_minute=2, check_per_day=1000)
     rig.turnstile.reply = siteverify_reply(success=False)
-    for n in range(10):
+    assert rig.free("t0", ip=IP_A).status_code == 403
+    assert rig.free("t1", ip=IP_A).status_code == 403
+    response = rig.free("t2", ip=IP_A)
+    assert response.status_code == 429
+    assert response.json() == {"error": "rate_limited"}
+    assert int(response.headers["retry-after"]) >= 1
+    assert len(rig.turnstile.seen) == 2
+
+
+def test_check_failed_turnstile_counts_toward_the_daily_check_limit() -> None:
+    rig = free_rig(check_per_minute=1000, check_per_day=3)
+    rig.turnstile.reply = siteverify_reply(success=False)
+    for n in range(3):
         assert rig.free(f"t{n}", ip=IP_A).status_code == 403
+    response = rig.free("t3", ip=IP_A)
+    assert response.status_code == 429
+    assert response.json() == {"error": "rate_limited"}
     rig.turnstile.reply = siteverify_reply(clock=rig.clock)
-    assert rig.free("good-1", ip=IP_A).status_code == 200
+    assert rig.free("good", ip=IP_A).status_code == 429

@@ -31,7 +31,7 @@ Body fields: `provider` (a `PresetId` value), `model` (required except for `free
 `provider_bad_request` 400, `provider_blocked_host` 422, `provider_unavailable` 502, `provider_bad_response` 502.
 Order: size, JSON/schema, cheap validation (provider, model, base_url, key rules), free-mode availability,
 check rate limit `hit()`, in-flight slot, then (free only) Turnstile, per-IP free `hit()`, Neuron budget, then `check()`.
-A failed Turnstile refunds the check `hit()` of the same request. A refused budget refunds both hits of the same request.
+A failed Turnstile is NOT refunded (review round 1). A refused budget refunds both hits of the same request.
 Requests that fail cheap validation count nothing.
 
 ## Settings (`app.settings.Settings`, env = upper-case name)
