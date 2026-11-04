@@ -112,6 +112,10 @@ def test_attribute_id_with_a_normal_phrase_is_accepted() -> None:
     assert outcome(attributes=(attribute(id="towing_limit"),)) == "accepted"
 
 
+def _pair(n: int) -> str:
+    return chr(97 + n % 26) + chr(97 + (n * 7 + 3) % 26)
+
+
 def _capped(attr_id: str) -> dict[str, Any]:
     words = [
         "alpha",
@@ -136,7 +140,7 @@ def _capped(attr_id: str) -> dict[str, Any]:
         "attributes": tuple(
             attribute(id=f"{attr_id}{chr(97 + n)}"[:47], label=line(n + 2, 120)) for n in range(12)
         ),
-        "synonyms_en": tuple(line(n + 3, 58) + f" {chr(97 + n)}{chr(98 + n)}" for n in range(32)),
+        "synonyms_en": tuple(line(n + 3, 55) + " " + _pair(n) for n in range(32)),
     }
 
 
