@@ -37,3 +37,13 @@ afterEach(async () => {
   const { cleanup } = await import("@testing-library/react");
   cleanup();
 });
+
+/**
+ * jsdom has no `CSS.escape`. Tests use it to build selectors from generated ids
+ * (serialization from the CSSOM spec, enough for ASCII ids).
+ */
+if (typeof (globalThis as { CSS?: unknown }).CSS === "undefined") {
+  (globalThis as { CSS?: { escape: (value: string) => string } }).CSS = {
+    escape: (value: string) => value.replace(/[^a-zA-Z0-9_\u00A0-\uFFFF-]/g, (c) => `\\${c}`),
+  };
+}

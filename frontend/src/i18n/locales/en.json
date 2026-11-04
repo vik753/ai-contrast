@@ -338,5 +338,76 @@
       "too_much_text": "The masked text is too long for the check. Split the contract into parts.",
       "length_mismatch": "The request did not arrive completely. Try again."
     }
+  },
+  "provider": {
+    "title": "AI provider",
+    "preset": {
+      "label": "Provider",
+      "free": "AI Contrast Free (Cloudflare Workers AI)",
+      "anthropic": "Anthropic (Claude)",
+      "openai": "OpenAI",
+      "gemini": "Google Gemini",
+      "mistral": "Mistral",
+      "openrouter": "OpenRouter",
+      "custom": "Custom (OpenAI-compatible)"
+    },
+    "model": {
+      "label": "Model"
+    },
+    "advanced": "Advanced",
+    "baseUrl": {
+      "label": "Base URL"
+    },
+    "key": {
+      "label": "API key"
+    },
+    "remember": {
+      "label": "Remember on this device",
+      "warning": "The key stays in this browser until you forget it. It is not encrypted. Any script or person with access to this browser profile can read it. Do not use this on a shared computer."
+    },
+    "forget": "Forget key",
+    "test": {
+      "button": "Test connection",
+      "ok": "The connection works.",
+      "checking": "Checking...",
+      "waiting": "Running the Cloudflare check..."
+    },
+    "frame": {
+      "title": "Cloudflare check"
+    },
+    "free": {
+      "notice": "Free mode: the text of your contracts (names replaced by placeholders) is processed by Cloudflare Workers AI with the model gpt-oss-120b. Cloudflare's data policy applies. Cloudflare does not use Workers AI content to train models. Daily limits apply.",
+      "turnstileNotice": "When you press \"Test connection\" or start a comparison, a Cloudflare check loads in a separate frame. It does not load on other providers."
+    },
+    "gemini": {
+      "hint": "Google Gemini has a free API key tier. Create the key in Google AI Studio and paste it here.",
+      "dataUse": "Warning: on the free tier Google may use your prompts and answers to improve its products, and people may read them. Do not use a free Gemini key for real contracts."
+    },
+    "error": {
+      "request_too_large": "The request is too large.",
+      "invalid_request": "The request is not valid.",
+      "invalid_provider": "This provider is not supported.",
+      "invalid_model": "Enter a valid model name.",
+      "unexpected_model": "This provider does not take a model name.",
+      "unexpected_base_url": "Only the custom provider takes a base URL.",
+      "invalid_base_url": "Enter a valid base URL: https, a host name, no user name, no query.",
+      "unexpected_turnstile_token": "This provider does not use the Cloudflare check.",
+      "invalid_provider_key": "Enter a valid API key.",
+      "unexpected_provider_key": "The free mode does not take an API key.",
+      "free_mode_unavailable": "The free mode is not available now. Use your own API key.",
+      "turnstile_failed": "The Cloudflare check failed. Try again.",
+      "free_quota_exhausted": "The free quota for today is used up. Try tomorrow or use your own API key.",
+      "rate_limited": "Too many checks. Wait a minute and try again.",
+      "busy": "The server is busy. Try again in a few seconds.",
+      "provider_auth_failed": "The provider refused the key. Check the key.",
+      "provider_model_not_found": "The provider does not know this model.",
+      "provider_rate_limited": "The provider limits your requests. Try again later.",
+      "provider_bad_request": "The provider refused the request. Check the model name.",
+      "provider_blocked_host": "This address is not allowed.",
+      "provider_unavailable": "The provider does not answer. Try again later.",
+      "provider_bad_response": "The provider sent an unexpected answer.",
+      "network": "The server cannot be reached. Check your connection.",
+      "unknown": "The check failed for an unknown reason."
+    }
   }
 }

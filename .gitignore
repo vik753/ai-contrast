@@ -19,6 +19,7 @@ htmlcov/
 # Node
 node_modules/
 dist/
+dist-turnstile/
 coverage/
 playwright-report/
 test-results/
