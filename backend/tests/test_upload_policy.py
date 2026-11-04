@@ -33,14 +33,20 @@ FORBIDDEN_ATTRIBUTES = {"form", "UploadFile", "SpooledTemporaryFile"}
 # see docs/agent/TASKS.md "Stage 3 dependencies".
 # S3-T6 (ADR 0012): httpx moved from dev to runtime (outbound HTTP through the guard).
 RUNTIME_DEPENDENCIES = {
+    # ADR 0016 point 1 (approved by security-reviewer, 2026-10-29).
+    "anthropic",
+    "certifi",
     "defusedxml",
     "fastapi",
-    "httpx",
+    "httpcore2",
+    "httpx2",
+    "openai",
     "pdfminer-six",
     "pydantic-settings",
     "uvicorn",
 }
-DEV_DEPENDENCIES = {"mypy", "pip-audit", "pytest", "ruff"}
+# `httpx` stays only for the FastAPI test client (ADR 0016 point 1).
+DEV_DEPENDENCIES = {"httpx", "mypy", "pip-audit", "pytest", "ruff"}
 
 
 def _violations(source: str) -> list[str]:  # noqa: PLR0912 - one branch per rule

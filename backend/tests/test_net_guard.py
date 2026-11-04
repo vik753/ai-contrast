@@ -3,7 +3,7 @@
 Public interface (app/net/guard.py): ``check_hostname``, ``check_addresses``,
 ``BlockedHostError``, ``BlockedAddressError``, ``GuardedNetworkBackend(resolver=, inner=)``.
 Assumptions: a refused port raises ``BlockedHostError`` or ``BlockedAddressError``; a
-resolver slower than the connect timeout raises ``httpcore.ConnectTimeout``; an empty or
+resolver slower than the connect timeout raises ``httpcore2.ConnectTimeout``; an empty or
 unparsable address list is refused (fail closed).
 Must fail before the implementation exists (module ``app.net.guard`` is missing).
 """
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 
-import httpcore
+import httpcore2
 import pytest
 
 from app.net.guard import (
@@ -227,7 +227,7 @@ def test_connect_tcp_first_address_fails_second_is_tried_and_dns_resolved_once()
 def test_connect_tcp_all_addresses_fail_raises_connect_error_after_trying_each() -> None:
     backend, _, inner = _backend([PUBLIC_V4, PUBLIC_V4_2], failing=(PUBLIC_V4, PUBLIC_V4_2))
 
-    with pytest.raises(httpcore.ConnectError):
+    with pytest.raises(httpcore2.ConnectError):
         _run(backend.connect_tcp("example.com", 443, timeout=5))
 
     assert inner.connects == [(PUBLIC_V4, 443), (PUBLIC_V4_2, 443)]
@@ -242,7 +242,7 @@ def test_connect_tcp_slow_resolver_hits_connect_timeout() -> None:
 
     backend = GuardedNetworkBackend(resolver=slow, inner=inner)
 
-    with pytest.raises(httpcore.ConnectTimeout):
+    with pytest.raises(httpcore2.ConnectTimeout):
         _run(backend.connect_tcp("example.com", 443, timeout=0.1))
 
     assert inner.connects == []

@@ -43,9 +43,10 @@ TELEMETRY_DISABLED: TelemetryConfig = {
     "auto_configure": False,
 }
 
-# `httpx` logs every request URL at INFO. The Google Docs ID is a password for the
-# document, so both loggers stay at WARNING (ADR 0012 point 5).
-NET_LOGGERS = ("httpx", "httpcore")
+# `httpx2` logs every request URL at INFO. The Google Docs ID is a password for the
+# document, so these loggers stay at WARNING (ADR 0012 point 5).
+# `httpx`/`httpcore` are kept as defence in depth (the dev test client uses them).
+NET_LOGGERS = ("httpx", "httpcore", "httpx2", "httpcore2")
 GOOGLE_READ_TIMEOUT_SECONDS = 10.0
 
 

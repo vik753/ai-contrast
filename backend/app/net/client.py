@@ -4,46 +4,48 @@ A new client per call. ``trust_env=False``, no redirects, HTTP/1.1 only, no retr
 certificate verification with the ``certifi`` bundle, and the SSRF guard below the
 transport. The factory takes no proxy, Unix socket, mounts or local address.
 
-``_GuardedTransport`` is our own ``httpx`` transport on top of an ``httpcore`` connection
+``_GuardedTransport`` is our own ``httpx2`` transport on top of an ``httpcore2`` connection
 pool with the guarded network backend. It uses public APIs only. Errors are mapped to
-``httpx`` errors with fixed texts (the text of a ``httpcore`` error can hold the URL);
+``httpx2`` errors with fixed texts (the text of a ``httpcore2`` error can hold the URL);
 guard errors pass through unchanged.
 """
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import AsyncIterable, AsyncIterator, Callable
 from types import TracebackType
 from typing import Final, cast
 
-import httpcore
-import httpx
+import certifi
+import httpcore2
+import httpx2
 
 from app.net.guard import HTTPS_PORT, BlockedHostError, GuardedNetworkBackend
 
 # Builds one new guarded client per fetch (``outbound_client`` with the settings applied).
-ClientFactory = Callable[[], httpx.AsyncClient]
+ClientFactory = Callable[[], httpx2.AsyncClient]
 
 MAX_CONNECTIONS: Final = 4
 _WRITE_TIMEOUT_SECONDS: Final = 10.0
 _POOL_TIMEOUT_SECONDS: Final = 5.0
 
 # More specific classes first.
-_ERROR_MAP: Final[tuple[tuple[type[Exception], type[httpx.TransportError]], ...]] = (
-    (httpcore.ConnectTimeout, httpx.ConnectTimeout),
-    (httpcore.ReadTimeout, httpx.ReadTimeout),
-    (httpcore.WriteTimeout, httpx.WriteTimeout),
-    (httpcore.PoolTimeout, httpx.PoolTimeout),
-    (httpcore.TimeoutException, httpx.TimeoutException),
-    (httpcore.ConnectError, httpx.ConnectError),
-    (httpcore.ReadError, httpx.ReadError),
-    (httpcore.WriteError, httpx.WriteError),
-    (httpcore.NetworkError, httpx.NetworkError),
-    (httpcore.UnsupportedProtocol, httpx.UnsupportedProtocol),
-    (httpcore.LocalProtocolError, httpx.LocalProtocolError),
-    (httpcore.RemoteProtocolError, httpx.RemoteProtocolError),
-    (httpcore.ProtocolError, httpx.ProtocolError),
-    (httpcore.ProxyError, httpx.ProxyError),
+_ERROR_MAP: Final[tuple[tuple[type[Exception], type[httpx2.TransportError]], ...]] = (
+    (httpcore2.ConnectTimeout, httpx2.ConnectTimeout),
+    (httpcore2.ReadTimeout, httpx2.ReadTimeout),
+    (httpcore2.WriteTimeout, httpx2.WriteTimeout),
+    (httpcore2.PoolTimeout, httpx2.PoolTimeout),
+    (httpcore2.TimeoutException, httpx2.TimeoutException),
+    (httpcore2.ConnectError, httpx2.ConnectError),
+    (httpcore2.ReadError, httpx2.ReadError),
+    (httpcore2.WriteError, httpx2.WriteError),
+    (httpcore2.NetworkError, httpx2.NetworkError),
+    (httpcore2.UnsupportedProtocol, httpx2.UnsupportedProtocol),
+    (httpcore2.LocalProtocolError, httpx2.LocalProtocolError),
+    (httpcore2.RemoteProtocolError, httpx2.RemoteProtocolError),
+    (httpcore2.ProtocolError, httpx2.ProtocolError),
+    (httpcore2.ProxyError, httpx2.ProxyError),
 )
 
 
@@ -54,7 +56,7 @@ def _mapped(error: Exception) -> Exception | None:
     return None
 
 
-class _ResponseStream(httpx.AsyncByteStream):
+class _ResponseStream(httpx2.AsyncByteStream):
     def __init__(self, stream: AsyncIterable[bytes]) -> None:
         self._stream = stream
 
@@ -74,12 +76,13 @@ class _ResponseStream(httpx.AsyncByteStream):
             await close()
 
 
-class _GuardedTransport(httpx.AsyncBaseTransport):
-    def __init__(self, network_backend: httpcore.AsyncNetworkBackend) -> None:
-        ssl_context = httpx.create_ssl_context(verify=True, trust_env=False)
+class _GuardedTransport(httpx2.AsyncBaseTransport):
+    def __init__(self, network_backend: httpcore2.AsyncNetworkBackend) -> None:
+        # Explicit certifi bundle: no env variable, no OS store, no truststore (ADR 0016).
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
         # The TLS secrets of a fetch never go to a file, whatever ``SSLKEYLOGFILE`` says.
         ssl_context.keylog_filename = None  # type: ignore[assignment]  # typeshed: str
-        self._pool = httpcore.AsyncConnectionPool(
+        self._pool = httpcore2.AsyncConnectionPool(
             ssl_context=ssl_context,
             max_connections=MAX_CONNECTIONS,
             http1=True,
@@ -88,16 +91,16 @@ class _GuardedTransport(httpx.AsyncBaseTransport):
             network_backend=network_backend,
         )
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         url = request.url
         if url.scheme != "https":
             raise BlockedHostError("scheme is not allowed")  # noqa: TRY003
         if "sni_hostname" in request.extensions:
             # It would send another TLS server name than the checked host (ADR 0012).
             raise BlockedHostError("extension is not allowed")  # noqa: TRY003
-        core_request = httpcore.Request(
+        core_request = httpcore2.Request(
             method=request.method,
-            url=httpcore.URL(
+            url=httpcore2.URL(
                 scheme=url.raw_scheme,
                 host=url.raw_host,
                 port=url.port or HTTPS_PORT,
@@ -114,7 +117,7 @@ class _GuardedTransport(httpx.AsyncBaseTransport):
             if mapped is None:
                 raise
             raise mapped from None
-        return httpx.Response(
+        return httpx2.Response(
             status_code=core_response.status,
             headers=core_response.headers,
             stream=_ResponseStream(cast(AsyncIterable[bytes], core_response.stream)),
@@ -141,13 +144,13 @@ def outbound_client(
     *,
     connect_timeout: float,
     read_timeout: float,
-    network_backend: httpcore.AsyncNetworkBackend | None = None,
-) -> httpx.AsyncClient:
+    network_backend: httpcore2.AsyncNetworkBackend | None = None,
+) -> httpx2.AsyncClient:
     """Return a new guarded client. The caller closes it (``async with``)."""
     backend = network_backend if network_backend is not None else GuardedNetworkBackend()
-    return httpx.AsyncClient(
+    return httpx2.AsyncClient(
         transport=_GuardedTransport(backend),
-        timeout=httpx.Timeout(
+        timeout=httpx2.Timeout(
             read_timeout,
             connect=connect_timeout,
             write=_WRITE_TIMEOUT_SECONDS,

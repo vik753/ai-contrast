@@ -33,6 +33,12 @@
     },
     "httpcore": {
       "level": "WARNING"
+    },
+    "httpx2": {
+      "level": "WARNING"
+    },
+    "httpcore2": {
+      "level": "WARNING"
     }
   },
   "root": {

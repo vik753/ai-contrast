@@ -6,7 +6,7 @@
    answers ``503 busy`` + ``Retry-After`` before any body byte is read, whatever the body is.
    The ``415`` media-type check (header only) may stay before the slot.
 2. A resolver that raises ``socket.gaierror`` / ``OSError`` makes the guard raise an
-   ``httpcore.ConnectError`` with no host name and no address in its message; the fetcher maps
+   ``httpcore2.ConnectError`` with no host name and no address in its message; the fetcher maps
    it to ``GoogleDocError("google_doc_unavailable")``; the endpoint answers
    ``502 {"error": "google_doc_unavailable"}``; no log record has the host name.
 Must fail before the fix.
@@ -21,8 +21,8 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-import httpcore
-import httpx
+import httpcore2
+import httpx2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -90,9 +90,9 @@ def _no_network(app: FastAPI) -> list[int]:
     """Make any outbound client creation visible: the list gets one item per call."""
     calls: list[int] = []
 
-    def factory() -> httpx.AsyncClient:
+    def factory() -> httpx2.AsyncClient:
         calls.append(1)
-        return httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+        return httpx2.AsyncClient(transport=httpx2.MockTransport(lambda r: httpx2.Response(500)))
 
     app.state.google_client_factory = factory
     return calls
@@ -295,7 +295,7 @@ def _connect(error: OSError) -> tuple[SpyInner, BaseException | None]:
 def test_guard_resolver_oserror_raises_httpcore_connect_error(error: OSError) -> None:
     inner, caught = _connect(error)
 
-    assert isinstance(caught, httpcore.ConnectError), repr(caught)
+    assert isinstance(caught, httpcore2.ConnectError), repr(caught)
     assert not isinstance(caught, socket.gaierror)
     assert inner.connects == []
 
@@ -306,7 +306,7 @@ def test_guard_resolver_oserror_raises_httpcore_connect_error(error: OSError) ->
 def test_guard_resolver_oserror_message_has_no_host_and_no_address(error: OSError) -> None:
     _, caught = _connect(error)
 
-    assert isinstance(caught, httpcore.ConnectError), repr(caught)
+    assert isinstance(caught, httpcore2.ConnectError), repr(caught)
     text = f"{caught!s} {caught!r}"
     assert HOST not in text
     assert "google" not in text
@@ -317,7 +317,7 @@ def test_guard_resolver_oserror_message_has_no_host_and_no_address(error: OSErro
     "error", _dns_errors(), ids=["gaierror-noname", "gaierror-again", "oserror"]
 )
 def test_fetch_google_doc_dns_failure_is_google_doc_unavailable(error: OSError) -> None:
-    def factory() -> httpx.AsyncClient:
+    def factory() -> httpx2.AsyncClient:
         backend = GuardedNetworkBackend(resolver=_failing_resolver(error), inner=SpyInner())
         return outbound_client(connect_timeout=5, read_timeout=10, network_backend=backend)
 
@@ -348,7 +348,7 @@ def test_google_doc_endpoint_dns_failure_502_unavailable_and_no_host_in_logs(
 
     app = make_app(max_concurrent_extractions=1)
 
-    def factory() -> httpx.AsyncClient:
+    def factory() -> httpx2.AsyncClient:
         backend = GuardedNetworkBackend(resolver=_failing_resolver(error), inner=SpyInner())
         return outbound_client(connect_timeout=5, read_timeout=10, network_backend=backend)
 

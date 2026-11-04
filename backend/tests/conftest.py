@@ -18,7 +18,7 @@ from app.main import create_app
 from app.settings import Settings
 from tests.helpers import ALLOWED_ORIGIN, LOG_NAMESPACE, SETTINGS_ENV_VARS
 
-TEST_CLIENT_LOGGERS = ("httpx", "httpcore")
+TEST_CLIENT_LOGGERS = ("httpx", "httpcore", "httpx2", "httpcore2")
 
 
 @pytest.fixture(autouse=True)

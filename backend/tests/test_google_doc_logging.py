@@ -1,12 +1,12 @@
 """S3-T6a items 6 and 2, logging part (threat model T1, T2 control 5, T7 control 6).
 
 The ID is a password for the document. It must not appear in any log, response or error.
-``httpx`` logs every request URL at INFO, so the canary goes through a REAL
-``httpx.AsyncClient`` built by ``outbound_client`` with a guarded backend, a fake resolver
+``httpx2`` logs every request URL at INFO, so the canary goes through a REAL
+``httpx2.AsyncClient`` built by ``outbound_client`` with a guarded backend, a fake resolver
 and a fake inner backend (the canned answer is HTTP 404). A control test proves that the
-same stack does log the URL when the ``httpx`` logger is at INFO.
+same stack does log the URL when the ``httpx2`` logger is at INFO.
 
-Uses plain ``caplog`` (not ``log_capture``): that fixture forces the ``httpx`` loggers to
+Uses plain ``caplog`` (not ``log_capture``): that fixture forces the ``httpx2`` loggers to
 WARNING, which would hide the very defect these tests look for.
 Must fail before the implementation exists.
 """
@@ -19,7 +19,7 @@ import logging
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -31,13 +31,13 @@ from tests.helpers import access_lines, all_log_text, new_canary
 from tests.netfakes import PUBLIC_V4, ResolverSpy, SpyInner
 
 PATH = "/api/extract/google-doc"
-NET_LOGGERS = ("httpx", "httpcore")
+NET_LOGGERS = ("httpx2", "httpcore2")
 LOG_CONFIG = Path(__file__).resolve().parent.parent / "log_config.json"
 
 
 @pytest.fixture
 def open_net_loggers() -> Iterator[None]:
-    """Reset ``httpx``/``httpcore`` to NOTSET (inherit root) and restore afterwards."""
+    """Reset ``httpx2``/``httpcore2`` to NOTSET (inherit root) and restore afterwards."""
     saved = {name: logging.getLogger(name).level for name in NET_LOGGERS}
     for name in NET_LOGGERS:
         logging.getLogger(name).setLevel(logging.NOTSET)
@@ -46,7 +46,7 @@ def open_net_loggers() -> Iterator[None]:
         logging.getLogger(name).setLevel(level)
 
 
-def guarded_client(inner: SpyInner | None = None) -> httpx.AsyncClient:
+def guarded_client(inner: SpyInner | None = None) -> httpx2.AsyncClient:
     backend = GuardedNetworkBackend(resolver=ResolverSpy([PUBLIC_V4]), inner=inner or SpyInner())
     return outbound_client(connect_timeout=5, read_timeout=10, network_backend=backend)
 
@@ -71,8 +71,8 @@ def fetch_with_real_client(document_id: str) -> GoogleDocError:
 def test_log_config_sets_httpx_and_httpcore_to_warning() -> None:
     loggers = json.loads(LOG_CONFIG.read_text(encoding="utf-8"))["loggers"]
 
-    assert loggers["httpx"]["level"] == "WARNING"
-    assert loggers["httpcore"]["level"] == "WARNING"
+    assert loggers["httpx2"]["level"] == "WARNING"
+    assert loggers["httpcore2"]["level"] == "WARNING"
 
 
 @pytest.mark.parametrize("name", NET_LOGGERS)
@@ -90,13 +90,13 @@ def test_control_httpx_at_info_does_log_the_request_url(
     open_net_loggers: None, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.DEBUG)
-    logging.getLogger("httpx").setLevel(logging.INFO)
+    logging.getLogger("httpx2").setLevel(logging.INFO)
     canary = new_canary()
 
     error = fetch_with_real_client(canary)
 
     assert error.code == "google_doc_not_found"
-    assert canary in all_log_text(caplog), "the test setup must be able to see the httpx log"
+    assert canary in all_log_text(caplog), "the test setup must be able to see the httpx2 log"
 
 
 def test_fetch_with_real_client_id_canary_absent_from_logs_after_app_start(
@@ -104,7 +104,7 @@ def test_fetch_with_real_client_id_canary_absent_from_logs_after_app_start(
     make_app: Callable[..., FastAPI],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    make_app()  # application start sets the httpx and httpcore loggers
+    make_app()  # application start sets the httpx2 and httpcore2 loggers
     caplog.set_level(logging.DEBUG)
     canary = new_canary()
 

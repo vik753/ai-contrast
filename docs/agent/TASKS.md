@@ -22,6 +22,7 @@ Order: S6-T0 (dependency approval) first; then S6-T1 (`app/net/` on `httpx2`); t
 2. TLS context `ssl.create_default_context(cafile=certifi.where())` passed as `verify=`; `certifi` pinned as runtime dependency; `truststore` never used; `trust_env=False`. Tests pin the context type and show `SSL_CERT_FILE`, `SSL_CERT_DIR`, `SSLKEYLOGFILE`, `HTTPS_PROXY`, `ALL_PROXY` have no effect. `[tool.uv] no-build = true`.
 3. Policy tests: only `app/net/` imports `httpx2`/`httpcore2`; nothing in `app/` imports `httpx`/`httpcore`; no `opentelemetry-sdk` or exporter in `uv.lock`. `httpx2`/`httpcore2` loggers at `WARNING` in `log_config.json` and at startup.
 4. `httpx` remains a dev dependency only; `pip-audit` clean.
+5. `anthropic` and `openai` are locked in S6-T1 (approved in S6-T0; the jiter constraint needs the whole set); S6-T2 uses them.
 
 ### S6-T2 `AIProvider` port and adapters (backend)
 

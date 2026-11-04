@@ -4,7 +4,7 @@ Public interface: ``fetch_google_doc(document_id, *, max_bytes, timeout_seconds,
 client_factory) -> bytes``; ``GoogleDocError(code)``; ``is_valid_document_id``.
 The flow is tested with ``StreamingTransport`` (a mock transport whose answers stream; no
 network, no guard: the guard has its own tests). The factory builds a plain
-``httpx.AsyncClient`` over the mock transport, with
+``httpx2.AsyncClient`` over the mock transport, with
 ``follow_redirects`` at its default (off), so the fetcher must follow redirects itself.
 Must fail before the implementation exists (module ``app.net.google_docs`` is missing).
 """
@@ -16,7 +16,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from app.net.google_docs import GoogleDocError, fetch_google_doc, is_valid_document_id
@@ -30,21 +30,21 @@ EXPORT_URL = f"https://docs.google.com/document/d/{DOC_ID}/export?format=docx"
 DOCX_BYTES = b"PK\x03\x04" + b"synthetic docx body " * 10
 GOOGLEUSERCONTENT = "https://doc-0k-0s-docs.googleusercontent.com/export/abc/def?id=1"
 
-Handler = Callable[[httpx.Request], Any]
+Handler = Callable[[httpx2.Request], Any]
 
 
 class Harness:
     def __init__(self, handler: Handler) -> None:
         self.handler = handler
-        self.requests: list[httpx.Request] = []
-        self.clients: list[httpx.AsyncClient] = []
+        self.requests: list[httpx2.Request] = []
+        self.clients: list[httpx2.AsyncClient] = []
 
-    def _handle(self, request: httpx.Request) -> Any:
+    def _handle(self, request: httpx2.Request) -> Any:
         self.requests.append(request)
         return self.handler(request)
 
-    def factory(self) -> httpx.AsyncClient:
-        client = httpx.AsyncClient(transport=StreamingTransport(self._handle))
+    def factory(self) -> httpx2.AsyncClient:
+        client = httpx2.AsyncClient(transport=StreamingTransport(self._handle))
         self.clients.append(client)
         return client
 
@@ -72,12 +72,12 @@ def fetch(
     return asyncio.run(go()), harness
 
 
-def ok(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=DOCX_BYTES)
+def ok(request: httpx2.Request) -> httpx2.Response:
+    return httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=DOCX_BYTES)
 
 
-def redirect(location: str, status: int = 302, **headers: str) -> httpx.Response:
-    return httpx.Response(status, headers={"Location": location, **headers})
+def redirect(location: str, status: int = 302, **headers: str) -> httpx2.Response:
+    return httpx2.Response(status, headers={"Location": location, **headers})
 
 
 def code_of(result: bytes | GoogleDocError) -> str:
@@ -147,7 +147,7 @@ def test_fetch_request_headers_are_exactly_the_fixed_set() -> None:
     _, harness = fetch(ok)
 
     headers = harness.requests[0].headers
-    # httpx adds `host` and `connection`; nothing else may be present.
+    # httpx2 adds `host` and `connection`; nothing else may be present.
     assert set(headers) <= {"host", "connection", "user-agent", "accept", "accept-encoding"}
     assert headers["accept"] == DOCX_CT
     assert headers["accept-encoding"] == "identity"
@@ -185,7 +185,7 @@ def test_fetch_headers_identical_on_every_hop() -> None:
 
 def test_fetch_client_is_closed_after_success_and_after_failure() -> None:
     _, harness_ok = fetch(ok)
-    _, harness_bad = fetch(lambda r: httpx.Response(404))
+    _, harness_bad = fetch(lambda r: httpx2.Response(404))
 
     assert len(harness_ok.clients) == 1
     assert len(harness_bad.clients) == 1
@@ -209,7 +209,7 @@ def test_fetch_follows_redirect_statuses(status: int) -> None:
 
 
 def test_fetch_relative_location_is_resolved_against_current_url() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/redir2":
             return ok(request)
         return redirect("/redir2")
@@ -232,12 +232,12 @@ def test_fetch_relative_location_is_resolved_against_current_url() -> None:
     ],
 )
 def test_fetch_allowed_redirect_target_is_followed(location: str) -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         return redirect(location) if len(harness_requests) == 1 else ok(request)
 
-    harness_requests: list[httpx.Request] = []
+    harness_requests: list[httpx2.Request] = []
 
-    def counting(request: httpx.Request) -> httpx.Response:
+    def counting(request: httpx2.Request) -> httpx2.Response:
         harness_requests.append(request)
         return handler(request)
 
@@ -300,15 +300,15 @@ def test_fetch_redirect_to_accounts_google_means_not_public(location: str) -> No
 
 
 def test_fetch_redirect_without_location_is_unavailable() -> None:
-    result, _ = fetch(lambda r: httpx.Response(302))
+    result, _ = fetch(lambda r: httpx2.Response(302))
 
     assert code_of(result) == "google_doc_unavailable"
 
 
-def _chain(hops: int) -> Callable[[httpx.Request], httpx.Response]:
+def _chain(hops: int) -> Callable[[httpx2.Request], httpx2.Response]:
     count = 0
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         nonlocal count
         count += 1
         if count <= hops:
@@ -340,7 +340,7 @@ def test_fetch_redirect_loop_is_bounded() -> None:
 
 
 def test_fetch_cookies_set_by_a_response_are_not_sent_on_the_next_hop() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/next":
             return ok(request)
         return redirect("/next", **{"Set-Cookie": "NID=secret-cookie; Path=/; Secure"})
@@ -356,7 +356,7 @@ def test_fetch_cookies_set_by_a_response_are_not_sent_on_the_next_hop() -> None:
 def test_fetch_cookies_cleared_on_every_hop_of_a_chain() -> None:
     count = 0
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         nonlocal count
         count += 1
         if count <= 3:
@@ -393,7 +393,7 @@ def test_fetch_cookies_cleared_on_every_hop_of_a_chain() -> None:
     ],
 )
 def test_fetch_status_maps_to_error_code(status: int, code: str) -> None:
-    result, harness = fetch(lambda r: httpx.Response(status, headers={"Content-Type": DOCX_CT}))
+    result, harness = fetch(lambda r: httpx2.Response(status, headers={"Content-Type": DOCX_CT}))
 
     assert code_of(result) == code
     assert len(harness.requests) == 1
@@ -402,7 +402,7 @@ def test_fetch_status_maps_to_error_code(status: int, code: str) -> None:
 @pytest.mark.parametrize("content_type", ["text/html", "text/html; charset=utf-8", "TEXT/HTML"])
 def test_fetch_200_html_means_not_public(content_type: str) -> None:
     result, _ = fetch(
-        lambda r: httpx.Response(200, headers={"Content-Type": content_type}, content=b"<html>")
+        lambda r: httpx2.Response(200, headers={"Content-Type": content_type}, content=b"<html>")
     )
 
     assert code_of(result) == "google_doc_not_public"
@@ -414,21 +414,23 @@ def test_fetch_200_html_means_not_public(content_type: str) -> None:
 )
 def test_fetch_200_other_media_type_is_unavailable(content_type: str) -> None:
     result, _ = fetch(
-        lambda r: httpx.Response(200, headers={"Content-Type": content_type}, content=DOCX_BYTES)
+        lambda r: httpx2.Response(200, headers={"Content-Type": content_type}, content=DOCX_BYTES)
     )
 
     assert code_of(result) == "google_doc_unavailable"
 
 
 def test_fetch_200_without_content_type_is_unavailable() -> None:
-    result, _ = fetch(lambda r: httpx.Response(200, content=DOCX_BYTES))
+    result, _ = fetch(lambda r: httpx2.Response(200, content=DOCX_BYTES))
 
     assert code_of(result) == "google_doc_unavailable"
 
 
 def test_fetch_200_docx_media_type_with_any_case_is_read() -> None:
     result, _ = fetch(
-        lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT.upper()}, content=DOCX_BYTES)
+        lambda r: httpx2.Response(
+            200, headers={"Content-Type": DOCX_CT.upper()}, content=DOCX_BYTES
+        )
     )
 
     assert result == DOCX_BYTES
@@ -436,7 +438,7 @@ def test_fetch_200_docx_media_type_with_any_case_is_read() -> None:
 
 def test_fetch_content_disposition_is_ignored() -> None:
     result, _ = fetch(
-        lambda r: httpx.Response(
+        lambda r: httpx2.Response(
             200,
             headers={"Content-Type": DOCX_CT, "Content-Disposition": 'attachment; filename="x"'},
             content=DOCX_BYTES,
@@ -452,7 +454,7 @@ def test_fetch_content_disposition_is_ignored() -> None:
 @pytest.mark.parametrize("encoding", ["gzip", "br", "deflate", "zstd", "gzip, identity", "x-foo"])
 def test_fetch_content_encoding_other_than_identity_is_unavailable(encoding: str) -> None:
     result, _ = fetch(
-        lambda r: httpx.Response(
+        lambda r: httpx2.Response(
             200, headers={"Content-Type": DOCX_CT, "Content-Encoding": encoding}, content=b"x" * 10
         )
     )
@@ -462,7 +464,7 @@ def test_fetch_content_encoding_other_than_identity_is_unavailable(encoding: str
 
 def test_fetch_content_encoding_identity_is_accepted_and_body_untouched() -> None:
     result, _ = fetch(
-        lambda r: httpx.Response(
+        lambda r: httpx2.Response(
             200,
             headers={"Content-Type": DOCX_CT, "Content-Encoding": "identity"},
             content=DOCX_BYTES,
@@ -490,7 +492,7 @@ class Chunks:
 def test_fetch_body_of_exactly_max_bytes_is_accepted() -> None:
     body = b"P" * 1000
     result, _ = fetch(
-        lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=body),
+        lambda r: httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=body),
         max_bytes=1000,
     )
 
@@ -499,7 +501,7 @@ def test_fetch_body_of_exactly_max_bytes_is_accepted() -> None:
 
 def test_fetch_body_one_byte_over_max_is_too_large() -> None:
     result, _ = fetch(
-        lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=b"P" * 1001),
+        lambda r: httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=b"P" * 1001),
         max_bytes=1000,
     )
 
@@ -509,7 +511,7 @@ def test_fetch_body_one_byte_over_max_is_too_large() -> None:
 def test_fetch_content_length_above_max_is_too_large_without_reading_the_body() -> None:
     chunks = Chunks(count=10, size=100)
     result, _ = fetch(
-        lambda r: httpx.Response(
+        lambda r: httpx2.Response(
             200,
             headers={"Content-Type": DOCX_CT, "Content-Length": "5000"},
             content=chunks,
@@ -524,7 +526,7 @@ def test_fetch_content_length_above_max_is_too_large_without_reading_the_body() 
 def test_fetch_stream_without_length_stops_reading_at_the_cap() -> None:
     chunks = Chunks(count=1000, size=100)
     result, _ = fetch(
-        lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=chunks),
+        lambda r: httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=chunks),
         max_bytes=1000,
     )
 
@@ -535,7 +537,7 @@ def test_fetch_stream_without_length_stops_reading_at_the_cap() -> None:
 def test_fetch_stream_longer_than_its_content_length_is_too_large() -> None:
     chunks = Chunks(count=100, size=100)
     result, _ = fetch(
-        lambda r: httpx.Response(
+        lambda r: httpx2.Response(
             200, headers={"Content-Type": DOCX_CT, "Content-Length": "10"}, content=chunks
         ),
         max_bytes=1000,
@@ -549,7 +551,7 @@ def test_fetch_stream_longer_than_its_content_length_is_too_large() -> None:
 
 
 def test_fetch_slow_response_headers_hit_the_total_deadline() -> None:
-    async def slow(request: httpx.Request) -> httpx.Response:
+    async def slow(request: httpx2.Request) -> httpx2.Response:
         await asyncio.sleep(10)
         return ok(request)
 
@@ -564,7 +566,7 @@ def test_fetch_slow_trickling_body_hits_the_total_deadline() -> None:
     chunks = Chunks(count=1000, size=1, delay=0.05)
     started = time.monotonic()
     result, _ = fetch(
-        lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=chunks),
+        lambda r: httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=chunks),
         max_bytes=10_000,
         timeout=0.3,
     )
@@ -574,7 +576,7 @@ def test_fetch_slow_trickling_body_hits_the_total_deadline() -> None:
 
 
 def test_fetch_deadline_covers_the_whole_redirect_chain() -> None:
-    async def slow_hops(request: httpx.Request) -> httpx.Response:
+    async def slow_hops(request: httpx2.Request) -> httpx2.Response:
         await asyncio.sleep(0.15)
         return redirect("/again")
 
@@ -589,7 +591,7 @@ def test_fetch_deadline_covers_the_whole_redirect_chain() -> None:
 
 
 def _raiser(error: Exception) -> Handler:
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         raise error
 
     return handler
@@ -598,8 +600,8 @@ def _raiser(error: Exception) -> Handler:
 @pytest.mark.parametrize(
     "make_error",
     [
-        httpx.ConnectError,
-        httpx.RemoteProtocolError,
+        httpx2.ConnectError,
+        httpx2.RemoteProtocolError,
         BlockedAddressError,
         BlockedHostError,
     ],
@@ -623,12 +625,12 @@ def test_fetch_transport_and_guard_errors_map_to_unavailable_without_leaking_tex
 
 def test_fetch_error_text_never_contains_the_id_for_any_code() -> None:
     results = [
-        fetch(lambda r: httpx.Response(403))[0],
-        fetch(lambda r: httpx.Response(404))[0],
-        fetch(lambda r: httpx.Response(500))[0],
+        fetch(lambda r: httpx2.Response(403))[0],
+        fetch(lambda r: httpx2.Response(404))[0],
+        fetch(lambda r: httpx2.Response(500))[0],
         fetch(lambda r: redirect("https://evil.example/x"))[0],
         fetch(
-            lambda r: httpx.Response(200, headers={"Content-Type": DOCX_CT}, content=b"x" * 2000)
+            lambda r: httpx2.Response(200, headers={"Content-Type": DOCX_CT}, content=b"x" * 2000)
         )[0],
     ]
 
