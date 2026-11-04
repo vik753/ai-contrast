@@ -76,8 +76,8 @@ def test_uv_lock_has_no_opentelemetry_sdk_or_exporter() -> None:
 def test_pyproject_pins_exact_runtime_versions() -> None:
     pins = _pins(PYPROJECT["project"]["dependencies"])
 
-    assert pins.get("anthropic") in {"==1.15.0", "==1.14.0"}
-    assert pins.get("openai") == "==3.31.0"
+    assert pins.get("anthropic") == "==1.17.0"
+    assert pins.get("openai") == "==3.35.1"
     assert pins.get("httpx2") == "==2.13.1"
     assert pins.get("httpcore2") == "==2.13.1"
     assert re.fullmatch(r"==\d[\w.]*", pins.get("certifi", "")), pins.get("certifi")
