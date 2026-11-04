@@ -536,10 +536,16 @@ def test_extract_two_concurrent_requests_hold_both_slots(
         async def send(message: dict[str, Any]) -> None:
             return None
 
-        tasks = [asyncio.create_task(app(scope, stalled_receive(), send)) for _ in range(2)]
+        # Distinct client addresses: the per-client limit must not apply here.
+        tasks = [
+            asyncio.create_task(
+                app({**scope, "client": (f"198.51.100.{n}", 50000)}, stalled_receive(), send)
+            )
+            for n in (1, 2)
+        ]
         for _ in range(2):
             await asyncio.wait_for(started.acquire(), 10)
-        third = await drive(app, scope, chunks(TEXT_BODY))
+        third = await drive(app, {**scope, "client": ("198.51.100.3", 50000)}, chunks(TEXT_BODY))
         stalled.set()
         await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), 10)
         return third.status, _slot_free(app)

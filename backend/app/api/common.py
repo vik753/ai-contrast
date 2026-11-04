@@ -23,6 +23,8 @@ from app.extraction.limiter import ExtractionLimiter
 from app.extraction.model import MIB
 from app.extraction.sandbox import SandboxLimits
 from app.http_limits import declared_length
+from app.limits.client_ip import client_key
+from app.limits.slots import ClientSlots
 from app.net.client import ClientFactory
 from app.settings import Settings
 
@@ -232,15 +234,39 @@ class SlotResponse(Response):
         self._send_timeout_event = send_timeout_event
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        slot = self._limiter.try_slot()
-        if slot is None:
-            busy = early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
-            await busy(scope, receive, send)
+        # The per-client slot is taken first, the shared pool second; both are released
+        # on every exit path. The client key is never logged.
+        state = scope["app"].state
+        client_slots = getattr(state, "client_slots", None)
+        if not isinstance(client_slots, ClientSlots):
+            msg = "app state is not configured"
+            raise TypeError(msg)
+        key = client_key(scope, self._settings)
+        # Explicit acquire/release in one try/finally: nothing is held between them
+        # that a dropped object could leak.
+        if not client_slots.try_acquire(key):
+            await self._busy(scope, receive, send)
             return
-        with slot:
-            response = await self._work()
+        try:
+            if not self._limiter.try_acquire():
+                await self._busy(scope, receive, send)
+                return
             try:
-                async with asyncio.timeout(self._settings.extract_send_timeout_seconds):
-                    await send_in_chunks(response, send)
-            except TimeoutError:
-                self._logger.info(self._send_timeout_event)
+                await self._run(send)
+            finally:
+                self._limiter.release()
+        finally:
+            client_slots.release(key)
+
+    @staticmethod
+    async def _busy(scope: Scope, receive: Receive, send: Send) -> None:
+        busy = early_error("busy", 503, {"Retry-After": str(RETRY_AFTER_SECONDS)})
+        await busy(scope, receive, send)
+
+    async def _run(self, send: Send) -> None:
+        response = await self._work()
+        try:
+            async with asyncio.timeout(self._settings.extract_send_timeout_seconds):
+                await send_in_chunks(response, send)
+        except TimeoutError:
+            self._logger.info(self._send_timeout_event)

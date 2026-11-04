@@ -19,6 +19,7 @@ from app import __version__
 from app.api import extract, google_doc, health, safety_check, segment
 from app.api.validation_errors import validation_error_handler
 from app.extraction.limiter import ExtractionLimiter
+from app.limits.slots import ClientSlots
 from app.middleware import (
     AccessLogMiddleware,
     BodySizeLimitMiddleware,
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     # One limiter per app: extractions in progress on this server (T6, ADR 0010).
     app.state.extraction_limiter = ExtractionLimiter(settings.max_concurrent_extractions)
+    app.state.client_slots = ClientSlots(settings.max_extractions_per_client)
 
     # A new guarded client per fetch; tests replace this attribute.
     app.state.google_client_factory = lambda: outbound_client(
