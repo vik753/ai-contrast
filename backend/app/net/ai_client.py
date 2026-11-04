@@ -13,10 +13,12 @@ Only this package imports ``httpx2``; ``app/ai/`` gets the types it needs from h
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import AsyncIterator
 from types import TracebackType
 from typing import Final
 
+import certifi
 import httpx2
 
 from app.net.client import _GuardedTransport
@@ -160,3 +162,15 @@ def ai_client(
         follow_redirects=False,
         trust_env=False,
     )
+
+
+def private_ai_transport() -> AITransport:
+    """DEVELOPMENT ONLY (``ALLOW_PRIVATE_PROVIDER_URLS``): a transport without the SSRF guard.
+
+    It reaches ``http`` and private hosts, such as a local model server. The settings refuse
+    the switch in production, and only the connection check uses this function. The redirect
+    refusal, size cap and header allowlist of ``ai_client`` still apply.
+    """
+    context = ssl.create_default_context(cafile=certifi.where())
+    context.keylog_filename = None  # type: ignore[assignment]  # typeshed: str
+    return httpx2.AsyncHTTPTransport(verify=context, trust_env=False, http2=False, retries=0)

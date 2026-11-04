@@ -175,6 +175,20 @@ curl -sS -X POST -H 'Content-Type: application/json' -d '{"blocks":[{"text":"1. 
 
 Expected: `{"clauses":[{"id":"c1","number":"1","level":1,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[0,0,10]],"heading_span":[0,3,10]},{"id":"c2","number":"1.1","level":2,"part_index":0,"section_kind":null,"part":"body","pages":[],"spans":[[1,0,37]],"heading_span":[0,3,10]}],"blocks":[{"text":"1. Subject","part":"body","page":null},{"text":"1.1. The insurer pays within 10 days.","part":"body","page":null}],"removed":[],"warnings":[],"detector_version":"pseudo-…","entities":[],"requisites":[],"neutralized":[]}`.
 A span is `[block, start, end]` into `blocks`. Clause 1.1 carries the heading of section 1.
+Check the connection check endpoint (S6-T4). A custom URL with an IP address is refused by syntax, before any network call:
+
+```bash
+curl -sS -i -X POST -H 'Content-Type: application/json' -H 'X-Provider-Key: sk-example' -d '{"provider":"custom","model":"my-model","base_url":"https://127.0.0.1/v1"}' http://127.0.0.1:8000/api/provider/check
+```
+
+Expected: status `422` and the body `{"error":"provider_blocked_host"}`. The key is a placeholder and is never sent anywhere.
+The free mode needs `CF_ACCOUNT_ID`, `CF_AI_TOKEN` and `TURNSTILE_SECRET_KEY` (hosting environment variables). Without them:
+
+```bash
+curl -sS -i -X POST -H 'Content-Type: application/json' -d '{"provider":"free","turnstile_token":"x"}' http://127.0.0.1:8000/api/provider/check
+```
+
+Expected: status `503` and the body `{"error":"free_mode_unavailable"}`.
 `detector_version` changes whenever the detector rules change.
 Check identifier detection (the email is fictional):
 

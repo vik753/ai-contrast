@@ -106,6 +106,11 @@ class FixedWindowLimiter:
             return True
         return not self._full(now)
 
+    def has(self, key: str) -> bool:
+        """Does ``key`` have an entry in a window that has not ended? Counts nothing."""
+        entry = self._table.get(key)
+        return entry is not None and not self._expired(entry[0], self._clock())
+
     def refund(self, key: str) -> None:
         """Undo one counted hit in the current window (never below 0)."""
         now = self._clock()

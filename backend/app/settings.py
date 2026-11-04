@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, PositiveInt, field_validator, model_validator
+from pydantic import Field, PositiveInt, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.extraction.model import (
@@ -26,6 +26,8 @@ from app.extraction.model import (
 )
 
 DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173"]
+# A Cloudflare account ID: 32 lower-case hex characters. It is part of the free-mode URL.
+CF_ACCOUNT_ID_RE = re.compile(r"[0-9a-f]{32}", re.ASCII)
 
 
 # An origin is exactly `scheme://host[:port]` (lowercase after normalization).
@@ -83,6 +85,21 @@ class Settings(BaseSettings):
       (``scheme://host[:port]``). Required in production, ``https`` only.
     - ``ALLOW_PRIVATE_PROVIDER_URLS``: allow private provider hosts (local models).
       Development only.
+
+    Connection check and free mode (S6-T4, ADR 0016 points 6 and 7). The three secrets are
+    ``SecretStr``, read only from the environment; free mode is available only when all
+    three are set:
+
+    - ``CF_ACCOUNT_ID`` (32 lower-case hex characters), ``CF_AI_TOKEN``: Cloudflare Workers AI.
+    - ``TURNSTILE_SECRET_KEY``: Cloudflare Turnstile secret.
+    - ``TURNSTILE_EXPECTED_HOSTNAME``: hostname that Turnstile must report (not compared if unset).
+    - ``TURNSTILE_ACTION``: action that Turnstile must report.
+    - ``CHECK_PER_MINUTE``, ``CHECK_PER_DAY``: checks per client key (the day resets 00:00 UTC).
+    - ``FREE_CALLS_PER_IP_PER_DAY``: free-mode calls per client key and day.
+    - ``FREE_NEURON_BUDGET``: global free-mode budget per day, in Neurons (1 to 9999; the
+      Cloudflare free allowance is 10000).
+    - ``MAX_CONCURRENT_CHECKS``: checks in flight per server.
+    - ``TURNSTILE_REPLAY_MAX_ENTRIES`` (1 to 10000), ``TURNSTILE_REPLAY_SECONDS``: replay table.
 
     Upload limits (positive integers, threat model T4 and T6, ADR 0010):
 
@@ -159,6 +176,19 @@ class Settings(BaseSettings):
     )
     allow_private_provider_urls: bool = False
 
+    cf_account_id: SecretStr | None = None
+    cf_ai_token: SecretStr | None = None
+    turnstile_secret_key: SecretStr | None = None
+    turnstile_expected_hostname: str | None = None
+    turnstile_action: str = "check"
+    check_per_minute: PositiveInt = 10
+    check_per_day: PositiveInt = 60
+    free_calls_per_ip_per_day: PositiveInt = 5
+    free_neuron_budget: Annotated[int, Field(ge=1, le=9999)] = 8000
+    max_concurrent_checks: PositiveInt = 2
+    turnstile_replay_max_entries: Annotated[int, Field(ge=1, le=10000)] = 10000
+    turnstile_replay_seconds: PositiveInt = 600
+
     max_file_bytes: PositiveInt = 10 * MIB
     max_json_body_bytes: PositiveInt = 64 * 1024
     max_concurrent_extractions: PositiveInt = 2
@@ -189,6 +219,15 @@ class Settings(BaseSettings):
     google_fetch_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 20.0
     google_connect_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 5.0
     google_body_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 5.0
+
+    @field_validator("cf_account_id")
+    @classmethod
+    def _account_id_shape(cls, value: SecretStr | None) -> SecretStr | None:
+        # The ID goes into a URL path: only 32 lower-case hex characters are accepted.
+        if value is not None and not CF_ACCOUNT_ID_RE.fullmatch(value.get_secret_value()):
+            msg = "cf_account_id must be 32 lower-case hex characters"
+            raise ValueError(msg)
+        return value
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

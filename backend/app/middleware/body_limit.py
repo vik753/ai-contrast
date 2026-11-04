@@ -6,6 +6,7 @@ allowed origin carries the CORS headers.
 - The ``/api/extract`` path (any method): ``max_file_bytes``, error ``file_too_large``.
 - The ``/api/safety-check`` path (any method): ``max_safety_body_bytes``, error
   ``request_too_large``.
+- The ``/api/provider/check`` path (any method): 4096 bytes, error ``request_too_large``.
 - The ``/api/segment`` path (any method): ``max_segment_body_bytes``, error
   ``request_too_large``.
 - Every other path: ``max_json_body_bytes``, error ``request_too_large``.
@@ -31,7 +32,14 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.http_limits import EXTRACT_PATH, SAFETY_PATH, SEGMENT_PATH, declared_length
+from app.http_limits import (
+    CHECK_MAX_BODY_BYTES,
+    CHECK_PATH,
+    EXTRACT_PATH,
+    SAFETY_PATH,
+    SEGMENT_PATH,
+    declared_length,
+)
 
 FILE_TOO_LARGE = "file_too_large"
 REQUEST_TOO_LARGE = "request_too_large"
@@ -68,6 +76,8 @@ class BodySizeLimitMiddleware:
             return self.max_file_bytes, FILE_TOO_LARGE
         if scope.get("path") == SAFETY_PATH:
             return self.max_safety_body_bytes, REQUEST_TOO_LARGE
+        if scope.get("path") == CHECK_PATH:
+            return CHECK_MAX_BODY_BYTES, REQUEST_TOO_LARGE
         if scope.get("path") == SEGMENT_PATH:
             return self.max_segment_body_bytes, REQUEST_TOO_LARGE
         return self.max_json_body_bytes, REQUEST_TOO_LARGE
