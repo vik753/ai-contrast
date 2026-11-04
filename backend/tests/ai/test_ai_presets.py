@@ -189,7 +189,7 @@ def test_custom_without_a_base_url_is_refused(url: str | None) -> None:
         "https://llm.example.com:443/v1",
         "https://LLM.Example.COM/v1",
         "https://api.eu-west.example.co.uk/openai/v1",
-        "https://a.b/v1",
+        "https://a.bc/v1",
         "https://xn--e1afmkfd.example.com/v1",
         "https://llm.example.com/a_b.c~d-e/f",
         "https://llm.example.com/" + "a" * 255,
@@ -202,6 +202,7 @@ def test_custom_base_url_valid_syntax_is_accepted(url: str) -> None:
 @pytest.mark.parametrize(
     "url",
     [
+        "https://a.b/v1",
         "http://llm.example.com/v1",
         "HTTP://llm.example.com/v1",
         "ftp://llm.example.com/v1",
