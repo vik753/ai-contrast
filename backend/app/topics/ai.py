@@ -88,14 +88,39 @@ def _passes(text: str, kind: TextKind, lang: str | None = None) -> bool:
     return True
 
 
-def checked_suggestions(out: SuggestOut) -> tuple[list[tuple[str, str]], int]:
-    """The ``(name, description)`` pairs that pass, and the number dropped."""
-    kept = [
-        (item.name, item.description)
-        for item in out.topics
-        if _passes(item.name, TextKind.NAME) and _passes(item.description, TextKind.DESCRIPTION)
-    ]
-    return kept, len(out.topics) - len(kept)
+def _reason(text: str, kind: TextKind) -> str | None:
+    """``None`` if the text passes, else ``flagged``, ``identifier`` or ``invalid``."""
+    try:
+        check_topic_text(text, kind)
+    except TopicTextError as error:
+        return {"topic_flagged": "flagged", "topic_contains_identifier": "identifier"}.get(
+            error.code, "invalid"
+        )
+    return None
+
+
+def checked_suggestions(out: SuggestOut) -> tuple[list[tuple[str, str]], dict[str, int]]:
+    """The ``(name, description)`` pairs that pass, and the drops by reason.
+
+    ``flagged`` is advisory: the source document may hold an injection (ADR 0017 point 4)."""
+    kept: list[tuple[str, str]] = []
+    dropped = {"flagged": 0, "identifier": 0, "invalid": 0}
+    for item in out.topics:
+        reasons = [
+            r
+            for r in (
+                _reason(item.name, TextKind.NAME),
+                _reason(item.description, TextKind.DESCRIPTION),
+            )
+            if r is not None
+        ]
+        if not reasons:
+            kept.append((item.name, item.description))
+        else:
+            # The strongest reason counts: flagged, then identifier, then invalid.
+            first = next(r for r in ("flagged", "identifier", "invalid") if r in reasons)
+            dropped[first] += 1
+    return kept, dropped
 
 
 def _attribute(item: AttributeItem, topic: TopicDefinition) -> AttributeDefinition | None:
