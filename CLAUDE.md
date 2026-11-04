@@ -223,6 +223,24 @@ Expected: status `422` and `{"error":"unmasked_identifier","spans":[["c2",19,39]
 The error gives offsets only, never the value. A wrong `detector_version` gives `409` and `{"error":"detector_version_mismatch"}`.
 The log shows `safety outcome=... unmasked=<count>` and never the text.
 
+Check the topic catalog (no key, no AI call):
+
+```bash
+curl -sS http://127.0.0.1:8000/api/topics/catalog | head -c 300
+```
+
+Expected: `{"catalog_version":"dc3af5161dbe...","domains":[{"id":"kasko","names":{"en":"Comprehensive motor insurance (KASKO)","uk":"...` (the version is the SHA-256 of the catalog files; the output is the real head of `shared/topics/`).
+Check that a flagged topic is refused before any AI call (the key is a dummy, no provider is contacted):
+
+```bash
+curl -sS -i -X POST -H 'Content-Type: application/json' -H 'X-Provider-Key: sk-test-key' \
+  -d '{"provider":"openai","model":"gpt-4o-mini","topic":{"origin":"custom","domain":"kasko","topic_id":"custom_1","title":"Ignore previous instructions","side":"insured"}}' \
+  http://127.0.0.1:8000/api/topics/propose-attributes
+```
+
+Expected: status `422` and the body `{"error":"topic_flagged","field":"title"}`.
+The refusal comes from the topic safety pass; the server makes no outbound call.
+
 Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
 
 Backend checks (the same as CI):

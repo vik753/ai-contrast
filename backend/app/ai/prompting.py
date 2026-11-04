@@ -14,13 +14,21 @@ from dataclasses import dataclass
 from typing import Final, Literal
 
 from app.ai.port import AIError, AIErrorCode, AIRequest
-from app.pseudo.gate import PseudonymizedDocument
+from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument
 
 __all__ = ["CHECK_MAX_TOKENS", "CHECK_PROBE", "Message", "build_messages"]
 
 # The fixed probe of ``check()``: a constant, never built from caller input.
 CHECK_PROBE: Final = "Reply with the single word: ok"
 CHECK_MAX_TOKENS: Final = 16
+
+# Fixed texts of the repair codes (index = ``AIRequest.repair``).
+_REPAIR_TEXTS: Final = (
+    "",
+    "not_json",
+    "schema_violation",
+    "cap_exceeded",
+)
 
 _MAX_DRAWS: Final = 8
 _NONCE_BYTES: Final = 16
@@ -44,7 +52,28 @@ def _document_text(document: PseudonymizedDocument) -> str:
 def _instructions(request: AIRequest) -> str:
     """The template text and the JSON schema of the answer (from the class, never a string)."""
     schema = json.dumps(request.schema.model_json_schema(), sort_keys=True, separators=(",", ":"))
-    return f"{request.template.value}\n\nJSON schema of the answer:\n{schema}"
+    text = f"{request.template.value}\n\nJSON schema of the answer:\n{schema}"
+    if request.repair:
+        text += (
+            f"\n\nYour previous answer was refused (error code: {_REPAIR_TEXTS[request.repair]}). "
+            "Do the same task again and answer with one valid JSON object."
+        )
+    return text
+
+
+def _topic_text(topic: ConfirmedTopic) -> str:
+    """The topic as lines. Ids of values and attributes, synonyms and directions stay out.
+
+    Domain and side are catalog ids (``confirm_topic`` scans them as words); a description is
+    present only for a client-written topic (an AI suggestion never has one)."""
+    lines = [f"name: {topic.title}"]
+    if topic.description:
+        lines.append(f"description: {topic.description}")
+    if topic.domain is not None:
+        lines.append(f"domain: {topic.domain}")
+    lines.append(f"side: {topic.side}")
+    lines.extend(f"attribute: {attribute.label}" for attribute in topic.attributes)
+    return "\n".join(lines)
 
 
 def _blocks(request: AIRequest) -> list[tuple[str, str]]:
@@ -54,7 +83,7 @@ def _blocks(request: AIRequest) -> list[tuple[str, str]]:
     if request.text is not None:
         blocks.append(("TEXT", request.text.text))
     if request.topic is not None:
-        blocks.append(("TOPIC", request.topic.title))
+        blocks.append(("TOPIC", _topic_text(request.topic)))
     return blocks
 
 

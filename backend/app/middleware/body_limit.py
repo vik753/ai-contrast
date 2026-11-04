@@ -6,6 +6,8 @@ allowed origin carries the CORS headers.
 - The ``/api/extract`` path (any method): ``max_file_bytes``, error ``file_too_large``.
 - The ``/api/safety-check`` path (any method): ``max_safety_body_bytes``, error
   ``request_too_large``.
+- ``/api/topics/suggest``: ``max_safety_body_bytes``; ``/api/topics/propose-attributes`` and
+  ``/api/topics/expand-synonyms``: 16 KiB (error ``request_too_large``).
 - The ``/api/provider/check`` path (any method): 4096 bytes, error ``request_too_large``.
 - The ``/api/segment`` path (any method): ``max_segment_body_bytes``, error
   ``request_too_large``.
@@ -35,9 +37,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.http_limits import (
     CHECK_MAX_BODY_BYTES,
     CHECK_PATH,
+    EXPAND_PATH,
     EXTRACT_PATH,
+    PROPOSE_PATH,
     SAFETY_PATH,
     SEGMENT_PATH,
+    SUGGEST_PATH,
+    TOPIC_MAX_BODY_BYTES,
     declared_length,
 )
 
@@ -72,15 +78,18 @@ class BodySizeLimitMiddleware:
         )
 
     def _limit(self, scope: Scope) -> tuple[int, str]:
-        if scope.get("path") == EXTRACT_PATH:
+        path = scope.get("path")
+        if path == EXTRACT_PATH:
             return self.max_file_bytes, FILE_TOO_LARGE
-        if scope.get("path") == SAFETY_PATH:
-            return self.max_safety_body_bytes, REQUEST_TOO_LARGE
-        if scope.get("path") == CHECK_PATH:
-            return CHECK_MAX_BODY_BYTES, REQUEST_TOO_LARGE
-        if scope.get("path") == SEGMENT_PATH:
-            return self.max_segment_body_bytes, REQUEST_TOO_LARGE
-        return self.max_json_body_bytes, REQUEST_TOO_LARGE
+        limits = {
+            SAFETY_PATH: self.max_safety_body_bytes,
+            SUGGEST_PATH: self.max_safety_body_bytes,
+            PROPOSE_PATH: TOPIC_MAX_BODY_BYTES,
+            EXPAND_PATH: TOPIC_MAX_BODY_BYTES,
+            CHECK_PATH: CHECK_MAX_BODY_BYTES,
+            SEGMENT_PATH: self.max_segment_body_bytes,
+        }
+        return limits.get(str(path), self.max_json_body_bytes), REQUEST_TOO_LARGE
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

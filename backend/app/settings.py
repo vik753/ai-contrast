@@ -108,6 +108,12 @@ class Settings(BaseSettings):
     - ``TURNSTILE_REPLAY_MAX_ENTRIES`` (1 to 10000), ``TURNSTILE_REPLAY_SECONDS``
       (at least 305: the 300 s challenge age plus skew): replay table.
     - ``CHECK_TABLE_MAX_KEYS``: client keys in each check limit table (fails closed when full).
+    - Topic AI endpoints (S7-T2, ADR 0017 point 6): ``TOPICS_PER_MINUTE``, ``TOPICS_PER_DAY``
+      (per client key, the three endpoints together), ``TOPIC_AI_DEADLINE_SECONDS`` (total per
+      AI call), ``SUGGEST_MAX_CHARS`` (clause text per suggest call),
+      ``FREE_TOPIC_CALLS_PER_IP_PER_DAY`` (free topic calls per /48 and day),
+      ``FREE_PASS_MAX_CALLS`` (calls per free pass), ``FREE_PASS_MAX_ENTRIES``
+      (live passes, 1 to 10000; the table fails closed when full).
     - In production the four free settings are all set or all unset, and the Cloudflare
       Turnstile test secrets (``1x…``, ``2x…``, ``3x…``) are refused.
 
@@ -205,6 +211,13 @@ class Settings(BaseSettings):
     turnstile_replay_max_entries: Annotated[int, Field(ge=1, le=10000)] = 10000
     turnstile_replay_seconds: Annotated[int, Field(ge=305)] = 600
     check_table_max_keys: PositiveInt = 50_000
+    topics_per_minute: PositiveInt = 10
+    topics_per_day: PositiveInt = 60
+    topic_ai_deadline_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 60.0
+    suggest_max_chars: PositiveInt = 60_000
+    free_topic_calls_per_ip_per_day: PositiveInt = 40
+    free_pass_max_calls: PositiveInt = 20
+    free_pass_max_entries: Annotated[int, Field(ge=1, le=10000)] = 10000
 
     max_file_bytes: PositiveInt = 10 * MIB
     max_json_body_bytes: PositiveInt = 64 * 1024

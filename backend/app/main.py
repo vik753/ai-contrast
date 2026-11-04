@@ -16,7 +16,16 @@ from fastapi.telemetry import TelemetryConfig
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import extract, google_doc, health, provider_check, safety_check, segment, topics
+from app.api import (
+    extract,
+    google_doc,
+    health,
+    provider_check,
+    safety_check,
+    segment,
+    topic_ai,
+    topics,
+)
 from app.api.provider_check import Clock
 from app.api.validation_errors import validation_error_handler
 from app.extraction.limiter import ExtractionLimiter
@@ -33,7 +42,7 @@ from app.settings import Settings
 from app.topics.catalog import load_catalog
 
 CORS_ALLOWED_METHODS = ["GET", "POST"]
-CORS_ALLOWED_HEADERS = ["Content-Type", "X-Provider-Key"]
+CORS_ALLOWED_HEADERS = ["Content-Type", "X-Provider-Key", "X-Free-Pass"]
 # Production is cross-origin: the browser may read `Retry-After` only if it is exposed.
 CORS_EXPOSED_HEADERS = ["Retry-After"]
 
@@ -98,6 +107,7 @@ def create_app(
         clock=clock,
     )
     topics.install(app, load_catalog(settings.topics_catalog_dir))
+    app.include_router(topic_ai.router)
 
     # A new guarded client per fetch; tests replace this attribute.
     app.state.google_client_factory = lambda: outbound_client(
