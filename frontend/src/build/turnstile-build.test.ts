@@ -43,7 +43,10 @@ describe("turnstile frame build (S6-T5 AC3)", () => {
       const src = readFileSync(root(f), "utf8");
       // Compare whole host-like tokens for equality (no substring match on a URL).
       const tokens = src.toLowerCase().split(/[^a-z0-9.-]+/);
-      expect(tokens.includes("challenges.cloudflare.com"), f).toBe(false);
+      expect(
+        tokens.some((t) => t === "challenges.cloudflare.com"),
+        f,
+      ).toBe(false);
       expect(src, f).not.toMatch(/createElement\(\s*["']script["']/);
     }
   });
