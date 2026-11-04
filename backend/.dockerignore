@@ -1,8 +1,0 @@
-# Allowlist: only what the image needs.
-*
-!pyproject.toml
-!uv.lock
-!log_config.json
-!app/
-app/**/__pycache__
-app/**/*.py[cod]

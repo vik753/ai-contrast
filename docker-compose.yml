@@ -21,7 +21,9 @@ name: ai-contrast
 services:
   backend:
     build:
-      context: ./backend
+      # The repository root: the image also holds shared/topics (ADR 0017).
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       # The image defaults to production (fail closed); local runs opt in to development.
       ENVIRONMENT: development

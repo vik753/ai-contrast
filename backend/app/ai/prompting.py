@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Final, Literal
 
 from app.ai.port import AIError, AIErrorCode, AIRequest
+from app.pseudo.gate import PseudonymizedDocument
 
 __all__ = ["CHECK_MAX_TOKENS", "CHECK_PROBE", "Message", "build_messages"]
 
@@ -32,9 +33,9 @@ class Message:
     content: str
 
 
-def _document_text(request: AIRequest) -> str:
+def _document_text(document: PseudonymizedDocument) -> str:
     lines: list[str] = []
-    for number, clause in enumerate(request.document.clauses, 1):
+    for number, clause in enumerate(document.clauses, 1):
         clause_id = clause.id if _SAFE_ID.fullmatch(clause.id) else f"c{number}"
         lines.append(f"[{clause_id}]\n{clause.text}")
     return "\n\n".join(lines)
@@ -47,7 +48,9 @@ def _instructions(request: AIRequest) -> str:
 
 
 def _blocks(request: AIRequest) -> list[tuple[str, str]]:
-    blocks = [("DOCUMENT", _document_text(request))]
+    blocks: list[tuple[str, str]] = []
+    if request.document is not None:
+        blocks.append(("DOCUMENT", _document_text(request.document)))
     if request.text is not None:
         blocks.append(("TEXT", request.text.text))
     if request.topic is not None:

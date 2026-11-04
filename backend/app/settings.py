@@ -8,6 +8,7 @@ so a startup failure cannot print a secret.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, PositiveInt, SecretStr, field_validator, model_validator
@@ -26,6 +27,9 @@ from app.extraction.model import (
 )
 
 DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173"]
+# Topic catalog (ADR 0017): `shared/topics/` at the repository root. The Docker image sets
+# `TOPICS_CATALOG_DIR` to its own copy.
+DEFAULT_TOPICS_CATALOG_DIR = Path(__file__).resolve().parents[2] / "shared" / "topics"
 # A Cloudflare account ID: 32 lower-case hex characters. It is part of the free-mode URL.
 CF_ACCOUNT_ID_RE = re.compile(r"[0-9a-f]{32}", re.ASCII)
 # Cloudflare's documented dummy Turnstile secrets: they accept or refuse every token.
@@ -161,6 +165,10 @@ class Settings(BaseSettings):
     - ``MAX_PDF_PAGES``: pages of one PDF, checked before extraction.
     - ``MAX_PDF_PREV_CHAIN``: ``/Prev`` links of the cross-reference chain.
 
+    Topics (ADR 0017): ``TOPICS_CATALOG_DIR`` is the directory of the domain files
+    (default ``shared/topics`` at the repository root). The server refuses to start when
+    the catalog is invalid.
+
     Google Docs by public link (positive, finite numbers of seconds, S3-T6, ADR 0012):
 
     - ``GOOGLE_FETCH_TIMEOUT_SECONDS``: total deadline of one fetch, redirects included.
@@ -181,6 +189,8 @@ class Settings(BaseSettings):
         default_factory=lambda: list(DEFAULT_ALLOWED_ORIGINS)
     )
     allow_private_provider_urls: bool = False
+
+    topics_catalog_dir: Path = DEFAULT_TOPICS_CATALOG_DIR
 
     cf_account_id: SecretStr | None = None
     cf_ai_token: SecretStr | None = None

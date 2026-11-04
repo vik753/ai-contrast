@@ -52,26 +52,47 @@ class CheckResult:
     ok: bool
 
 
+# Field set of each template: (document, topic, text) each "required", "optional" or "forbidden"
+# (ADR 0017 point 5; ADR 0009: attribute proposal and synonym expansion take no document).
+_FIELD_SETS: dict[PromptTemplate, tuple[str, str, str]] = {
+    PromptTemplate.DOCUMENT_JSON: ("required", "optional", "optional"),
+    PromptTemplate.SUGGEST_TOPICS: ("required", "forbidden", "forbidden"),
+    PromptTemplate.PROPOSE_ATTRIBUTES: ("forbidden", "required", "forbidden"),
+    PromptTemplate.EXPAND_SYNONYMS: ("forbidden", "required", "forbidden"),
+}
+
+
 @dataclass(frozen=True)
 class AIRequest:
     template: PromptTemplate
-    document: PseudonymizedDocument
     schema: type[BaseModel]
     max_tokens: int
+    document: PseudonymizedDocument | None = None
     text: PseudonymizedText | None = None
     topic: ConfirmedTopic | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.template, PromptTemplate):
+            raise TypeError("template has a wrong type")  # noqa: TRY003
         checks = (
-            (self.template, PromptTemplate),
             (self.document, PseudonymizedDocument),
+            (self.text, PseudonymizedText),
+            (self.topic, ConfirmedTopic),
         )
-        optional = ((self.text, PseudonymizedText), (self.topic, ConfirmedTopic))
-        if not all(isinstance(value, kind) for value, kind in checks):
-            raise TypeError("template or document has a wrong type")  # noqa: TRY003
-        if not all(value is None or isinstance(value, kind) for value, kind in optional):
-            raise TypeError("text or topic has a wrong type")  # noqa: TRY003
-        if self.text is not None and self.text.source != document_digest(self.document):
+        if not all(value is None or isinstance(value, kind) for value, kind in checks):
+            raise TypeError("document, text or topic has a wrong type")  # noqa: TRY003
+        for value, rule in zip(
+            (self.document, self.topic, self.text), _FIELD_SETS[self.template], strict=True
+        ):
+            if (rule == "required" and value is None) or (
+                rule == "forbidden" and value is not None
+            ):
+                raise TypeError("the fields do not fit the template")  # noqa: TRY003
+        if (
+            self.text is not None
+            and self.document is not None
+            and self.text.source != document_digest(self.document)
+        ):
             raise ValueError("text belongs to another document")  # noqa: TRY003
         if not (isinstance(self.schema, type) and issubclass(self.schema, BaseModel)):
             raise TypeError("schema must be a pydantic model class")  # noqa: TRY003

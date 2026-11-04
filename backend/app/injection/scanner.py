@@ -1,0 +1,220 @@
+"""Layer 2 detector: text addressed to an AI, special tokens, look-alikes (ADR 0009, ADR 0017).
+
+The input is Layer 1 clean text. Matching runs on a view of the text: NFKC, the confusable
+skeleton and lower case (``app.pseudo.matching.fold``), so homoglyph and full-width variants
+meet the same pattern. Every pattern is linear in the text: fixed strings are found with
+``str.find``; a word rule looks at a window of at most ``WINDOW`` characters after an anchor
+word; the placeholder and base64 patterns are single bounded repeats. Hit spans are offsets
+into the input text. A text with more than ``MAX_HITS`` hits keeps the first ones and is
+still flagged (a cap fails closed). Nothing here logs or returns text.
+"""
+
+from __future__ import annotations
+
+import re
+from array import array
+from bisect import bisect_left, bisect_right
+from dataclasses import dataclass
+from typing import Final, Literal
+
+from app.injection import patterns as p
+from app.pseudo.matching import fold
+
+__all__ = ["Hit", "scan"]
+
+WINDOW: Final = 100
+FOLLOW_WORDS: Final = 5
+MAX_TARGET_DISTANCE: Final = 4
+MAX_AS_DISTANCE: Final = 4
+MAX_TOKEN_CHARS: Final = 40
+_PLACEHOLDER_MIN_LETTER_DOT: Final = 2
+
+_WORD: Final = re.compile(r"[^\W_]+")
+_TOKEN_BODY: Final = re.compile(r"[a-z0-9_ ]{1,40}\|>")
+_PLACEHOLDER: Final = re.compile(r"[^\[\]\s]{1,40}\]")
+_BASE64: Final = re.compile(rf"[A-Za-z0-9+/]{{{p.BASE64_MIN_RUN},}}={{0,2}}")
+
+Cls = Literal["heuristic", "high"]
+
+
+@dataclass(frozen=True, slots=True)
+class Hit:
+    """A match: class and ``[start, end)`` offsets into the scanned text."""
+
+    cls: Cls
+    start: int
+    end: int
+
+
+class _WordSet:
+    """Folded whole words and folded stems."""
+
+    def __init__(self, entries: tuple[str, ...]) -> None:
+        self.exact = frozenset(fold(e) for e in entries if not e.endswith("*"))
+        self.stems = tuple(fold(e[:-1]) for e in entries if e.endswith("*"))
+
+    def __contains__(self, word: str) -> bool:
+        return word in self.exact or word.startswith(self.stems)
+
+
+_IGNORE = _WordSet(p.IGNORE_VERBS)
+_TARGETS = _WordSet(p.INSTRUCTION_TARGETS)
+_SYSTEM = _WordSet(p.SYSTEM_WORDS)
+_PROMPT = _WordSet(p.PROMPT_WORDS)
+_RATE = _WordSet(p.RATE_VERBS)
+_AS = _WordSet(p.AS_WORDS)
+_DEEMED = _WordSet(p.DEEMED_WORDS)
+_RATING = _WordSet(p.RATING_WORDS)
+_FIXED = tuple(fold(token) for token in p.FIXED_TOKENS)
+_ROLES = tuple(fold(label) for label in p.ROLE_LABELS)
+
+# A raw hit in view coordinates: start, end, class, kind ("instruction" or "rating" take part
+# in the combination rule).
+_Raw = tuple[int, int, Cls, str]
+
+
+def _view(text: str) -> tuple[str, array[int] | None]:
+    """The matching view and, when its length differs from ``text``, the source offsets."""
+    if text.isascii():
+        return fold(text), None
+    cache: dict[str, str] = {}
+    pieces: list[str] = []
+    for char in text:
+        piece = cache.get(char)
+        if piece is None:
+            piece = cache[char] = fold(char)
+        pieces.append(piece)
+    view = "".join(pieces)
+    if len(view) == len(text):
+        return view, None
+    source: array[int] = array("i")
+    for index, piece in enumerate(pieces):
+        source.extend([index] * len(piece))
+    return view, source
+
+
+def _find_all(view: str, needle: str) -> list[int]:
+    found: list[int] = []
+    position = view.find(needle)
+    while position != -1:
+        found.append(position)
+        position = view.find(needle, position + 1)
+    return found
+
+
+def _fixed(view: str, out: list[_Raw]) -> None:
+    for token in _FIXED:
+        out.extend((i, i + len(token), "high", "token") for i in _find_all(view, token))
+    for i in _find_all(view, "<|"):
+        body = _TOKEN_BODY.match(view, i + 2, i + 2 + MAX_TOKEN_CHARS + 2)
+        if body is not None:
+            out.append((i, body.end(), "high", "token"))
+
+
+def _role_labels(view: str, out: list[_Raw]) -> None:
+    for label in _ROLES:
+        for i in _find_all(view, label):
+            back = i
+            while back > 0 and i - back < MAX_AS_DISTANCE and view[back - 1] in " \t":
+                back -= 1
+            if back == 0 or view[back - 1] == "\n":
+                out.append((i, i + len(label), "high", "token"))
+
+
+def _placeholders(view: str, out: list[_Raw]) -> None:
+    for i in _find_all(view, "["):
+        body = _PLACEHOLDER.match(view, i + 1)
+        if body is None:
+            continue
+        content = body.group()[:-1]
+        letter_dot = (
+            len(content) >= _PLACEHOLDER_MIN_LETTER_DOT
+            and content[0].isalpha()
+            and content[1] == "."
+        )
+        if "_" in content or letter_dot:
+            out.append((i, body.end(), "heuristic", "placeholder"))
+
+
+def _follow(view: str, start: int) -> list[tuple[str, int, int]]:
+    """Up to ``FOLLOW_WORDS`` words after ``start``, within ``WINDOW`` characters."""
+    words: list[tuple[str, int, int]] = []
+    for match in _WORD.finditer(view, start, start + WINDOW):
+        words.append((match.group(), match.start(), match.end()))
+        if len(words) == FOLLOW_WORDS:
+            break
+    return words
+
+
+def _first(follow: list[tuple[str, int, int]], words: _WordSet, limit: int) -> int | None:
+    for index, (word, _, _) in enumerate(follow[:limit]):
+        if word in words:
+            return index
+    return None
+
+
+def _word_rules(view: str, out: list[_Raw]) -> None:
+    for anchor in _WORD.finditer(view):
+        word = anchor.group()
+        if word in _IGNORE:
+            follow = _follow(view, anchor.end())
+            target = _first(follow, _TARGETS, MAX_TARGET_DISTANCE)
+            if target is not None:
+                out.append((anchor.start(), follow[target][2], "heuristic", "instruction"))
+        elif word in _SYSTEM:
+            follow = _follow(view, anchor.end())
+            if follow and follow[0][0] in _PROMPT:
+                out.append((anchor.start(), follow[0][2], "heuristic", "instruction"))
+        elif word in _RATE:
+            follow = _follow(view, anchor.end())
+            at = _first(follow, _AS, MAX_AS_DISTANCE)
+            if at is not None and at + 1 < len(follow) and follow[at + 1][0] in _RATING:
+                out.append((anchor.start(), follow[at + 1][2], "heuristic", "rating"))
+        elif word in _DEEMED:
+            follow = _follow(view, anchor.end())
+            if follow and follow[0][0] in _RATING:
+                out.append((anchor.start(), follow[0][2], "heuristic", "rating"))
+
+
+def _combine(raw: list[_Raw]) -> list[_Raw]:
+    """An instruction to an AI near a rating command: both become high class."""
+    ratings = sorted(start for start, _, _, kind in raw if kind == "rating")
+    if not ratings:
+        return raw
+    near: set[int] = set()
+    for start, end, _, kind in raw:
+        if kind != "instruction":
+            continue
+        low = bisect_left(ratings, start - p.COMBINE_DISTANCE)
+        high = bisect_right(ratings, end + p.COMBINE_DISTANCE)
+        if low < high:
+            near.add(start)
+            near.update(ratings[low:high])
+    return [
+        (s, e, "high" if kind in {"instruction", "rating"} and s in near else cls, kind)
+        for s, e, cls, kind in raw
+    ]
+
+
+def scan(text: str) -> list[Hit]:
+    """All Layer 2 hits of ``text``, sorted by start. Empty list: no hit."""
+    view, source = _view(text)
+    raw: list[_Raw] = []
+    _fixed(view, raw)
+    _role_labels(view, raw)
+    _placeholders(view, raw)
+    _word_rules(view, raw)
+    raw = _combine(raw)[: p.MAX_HITS]
+    hits: set[Hit] = set()
+    for start, end, cls, _ in raw:
+        if source is None:
+            hits.add(Hit(cls, start, end))
+        else:
+            hits.add(Hit(cls, source[start], source[end - 1] + 1))
+    for match in _BASE64.finditer(text):
+        # A blob mixes many characters; a run of one repeated letter is not one.
+        if len(set(match.group())) >= p.BASE64_MIN_DISTINCT:
+            hits.add(Hit("heuristic", match.start(), match.end()))
+            if len(hits) >= p.MAX_HITS:
+                break
+    return sorted(hits, key=lambda h: (h.start, h.end, h.cls))

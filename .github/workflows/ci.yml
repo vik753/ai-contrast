@@ -141,7 +141,7 @@ jobs:
           persist-credentials: false
 
       - name: Build backend image
-        run: docker build --pull -t ai-contrast-backend:ci backend
+        run: docker build --pull -f backend/Dockerfile -t ai-contrast-backend:ci .
 
       - name: Image runs as a non-root user
         # Config.User is "user", "uid", "user:group" or "uid:gid"; check the user part.

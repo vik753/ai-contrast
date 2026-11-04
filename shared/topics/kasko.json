@@ -121,8 +121,8 @@
     },
     {
       "id": "repair_method",
-      "names": {"en": "Repair: dealer or cash", "uk": "Ремонт: дилер чи грошова виплата", "ru": "Ремонт: дилер или денежная выплата"},
-      "descriptions": {"en": "How the loss is settled: repair at a chosen service, or payment by estimate.", "uk": "Як врегульовується збиток: ремонт на СТО чи виплата за калькуляцією.", "ru": "Как урегулируется убыток: ремонт на СТО или выплата по калькуляции."},
+      "names": {"en": "Repair - dealer or cash", "uk": "Ремонт - дилер чи грошова виплата", "ru": "Ремонт - дилер или денежная выплата"},
+      "descriptions": {"en": "How the loss is settled - repair at a chosen service, or payment by estimate.", "uk": "Як врегульовується збиток - ремонт на СТО чи виплата за калькуляцією.", "ru": "Как урегулируется убыток - ремонт на СТО или выплата по калькуляции."},
       "synonyms": {
         "en": ["dealer repair", "authorised service", "repair shop", "cash settlement", "estimate", "original parts", "repair cost"],
         "uk": ["офіційн дилер", "станці технічн обслуговуван", "сто ", "калькуляц", "оригінальн запчастин", "грошов виплат", "вартість ремонт"],
@@ -171,7 +171,7 @@
     {
       "id": "theft_conditions",
       "names": {"en": "Theft conditions", "uk": "Умови щодо крадіжки", "ru": "Условия по краже"},
-      "descriptions": {"en": "Extra conditions for theft payouts: keys, anti-theft devices, waiting period.", "uk": "Додаткові умови виплати за крадіжку: ключі, протиугінні засоби, очікування.", "ru": "Дополнительные условия выплаты за кражу: ключи, противоугонные средства, ожидание."},
+      "descriptions": {"en": "Extra conditions for theft payouts - keys, anti-theft devices, waiting period.", "uk": "Додаткові умови виплати за крадіжку - ключі, протиугінні засоби, очікування.", "ru": "Дополнительные условия выплаты за кражу - ключи, противоугонные средства, ожидание."},
       "synonyms": {
         "en": ["theft", "stolen", "hijacking", "anti-theft", "immobilizer", "keys", "waiting period"],
         "uk": ["крадіжк", "викрадення", "угон", "протиугон", "іммобілайзер", "ключ", "період очікуван"],
@@ -192,7 +192,7 @@
     {
       "id": "territory",
       "names": {"en": "Territory", "uk": "Територія дії", "ru": "Территория действия"},
-      "descriptions": {"en": "Where the policy applies: Ukraine, Europe, other regions.", "uk": "Де діє поліс: Україна, Європа, інші регіони.", "ru": "Где действует полис: Украина, Европа, другие регионы."},
+      "descriptions": {"en": "Where the policy applies - Ukraine, Europe, other regions.", "uk": "Де діє поліс - Україна, Європа, інші регіони.", "ru": "Где действует полис - Украина, Европа, другие регионы."},
       "synonyms": {
         "en": ["territory", "geographical scope", "territorial limits", "europe", "abroad", "temporarily occupied"],
         "uk": ["територі", "територіальн", "географічн", "європ", "за кордон", "тимчасово окупован"],
@@ -212,7 +212,7 @@
     {
       "id": "drivers_allowed",
       "names": {"en": "Permitted drivers", "uk": "Допущені до керування", "ru": "Допущенные к управлению"},
-      "descriptions": {"en": "Who may drive: anyone, named drivers, or age and experience limits.", "uk": "Хто може керувати: будь-хто, названі особи або обмеження за віком і стажем.", "ru": "Кто может управлять: любой, названные лица или ограничения по возрасту и стажу."},
+      "descriptions": {"en": "Who may drive - anyone, named drivers, or age and experience limits.", "uk": "Хто може керувати - будь-хто, названі особи або обмеження за віком і стажем.", "ru": "Кто может управлять - любой, названные лица или ограничения по возрасту и стажу."},
       "synonyms": {
         "en": ["permitted driver", "named driver", "authorised driver", "driving experience", "driver age", "any driver"],
         "uk": ["допущен до керуван", "водії", "водій", "стаж", "вік водія", "необмежен коло"],

@@ -16,7 +16,8 @@ from fastapi.telemetry import TelemetryConfig
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import extract, google_doc, health, provider_check, safety_check, segment
+from app.api import extract, google_doc, health, provider_check, safety_check, segment, topics
+from app.api.provider_check import Clock
 from app.api.validation_errors import validation_error_handler
 from app.extraction.limiter import ExtractionLimiter
 from app.limits.slots import ClientSlots
@@ -26,8 +27,10 @@ from app.middleware import (
     ErrorCatcherMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.net.ai_client import AITransport
 from app.net.client import outbound_client
 from app.settings import Settings
+from app.topics.catalog import load_catalog
 
 CORS_ALLOWED_METHODS = ["GET", "POST"]
 CORS_ALLOWED_HEADERS = ["Content-Type", "X-Provider-Key"]
@@ -51,8 +54,18 @@ NET_LOGGERS = ("httpx", "httpcore", "httpx2", "httpcore2")
 GOOGLE_READ_TIMEOUT_SECONDS = 10.0
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    """Build the app. Does not configure logging: the server entry point does that."""
+def create_app(
+    settings: Settings | None = None,
+    *,
+    provider_transport: AITransport | None = None,
+    turnstile_transport: AITransport | None = None,
+    clock: Clock | None = None,
+) -> FastAPI:
+    """Build the app. Does not configure logging: the server entry point does that.
+
+    The keyword arguments are test hooks for the check endpoint (fake transports and clock).
+    Startup fails when the topic catalog is invalid (ADR 0017).
+    """
     if settings is None:
         settings = Settings()
 
@@ -77,7 +90,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # One limiter per app: extractions in progress on this server (T6, ADR 0010).
     app.state.extraction_limiter = ExtractionLimiter(settings.max_concurrent_extractions)
     app.state.client_slots = ClientSlots(settings.max_extractions_per_client)
-    provider_check.install(app, settings)
+    provider_check.install(
+        app,
+        settings,
+        provider_transport=provider_transport,
+        turnstile_transport=turnstile_transport,
+        clock=clock,
+    )
+    topics.install(app, load_catalog(settings.topics_catalog_dir))
 
     # A new guarded client per fetch; tests replace this attribute.
     app.state.google_client_factory = lambda: outbound_client(

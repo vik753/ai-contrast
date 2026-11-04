@@ -44,7 +44,7 @@
     {
       "id": "policy_territory",
       "names": {"en": "Territory and policy period", "uk": "Територія та строк дії полісу", "ru": "Территория и срок действия полиса"},
-      "descriptions": {"en": "Where the policy applies and for how long (Ukraine, Green Card countries).", "uk": "Де та як довго діє поліс (Україна, країни «Зеленої картки»).", "ru": "Где и как долго действует полис (Украина, страны «Зелёной карты»)."},
+      "descriptions": {"en": "Where the policy applies and for how long (Ukraine, Green Card countries).", "uk": "Де та як довго діє поліс (Україна, країни Зеленої картки).", "ru": "Где и как долго действует полис (Украина, страны Зелёной карты)."},
       "synonyms": {
         "en": ["territory", "policy period", "validity", "green card", "international"],
         "uk": ["територі", "строк дії", "термін дії", "зелен картк", "дія полісу", "міжнародн"],
@@ -54,7 +54,7 @@
         {"id": "territory_scope", "labels": {"en": "Territory", "uk": "Територія", "ru": "Территория"}, "type": "categories",
           "values": [
             {"id": "ukraine", "labels": {"en": "Ukraine", "uk": "Україна", "ru": "Украина"}},
-            {"id": "green_card", "labels": {"en": "Green Card countries", "uk": "Країни «Зеленої картки»", "ru": "Страны «Зелёной карты»"}},
+            {"id": "green_card", "labels": {"en": "Green Card countries", "uk": "Країни Зеленої картки", "ru": "Страны Зелёной карты"}},
             {"id": "other", "labels": {"en": "Other countries", "uk": "Інші країни", "ru": "Другие страны"}}
           ],
           "directions": {"insured": "more_better", "insurer": "fewer_better", "injured_party": "more_better"}},

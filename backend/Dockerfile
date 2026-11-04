@@ -1,5 +1,6 @@
 # AI Contrast backend image.
-# Build:  docker build -t ai-contrast-backend backend/
+# Build:  docker build -f backend/Dockerfile -t ai-contrast-backend .
+#         (the context is the repository root: the image also holds shared/topics)
 # Run:    docker run --rm -p 127.0.0.1:8000:8000 \
 #           -e ALLOWED_ORIGINS=https://app.example ai-contrast-backend
 #         (production mode by default; ALLOWED_ORIGINS with https origins is required)
@@ -25,11 +26,13 @@ WORKDIR /app
 
 # Dependencies first (better layer cache). `--locked` fails if uv.lock is out of date;
 # uv.lock pins every package with hashes. No dev dependencies in the image.
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --locked --no-dev
 
-COPY log_config.json ./
-COPY app ./app
+COPY backend/log_config.json ./
+COPY backend/app ./app
+# The topic catalog (ADR 0017); the runtime stage points TOPICS_CATALOG_DIR at it.
+COPY shared/topics ./shared/topics
 RUN python -m compileall -q app
 
 # ---- runtime: no uv, no build tools, non-root ----
@@ -40,6 +43,7 @@ FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c
 # origins) to be set, so the container does not start without it.
 # Local development (Docker Compose) sets ENVIRONMENT=development explicitly.
 ENV ENVIRONMENT=production \
+    TOPICS_CATALOG_DIR=/app/shared/topics \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:${PATH}"
