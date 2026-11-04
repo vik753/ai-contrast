@@ -51,8 +51,9 @@ def test_confirm_topic_keeps_the_whole_definition() -> None:
                 label="Cover",
                 type="enum",
                 values=("Yes", "No"),
+                value_ids=("yes", "no"),
                 direction="ordered",
-                order=("Yes", "No"),
+                order=("yes", "no"),
             ),
         ),
         synonyms_en=("towing", "tow truck"),
@@ -68,7 +69,9 @@ def test_confirm_topic_keeps_the_whole_definition() -> None:
     assert topic.attributes[0].units == ("UAH",)
     assert topic.attributes[0].direction == "higher_better"
     assert topic.attributes[1].values == ("City", "Region")
-    assert topic.attributes[2].order == ("Yes", "No")
+    assert topic.attributes[2].order == ("yes", "no")
+    assert topic.attributes[2].value_ids == ("yes", "no")
+    assert topic.attributes[2].values == ("Yes", "No")
     assert topic.synonyms_en == ("towing", "tow truck")
     assert topic.synonyms_uk == ("евакуатор",)
     assert topic.synonyms_ru == ("эвакуатор",)
@@ -211,7 +214,7 @@ def test_confirm_topic_direction_that_does_not_fit_the_type_is_refused(
 
 
 def test_confirm_topic_enum_order_must_be_a_permutation_of_the_values() -> None:
-    bad = attribute(type="enum", values=("Yes", "No"), direction="ordered", order=("Yes",))
+    bad = attribute(type="enum", values=("Yes", "No"), direction="ordered", order=("v0",))
 
     assert refused(attributes=(bad,)) == "invalid_topic_definition"
 

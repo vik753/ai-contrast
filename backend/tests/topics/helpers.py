@@ -31,6 +31,8 @@ def definition(**changes: Any) -> TopicDefinition:
 
 def attribute(**changes: Any) -> AttributeDefinition:
     base: dict[str, Any] = {"id": "limit", "label": "Towing limit", "type": "amount"}
+    if "values" in changes and "value_ids" not in changes:
+        changes["value_ids"] = tuple(f"v{n}" for n in range(len(changes["values"])))
     return AttributeDefinition(**{**base, **changes})
 
 
