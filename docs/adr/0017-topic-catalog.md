@@ -18,13 +18,14 @@ This is the first stage with real prompts. Topic text crosses documents (it is t
 - **Domain:** `id`, names in `en`/`uk`/`ru`, `sides` (closed list per domain with names in three languages: `kasko` and `property_insurance`: `insured`, `insurer`; `osago`: `insured`, `insurer`, `injured_party`; `lease`: `tenant`, `landlord`), and `topics`.
 - **Topic:** `id` (`[a-z][a-z0-9_]{1,47}`), names and a one-line description in three languages, `synonyms` per language (stems and phrases for stage 8 keyword tags, at most 40 per language, each at most 60 characters), and `attributes` (1–12).
 - **Attribute:** `id`, labels in three languages, `type` one of:
-  - `amount` (number with a currency from a closed list: `UAH`, `USD`, `EUR`, plus `percent_of_sum` where the contract states a share of the sum insured),
+  - `amount` (number with a unit from a closed list: `UAH`, `USD`, `EUR`, `percent_of_sum` for a share of the sum insured, `percent_of_loss` for a share of each loss),
   - `percentage`,
-  - `duration` (number with a unit from `days`, `working_days`, `months`, `years`),
+  - `duration` (number with a unit from `hours`, `days`, `working_days`, `months`, `years`),
   - `enum` (closed values; the shared coverage enum is `covered`, `not_covered`, `conditional`, `not_stated`),
   - `categories` (a list from a closed set given in the attribute, labels in three languages),
   - `text` (anything else; never compared by code);
   - and `direction` per side: `lower_better`, `higher_better`, `none`; for `enum`, an explicit order of values per side or `none`; for `categories`, `more_better`, `fewer_better` or `none`. `text` is always `none`.
+- **Field names** (JSON): domain `{id, names, sides, topics}`; side `{id, names}`; topic `{id, names, descriptions, synonyms, attributes}` (language maps `en`/`uk`/`ru`); attribute `{id, labels, type, directions, units?, values?}` with `directions` mapping side id to direction; `enum`/`categories` values as `{id, labels}`; an enum direction is an ordered list of value ids, best first.
 - Every catalog text must pass `confirm_topic()` (a loader test). Caps (fail closed in the loader and in a test): at most 30 topics per domain, 12 attributes per topic, 30 enum or category values per attribute, 200 characters per name, label or description.
 
 ### 2. Catalog API
