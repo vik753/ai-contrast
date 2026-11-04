@@ -34,6 +34,7 @@ _MAX_PATH: Final = 256
 _SCHEME: Final = "https://"
 _HTTPS_PORT: Final = "443"
 _FREE_URL: Final = "https://api.cloudflare.com/client/v4/accounts/{}/ai/v1"
+_NUMERIC_LABEL_RE: Final = re.compile(r"[0-9]+|0[xX][0-9a-fA-F]*", re.ASCII)
 _ACCOUNT_ID_RE: Final = re.compile(r"[0-9a-f]{32}", re.ASCII)
 # Development only (``ALLOW_PRIVATE_PROVIDER_URLS``): a host name or IP literal, any port.
 _PRIVATE_AUTHORITY_RE: Final = re.compile(
@@ -135,6 +136,10 @@ def is_ip_literal_url(url: str) -> bool:
         host = authority[1:].split("]", 1)[0]
     else:
         host = authority.split(":", 1)[0]
+    host = host.removesuffix(".")
+    if _NUMERIC_LABEL_RE.fullmatch(host.rsplit(".", 1)[-1]):
+        # A numeric last label is an IPv4 form (decimal, hex, octal, short, trailing dot).
+        return True
     try:
         ipaddress.ip_address(host)
     except ValueError:

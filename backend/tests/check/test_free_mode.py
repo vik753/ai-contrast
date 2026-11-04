@@ -6,9 +6,9 @@ import json
 
 import httpx2
 import pytest
-from app.limits.free import CHECK_NEURONS
 from pydantic import ValidationError
 
+from app.limits.free import CHECK_NEURONS
 from app.settings import Settings
 from tests.ai.helpers import error_reply, model_reply
 from tests.check.helpers import (
@@ -136,11 +136,13 @@ def test_free_success_calls_cloudflare_with_our_token_and_the_fixed_model() -> N
     assert CF_TOKEN not in seen.url + seen.body.decode()
 
 
-def test_free_ignores_a_model_given_by_the_client() -> None:
+def test_free_with_a_model_from_the_client_returns_unexpected_model() -> None:
     rig = free_rig()
     response = rig.check({"provider": "free", "model": "evil-model", "turnstile_token": "t"})
-    assert response.status_code == 200
-    assert json.loads(rig.upstream.seen[0].body)["model"] == FREE_MODEL
+    assert response.status_code == 422
+    assert response.json() == {"error": "unexpected_model"}
+    assert rig.upstream.seen == []
+    assert rig.turnstile.seen == []
 
 
 def test_free_base_url_from_the_client_is_refused() -> None:

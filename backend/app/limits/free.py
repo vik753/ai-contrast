@@ -88,3 +88,7 @@ class FreeQuota:
         """Replace the reserved ``estimate`` by the ``actual`` Neurons (never below 0 spent)."""
         self._roll()
         self._spent = max(0, self._spent - estimate + max(0, actual))
+
+    def refund_call(self, key: str) -> None:
+        """Undo the per-key call of a reserve whose model did no work (never below 0)."""
+        self._calls.refund(key)

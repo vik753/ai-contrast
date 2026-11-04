@@ -9,10 +9,10 @@ from datetime import UTC, datetime
 
 import httpx2
 import pytest
-from app.limits.free import FreeQuota
-from app.net.turnstile import TurnstileError, TurnstileVerdict, verify
 from pydantic import SecretStr
 
+from app.limits.free import FreeQuota
+from app.net.turnstile import TurnstileError, TurnstileVerdict, verify
 from tests.ai.helpers import FakeUpstream
 from tests.check.helpers import DAY, DEFAULT_TOKEN, NOW, TS_SECRET, Clock
 

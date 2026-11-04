@@ -28,6 +28,8 @@ from app.extraction.model import (
 DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173"]
 # A Cloudflare account ID: 32 lower-case hex characters. It is part of the free-mode URL.
 CF_ACCOUNT_ID_RE = re.compile(r"[0-9a-f]{32}", re.ASCII)
+# Cloudflare's documented dummy Turnstile secrets: they accept or refuse every token.
+CF_TEST_SECRET_RE = re.compile(r"[123]x0{31}AA", re.ASCII)
 
 
 # An origin is exactly `scheme://host[:port]` (lowercase after normalization).
@@ -99,7 +101,11 @@ class Settings(BaseSettings):
     - ``FREE_NEURON_BUDGET``: global free-mode budget per day, in Neurons (1 to 9999; the
       Cloudflare free allowance is 10000).
     - ``MAX_CONCURRENT_CHECKS``: checks in flight per server.
-    - ``TURNSTILE_REPLAY_MAX_ENTRIES`` (1 to 10000), ``TURNSTILE_REPLAY_SECONDS``: replay table.
+    - ``TURNSTILE_REPLAY_MAX_ENTRIES`` (1 to 10000), ``TURNSTILE_REPLAY_SECONDS``
+      (at least 305: the 300 s challenge age plus skew): replay table.
+    - ``CHECK_TABLE_MAX_KEYS``: client keys in each check limit table (fails closed when full).
+    - In production the four free settings are all set or all unset, and the Cloudflare
+      Turnstile test secrets (``1x…``, ``2x…``, ``3x…``) are refused.
 
     Upload limits (positive integers, threat model T4 and T6, ADR 0010):
 
@@ -187,7 +193,8 @@ class Settings(BaseSettings):
     free_neuron_budget: Annotated[int, Field(ge=1, le=9999)] = 8000
     max_concurrent_checks: PositiveInt = 2
     turnstile_replay_max_entries: Annotated[int, Field(ge=1, le=10000)] = 10000
-    turnstile_replay_seconds: PositiveInt = 600
+    turnstile_replay_seconds: Annotated[int, Field(ge=305)] = 600
+    check_table_max_keys: PositiveInt = 50_000
 
     max_file_bytes: PositiveInt = 10 * MIB
     max_json_body_bytes: PositiveInt = 64 * 1024
@@ -256,6 +263,19 @@ class Settings(BaseSettings):
     def _production_rules(self) -> Self:
         if self.environment != "production":
             return self
+        free = (
+            self.cf_account_id,
+            self.cf_ai_token,
+            self.turnstile_secret_key,
+            self.turnstile_expected_hostname,
+        )
+        if any(item is not None for item in free) and any(item is None for item in free):
+            msg = "free mode settings must be all set or all unset in production"
+            raise ValueError(msg)
+        secret = self.turnstile_secret_key
+        if secret is not None and CF_TEST_SECRET_RE.fullmatch(secret.get_secret_value()):
+            msg = "a Cloudflare test Turnstile secret is not allowed in production"
+            raise ValueError(msg)
         if self.allow_private_provider_urls:
             msg = "allow_private_provider_urls must be false in production"
             raise ValueError(msg)

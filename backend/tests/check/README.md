@@ -6,7 +6,7 @@ Run: `cd backend && uv run --locked pytest tests/check -q`. All tests fail until
 ## Endpoint
 
 `POST /api/provider/check`, JSON body, header `X-Provider-Key` (not for `free`).
-Body fields: `provider` (a `PresetId` value), `model` (required except for `free`; for `free` the model is fixed and any given value is ignored), `base_url` (`custom` only), `turnstile_token` (`free` only). Unknown fields are refused. Body cap 4096 bytes.
+Body fields: `provider` (a `PresetId` value), `model` (required except for `free`; for `free` the model is fixed and any given value is refused with `422 unexpected_model`), `base_url` (`custom` only), `turnstile_token` (`free` only). Unknown fields are refused. Body cap 4096 bytes.
 
 | Case | Status | Body |
 | --- | --- | --- |

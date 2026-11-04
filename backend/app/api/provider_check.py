@@ -39,8 +39,9 @@ from app.api.provider_key import ProviderKeyHeader, provider_key_header
 from app.extraction.limiter import ExtractionLimiter
 from app.http_limits import CHECK_PATH
 from app.limits.client_ip import client_key, daily_key
-from app.limits.free import CHECK_NEURONS, FreeQuota
+from app.limits.free import CHECK_NEURONS, DAY_SECONDS, FreeQuota
 from app.limits.replay import ReplayTable
+from app.limits.slots import ClientSlots
 from app.limits.window import FixedWindowLimiter
 from app.net.ai_client import AITransport, private_ai_transport
 from app.net.turnstile import TurnstileError, TurnstileVerdict, verify
@@ -52,12 +53,10 @@ Clock = Callable[[], float]
 
 BUSY_RETRY_AFTER_SECONDS: Final = 5
 BODY_TIMEOUT_SECONDS: Final = 5.0
-TABLE_KEYS: Final = 50_000
 MAX_TOKEN_CHARS: Final = 2048
 CHALLENGE_MAX_AGE_SECONDS: Final = 300.0
 CHALLENGE_FUTURE_SKEW_SECONDS: Final = 5.0
 MINUTE_SECONDS: Final = 60
-DAY_SECONDS: Final = 86400
 
 _STATUS: Final = {
     AIErrorCode.PROVIDER_AUTH_FAILED: 401,
@@ -89,11 +88,29 @@ class CheckBody(BaseModel):
 
 
 class CheckState:
-    """Per-app limits for the check endpoint. Holds no client data except counters by key."""
+    """Per-app limits for the check endpoint. Holds no client data except counters by key.
 
-    def __init__(self, app: FastAPI, settings: Settings) -> None:
+    The three test hooks (``provider_transport``, ``turnstile_transport``, ``clock``) are typed
+    arguments of ``install()``. The existing tests also set the same names on ``app.state``
+    after the app is built, so a missing hook is read from there, type-checked (a value of
+    another type is ignored). Production leaves them unset.
+    """
+
+    def __init__(
+        self,
+        app: FastAPI,
+        settings: Settings,
+        *,
+        provider_transport: AITransport | None = None,
+        turnstile_transport: AITransport | None = None,
+        clock: Clock | None = None,
+    ) -> None:
         self._app = app
         self.settings = settings
+        self.provider_hook = provider_transport
+        self.turnstile_hook = turnstile_transport
+        self.clock_hook = clock
+        keys = settings.check_table_max_keys
 
         # The minute window is rolling and needs a monotonic clock; day windows need wall time.
         def mono() -> float:
@@ -102,33 +119,39 @@ class CheckState:
         def wall() -> float:
             return self._clock(time.time)
 
-        self.minute = FixedWindowLimiter(
-            settings.check_per_minute, MINUTE_SECONDS, TABLE_KEYS, mono
-        )
-        self.day = FixedWindowLimiter(
-            settings.check_per_day, DAY_SECONDS, TABLE_KEYS, wall, aligned=True
-        )
+        self.minute = FixedWindowLimiter(settings.check_per_minute, MINUTE_SECONDS, keys, mono)
+        self.day = FixedWindowLimiter(settings.check_per_day, DAY_SECONDS, keys, wall, aligned=True)
         self.quota = FreeQuota(
-            settings.free_calls_per_ip_per_day, settings.free_neuron_budget, TABLE_KEYS, wall
+            settings.free_calls_per_ip_per_day, settings.free_neuron_budget, keys, wall
         )
         self.replay = ReplayTable(
             settings.turnstile_replay_max_entries, settings.turnstile_replay_seconds, wall
         )
         self.slots = ExtractionLimiter(settings.max_concurrent_checks)
+        self.client_slots = ClientSlots(1)
         self._private: AITransport | None = None
 
     def _clock(self, default: Clock) -> float:
-        hook = getattr(self._app.state, "clock", None)
-        return float(hook()) if callable(hook) else default()
+        hook = self.clock_hook
+        if hook is None:
+            late = getattr(self._app.state, "clock", None)
+            hook = late if callable(late) else None
+        return float(hook()) if hook is not None else default()
+
+    def _transport(self, fixed: AITransport | None, name: str) -> AITransport | None:
+        if fixed is not None:
+            return fixed
+        late = getattr(self._app.state, name, None)
+        return late if isinstance(late, AITransport) else None
 
     def now(self) -> float:
         return self._clock(time.time)
 
     def provider_transport(self, *, private: bool) -> AITransport | None:
         """The test hook, else (development switch, ``custom`` only) the unguarded transport."""
-        hook = getattr(self._app.state, "provider_transport", None)
+        hook = self._transport(self.provider_hook, "provider_transport")
         if hook is not None:
-            return hook  # type: ignore[no-any-return]
+            return hook
         if private:
             if self._private is None:
                 self._private = private_ai_transport()
@@ -136,8 +159,7 @@ class CheckState:
         return None
 
     def turnstile_transport(self) -> AITransport | None:
-        hook: AITransport | None = getattr(self._app.state, "turnstile_transport", None)
-        return hook
+        return self._transport(self.turnstile_hook, "turnstile_transport")
 
     @property
     def free_available(self) -> bool:
@@ -149,9 +171,23 @@ class CheckState:
         )
 
 
-def install(app: FastAPI, settings: Settings) -> None:
+def install(
+    app: FastAPI,
+    settings: Settings,
+    *,
+    provider_transport: AITransport | None = None,
+    turnstile_transport: AITransport | None = None,
+    clock: Clock | None = None,
+) -> None:
+    """Register the route and build the state (the keyword arguments are test hooks)."""
     app.include_router(router)
-    app.state.check_state = CheckState(app, settings)
+    app.state.check_state = CheckState(
+        app,
+        settings,
+        provider_transport=provider_transport,
+        turnstile_transport=turnstile_transport,
+        clock=clock,
+    )
 
 
 def _state(request: Request) -> CheckState:
@@ -191,7 +227,9 @@ def _free_plan(body: CheckBody, header: ProviderKeyHeader) -> Plan | Response:
         return _refusal("unexpected_provider_key")
     if body.base_url is not None:
         return _refusal("unexpected_base_url")
-    # The model of the free preset is fixed; any given value is ignored.
+    if body.model is not None:
+        return _refusal("unexpected_model")
+    # The model of the free preset is fixed.
     return Plan(PresetId.FREE, PRESETS[PresetId.FREE].models[0], None, None, body.turnstile_token)
 
 
@@ -316,12 +354,19 @@ async def check_connection(
     refused = _count(hits)
     if refused is not None:
         return refused
-    slot = state.slots.try_slot()
-    if slot is None:
+    # One check per client key first, then the shared pool; both are released on every path.
+    if not state.client_slots.try_acquire(key):
         hits.refund()
         return _limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
-    with slot:
-        return await _run(state, plan, hits)
+    try:
+        slot = state.slots.try_slot()
+        if slot is None:
+            hits.refund()
+            return _limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
+        with slot:
+            return await _run(state, plan, hits)
+    finally:
+        state.client_slots.release(key)
 
 
 async def _parse(request: Request, header: ProviderKeyHeader, state: CheckState) -> Plan | Response:
@@ -345,7 +390,7 @@ async def _run(state: CheckState, plan: Plan, hits: Hits) -> Response:
     if plan.preset is not PresetId.FREE:
         return (await _call(state, plan, plan.key, free_account=None))[0]
     if not await _turnstile(state, plan.token):
-        hits.refund()
+        # Counted, not refunded: the check limits bound a flood of bad tokens.
         return error_response("turnstile_failed", 403)
     token, account = state.settings.cf_ai_token, state.settings.cf_account_id
     if token is None or account is None:  # checked before; keeps the types honest
@@ -361,6 +406,7 @@ async def _run(state: CheckState, plan: Plan, hits: Hits) -> Response:
         response, no_cost = await _call(state, plan, token, free_account=account.get_secret_value())
         if no_cost:
             spent = 0
+            state.quota.refund_call(hits.day_key)  # the model did no work
         return response
     finally:
         state.quota.settle(CHECK_NEURONS, spent)
