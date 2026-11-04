@@ -16,6 +16,7 @@ offsets only, never text.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from bisect import bisect_right
 from collections.abc import Sequence
@@ -45,6 +46,7 @@ __all__ = [
     "PseudonymizedDocument",
     "PseudonymizedText",
     "SafetyError",
+    "document_digest",
     "safety_pass",
 ]
 
@@ -110,6 +112,7 @@ class PseudonymizedDocument:
 @dataclass(frozen=True, slots=True)
 class PseudonymizedText:
     text: str
+    source: str  # ``document_digest`` of the document this text was made from
     token: InitVar[object]
 
     def __post_init__(self, token: object) -> None:
@@ -149,6 +152,19 @@ class SafetyError(Exception):
         super().__init__(code)
         self.code = code
         self.spans = spans
+
+
+def document_digest(document: PseudonymizedDocument) -> str:
+    """A SHA-256 digest of a document (label, clause ids and texts).
+
+    A ``PseudonymizedText`` carries the digest of its source document, so the AI layer can
+    refuse a request that mixes the text of one document with another document (ADR 0009).
+    """
+    digest = hashlib.sha256()
+    for part in (document.label, *(f"{c.id}\x00{c.text}" for c in document.clauses)):
+        digest.update(len(part).to_bytes(8, "big"))
+        digest.update(part.encode("utf-8"))
+    return digest.hexdigest()
 
 
 def _detector_clauses(texts: list[str]) -> list[Clause]:
