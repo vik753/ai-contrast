@@ -18,6 +18,7 @@ from app.settings import Settings
 
 UNKNOWN: Final = "unknown"
 _IPV6_PREFIX: Final = 64
+_IPV6_DAILY_PREFIX: Final = 48
 
 
 _SIX_TO_FOUR: Final = ipaddress.IPv6Network("2002::/16")
@@ -71,3 +72,18 @@ def client_key(scope: Scope, settings: Settings) -> str:
     if len(entries) < settings.trusted_proxy_hops:
         return UNKNOWN
     return _key_of(entries[-settings.trusted_proxy_hops])
+
+
+def daily_key(key: str) -> str:
+    """The key of daily tables: an IPv6 /64 key becomes its /48 key, others are unchanged.
+
+    One /48 is the usual allocation to a site; rotating through /64 inside it must not give
+    a client more daily calls or fill a daily table with many keys.
+    """
+    if "/" not in key:
+        return key
+    try:
+        network = ipaddress.IPv6Network(key)
+    except ValueError:
+        return UNKNOWN
+    return str(network.supernet(new_prefix=_IPV6_DAILY_PREFIX))

@@ -6,6 +6,7 @@ This module and ``factory.py`` take connection settings (model ID, base URL), ne
 from __future__ import annotations
 
 import enum
+import ipaddress
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ __all__ = [
     "PresetId",
     "checked_base_url",
     "checked_model",
+    "free_base_url",
+    "is_ip_literal_url",
 ]
 
 _MODEL_RE: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}", re.ASCII)
@@ -30,6 +33,14 @@ _PATH_RE: Final = re.compile(r"(?:/[A-Za-z0-9._~-]*)*", re.ASCII)
 _MAX_PATH: Final = 256
 _SCHEME: Final = "https://"
 _HTTPS_PORT: Final = "443"
+_FREE_URL: Final = "https://api.cloudflare.com/client/v4/accounts/{}/ai/v1"
+_NUMERIC_LABEL_RE: Final = re.compile(r"[0-9]+|0[xX][0-9a-fA-F]*", re.ASCII)
+_ACCOUNT_ID_RE: Final = re.compile(r"[0-9a-f]{32}", re.ASCII)
+# Development only (``ALLOW_PRIVATE_PROVIDER_URLS``): a host name or IP literal, any port.
+_PRIVATE_AUTHORITY_RE: Final = re.compile(
+    r"(?:[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?|\[[0-9A-Fa-f:.]{2,45}\])(?::[0-9]{1,5})?",
+    re.ASCII,
+)
 
 
 class PresetId(enum.StrEnum):
@@ -109,11 +120,62 @@ def checked_model(model: str) -> str:
     return model
 
 
-def checked_base_url(url: str | None) -> str:
+def free_base_url(account_id: str) -> str:
+    """The URL of the free preset. It is built only from the operator's account ID."""
+    if not _ACCOUNT_ID_RE.fullmatch(account_id):
+        raise ConnectionConfigError("invalid_base_url") from None
+    return _FREE_URL.format(account_id)
+
+
+def is_ip_literal_url(url: str) -> bool:
+    """Is the host of an ``https://`` URL an IPv4 or IPv6 literal? Syntax only, no lookup."""
+    if not url.startswith(_SCHEME):
+        return False
+    authority = url[len(_SCHEME) :].split("/", 1)[0]
+    if authority.startswith("["):
+        host = authority[1:].split("]", 1)[0]
+    else:
+        host = authority.split(":", 1)[0]
+    host = host.removesuffix(".")
+    if _NUMERIC_LABEL_RE.fullmatch(host.rsplit(".", 1)[-1]):
+        # A numeric last label is an IPv4 form (decimal, hex, octal, short, trailing dot).
+        return True
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
+
+
+def _checked_private_url(url: str | None) -> str:
+    """Development only: ``http`` or ``https``, a name or IP literal, any port."""
+    if not url or not _PRINTABLE_RE.fullmatch(url) or "?" in url or "#" in url:
+        raise ConnectionConfigError("invalid_base_url") from None
+    scheme, sep, rest = url.partition("://")
+    authority, slash, tail = rest.partition("/")
+    path = slash + tail
+    segments = path.split("/")[1:]
+    if (
+        scheme not in {"http", "https"}
+        or not sep
+        or not _PRIVATE_AUTHORITY_RE.fullmatch(authority)
+        or len(path) > _MAX_PATH
+        or not _PATH_RE.fullmatch(path)
+        or any(segment in {".", ".."} for segment in segments)
+    ):
+        raise ConnectionConfigError("invalid_base_url") from None
+    return f"{scheme}://{authority}{path}".rstrip("/")
+
+
+def checked_base_url(url: str | None, *, allow_private: bool = False) -> str:
     """Syntax check of a custom base URL (ADR 0016 point 4); return the normalized URL.
 
-    The addresses are checked later, by the guard at connect time.
+    The addresses are checked later, by the guard at connect time. ``allow_private`` is the
+    development switch ``ALLOW_PRIVATE_PROVIDER_URLS``: it allows ``http``, IP literals and
+    any port, and the caller must also use a transport without the guard.
     """
+    if allow_private:
+        return _checked_private_url(url)
     if not url or not _PRINTABLE_RE.fullmatch(url) or not url.startswith(_SCHEME):
         raise ConnectionConfigError("invalid_base_url") from None
     if "?" in url or "#" in url:

@@ -9,6 +9,9 @@ from starlette.datastructures import Headers
 EXTRACT_PATH: Final = "/api/extract"
 SEGMENT_PATH: Final = "/api/segment"
 SAFETY_PATH: Final = "/api/safety-check"
+CHECK_PATH: Final = "/api/provider/check"
+# Body cap of the connection check: a short JSON object (ADR 0016 point 6).
+CHECK_MAX_BODY_BYTES: Final = 4096
 
 # A `Content-Length` with more digits than this counts as too large; it is never
 # passed to `int()` (no work proportional to a hostile header length).
