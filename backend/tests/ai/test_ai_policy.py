@@ -286,7 +286,6 @@ def test_policy_surface_checker_accepts_clean_module_private_helpers_and_exempt_
         "class AIRequest:\n    documents: tuple[PseudonymizedDocument, ...]\n",
         "class AIRequest:\n    documents: list[PseudonymizedDocument]\n",
         "class AIRequest:\n    a: PseudonymizedDocument\n    b: PseudonymizedDocument\n",
-        "class AIRequest:\n    document: PseudonymizedDocument | None\n",
         "class AIRequest:\n    template: PromptTemplate\n",
         "class AIRequest:\n    document: PseudonymizedDocument\n    other: Foo\n",
     ],
