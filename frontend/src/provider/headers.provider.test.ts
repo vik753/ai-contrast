@@ -69,7 +69,7 @@ describe("frame page headers (S6-T5 AC3)", () => {
   it("test_frame_ancestors_is_one_exact_app_origin_or_placeholder", () => {
     const fa = directive(frameCsp(), "frame-ancestors");
     expect(fa).toHaveLength(1);
-    expect(fa?.[0]).toMatch(/^(https?:\/\/[a-z0-9.:-]+|__APP_ORIGIN__)$/);
+    expect(fa?.[0]).toMatch(/^(https:\/\/[a-z0-9.-]+|__APP_ORIGIN__)$/);
     expect(fa?.[0]).not.toContain("*");
   });
 
@@ -82,8 +82,9 @@ describe("frame page headers (S6-T5 AC3)", () => {
     for (const d of ["script-src", "frame-src"]) {
       const src = directive(csp, d) ?? [];
       expect(src, d).toContain("https://challenges.cloudflare.com");
+      const allowed = d === "frame-src" ? [] : ["'self'"];
       for (const s of src)
-        expect(["'self'", "https://challenges.cloudflare.com"], `${d} ${s}`).toContain(s);
+        expect([...allowed, "https://challenges.cloudflare.com"], `${d} ${s}`).toContain(s);
     }
     expect(directive(csp, "default-src")).toEqual(["'none'"]);
     expect(csp).not.toMatch(/unsafe-eval|script-src[^;]*unsafe-inline|\*/);

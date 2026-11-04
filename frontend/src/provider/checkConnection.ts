@@ -13,7 +13,7 @@ export interface CheckRequest {
 export type CheckResult = { ok: true } | { ok: false; code: string };
 
 /** Codes the server may answer with. `network` and `unknown` are made here only. */
-const SERVER_CODES: ReadonlySet<string> = new Set([
+export const SERVER_CODES: ReadonlySet<string> = new Set([
   "request_too_large",
   "invalid_request",
   "invalid_provider",

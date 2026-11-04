@@ -1,6 +1,10 @@
 /** Messages between the app and the Turnstile frame (ADR 0016 point 7). Strict shapes only. */
 export const TOKEN_MESSAGE_TYPE = "turnstile-token";
 export const MAX_TOKEN_LENGTH = 2048;
+export const EXPIRED_MESSAGE_TYPE = "turnstile-expired";
+export const ERROR_MESSAGE_TYPE = "turnstile-error";
+/** A token older than this is dropped (Cloudflare tokens live 300 s; the server also checks 300 s). */
+export const MAX_TOKEN_AGE_MS = 240_000;
 export const RESET_MESSAGE = { type: "reset" } as const;
 
 function exactKeys(data: object, keys: readonly string[]): boolean {
@@ -22,4 +26,17 @@ export function parseTokenMessage(data: unknown): string | null {
 
 export function isResetMessage(data: unknown): boolean {
   return isRecord(data) && exactKeys(data, ["type"]) && data.type === RESET_MESSAGE.type;
+}
+
+export function isExpiredMessage(data: unknown): boolean {
+  return isRecord(data) && exactKeys(data, ["type"]) && data.type === EXPIRED_MESSAGE_TYPE;
+}
+
+export function isErrorMessage(data: unknown): boolean {
+  return isRecord(data) && exactKeys(data, ["type"]) && data.type === ERROR_MESSAGE_TYPE;
+}
+
+/** True when a token issued at `issuedAt` may still be used at `now` (both in ms). */
+export function isTokenFresh(issuedAt: number, now: number): boolean {
+  return now >= issuedAt && now - issuedAt <= MAX_TOKEN_AGE_MS;
 }

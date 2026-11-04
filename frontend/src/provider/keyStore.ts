@@ -71,4 +71,19 @@ export function forgetAllKeys(): void {
       // Blocked storage has nothing to remove.
     }
   }
+  notifyKeysCleared();
+}
+
+const clearedListeners = new Set<() => void>();
+
+/** Calls `listener` after all keys were removed ("Clear all" or `forgetAllKeys`). */
+export function subscribeKeysCleared(listener: () => void): () => void {
+  clearedListeners.add(listener);
+  return () => {
+    clearedListeners.delete(listener);
+  };
+}
+
+export function notifyKeysCleared(): void {
+  for (const listener of [...clearedListeners]) listener();
 }

@@ -1,4 +1,6 @@
 import {
+  ERROR_MESSAGE_TYPE,
+  EXPIRED_MESSAGE_TYPE,
   MAX_TOKEN_LENGTH,
   TOKEN_MESSAGE_TYPE,
   isResetMessage,
@@ -6,6 +8,8 @@ import {
 
 export interface FrameController {
   onWidgetToken: (token: string) => void;
+  onWidgetExpired: () => void;
+  onWidgetError: () => void;
   onMessage: (event: { origin: string; source: unknown; data: unknown }) => void;
 }
 
@@ -22,6 +26,12 @@ export function createFrameController(deps: {
     onWidgetToken(token) {
       if (token.length === 0 || token.length > MAX_TOKEN_LENGTH) return;
       deps.parent.postMessage({ type: TOKEN_MESSAGE_TYPE, token }, deps.appOrigin);
+    },
+    onWidgetExpired() {
+      deps.parent.postMessage({ type: EXPIRED_MESSAGE_TYPE }, deps.appOrigin);
+    },
+    onWidgetError() {
+      deps.parent.postMessage({ type: ERROR_MESSAGE_TYPE }, deps.appOrigin);
     },
     onMessage(event) {
       if (event.origin !== deps.appOrigin || event.source !== deps.parent) return;

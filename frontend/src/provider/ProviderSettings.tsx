@@ -3,9 +3,13 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { checkConnection, type CheckResult } from "./checkConnection";
 import { getFrameOrigin } from "./frameOrigin";
-import { forgetKey, getKey, isRemembered, setKey } from "./keyStore";
+import { forgetKey, getKey, isRemembered, setKey, subscribeKeysCleared } from "./keyStore";
 import { DEFAULT_PRESET, PRESETS, isPresetId, type PresetId } from "./presets";
 import { TurnstileFrame } from "./TurnstileFrame";
+import { isTokenFresh } from "./turnstileProtocol";
+
+/** The wait for the frame token ends with an error after this time. */
+const TOKEN_WAIT_MS = 30_000;
 
 type Outcome = CheckResult | null;
 
@@ -34,7 +38,7 @@ export function ProviderSettings() {
   // The key field is uncontrolled: the key lives in storage, never in React state or the DOM text.
   const keyField = useRef<HTMLInputElement>(null);
   const awaitingRef = useRef(false);
-  const tokenRef = useRef<string | null>(null);
+  const tokenRef = useRef<{ value: string; at: number } | null>(null);
   const run = useRef(0);
   const abort = useRef<AbortController | null>(null);
 
@@ -45,6 +49,17 @@ export function ProviderSettings() {
   useEffect(() => {
     if (keyField.current) keyField.current.value = getKey(preset) ?? "";
   }, [preset]);
+
+  useEffect(
+    () =>
+      subscribeKeysCleared(() => {
+        if (keyField.current) keyField.current.value = "";
+        tokenRef.current = null;
+        setRemember(false);
+        setOutcome(null);
+      }),
+    [],
+  );
 
   useEffect(
     () => () => {
@@ -58,6 +73,17 @@ export function ProviderSettings() {
     awaitingRef.current = value;
     setAwaiting(value);
   };
+
+  useEffect(() => {
+    if (!awaiting) return;
+    const timer = setTimeout(() => {
+      setWaiting(false);
+      setOutcome({ ok: false, code: "turnstile_failed" });
+    }, TOKEN_WAIT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [awaiting]);
 
   const finish = (mine: number, result: CheckResult) => {
     if (mine !== run.current) return;
@@ -87,7 +113,20 @@ export function ProviderSettings() {
     if (awaitingRef.current) {
       void submitToken(token);
     } else {
-      tokenRef.current = token;
+      tokenRef.current = { value: token, at: Date.now() };
+    }
+  };
+
+  const onExpired = () => {
+    tokenRef.current = null;
+    setResetSignal((n) => n + 1);
+  };
+
+  const onFrameError = () => {
+    tokenRef.current = null;
+    if (awaitingRef.current) {
+      setWaiting(false);
+      setOutcome({ ok: false, code: "turnstile_failed" });
     }
   };
 
@@ -132,9 +171,13 @@ export function ProviderSettings() {
         return;
       }
       setFrameOn(true);
-      const token = tokenRef.current;
-      if (token !== null) void submitToken(token);
-      else setWaiting(true);
+      const cached = tokenRef.current;
+      if (cached !== null && isTokenFresh(cached.at, Date.now())) {
+        void submitToken(cached.value);
+      } else {
+        tokenRef.current = null;
+        setWaiting(true);
+      }
       return;
     }
     const key = (keyField.current?.value ?? "").trim();
@@ -297,20 +340,29 @@ export function ProviderSettings() {
         )}
       </div>
 
-      {awaiting ? <p aria-live="polite">{t("provider.test.waiting")}</p> : null}
-      {busy ? <p aria-live="polite">{t("provider.test.checking")}</p> : null}
-      {outcome?.ok === true ? (
-        <p role="status" className="provider__ok">
-          {t("provider.test.ok")}
-        </p>
-      ) : null}
-      {outcome?.ok === false ? (
-        <p role="alert" className="provider__error">
-          {t(`provider.error.${outcome.code}` as "provider.error.unknown")}
-        </p>
-      ) : null}
+      <div aria-live="polite">
+        {awaiting ? <p>{t("provider.test.waiting")}</p> : null}
+        {busy ? <p>{t("provider.test.checking")}</p> : null}
+        {outcome?.ok === true ? (
+          <p role="status" className="provider__ok">
+            {t("provider.test.ok")}
+          </p>
+        ) : null}
+        {outcome?.ok === false ? (
+          <p role="alert" className="provider__error">
+            {t(`provider.error.${outcome.code}` as "provider.error.unknown")}
+          </p>
+        ) : null}
+      </div>
 
-      {isFree && frameOn ? <TurnstileFrame onToken={onToken} resetSignal={resetSignal} /> : null}
+      {isFree && frameOn ? (
+        <TurnstileFrame
+          onToken={onToken}
+          onExpired={onExpired}
+          onError={onFrameError}
+          resetSignal={resetSignal}
+        />
+      ) : null}
     </section>
   );
 }

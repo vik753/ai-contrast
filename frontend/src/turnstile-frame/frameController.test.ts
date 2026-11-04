@@ -75,3 +75,13 @@ describe("site key (S6-T5 AC3, Cloudflare test key in development)", () => {
     ).toThrow();
   });
 });
+
+describe("frame controller expiry and error messages", () => {
+  it("test_expired_and_error_are_posted_to_the_exact_app_origin", () => {
+    const { parent, c } = setup();
+    c.onWidgetExpired();
+    c.onWidgetError();
+    expect(parent.postMessage).toHaveBeenNthCalledWith(1, { type: "turnstile-expired" }, APP);
+    expect(parent.postMessage).toHaveBeenNthCalledWith(2, { type: "turnstile-error" }, APP);
+  });
+});
