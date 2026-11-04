@@ -24,7 +24,7 @@ Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety 
 2. `app/injection/`: Layer 2 per ADR 0017 point 4 (versioned pattern file, skeleton matching, linear-time, classes `heuristic`/`high`, spans), with the ADR 0009 token list and honest negatives.
 3. `app/topics/safety.py` per point 3 (cleaning, grammar, placeholder-free on skeleton, identifier detector, Layer 2) with codes `invalid_topic_text`, `topic_contains_identifier` (spans), `topic_flagged`.
 4. Gate: `ConfirmedTopic` holds the whole definition (point 3) with frozen `ConfirmedAttribute`; only `confirm_topic()` creates it; not bound to a document; the AST policy test is extended.
-5. `AIRequest`: `document` optional; each `PromptTemplate` declares `requires_document` / `forbids_document`; enforced in `__post_init__`.
+5. `AIRequest`: `document` optional; each `PromptTemplate` declares its full field set (document / topic / text required or forbidden); enforced in `__post_init__`.
 6. Stage 6 follow-up: the `tests/check` helpers pass hooks to `install()`; the `app.state.*` fallback in `CheckState` is deleted.
 
 ### S7-T2 AI topic endpoints and free pass (backend)
@@ -33,7 +33,8 @@ Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety 
 
 1. Prompts and strict output schemas for `SUGGEST_TOPICS`, `PROPOSE_ATTRIBUTES`, `EXPAND_SYNONYMS` (point 5): caps, one repair attempt without the previous output, `ai_bad_output`.
 2. Endpoints of point 6 with the provider selection, server-side safety passes (suggest: masked document as in `/api/safety-check`; others: topic definition), body caps, per-IP limits, 1 AI call in flight per client and 2 per server (shared with `/api/provider/check`), every model text through the topic safety pass; one document per call (wire canary).
-3. Free pass (point 6): HMAC token, 15 min, same /48, at most 20 calls counted in memory, `FREE_PASS_KEY` in the "all or none" free settings; per-IP free quota and Neuron budget still charged.
+3. Free pass (point 6): per-process HMAC key, `aud=topics`, 15 min, same /48, at most 20 calls, bounded nonce table that fails closed, `X-Free-Pass` header only, `compare_digest`; per-IP free topic quota (40/day) and Neuron budget reserved before the call.
+3a. ADR 0017 point 3 cross-document rules: 4 KiB cap on non-catalog `ConfirmedTopic`, suggestion descriptions never in prompts, synonyms never sent to a model, model-proposed directions start as `none` (`direction_source`), catalog topics by id + `catalog_version`, caps per request; suggest input cap and extraction slot released before the AI call; 60 s AI deadline.
 4. Log canary: no topic text, model output, key or pass in logs.
 5. `CLAUDE.md` Commands: `GET /api/topics/catalog` and one refused topic (`topic_flagged`) without any AI call.
 
