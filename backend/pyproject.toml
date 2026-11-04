@@ -99,3 +99,7 @@ filterwarnings = [
     # new dev dependency; until then keep `httpx` (approved in task S1-T1).
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
 ]
+
+[tool.ruff.lint.isort]
+# Fixed, so the import order does not depend on what is installed in the environment.
+known-first-party = ["app", "tests"]
