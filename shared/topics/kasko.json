@@ -206,7 +206,7 @@
             {"id": "cis_other", "labels": {"en": "Other countries", "uk": "Інші країни", "ru": "Другие страны"}},
             {"id": "excl_occupied", "labels": {"en": "Excludes occupied or combat areas", "uk": "Виключає окуповані чи бойові райони", "ru": "Исключает оккупированные или боевые районы"}}
           ],
-          "directions": {"insured": "none", "insurer": "none"}}
+          "directions": {"insured": "more_better", "insurer": "none"}}
       ]
     },
     {

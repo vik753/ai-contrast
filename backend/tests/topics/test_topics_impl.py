@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.injection import scan
+from app.injection import patterns, scan
 from app.main import create_app
 from app.pseudo.gate import confirm_topic
 from app.settings import DEFAULT_TOPICS_CATALOG_DIR, Settings
@@ -118,3 +118,42 @@ def test_scan_instruction_far_from_rating_stays_heuristic() -> None:
 
 def test_scan_hit_cap_still_flags() -> None:
     assert scan("<s>" * 5000)
+
+
+# --- review round 1 ---------------------------------------------------------------------------
+
+
+def test_docker_context_allowlist_admits_only_the_runtime_files() -> None:
+    lines = [
+        line.strip()
+        for line in (BACKEND / "Dockerfile.dockerignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+    admitted = [line[1:] for line in lines if line.startswith("!")]
+
+    assert lines[0] == "*"
+    assert sorted(admitted) == sorted(
+        [
+            "backend/pyproject.toml",
+            "backend/uv.lock",
+            "backend/log_config.json",
+            "backend/app/",
+            "shared/topics/",
+        ]
+    )
+    assert not [line for line in lines[1:] if not line.startswith(("!", "backend/app/**"))]
+
+
+def test_pattern_lists_have_no_duplicate_entries() -> None:
+    for name in dir(patterns):
+        value = getattr(patterns, name)
+        if isinstance(value, tuple) and all(isinstance(item, str) for item in value):
+            assert len(set(value)) == len(value), name
+
+
+def test_kasko_territory_is_better_with_more_territory_for_the_insured() -> None:
+    catalog = load_catalog(DEFAULT_TOPICS_CATALOG_DIR)
+    kasko = next(d for d in catalog.domains if d.id == "kasko")
+    attributes = [a for t in kasko.topics for a in t.attributes if a.id == "territory_scope"]
+
+    assert [a.directions["insured"] for a in attributes] == ["more_better"]

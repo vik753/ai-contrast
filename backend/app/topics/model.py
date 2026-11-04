@@ -22,6 +22,7 @@ __all__ = [
     "MAX_ATTRIBUTES",
     "MAX_SYNONYMS",
     "MAX_VALUES",
+    "NON_CATALOG_ID_RE",
     "TYPES",
     "AttributeDefinition",
     "TopicDefinition",
@@ -47,6 +48,8 @@ DIRECTIONS_BY_TYPE: Final = {
 }
 TYPES: Final = frozenset(DIRECTIONS_BY_TYPE)
 _VALUE_TYPES: Final = frozenset({"enum", "categories"})
+# Ids of topics that do not come from the catalog: the client's own and the suggested ones.
+NON_CATALOG_ID_RE: Final = re.compile(r"(?:custom|suggested)_[1-9][0-9]?", re.ASCII)
 INVALID_DEFINITION: Final = "invalid_topic_definition"
 
 
@@ -68,6 +71,7 @@ class AttributeDefinition(BaseModel):
     direction: str = "none"
     order: tuple[str, ...] = ()
     values: tuple[str, ...] = ()
+    value_ids: tuple[str, ...] = ()
     direction_source: Literal["catalog", "client"] = "client"
 
 
@@ -100,15 +104,22 @@ def _check_attribute(attribute: AttributeDefinition) -> None:
     ):
         raise _fail()
     values = attribute.values
+    ids = attribute.value_ids
     if kind in _VALUE_TYPES:
         if not 1 <= len(values) <= MAX_VALUES or len(set(values)) != len(values):
             raise _fail()
-    elif values:
+        if (
+            len(ids) != len(values)
+            or len(set(ids)) != len(ids)
+            or any(ID_RE.fullmatch(item) is None for item in ids)
+        ):
+            raise _fail()
+    elif values or ids:
         raise _fail()
     if attribute.direction not in DIRECTIONS_BY_TYPE[kind]:
         raise _fail()
     if attribute.direction == "ordered":
-        if sorted(attribute.order) != sorted(values):
+        if sorted(attribute.order) != sorted(ids):
             raise _fail()
     elif attribute.order:
         raise _fail()
@@ -118,8 +129,9 @@ def check_structure(definition: TopicDefinition) -> None:
     """Ids, types, units, directions, caps. Raises ``TopicDefinitionError`` with
     ``invalid_topic_definition``. Looks at no text content beyond the shape."""
     synonym_lists = (definition.synonyms_en, definition.synonyms_uk, definition.synonyms_ru)
+    topic_id_pattern = ID_RE if definition.origin == "catalog" else NON_CATALOG_ID_RE
     if (
-        ID_RE.fullmatch(definition.topic_id) is None
+        topic_id_pattern.fullmatch(definition.topic_id) is None
         or ID_RE.fullmatch(definition.side) is None
         or (definition.domain is not None and ID_RE.fullmatch(definition.domain) is None)
         or len(definition.attributes) > MAX_ATTRIBUTES

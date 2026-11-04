@@ -24,6 +24,7 @@ from dataclasses import InitVar, dataclass
 from itertools import pairwise
 from typing import Final, NoReturn, final
 
+from app.injection import scan
 from app.pseudo import checksums
 from app.pseudo.detector import TooManyIdentifiersError, detect
 from app.pseudo.hits import HIGH
@@ -147,6 +148,7 @@ class ConfirmedAttribute:
     direction: str
     order: tuple[str, ...]
     values: tuple[str, ...]
+    value_ids: tuple[str, ...]
     direction_source: str
     token: InitVar[object]
 
@@ -361,10 +363,16 @@ MAX_TOPIC_BYTES: Final = 4096
 
 
 def _topic_bytes(definition: TopicDefinition) -> int:
-    parts: list[str] = [definition.title, definition.description, definition.topic_id]
+    parts: list[str] = [
+        definition.title,
+        definition.description,
+        definition.topic_id,
+        definition.side,
+        definition.domain or "",
+    ]
     for attribute in definition.attributes:
         parts += [attribute.id, attribute.label, *attribute.units, *attribute.values]
-        parts += attribute.order
+        parts += [*attribute.order, *attribute.value_ids]
     parts += [*definition.synonyms_en, *definition.synonyms_uk, *definition.synonyms_ru]
     return sum(len(part.encode("utf-8")) for part in parts)
 
@@ -383,6 +391,9 @@ def _check_texts(definition: TopicDefinition) -> None:
         _checked(definition.description, TextKind.DESCRIPTION, "description")
     for number, attribute in enumerate(definition.attributes):
         where = f"attributes.{number}"
+        # The id is not shown, but a model reads it: Layer 2 sees it as words.
+        if scan(attribute.id.replace("_", " ")):
+            raise TopicTextError("topic_flagged", field=f"{where}.id")
         _checked(attribute.label, TextKind.LABEL, f"{where}.label")
         for index, value in enumerate(attribute.values):
             _checked(value, TextKind.VALUE, f"{where}.values.{index}")
@@ -404,6 +415,7 @@ def _confirm_attribute(attribute: AttributeDefinition) -> ConfirmedAttribute:
         attribute.direction,
         attribute.order,
         attribute.values,
+        attribute.value_ids,
         attribute.direction_source,
         _SENTINEL,
     )
@@ -430,6 +442,12 @@ def confirm_topic(definition: TopicDefinition, *, catalog: Catalog | None = None
                 raise TopicDefinitionError("invalid_direction")
         if _topic_bytes(definition) > MAX_TOPIC_BYTES:
             raise TopicDefinitionError("topic_too_large")
+        if (
+            catalog is not None
+            and definition.domain is not None
+            and not catalog.has_side(definition.domain, definition.side)
+        ):
+            raise TopicDefinitionError("invalid_topic_definition")
         _check_texts(definition)
     return ConfirmedTopic(
         definition.domain,

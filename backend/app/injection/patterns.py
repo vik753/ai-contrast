@@ -23,16 +23,20 @@ FIXED_TOKENS: Final = (
     "<</sys>>",
     "<start_of_turn>",
     "<end_of_turn>",
-    "<document>",
-    "</document>",
     "<<<begin",
     "<<<end",
 )
 
-# `Human:` and `Assistant:` at the start of a line. Class "high".
-ROLE_LABELS: Final = ("human:", "assistant:")
+# Our tag names, with or without attributes: the name must be followed by a blank or ">".
+TAG_PREFIXES: Final = ("<document", "</document")
 
-# "ignore previous instructions": a verb, then within three words a target.
+# `Human:` and `Assistant:` at the start of a line (after a few blanks, a blank before the
+# colon is allowed). Class "high".
+ROLE_LABELS: Final = ("human", "assistant")
+# At most this many blanks before a role label and between it and the colon.
+ROLE_BLANKS: Final = 16
+
+# "ignore previous instructions": a verb, then within eight words a target.
 IGNORE_VERBS: Final = (
     "ignore",
     "disregard",
@@ -41,12 +45,10 @@ IGNORE_VERBS: Final = (
     "bypass",
     "ігнору*",
     "ігнорув*",
-    "забудь*",
     "проігнору*",
     "игнорир*",
     "игнорь*",
     "проигнорир*",
-    "забудь*",
 )
 INSTRUCTION_TARGETS: Final = (
     "instruction",
@@ -62,7 +64,6 @@ INSTRUCTION_TARGETS: Final = (
     "промпт*",
     "инструкци*",
     "указани*",
-    "правила",
 )
 
 # "system prompt".

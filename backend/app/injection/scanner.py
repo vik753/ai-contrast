@@ -5,7 +5,7 @@ skeleton and lower case (``app.pseudo.matching.fold``), so homoglyph and full-wi
 meet the same pattern. Every pattern is linear in the text: fixed strings are found with
 ``str.find``; a word rule looks at a window of at most ``WINDOW`` characters after an anchor
 word; the placeholder and base64 patterns are single bounded repeats. Hit spans are offsets
-into the input text. A text with more than ``MAX_HITS`` hits keeps the first ones and is
+into the input text. A text with more than ``MAX_HITS`` hits keeps the high ones first and is
 still flagged (a cap fails closed). Nothing here logs or returns text.
 """
 
@@ -22,15 +22,15 @@ from app.pseudo.matching import fold
 
 __all__ = ["Hit", "scan"]
 
-WINDOW: Final = 100
-FOLLOW_WORDS: Final = 5
-MAX_TARGET_DISTANCE: Final = 4
+WINDOW: Final = 200
+FOLLOW_WORDS: Final = 9
+MAX_TARGET_DISTANCE: Final = 8
 MAX_AS_DISTANCE: Final = 4
 MAX_TOKEN_CHARS: Final = 40
 _PLACEHOLDER_MIN_LETTER_DOT: Final = 2
 
 _WORD: Final = re.compile(r"[^\W_]+")
-_TOKEN_BODY: Final = re.compile(r"[a-z0-9_ ]{1,40}\|>")
+_TOKEN_BODY: Final = re.compile(r"[a-z0-9_ -]{1,40}\|>")
 _PLACEHOLDER: Final = re.compile(r"[^\[\]\s]{1,40}\]")
 _BASE64: Final = re.compile(rf"[A-Za-z0-9+/]{{{p.BASE64_MIN_RUN},}}={{0,2}}")
 
@@ -67,6 +67,7 @@ _DEEMED = _WordSet(p.DEEMED_WORDS)
 _RATING = _WordSet(p.RATING_WORDS)
 _FIXED = tuple(fold(token) for token in p.FIXED_TOKENS)
 _ROLES = tuple(fold(label) for label in p.ROLE_LABELS)
+_TAGS = tuple(fold(tag) for tag in p.TAG_PREFIXES)
 
 # A raw hit in view coordinates: start, end, class, kind ("instruction" or "rating" take part
 # in the combination rule).
@@ -114,11 +115,25 @@ def _fixed(view: str, out: list[_Raw]) -> None:
 def _role_labels(view: str, out: list[_Raw]) -> None:
     for label in _ROLES:
         for i in _find_all(view, label):
+            end = i + len(label)
+            stop = min(len(view), end + p.ROLE_BLANKS + 1)
+            while end < stop and view[end] in " \t":
+                end += 1
+            if end >= len(view) or view[end] != ":":
+                continue
             back = i
-            while back > 0 and i - back < MAX_AS_DISTANCE and view[back - 1] in " \t":
+            while back > 0 and i - back < p.ROLE_BLANKS and view[back - 1] in " \t":
                 back -= 1
             if back == 0 or view[back - 1] == "\n":
-                out.append((i, i + len(label), "high", "token"))
+                out.append((i, end + 1, "high", "token"))
+
+
+def _tags(view: str, out: list[_Raw]) -> None:
+    for tag in _TAGS:
+        for i in _find_all(view, tag):
+            end = i + len(tag)
+            if end < len(view) and view[end] in " \t\n\r>/":
+                out.append((i, end, "high", "token"))
 
 
 def _placeholders(view: str, out: list[_Raw]) -> None:
@@ -202,9 +217,13 @@ def scan(text: str) -> list[Hit]:
     raw: list[_Raw] = []
     _fixed(view, raw)
     _role_labels(view, raw)
+    _tags(view, raw)
     _placeholders(view, raw)
     _word_rules(view, raw)
-    raw = _combine(raw)[: p.MAX_HITS]
+    raw = _combine(raw)
+    if len(raw) > p.MAX_HITS:
+        # A cap never lowers the class: keep the high hits first.
+        raw = sorted(raw, key=lambda item: item[2] != "high")[: p.MAX_HITS]
     hits: set[Hit] = set()
     for start, end, cls, _ in raw:
         if source is None:

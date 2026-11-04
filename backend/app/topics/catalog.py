@@ -25,6 +25,7 @@ from app.topics.model import (
     ID_RE,
     MAX_SYNONYMS,
     MAX_VALUES,
+    NON_CATALOG_ID_RE,
     AttributeDefinition,
     TopicDefinition,
 )
@@ -147,8 +148,10 @@ class Domain(_Model):
         if len(set(side_ids)) != len(side_ids) or any(ID_RE.fullmatch(s) is None for s in side_ids):
             raise ValueError("bad side ids")
         topic_ids = [topic.id for topic in self.topics]
-        if len(set(topic_ids)) != len(topic_ids) or any(
-            ID_RE.fullmatch(t) is None for t in topic_ids
+        if (
+            len(set(topic_ids)) != len(topic_ids)
+            or any(ID_RE.fullmatch(t) is None for t in topic_ids)
+            or any(NON_CATALOG_ID_RE.fullmatch(t) for t in topic_ids)
         ):
             raise ValueError("bad topic ids")
         for topic in self.topics:
@@ -165,7 +168,7 @@ def _definition_attribute(attribute: Attribute, side: str, lang: str) -> Attribu
     labels = {value.id: value.labels.get(lang) for value in attribute.values or ()}
     order: tuple[str, ...] = ()
     if isinstance(direction, tuple):
-        order = tuple(labels[value_id] for value_id in direction)
+        order = direction
         direction = "ordered"
     return AttributeDefinition(
         id=attribute.id,
@@ -175,6 +178,7 @@ def _definition_attribute(attribute: Attribute, side: str, lang: str) -> Attribu
         direction=direction,
         order=order,
         values=tuple(labels.values()),
+        value_ids=tuple(labels),
         direction_source="catalog",
     )
 
@@ -189,8 +193,12 @@ class Catalog(_Model):
         """The catalog topic for one side and one UI language. Raises ``KeyError`` if unknown."""
         if lang not in LANGS:
             raise KeyError(lang)
-        domain = next(d for d in self.domains if d.id == domain_id)
-        topic = next(t for t in domain.topics if t.id == topic_id)
+        domain = next((d for d in self.domains if d.id == domain_id), None)
+        if domain is None:
+            raise KeyError(domain_id)
+        topic = next((t for t in domain.topics if t.id == topic_id), None)
+        if topic is None:
+            raise KeyError(topic_id)
         if side not in {s.id for s in domain.sides}:
             raise KeyError(side)
         return TopicDefinition(
@@ -206,6 +214,10 @@ class Catalog(_Model):
             synonyms_ru=topic.synonyms.get("ru"),
         )
 
+    def has_side(self, domain_id: str, side: str) -> bool:
+        """The domain exists and has this side."""
+        return any(d.id == domain_id and side in {s.id for s in d.sides} for d in self.domains)
+
     def matches(self, definition: TopicDefinition) -> bool:
         """The definition equals the catalog topic in one of the three languages."""
         if definition.origin != "catalog" or definition.domain is None:
@@ -215,7 +227,7 @@ class Catalog(_Model):
                 expected = self.definition(
                     definition.domain, definition.topic_id, definition.side, lang
                 )
-            except (KeyError, StopIteration):
+            except KeyError:
                 return False
             if expected == definition:
                 return True
