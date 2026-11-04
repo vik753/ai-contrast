@@ -11,8 +11,8 @@ import asyncio
 import anthropic
 import httpx2
 import pytest
-from app.ai.presets import PresetId
 
+from app.ai.presets import PresetId
 from tests.ai.helpers import KEY, FakeUpstream, make_provider, record_spans, run, tap_logs
 
 C = "envcanary5e2b"

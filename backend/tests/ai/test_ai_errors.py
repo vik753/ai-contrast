@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import httpx2
 import pytest
+
 from app.ai.port import AIError, AIErrorCode
 from app.ai.presets import PresetId
-
 from app.net.guard import BlockedAddressError, BlockedHostError
 from tests.ai.helpers import (
     BODY_CANARY,

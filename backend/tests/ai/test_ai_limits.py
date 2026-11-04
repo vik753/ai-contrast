@@ -12,11 +12,11 @@ import httpcore2
 import httpx2
 import openai
 import pytest
+from pydantic import SecretStr
+
 from app.ai.factory import provider_for
 from app.ai.port import AIError
 from app.ai.presets import PresetId
-from pydantic import SecretStr
-
 from tests.ai.helpers import (
     KEY,
     MIB,

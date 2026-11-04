@@ -12,9 +12,9 @@ from __future__ import annotations
 import json
 
 import pytest
+
 from app.ai.port import AIRequest
 from app.ai.presets import PresetId
-
 from app.pseudo.gate import PseudonymizedDocument, safety_pass
 from app.pseudo.untrusted import UntrustedMaskedDocument
 from tests.ai.helpers import (

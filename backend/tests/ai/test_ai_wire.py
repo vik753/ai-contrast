@@ -9,9 +9,9 @@ import json
 from typing import Any
 
 import pytest
+
 from app.ai.port import CheckResult
 from app.ai.presets import PresetId
-
 from tests.ai.helpers import (
     KEY,
     TEXTS,
