@@ -1,0 +1,78 @@
+# ADR 0017 — Topic catalog: templates, typed attributes, custom and suggested topics
+
+- Status: proposed (tech lead, 2026-11-04; needs `security-reviewer` design approval)
+- Date: 2026-11-04
+- Related: ADR 0008 and 0015 (gate types, safety pass), ADR 0009 Layers 2 and 3 (schema-first topics, `ConfirmedTopic`, one document per call), ADR 0013 (browser storage), ADR 0016 (AI port, free mode), threat model T5, T6, T10, T11
+
+## Context
+
+Stage 7 builds the topics that stages 8 (tagging) and 9 (analysis) use. Requirement 3 of `docs/plan.md`: three kinds of topics, combinable and editable before the analysis — ready templates, topics suggested by AI from the uploaded contracts, and the client's own topics. Requirement 4: the client chooses their side. ADR 0009 Layer 3 makes every topic **schema-first**: typed attributes with a direction per client side, so stage 9 compares values by code and no model ever reads two contracts.
+
+This is the first stage with real prompts. Topic text crosses documents (it is the only string allowed in calls for different documents), so it must be short, client-confirmed, masked and free of AI-addressed text.
+
+## Decision
+
+### 1. Catalog format (`shared/topics/`)
+
+- One JSON file per domain: `kasko`, `osago`, `lease`, `property_insurance`, written by `domain-analyst`, validated by a Pydantic model in `app/topics/catalog.py` and by a JSON schema test in the frontend. A `catalog_version` (hash of the files) goes into every reply and, at stage 9, into the cache key.
+- **Domain:** `id`, names in `en`/`uk`/`ru`, `sides` (closed list per domain with names in three languages: `kasko` and `property_insurance`: `insured`, `insurer`; `osago`: `insured`, `insurer`, `injured_party`; `lease`: `tenant`, `landlord`), and `topics`.
+- **Topic:** `id` (`[a-z][a-z0-9_]{1,47}`), names and a one-line description in three languages, `synonyms` per language (stems and phrases for stage 8 keyword tags, at most 40 per language, each at most 60 characters), and `attributes` (1–12).
+- **Attribute:** `id`, labels in three languages, `type` one of:
+  - `amount` (number with a currency from a closed list: `UAH`, `USD`, `EUR`, plus `percent_of_sum` where the contract states a share of the sum insured),
+  - `percentage`,
+  - `duration` (number with a unit from `days`, `working_days`, `months`, `years`),
+  - `enum` (closed values; the shared coverage enum is `covered`, `not_covered`, `conditional`, `not_stated`),
+  - `categories` (a list from a closed set given in the attribute, labels in three languages),
+  - `text` (anything else; never compared by code);
+  - and `direction` per side: `lower_better`, `higher_better`, `none`; for `enum`, an explicit order of values per side or `none`; for `categories`, `more_better`, `fewer_better` or `none`. `text` is always `none`.
+- Caps (fail closed in the loader and in a test): at most 30 topics per domain, 12 attributes per topic, 30 enum or category values per attribute, 200 characters per name, label or description.
+
+### 2. Catalog API
+
+`GET /api/topics/catalog` returns all domains with `catalog_version` (static, cacheable, no AI call, no request body). The frontend also bundles the same files at build time so the UI works before the backend wakes; a test checks both copies are identical.
+
+### 3. Topic text safety pass (`app/topics/safety.py`)
+
+Every topic text that did not come from the catalog (client-typed names and descriptions, AI-suggested names, AI-proposed attribute labels and category values, synonyms from expansion) passes the same function before it is used anywhere:
+
+1. Layer 1 cleaning (`app/textclean/`) must be idempotent (`invalid_topic_text` otherwise); NFC.
+2. Grammar: 1–80 characters for names, 1–200 for descriptions and labels, no line breaks, allowed characters only (letters and marks of the Latin and Cyrillic scripts, digits, space and `-'’.,()/%№`); no `[`, `]`, `⟦`, `⟧`, `<`, `>`, `{`, `}`, `|`, backtick.
+3. **Placeholder-free:** no `[X.TYPE_n]` look-alike, also on the confusable skeleton.
+4. **Identifier detector** (ADR 0015) runs on the text; any hit → `topic_contains_identifier` with spans (the client must remove it; topics are never masked, because a masked placeholder in a shared topic would leak which document it came from).
+5. **Layer 2** (point 4) runs on the text; any hit → `topic_flagged` (a suggested topic is dropped and its source document is flagged).
+
+Only after all five does `confirm_topic()` create a `ConfirmedTopic`. The gate type grows to hold the whole confirmed definition: `domain`, `topic_id` (catalog id or `custom_<n>`), `title`, `description`, `attributes` (a tuple of frozen `ConfirmedAttribute`), `synonyms` (tuples per language), `side`. **`ConfirmedTopic` is not bound to any document** (it is the one cross-document string, ADR 0009); the stage 6 follow-up that proposed binding it is withdrawn. Catalog topics also go through `confirm_topic()` (their text is trusted, but the type is the same).
+
+### 4. Layer 2 patterns (`app/injection/`)
+
+Stage 7 builds the ADR 0009 Layer 2 detector because topics need it first; stage 9 reuses it on clauses. A versioned, checked-in pattern file (EN/UK/RU and the role and special tokens listed in ADR 0009), matched on the NFKC + confusable skeleton view with linear-time patterns, returns classes `heuristic` or `high` with spans. For topics, any class blocks the text. Tests cover each listed token, the three languages, homoglyph and zero-width variants (after Layer 1), and honest negatives ("AI system", "model year", "штучний інтелект" in an IT contract topic).
+
+### 5. AI calls (new `PromptTemplate` members)
+
+- **`SUGGEST_TOPICS`** — per document (one `PseudonymizedDocument`, the domain, the side): returns at most 8 topic names with a one-line description, strict schema. Each suggestion goes through point 3; failures are dropped and counted. The source document label is never part of the suggestion.
+- **`PROPOSE_ATTRIBUTES`** — **no document**: input is one `ConfirmedTopic` whose attributes are still empty (name, description, domain, side). Returns 1–12 attributes in the point 1 schema. Every label and value goes through point 3. The client confirms or edits; the result becomes a new `ConfirmedTopic`.
+- **`EXPAND_SYNONYMS`** — **no document**: input one `ConfirmedTopic`; returns synonyms per language (caps of point 1), each through point 3.
+- `AIRequest` changes: `document` becomes optional; each `PromptTemplate` member declares whether it **requires** one document or **forbids** any document; `AIRequest.__post_init__` enforces it, so `PROPOSE_ATTRIBUTES` and `EXPAND_SYNONYMS` can never carry contract text (ADR 0009: "attribute proposal, synonym expansion and the connection test take none"). The AST policy test keeps the "no `str`" rule.
+- Output caps: `max_tokens` per template (suggest 1,200; propose 1,500; expand 800), one repair attempt per ADR 0009 (same inputs plus an error-code enum, never the previous output), then `ai_bad_output`.
+
+### 6. Endpoints
+
+`POST /api/topics/suggest`, `POST /api/topics/propose-attributes`, `POST /api/topics/expand-synonyms`. Each takes the provider selection of ADR 0016 point 6 (`provider`, `model`, `base_url`, `X-Provider-Key`), runs the safety pass server-side on its own input (suggest: the masked document as in `/api/safety-check`, with `detector_version`; the others: the topic definition), and returns only validated, safety-passed JSON. Limits: body caps (suggest uses the safety-check cap; the others 16 KiB), per-IP limits with the ADR 0016 limiter (aligned daily windows, /48 tier), 1 AI call in flight per client and 2 per server (shared with `/api/provider/check`), model output never logged.
+
+**Free mode:** one Turnstile token per call would mean a challenge per topic. Instead, a verified Turnstile token at `/api/provider/check` (free) or at the first free topic call returns a **free pass**: an HMAC-SHA256-signed, stateless token (`v1.<expiry>.<client-key-hash>.<nonce>.<mac>`) valid 15 minutes for the same client /48, at most 20 free calls (counted in memory by nonce; lost on restart, which fails closed — the client solves a new challenge). The HMAC key is a new secret `FREE_PASS_KEY` (32+ random bytes, `SecretStr`, part of the "all or none" free settings of ADR 0016), never logged. Each call still charges the per-IP free quota and the global Neuron budget.
+
+### 7. Browser
+
+- Topic panel: choose the domain (or "no template"), the side (closed list of the domain), template topics (all selected by default, each can be turned off), suggested topics (button "Suggest from my contracts", one call per document; the client accepts each suggestion), own topics (name and optional description → "Propose attributes" → editable attribute list → "Confirm"). Every topic shows its attributes and directions in the UI language. All strings in `en`/`uk`/`ru`.
+- **Own topics storage:** in memory by default. "Save my topics on this device" (opt-in) stores them in `localStorage` key `aic.topics.v1` (only names, descriptions, attributes, synonyms — never contract text); removed by "Clear all". Export and import as a JSON file: import is untrusted input (size cap 256 KiB, strict schema, the same caps as point 1, every text re-checked by the server safety pass before use; nothing from the file is rendered as HTML).
+- The topic set the client confirmed is sent with every later AI request; the server re-runs `confirm_topic()` on every request (the browser is never trusted).
+
+### 8. Eval (first AI eval)
+
+`ai-eval-engineer` adds `backend/eval/topics/`: for each domain, synthetic contracts (from `domain-analyst`) with expected topics; metrics: suggestion precision/recall against expected topics, attribute-proposal schema validity and type agreement on a fixed list of custom topic names, synonym coverage of hand-written stems, Layer 2 false-positive rate on honest topic names. Runs on a recorded-response mode in CI (no network, no key) and on a live mode locally with a key; the live numbers are recorded in the PR. Baseline file like the detector eval.
+
+## Consequences
+
+- Positive: stage 8 and 9 get typed, confirmed topics; no model ever reads two contracts; topic text is the only cross-document string and is tightly checked.
+- Negative: a new secret (`FREE_PASS_KEY`); three new endpoints and three prompts; the catalog needs careful domain work in three languages.
+- Residual risk: a client can type a topic that leaks information they chose to share (it is checked for identifiers, not for meaning); AI suggestions can be irrelevant (the client accepts each one); the free pass allows 20 calls per challenge.
