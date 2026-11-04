@@ -41,9 +41,9 @@ People and roles:
 | Browser storage | IndexedDB behind the `CacheStore` port; SHA-256 via Web Crypto API |
 | `backend/` | Python 3.13, FastAPI, stateless; progress and results via SSE |
 | Text extraction | One sandboxed subprocess per file (ADR 0011); own DOCX walker over relationship-resolved parts with `defusedxml`; `pdfminer.six` with a render-mode device (no pdfplumber, no python-docx; ADR 0004 revision, ADR 0009) |
-| AI layer | `AIProvider` port; adapters on the official `anthropic` and `openai` SDKs. **No LiteLLM.** |
+| AI layer | `AIProvider` port; adapters on the official `anthropic` and `openai` SDKs. Both SDKs and our outbound client (`app/net/`) run on `httpx2`/`httpcore2` (ADR 0016); `httpx` is a dev dependency only. **No LiteLLM.** |
 | Validation | Pydantic v2 |
-| Rate limiting | slowapi (in memory) |
+| Rate limiting | Own in-memory limiter, `app/limits/` (fixed windows, bounded tables that fail closed; ADR 0016). No slowapi. |
 | Free default model | Cloudflare Workers AI `@cf/openai/gpt-oss-120b` via the `openai` adapter, our token, Turnstile, daily quotas (ADR 0007) |
 | Demo mode | Built-in synthetic contracts with precomputed results (ADR 0007) |
 | Pseudonymization | Identifiers replaced by typed placeholders before any AI call; mandatory preview; mapping only in the browser (ADR 0008) |
@@ -58,7 +58,7 @@ People and roles:
 5. **Uploaded files:** processed in memory; limits on size, count and pages; type detected by magic bytes; DOCX archive checks (zip bomb); XML without external entities; parsing in a subprocess with time and memory limits.
 6. **Untrusted text:** contract text and model output are rendered as plain text only. No `dangerouslySetInnerHTML`. No HTML or Markdown rendering of model output. Links are not clickable.
 7. **Prompts:** instructions are separated from data (delimited document blocks). Strict JSON schema validated by Pydantic. Every quote is verified against the source text. The model gets no tools.
-8. **Frontend:** no third-party scripts, analytics, fonts or CDNs. Strict CSP in `frontend/public/_headers`.
+8. **Frontend:** no third-party scripts, analytics, fonts or CDNs. Strict CSP in `frontend/public/_headers`. The one exception is the Cloudflare Turnstile script of free mode. It runs only in the isolated frame on its own origin (ADR 0016 point 7, `frontend/turnstile/public/_headers`) and never in the app origin.
 9. **Dependencies:** minimal. A new dependency needs approval of the tech lead and `security-reviewer`. Pinned in `uv.lock` / `package-lock.json`. Install only with `uv sync --locked` / `npm ci`.
 10. **GitHub Actions:** pin every action by full commit SHA. Minimal `permissions:` per workflow.
 11. **License AGPL-3.0-only:** the UI shows a "Source code" link to this repository (AGPL section 13).

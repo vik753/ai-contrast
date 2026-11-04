@@ -13,8 +13,8 @@ How to resume after a break: read this file, then continue with the first unchec
 | 4 | Browser hash and cache | done |
 | 5 | Clause splitting | done |
 | 5b | Pseudonymization | done |
-| 6 | Model connection | next |
-| 7 | Topic catalog | planned |
+| 6 | Model connection | done |
+| 7 | Topic catalog | next |
 | 8 | Clause tagging | planned |
 | 9 | Analysis | planned |
 | 10 | Result table | planned |
@@ -100,3 +100,8 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-10-29 — PR #63 (address stops before codes), #64 (canary harness, shared masking vectors, held-out corpus), #65 (detector round 2), #66 (eval gates and baseline), #67 (detector round 3: unit words, addresses) merged.
 - Lesson: the held-out split found overfitting (round 2 held-out recall en 0.76). Round 3 used category briefs without values, and near-copies were removed from the held-out split.
 - 2026-10-29 — Stage 5b done: detector in `/api/segment`, mandatory browser preview, `/api/safety-check` with the type gate (`app/pseudo/gate.py`, AST policy test), canary harness (`backend/tests/canary/`) and detector eval. Held-out numbers: recall en 64/66, ru 64/64, uk 57/57; precision 1.000 per language; 0 `must_not_mask` violations; one gate xfail (en PERSON normal 0.929). ADR 0015 accepted; threat model T5, T6, T11 updated; finished stage 5b moved to `docs/agent/TASKS-archive.md`; README updated. `CLAUDE.md` Commands now show detection and `/api/safety-check`. The per-IP limit is still a stage 13 blocker. Next: stage 6 (model connection).
+- 2026-10-29 — PR #69 merged: stage 6 plan, ADR 0016 (proposed), two security design rounds, dependency approval (S6-T0).
+- 2026-10-29 to 2026-11-04 — PR #70 (S6-T1: `app/net/` on `httpx2`/`httpcore2`, `anthropic` and `openai` locked), #71 (Dependabot groups), #72 (S6-T3: own in-memory limiter, client IP, 1 extraction slot per client; stage 13 blocker closed), #77 (S6-T2: `AIProvider` port, adapters, presets, wire canary), #78 (S6-T4: `POST /api/provider/check`, free mode with Turnstile, quotas), #79 (S6-T5: provider settings, key storage, isolated Turnstile frame) merged.
+- 2026-11-04 — Stage 6 done. ADR 0016 accepted; threat model T1, T2, T6, T9, T10, T11 updated; `CLAUDE.md` architecture rows and rule 8 note; README (providers, key storage, free mode); finished stage 6 moved to `docs/agent/TASKS-archive.md`; stage 13 deploy checks and customer actions listed in `docs/agent/TASKS.md`. Next: stage 7 (topic catalog).
+- Lesson: a PR with a merge conflict gets no CI run, so the checks look "pending" forever. Resolve the conflict first.
+- Lesson: the ruff first-party setting must be explicit in `pyproject.toml`; otherwise import sorting can differ between local runs and CI.
