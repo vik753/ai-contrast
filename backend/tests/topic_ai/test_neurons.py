@@ -26,6 +26,7 @@ from tests.topic_ai.helpers import (
     gated_rig,
     suggest_body,
     suggest_out,
+    syn_out,
     topic_body,
     usage_reply,
 )
@@ -107,9 +108,10 @@ def test_daily_budget_refuses_before_it_would_be_exceeded() -> None:
     for n in range(60):
         done = rig.check({"provider": "free", "turnstile_token": f"c{n}"}, headers={})
         assert done.status_code == 200, n
+    before = len(rig.upstream.seen)
     r = rig.free_call("propose", token="tp")
     assert (r.status_code, error_of(r)) == (429, "free_quota_exhausted")
-    assert rig.upstream.seen == []
+    assert len(rig.upstream.seen) == before
 
 
 def test_the_reservation_is_held_while_the_call_is_in_flight() -> None:
@@ -225,7 +227,8 @@ def test_pass_call_is_refunded_when_the_provider_refuses_without_cost(status: in
     pass_ = rig.free_call("propose", token="t1").json()["free_pass"]  # call 1
     ok = rig.upstream.reply
     rig.upstream.reply = error_reply(status)
-    assert rig.free_call("propose", pass_=pass_).status_code == status
+    expected = 401 if status == 403 else status  # 403 maps to provider_auth_failed
+    assert rig.free_call("propose", pass_=pass_).status_code == expected
     rig.upstream.reply = ok
     assert _calls_left(rig, pass_) == 2
 
@@ -246,11 +249,12 @@ class _Switch(httpx2.AsyncBaseTransport):
 
     def __init__(self) -> None:
         self.hang = False
+        self.out = syn_out(en=["towing"])
 
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         if self.hang:
             await asyncio.Event().wait()
-        return model_reply(OUT)(request)
+        return model_reply(self.out)(request)
 
 
 def test_pass_call_is_not_refunded_after_a_timeout() -> None:
