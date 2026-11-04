@@ -9,8 +9,8 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 - 🟡 **Attention** needed
 - 🔴 **Unfavorable** or risky for you
 
-> **Status:** in development. Stage 0 (project rules), stage 1 (scaffold), stage 2 (file upload), stage 3 (text extraction), stage 4 (browser hash and cache) and stage 5 (clause splitting) are done. See [`docs/plan.md`](docs/plan.md).
-> You can add contracts and files, and the server extracts their text and splits it into clauses. Contract comparison is not built yet.
+> **Status:** in development. Stage 0 (project rules), stage 1 (scaffold), stage 2 (file upload), stage 3 (text extraction), stage 4 (browser hash and cache), stage 5 (clause splitting), stage 5b (pseudonymization) and stage 6 (model connection) are done. See [`docs/plan.md`](docs/plan.md).
+> You can add contracts and files, the server extracts their text and splits it into clauses, you check the masked identifiers, and you test the connection to an AI provider. Contract comparison is not built yet.
 
 ## Principles
 
@@ -35,6 +35,26 @@ Data and history: results are saved only in this browser, and only if you turn i
 ## Names are replaced before any AI call
 
 Names and other identifiers (companies, people, codes, accounts, addresses, contacts) are replaced by placeholders such as `[A.ORG_1]` before any AI call. You check every replacement in the preview and confirm it. The mapping between placeholders and real values stays in your browser. The result is pseudonymized, not anonymous: check the preview carefully.
+
+## AI providers and your key
+
+Open the provider settings to choose where the masked text goes.
+
+- **AI Contrast Free (default).** A free model on Cloudflare Workers AI (`@cf/openai/gpt-oss-120b`) with our token. You need no key. Quotas are small: a few calls per day for each client and a daily budget for all users. When the quota is used up, use your own key. The UI states which provider processes the text and its data policy.
+- **Your own key.** Presets: Anthropic, OpenAI, Google Gemini, Mistral and OpenRouter. Choose a model from the suggestions or enter a model ID. Gemini has a free key; the UI warns that Google may use free-tier data. Create a separate key for AI Contrast and set a spending limit.
+- **Custom URL (advanced).** Any OpenAI-compatible service under an `https` host name. The server accepts only a public host name on port 443. IP addresses, local hosts and `http` are refused (see [`docs/security/threat-model.md`](docs/security/threat-model.md), T2). Local models work only in development (`ALLOW_PRIVATE_PROVIDER_URLS=true`).
+- **Test connection.** The button sends one fixed tiny request. The server returns only "ok" or an error code, never model text.
+
+Where your key lives:
+
+- By default the key stays in `sessionStorage` and disappears when you close the tab.
+- "Remember on this device" is opt-in. It stores the key in `localStorage` and shows a warning.
+- "Forget key" removes the key of the selected provider. "Delete all data" in "Data and history" removes all keys and empties the open key field.
+- The browser sends the key only to our backend, only in the `X-Provider-Key` header. The server holds it for one request, never logs it and never stores it.
+
+Free mode and the Cloudflare check: free mode uses Cloudflare Turnstile against bots. The Cloudflare script runs only in a small separate page (the "Turnstile frame") on its own origin, in a sandboxed iframe. It never runs in the app page, so it cannot read your keys. The frame loads only in free mode, not on page load. Details: [`docs/adr/0016-model-connection.md`](docs/adr/0016-model-connection.md).
+
+Free mode needs server settings (`CF_ACCOUNT_ID`, `CF_AI_TOKEN`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME`). Without them the server answers `free_mode_unavailable`. For local tests of the frame, run `npm run dev:turnstile` in `frontend/` (it serves `http://localhost:5174` and uses Cloudflare's test site key).
 
 ## Tech
 
