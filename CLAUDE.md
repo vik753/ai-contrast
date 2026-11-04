@@ -229,7 +229,7 @@ Check the topic catalog (no key, no AI call):
 curl -sS http://127.0.0.1:8000/api/topics/catalog | head -c 300
 ```
 
-Expected: `{"catalog_version":"dc3af5161dbe...","domains":[{"id":"kasko","names":{"en":"Comprehensive motor insurance (KASKO)","uk":"...` (the version is the SHA-256 of the catalog files; the output is the real head of `shared/topics/`).
+Expected: `{"catalog_version":"<64-character hex string>","domains":[{"id":"kasko","names":{"en":"Comprehensive motor insurance (KASKO)","uk":"...` (the version is the SHA-256 of the catalog files; the output is the real head of `shared/topics/`).
 Check that a flagged topic is refused before any AI call (the key is a dummy, no provider is contacted):
 
 ```bash

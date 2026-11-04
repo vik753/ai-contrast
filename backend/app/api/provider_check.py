@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Annotated, Final
 
@@ -41,6 +42,7 @@ from app.http_limits import CHECK_PATH
 from app.limits.client_ip import client_key, daily_key
 from app.limits.free import CHECK_NEURONS, DAY_SECONDS, FreeQuota
 from app.limits.free_pass import FreePasses
+from app.limits.hits import Hits
 from app.limits.replay import ReplayTable
 from app.limits.slots import ClientSlots
 from app.limits.window import FixedWindowLimiter
@@ -190,6 +192,27 @@ def install(
     )
 
 
+class BusyError(Exception):
+    """No AI slot is free. Carries no data."""
+
+
+@contextmanager
+def ai_slots(state: CheckState, key: str) -> Iterator[None]:
+    """Hold one AI call of the client ``key`` and one place of the shared pool.
+
+    Raises ``BusyError`` on entry when either is taken. Both are released on every exit."""
+    if not state.client_slots.try_acquire(key):
+        raise BusyError
+    try:
+        slot = state.slots.try_slot()
+        if slot is None:
+            raise BusyError
+        with slot:
+            yield
+    finally:
+        state.client_slots.release(key)
+
+
 def check_state(request: Request) -> CheckState:
     state = getattr(request.app.state, "check_state", None)
     if not isinstance(state, CheckState):
@@ -267,36 +290,12 @@ def limited(code: str, status: int, retry_after: int) -> JSONResponse:
     return error_response(code, status, {"Retry-After": str(max(1, retry_after))})
 
 
-@dataclass
-class Hits:
-    """The check hits that one request counted, so only they can be refunded."""
-
-    state: CheckState
-    minute_key: str
-    day_key: str
-    minute: bool = False
-    day: bool = False
-
-    def refund(self) -> None:
-        if self.day:
-            self.state.day.refund(self.day_key)
-            self.day = False
-        if self.minute:
-            self.state.minute.refund(self.minute_key)
-            self.minute = False
-
-
-def _count(hits: Hits) -> JSONResponse | None:
-    decision = hits.state.minute.hit(hits.minute_key)
-    if not decision.allowed:
-        return limited("rate_limited", 429, decision.retry_after)
-    hits.minute = True
-    decision = hits.state.day.hit(hits.day_key)
-    if not decision.allowed:
-        hits.refund()
-        return limited("rate_limited", 429, decision.retry_after)
-    hits.day = True
-    return None
+def count_hits(hits: Hits) -> JSONResponse | None:
+    """Count the hits; the 429 answer when a limit refuses."""
+    refused = hits.count()
+    if refused is None:
+        return None
+    return limited("rate_limited", 429, refused.retry_after)
 
 
 def _turnstile_ok(verdict: TurnstileVerdict, settings: Settings, now: float) -> bool:
@@ -352,23 +351,16 @@ async def check_connection(
     if isinstance(plan, Response):
         return plan
     key = client_key(request.scope, state.settings)
-    hits = Hits(state, key, daily_key(key))
-    refused = _count(hits)
+    hits = Hits(state.minute, state.day, key, daily_key(key))
+    refused = count_hits(hits)
     if refused is not None:
         return refused
-    # One check per client key first, then the shared pool; both are released on every path.
-    if not state.client_slots.try_acquire(hits.day_key):
+    try:
+        with ai_slots(state, hits.day_key):
+            return await _run(state, plan, hits)
+    except BusyError:
         hits.refund()
         return limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
-    try:
-        slot = state.slots.try_slot()
-        if slot is None:
-            hits.refund()
-            return limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
-        with slot:
-            return await _run(state, plan, hits)
-    finally:
-        state.client_slots.release(hits.day_key)
 
 
 async def _parse(request: Request, header: ProviderKeyHeader, state: CheckState) -> Plan | Response:

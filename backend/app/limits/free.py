@@ -20,11 +20,13 @@ from app.limits.window import FixedWindowLimiter
 DAY_SECONDS: Final = 86400
 # The Neurons that a free check reserves before the call (a probe of a few tokens).
 CHECK_NEURONS: Final = 10
-# The Neurons that a free topic call reserves (ADR 0017 point 6). The port reports no usage,
-# so the reservation is not corrected afterwards.
-TOPIC_NEURONS: Final = 20
 # Topic calls together may use at most this share of the daily Neuron budget, in percent.
 TOPIC_BUDGET_PERCENT: Final = 30
+# Cloudflare price of the free model, in Neurons per million tokens (input, output).
+NEURONS_PER_M_INPUT: Final = 31818
+NEURONS_PER_M_OUTPUT: Final = 68182
+# A token is estimated as three characters of input (worst case for Latin and Cyrillic text).
+CHARS_PER_TOKEN: Final = 3
 
 type Reason = Literal["ip", "budget", "table"]
 
@@ -34,6 +36,29 @@ class QuotaDecision:
     allowed: bool
     retry_after: int = 0  # whole seconds until 00:00 UTC, at least 1 when refused
     reason: Reason | None = None
+
+
+def _ceil_div(numerator: int, denominator: int) -> int:
+    return -(-numerator // denominator)
+
+
+def topic_neurons(input_chars: int, max_tokens: int, *, repair: bool) -> int:
+    """The worst-case Neurons of one topic job: input at three characters per token, output at
+    ``max_tokens``; doubled when a repair call can follow. At least 1."""
+    if input_chars < 0 or max_tokens < 0:
+        msg = "input_chars and max_tokens must not be negative"
+        raise ValueError(msg)
+    micro = input_chars * NEURONS_PER_M_INPUT + CHARS_PER_TOKEN * max_tokens * NEURONS_PER_M_OUTPUT
+    neurons = max(1, _ceil_div(micro, CHARS_PER_TOKEN * 1_000_000))
+    return neurons * 2 if repair else neurons
+
+
+def usage_neurons(input_tokens: int, output_tokens: int) -> int:
+    """The Neurons of reported token usage, rounded up."""
+    micro = (
+        max(0, input_tokens) * NEURONS_PER_M_INPUT + max(0, output_tokens) * NEURONS_PER_M_OUTPUT
+    )
+    return _ceil_div(micro, 1_000_000)
 
 
 class FreeQuota:
@@ -82,26 +107,39 @@ class FreeQuota:
         self._roll()
         return max(0, self._budget - self._spent)
 
-    def reserve(self, key: str, neurons: int) -> QuotaDecision:
-        """Count one call for ``key`` and reserve ``neurons``, or refuse and count nothing."""
+    def _reserve(
+        self, key: str, neurons: int, calls: FixedWindowLimiter, *, topic: bool
+    ) -> QuotaDecision:
         if neurons < 1:
             msg = "neurons must be positive"
             raise ValueError(msg)
         now = self._roll()
-        if self._spent + neurons > self._budget:
+        over_share = topic and self._topic_spent + neurons > self._topic_cap
+        if self._spent + neurons > self._budget or over_share:
             return QuotaDecision(False, self._until_midnight(now), "budget")
-        decision = self._calls.hit(key)
+        decision = calls.hit(key)
         if not decision.allowed:
             # A key without a fresh entry is refused only because the table is full.
-            reason: Reason = "ip" if self._calls.has(key) else "table"
+            reason: Reason = "ip" if calls.has(key) else "table"
             return QuotaDecision(False, decision.retry_after, reason)
         self._spent += neurons
+        if topic:
+            self._topic_spent += neurons
         return QuotaDecision(True)
+
+    def _settle(self, estimate: int, actual: int, *, topic: bool) -> None:
+        self._roll()
+        self._spent = max(0, self._spent - estimate + max(0, actual))
+        if topic:
+            self._topic_spent = max(0, self._topic_spent - estimate + max(0, actual))
+
+    def reserve(self, key: str, neurons: int) -> QuotaDecision:
+        """Count one call for ``key`` and reserve ``neurons``, or refuse and count nothing."""
+        return self._reserve(key, neurons, self._calls, topic=False)
 
     def settle(self, estimate: int, actual: int) -> None:
         """Replace the reserved ``estimate`` by the ``actual`` Neurons (never below 0 spent)."""
-        self._roll()
-        self._spent = max(0, self._spent - estimate + max(0, actual))
+        self._settle(estimate, actual, topic=False)
 
     def refund_call(self, key: str) -> None:
         """Undo the per-key call of a reserve whose model did no work (never below 0)."""
@@ -109,25 +147,11 @@ class FreeQuota:
 
     def reserve_topic(self, key: str, neurons: int) -> QuotaDecision:
         """Like ``reserve`` for a free topic call: the topic counter and the topic share apply."""
-        if neurons < 1:
-            msg = "neurons must be positive"
-            raise ValueError(msg)
-        now = self._roll()
-        if self._spent + neurons > self._budget or self._topic_spent + neurons > self._topic_cap:
-            return QuotaDecision(False, self._until_midnight(now), "budget")
-        decision = self._topic_calls.hit(key)
-        if not decision.allowed:
-            reason: Reason = "ip" if self._topic_calls.has(key) else "table"
-            return QuotaDecision(False, decision.retry_after, reason)
-        self._spent += neurons
-        self._topic_spent += neurons
-        return QuotaDecision(True)
+        return self._reserve(key, neurons, self._topic_calls, topic=True)
 
     def settle_topic(self, estimate: int, actual: int) -> None:
         """Replace the reserved ``estimate`` of a topic call by the ``actual`` Neurons."""
-        self._roll()
-        self._spent = max(0, self._spent - estimate + max(0, actual))
-        self._topic_spent = max(0, self._topic_spent - estimate + max(0, actual))
+        self._settle(estimate, actual, topic=True)
 
     def refund_topic_call(self, key: str) -> None:
         """Undo the per-key call of a ``reserve_topic`` whose model did no work."""

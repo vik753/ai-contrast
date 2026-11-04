@@ -11,7 +11,10 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
+from app.ai.port import AIRequest
+from app.ai.prompting import data_chars
 from app.ai.prompts import PromptTemplate
+from app.limits.free import topic_neurons
 from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument
 from app.topics.ai import (
     EXPAND_MAX_TOKENS,
@@ -43,6 +46,20 @@ class Job:
     finish: Callable[[BaseModel], dict[str, object]]
     document: PseudonymizedDocument | None = None
     topic: ConfirmedTopic | None = None
+
+    def request(self, repair: int = 0) -> AIRequest:
+        return AIRequest(
+            self.template,
+            self.schema,
+            self.max_tokens,
+            document=self.document,
+            topic=self.topic,
+            repair=repair,
+        )
+
+    def neurons(self) -> int:
+        """The worst case in Neurons: the input, the output cap, and a repair call (ADR 0017)."""
+        return topic_neurons(data_chars(self.request()), self.max_tokens, repair=True)
 
 
 def propose_job(topic: ConfirmedTopic, definition: TopicDefinition) -> Job:

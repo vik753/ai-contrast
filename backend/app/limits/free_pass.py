@@ -16,6 +16,7 @@ import hmac
 import re
 import secrets
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Final
 
 __all__ = ["FreePassError", "FreePasses"]
@@ -38,6 +39,13 @@ class FreePassError(Exception):
         self.code = code
 
 
+@dataclass(slots=True)
+class _Entry:
+    expiry: int
+    calls: int
+    owner: str
+
+
 class FreePasses:
     def __init__(
         self,
@@ -56,7 +64,9 @@ class FreePasses:
         self._clock = clock
         self._ttl = ttl
         # nonce -> [expiry, calls]; the oldest pass first (the lifetime is fixed).
-        self._table: dict[str, list[int]] = {}
+        self._table: dict[str, _Entry] = {}
+        # client hash -> nonce of its one live pass (a new solve replaces the old pass).
+        self._owner: dict[str, str] = {}
 
     def _digest(self, text: str) -> str:
         return hmac.new(self._key, text.encode("ascii"), hashlib.sha256).hexdigest()
@@ -67,31 +77,44 @@ class FreePasses:
     def _drop_expired(self, now: float) -> None:
         while self._table:
             oldest = next(iter(self._table))
-            if now < self._table[oldest][0]:
+            if now < self._table[oldest].expiry:
                 return
-            del self._table[oldest]
+            self._remove(oldest)
 
-    def has_room(self) -> bool:
-        """Can a new pass be issued now?"""
+    def _remove(self, nonce: str) -> None:
+        entry = self._table.pop(nonce, None)
+        if entry is not None and self._owner.get(entry.owner) == nonce:
+            del self._owner[entry.owner]
+
+    def has_room(self, client: str) -> bool:
+        """Can a pass be issued to ``client`` now? A client with a live pass replaces it."""
         self._drop_expired(self._clock())
-        return len(self._table) < self._max_entries
+        return self._client(client) in self._owner or len(self._table) < self._max_entries
 
     def issue(self, client: str) -> tuple[str, str] | None:
         """A new pass for ``client`` (call 1 is the issuing call): ``(pass, nonce)``.
 
-        ``None`` when the table is full of live passes."""
+        The pass that ``client`` held before stops working. ``None`` when the table is full of
+        live passes and ``client`` has none."""
         now = self._clock()
         self._drop_expired(now)
-        if len(self._table) >= self._max_entries:
+        owner = self._client(client)
+        old = self._owner.get(owner)
+        if old is not None:
+            self._remove(old)
+        elif len(self._table) >= self._max_entries:
             return None
         expiry = int(now) + self._ttl
         nonce = secrets.token_hex(16)
-        self._table[nonce] = [expiry, 1]
-        head = f"{VERSION}.{AUDIENCE}.{expiry}.{self._client(client)}.{nonce}"
+        self._table[nonce] = _Entry(expiry, 1, owner)
+        self._owner[owner] = nonce
+        head = f"{VERSION}.{AUDIENCE}.{expiry}.{owner}.{nonce}"
         return f"{head}.{self._digest(head)}", nonce
 
-    def use(self, value: str, client: str) -> str:
-        """Count one call against a pass and return its nonce. Raises ``FreePassError``."""
+    def check(self, value: str, client: str) -> str:
+        """Validate a pass for ``client`` and return its nonce; count nothing.
+
+        Raises ``FreePassError``."""
         parts = value.split(".")
         if len(value) > MAX_PASS_CHARS or len(parts) != _PARTS:
             raise FreePassError("free_pass_invalid")
@@ -115,17 +138,22 @@ class FreePasses:
         entry = self._table.get(nonce)
         if entry is None:
             raise FreePassError("free_pass_invalid")
-        if entry[1] >= self._max_calls:
+        if entry.calls >= self._max_calls:
             raise FreePassError("free_pass_exhausted")
-        entry[1] += 1
+        return nonce
+
+    def use(self, value: str, client: str) -> str:
+        """Check a pass and count one call against it; return its nonce."""
+        nonce = self.check(value, client)
+        self._table[nonce].calls += 1
         return nonce
 
     def refund(self, nonce: str) -> None:
         """Give back one call of a pass whose call did no work (never below 1)."""
         entry = self._table.get(nonce)
-        if entry is not None and entry[1] > 1:
-            entry[1] -= 1
+        if entry is not None and entry.calls > 1:
+            entry.calls -= 1
 
     def discard(self, nonce: str) -> None:
         """Forget a pass that was never handed out."""
-        self._table.pop(nonce, None)
+        self._remove(nonce)

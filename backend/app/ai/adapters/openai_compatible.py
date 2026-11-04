@@ -43,6 +43,22 @@ def _text_of(payload: dict[str, object], *, require_text: bool) -> str:
     return ""
 
 
+MAX_TOKEN_COUNT = 10**9
+
+
+def _usage_of(payload: dict[str, object]) -> tuple[int, int] | None:
+    """``(prompt_tokens, completion_tokens)`` if both are plain non-negative integers."""
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    prompt, completion = usage.get("prompt_tokens"), usage.get("completion_tokens")
+    if type(prompt) is not int or type(completion) is not int:
+        return None
+    if not (0 <= prompt <= MAX_TOKEN_COUNT and 0 <= completion <= MAX_TOKEN_COUNT):
+        return None
+    return prompt, completion
+
+
 class OpenAICompatibleAdapter:
     def __init__(
         self,
@@ -59,6 +75,21 @@ class OpenAICompatibleAdapter:
         self._transport = transport
         # OpenAI's own models want ``max_completion_tokens``; compatible servers ``max_tokens``.
         self._completion_tokens_field = completion_tokens_field
+        self._usage = (0, 0)
+        self._usage_missing = False
+
+    @property
+    def usage(self) -> tuple[int, int] | None:
+        """Input and output tokens the provider reported for all calls of this adapter, or
+        ``None`` if any answer did not report them (the caller then assumes the worst case)."""
+        return None if self._usage_missing else self._usage
+
+    def _record_usage(self, payload: dict[str, object]) -> None:
+        reported = _usage_of(payload)
+        if reported is None:
+            self._usage_missing = True
+        else:
+            self._usage = (self._usage[0] + reported[0], self._usage[1] + reported[1])
 
     async def _post(
         self, messages: tuple[Message, ...], max_tokens: int, timeout: float
@@ -114,4 +145,5 @@ class OpenAICompatibleAdapter:
         payload = await self._post(
             build_messages(request), request.max_tokens, COMPLETE_TIMEOUT_SECONDS
         )
+        self._record_usage(payload)
         return _model_json(_text_of(payload, require_text=True))

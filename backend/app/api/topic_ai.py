@@ -32,7 +32,6 @@ from app.ai.port import (
     AIError,
     AIErrorCode,
     AIProvider,
-    AIRequest,
 )
 from app.ai.presets import ConnectionConfigError, PresetId
 from app.api.common import (
@@ -40,6 +39,7 @@ from app.api.common import (
     check_upload_headers,
     early_error,
     error_response,
+    extraction_slots,
     read_body,
     sandbox_limits,
 )
@@ -48,20 +48,25 @@ from app.api.provider_check import (
     AI_STATUS,
     BUSY_RETRY_AFTER_SECONDS,
     FREE_PASS_HEADER,
+    BusyError,
     CheckBody,
     CheckState,
     Plan,
+    ai_slots,
     check_state,
+    count_hits,
     limited,
     make_provider,
     plan_connection,
     verify_turnstile,
 )
 from app.api.provider_key import provider_key_header
+from app.api.topics import catalog_of
 from app.http_limits import EXPAND_PATH, PROPOSE_PATH, SUGGEST_PATH, TOPIC_MAX_BODY_BYTES
 from app.limits.client_ip import client_key, daily_key
-from app.limits.free import TOPIC_NEURONS
+from app.limits.free import usage_neurons
 from app.limits.free_pass import FreePassError
+from app.limits.hits import Hits
 from app.pseudo.gate import (
     ConfirmedTopic,
     PseudonymizedDocument,
@@ -89,6 +94,7 @@ NO_STORE: Final = {"Cache-Control": "no-store"}
 INVALID_DEFINITION: Final = "invalid_topic_definition"
 ACCEPTED_MEDIA_TYPE: Final = "application/json"
 MAX_REPAIRS: Final = 1
+_USAGE_FIELDS: Final = 2
 
 
 class SuggestBody(CheckBody):
@@ -99,25 +105,6 @@ class SuggestBody(CheckBody):
 
 class TopicBody(CheckBody):
     topic: TopicDefinition
-
-
-@dataclass
-class Hits:
-    """The rate-limit hits that one request counted, so only they can be refunded."""
-
-    state: CheckState
-    minute_key: str
-    day_key: str
-    minute: bool = False
-    day: bool = False
-
-    def refund(self) -> None:
-        if self.day:
-            self.state.topic_day.refund(self.day_key)
-            self.day = False
-        if self.minute:
-            self.state.topic_minute.refund(self.minute_key)
-            self.minute = False
 
 
 @dataclass
@@ -173,17 +160,8 @@ def _free_header(request: Request, plan: Plan, body: CheckBody) -> Response | st
 
 
 def _count(state: CheckState, key: str) -> Hits | JSONResponse:
-    hits = Hits(state, key, daily_key(key))
-    decision = state.topic_minute.hit(hits.minute_key)
-    if not decision.allowed:
-        return limited("rate_limited", 429, decision.retry_after)
-    hits.minute = True
-    decision = state.topic_day.hit(hits.day_key)
-    if not decision.allowed:
-        hits.refund()
-        return limited("rate_limited", 429, decision.retry_after)
-    hits.day = True
-    return hits
+    hits = Hits(state.topic_minute, state.topic_day, key, daily_key(key))
+    return count_hits(hits) or hits
 
 
 async def _read(request: Request, declared: int, settings: Settings, cap: int) -> bytes | Response:
@@ -237,7 +215,7 @@ async def _topic_endpoint(request: Request, *, propose: bool) -> Response:
     if isinstance(selected, Response):
         return selected
     plan, pass_value = selected
-    topic = _confirm(body.topic, request.app.state.catalog, no_attributes=propose)
+    topic = _confirm(body.topic, catalog_of(request), no_attributes=propose)
     if isinstance(topic, Response):
         return topic
     hits = _count(state, client_key(request.scope, state.settings))
@@ -313,17 +291,16 @@ def _suggest_input(
     selected = _select(request, state, body)
     if isinstance(selected, Response):
         return selected
-    if not request.app.state.catalog.has_side(body.domain, body.side):
+    if not catalog_of(request).has_side(body.domain, body.side):
         return error_response(INVALID_DEFINITION, 422)
     if sum(len(clause.text) for clause in body.document.clauses) > state.settings.suggest_max_chars:
         return error_response("document_too_large_for_suggest", 422)
     return selected
 
 
-async def _suggest_extraction(
+async def _suggest_parse(
     request: Request, state: CheckState, declared: int
-) -> Prepared | Response:
-    """Everything that runs under the extraction slots: body, validation, count, safety pass."""
+) -> tuple[SuggestBody, Plan, str | None] | Response:
     settings = state.settings
     raw = await _read(request, declared, settings, settings.safety_max_body_bytes)
     if isinstance(raw, Response):
@@ -334,13 +311,28 @@ async def _suggest_extraction(
     selected = _suggest_input(request, state, body)
     if isinstance(selected, Response):
         return selected
-    hits = _count(state, client_key(request.scope, settings))
+    return body, selected[0], selected[1]
+
+
+async def _suggest_extraction(
+    request: Request, state: CheckState, declared: int
+) -> Prepared | Response:
+    """Everything that runs under the extraction slots: body, validation, count, safety pass."""
+    parsed = await _suggest_parse(request, state, declared)
+    if isinstance(parsed, Response):
+        return parsed
+    body, plan, pass_value = parsed
+    hits = _count(state, client_key(request.scope, state.settings))
     if isinstance(hits, Response):
         return hits
-    document = await _document_pass(settings, body.document)
+    # Cheap free-mode checks before the expensive sandbox pass.
+    refused = _pass_precheck(state, plan, pass_value, hits)
+    if refused is not None:
+        return refused
+    document = await _document_pass(state.settings, body.document)
     if isinstance(document, Response):
         return document
-    return Prepared(selected[0], selected[1], hits, suggest_job(document))
+    return Prepared(plan, pass_value, hits, suggest_job(document))
 
 
 @router.post(SUGGEST_PATH)
@@ -355,8 +347,7 @@ async def suggest(request: Request) -> Response:
     )
     if isinstance(checked, JSONResponse):
         return checked
-    slots = request.app.state.client_slots
-    pool = request.app.state.extraction_limiter
+    slots, pool = extraction_slots(request)
     key = client_key(request.scope, settings)
     # The extraction slots cover the body read and the sandbox, never the AI call.
     if not slots.try_acquire(key):
@@ -380,33 +371,19 @@ async def suggest(request: Request) -> Response:
 
 async def _ai_stage(state: CheckState, prepared: Prepared) -> Response:
     hits = prepared.hits
-    # One AI call per client first, then the pool shared with the check; both always released.
-    if not state.client_slots.try_acquire(hits.day_key):
+    try:
+        with ai_slots(state, hits.day_key):
+            return await _run(state, prepared)
+    except BusyError:
         hits.refund()
         return _busy()
-    try:
-        slot = state.slots.try_slot()
-        if slot is None:
-            hits.refund()
-            return _busy()
-        with slot:
-            return await _run(state, prepared)
-    finally:
-        state.client_slots.release(hits.day_key)
 
 
 async def _complete(provider: AIProvider, job: Job) -> BaseModel:
     """One call and at most one repair call (same inputs plus a fixed error code)."""
     repair = 0
     for _ in range(MAX_REPAIRS + 1):
-        request = AIRequest(
-            job.template,
-            job.schema,
-            job.max_tokens,
-            document=job.document,
-            topic=job.topic,
-            repair=repair,
-        )
+        request = job.request(repair)
         try:
             raw = await provider.complete_json(request)
         except AIError as error:
@@ -422,23 +399,43 @@ async def _complete(provider: AIProvider, job: Job) -> BaseModel:
     raise BadOutputError
 
 
+@dataclass(frozen=True)
+class Outcome:
+    """The reply body or an error; whether the model did no work; the Neurons the provider
+    reported for the call (``None`` when unknown: the reservation then stands)."""
+
+    result: dict[str, object] | JSONResponse
+    no_cost: bool = False
+    actual: int | None = None
+
+
+def _reported(provider: AIProvider) -> int | None:
+    usage = getattr(provider, "usage", None)
+    if not (isinstance(usage, tuple) and len(usage) == _USAGE_FIELDS):
+        return None
+    return usage_neurons(*usage)
+
+
 async def _execute(
     state: CheckState, plan: Plan, key: SecretStr, free_account: str | None, job: Job
-) -> tuple[dict[str, object] | JSONResponse, bool]:
-    """The reply body or an error, and whether the model did no work (for the budget)."""
+) -> Outcome:
     try:
         provider = make_provider(state, plan, key, free_account=free_account)
+    except ConnectionConfigError as error:
+        return Outcome(error_response(error.code, 422), no_cost=True)
+    try:
         async with asyncio.timeout(state.settings.topic_ai_deadline_seconds):
             out = await _complete(provider, job)
-        return job.finish(out), False
-    except ConnectionConfigError as error:
-        return error_response(error.code, 422), True
+        return Outcome(job.finish(out), actual=_reported(provider))
     except BadOutputError:
-        return error_response("ai_bad_output", 502), False
+        return Outcome(error_response("ai_bad_output", 502), actual=_reported(provider))
     except AIError as error:
-        return error_response(error.code.value, AI_STATUS[error.code]), error.code in AI_NO_COST
+        return Outcome(
+            error_response(error.code.value, AI_STATUS[error.code]),
+            no_cost=error.code in AI_NO_COST,
+        )
     except TimeoutError:
-        return error_response(AIErrorCode.PROVIDER_UNAVAILABLE.value, 502), False
+        return Outcome(error_response(AIErrorCode.PROVIDER_UNAVAILABLE.value, 502))
 
 
 def _ok(body: dict[str, object]) -> JSONResponse:
@@ -450,38 +447,41 @@ async def _run(state: CheckState, prepared: Prepared) -> Response:
     if plan.preset is not PresetId.FREE:
         if plan.key is None:  # cheap validation guarantees a key for every non-free preset
             return error_response("invalid_provider_key", 422)
-        result, _ = await _execute(state, plan, plan.key, None, prepared.job)
-        return result if isinstance(result, Response) else _ok(result)
+        outcome = await _execute(state, plan, plan.key, None, prepared.job)
+        return outcome.result if isinstance(outcome.result, Response) else _ok(outcome.result)
     return await _run_free(state, prepared)
 
 
-async def _free_claim(state: CheckState, prepared: Prepared) -> Free | Response:
-    """Use the pass, or verify Turnstile and issue a new one."""
-    client = prepared.hits.day_key
-    if prepared.pass_value is not None:
+def _pass_precheck(
+    state: CheckState, plan: Plan, pass_value: str | None, hits: Hits
+) -> Response | None:
+    """The free-mode checks that need no network and count nothing: the pass is valid, or a
+    Turnstile token is present and the table has room. ``None`` for a keyed provider."""
+    if plan.preset is not PresetId.FREE:
+        return None
+    if pass_value is not None:
         try:
-            return Free(state.passes.use(prepared.pass_value, client), None)
+            state.passes.check(pass_value, hits.day_key)
         except FreePassError as error:
             return error_response(error.code, 403)
-    if not state.passes.has_room():
-        prepared.hits.refund()
+        return None
+    if plan.token is None:
+        return error_response("turnstile_failed", 403)
+    if not state.passes.has_room(hits.day_key):
+        hits.refund()
         return error_response("free_pass_unavailable", 503)
-    if not await verify_turnstile(state, prepared.plan.token):
+    return None
+
+
+async def _free_admit(state: CheckState, prepared: Prepared) -> Response | None:
+    """Pass or Turnstile checks of a free call. ``None`` when the call may go on."""
+    refused = _pass_precheck(state, prepared.plan, prepared.pass_value, prepared.hits)
+    if refused is not None:
+        return refused
+    if prepared.pass_value is None and not await verify_turnstile(state, prepared.plan.token):
         # Counted, not refunded: the rate limits bound a flood of bad tokens.
         return error_response("turnstile_failed", 403)
-    issued = state.passes.issue(client)
-    if issued is None:
-        prepared.hits.refund()
-        return error_response("free_pass_unavailable", 503)
-    return Free(issued[1], issued[0])
-
-
-def _undo(state: CheckState, free: Free) -> None:
-    """Take back the pass call (or the whole new pass) of a call that did not happen."""
-    if free.issued is None:
-        state.passes.refund(free.nonce)
-    else:
-        state.passes.discard(free.nonce)
+    return None
 
 
 async def _run_free(state: CheckState, prepared: Prepared) -> Response:
@@ -489,30 +489,59 @@ async def _run_free(state: CheckState, prepared: Prepared) -> Response:
     token, account = settings.cf_ai_token, settings.cf_account_id
     if token is None or account is None:  # checked before; keeps the types honest
         return error_response("free_mode_unavailable", 503)
-    claim = await _free_claim(state, prepared)
-    if isinstance(claim, Response):
-        return claim
-    key = prepared.hits.day_key
-    decision = state.quota.reserve_topic(key, TOPIC_NEURONS)
+    refused = await _free_admit(state, prepared)
+    if refused is not None:
+        return refused
+    # The worst case is reserved before the call; a pass call is consumed only after that.
+    hits, neurons = prepared.hits, prepared.job.neurons()
+    decision = state.quota.reserve_topic(hits.day_key, neurons)
     if not decision.allowed:
-        _undo(state, claim)
         if decision.reason != "ip":
             # The shared state refused, not this client: the request counts nothing.
-            prepared.hits.refund()
+            hits.refund()
         return limited("free_quota_exhausted", 429, decision.retry_after)
-    spent = TOPIC_NEURONS
+    claim = _claim(state, prepared.pass_value, hits.day_key)
+    if isinstance(claim, Response):
+        state.quota.settle_topic(neurons, 0)
+        state.quota.refund_topic_call(hits.day_key)
+        hits.refund()
+        return claim
+    spent = neurons
     try:
-        result, no_cost = await _execute(
+        outcome = await _execute(
             state, prepared.plan, token, account.get_secret_value(), prepared.job
         )
-        if no_cost:
+        if outcome.no_cost:
             spent = 0
-            state.quota.refund_topic_call(key)  # the model did no work
+            state.quota.refund_topic_call(hits.day_key)  # the model did no work
+        elif outcome.actual is not None:
+            spent = min(neurons, outcome.actual)
     finally:
-        state.quota.settle_topic(TOPIC_NEURONS, spent)
-    if isinstance(result, Response):
-        _undo(state, claim)
-        return result
+        state.quota.settle_topic(neurons, spent)
+    return _free_reply(state, claim, outcome)
+
+
+def _free_reply(state: CheckState, claim: Free, outcome: Outcome) -> Response:
+    if isinstance(outcome.result, Response):
+        # A pass call comes back only when the model did no work; a new pass is never given out.
+        if claim.issued is not None:
+            state.passes.discard(claim.nonce)
+        elif outcome.no_cost:
+            state.passes.refund(claim.nonce)
+        return outcome.result
     if claim.issued is not None:
-        result = {**result, "free_pass": claim.issued}
-    return _ok(result)
+        return _ok({**outcome.result, "free_pass": claim.issued})
+    return _ok(outcome.result)
+
+
+def _claim(state: CheckState, pass_value: str | None, day_key: str) -> Free | Response:
+    """Count the call against the pass, or issue a new pass (it replaces the client's old one)."""
+    if pass_value is not None:
+        try:
+            return Free(state.passes.use(pass_value, day_key), None)
+        except FreePassError as error:
+            return error_response(error.code, 403)
+    issued = state.passes.issue(day_key)
+    if issued is None:
+        return error_response("free_pass_unavailable", 503)
+    return Free(issued[1], issued[0])

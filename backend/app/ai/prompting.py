@@ -16,7 +16,7 @@ from typing import Final, Literal
 from app.ai.port import AIError, AIErrorCode, AIRequest
 from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument
 
-__all__ = ["CHECK_MAX_TOKENS", "CHECK_PROBE", "Message", "build_messages"]
+__all__ = ["CHECK_MAX_TOKENS", "CHECK_PROBE", "Message", "build_messages", "data_chars"]
 
 # The fixed probe of ``check()``: a constant, never built from caller input.
 CHECK_PROBE: Final = "Reply with the single word: ok"
@@ -101,3 +101,8 @@ def build_messages(request: AIRequest) -> tuple[Message, ...]:
         content = f"<<<BEGIN {kind} {nonce}>>>\n{text}\n<<<END {kind} {nonce}>>>"
         messages.append(Message("user", content))
     return tuple(messages)
+
+
+def data_chars(request: AIRequest) -> int:
+    """Characters of the data blocks of a request (the instructions are a fixed text)."""
+    return sum(len(text) for _, text in _blocks(request))
