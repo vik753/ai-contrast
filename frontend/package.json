@@ -24,11 +24,11 @@
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/rus": "1.0.0",
     "@tesseract.js-data/ukr": "1.0.0",
-    "i18next": "26.4.4",
+    "i18next": "26.5.4",
     "pdfjs-dist": "6.4.299",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "react-i18next": "17.0.16",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-i18next": "17.1.0",
     "tesseract.js": "7.0.0",
     "tesseract.js-core": "7.0.0"
   },
@@ -39,14 +39,14 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
-    "eslint": "10.12.0",
+    "eslint": "10.13.0",
     "eslint-plugin-react-hooks": "7.1.1",
-    "fake-indexeddb": "6.2.5",
+    "fake-indexeddb": "6.2.6",
     "jsdom": "29.1.1",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.71.2",
-    "vite": "8.3.4",
-    "vitest": "5.0.4"
+    "typescript-eslint": "8.72.0",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   }
 }
