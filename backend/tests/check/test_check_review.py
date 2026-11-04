@@ -102,9 +102,8 @@ def _scope(ip: str, length: int) -> dict[str, Any]:
 
 
 def test_check_second_concurrent_check_from_one_ip_returns_503_busy() -> None:
-    rig = Rig(check_per_minute=1000)
     gate = GateTransport()
-    rig.app.state.provider_transport = gate
+    rig = Rig(check_per_minute=1000, provider_transport=gate)
     body = json.dumps(valid_body()).encode()
 
     async def wait_started(n: int) -> None:
@@ -150,9 +149,8 @@ def test_custom_alternative_loopback_forms_are_refused_without_network(url: str)
 
 
 def test_check_second_concurrent_check_from_one_slash_48_returns_503_busy() -> None:
-    rig = Rig(check_per_minute=1000)
     gate = GateTransport()
-    rig.app.state.provider_transport = gate
+    rig = Rig(check_per_minute=1000, provider_transport=gate)
     body = json.dumps(valid_body()).encode()
 
     async def scenario() -> AsgiRun:

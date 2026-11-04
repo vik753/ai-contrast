@@ -73,15 +73,17 @@ def siteverify_reply(
 class Rig:
     """An app with fake provider and Turnstile transports and a fixed clock."""
 
-    def __init__(self, **settings: Any) -> None:
+    def __init__(self, *, provider_transport: Any = None, **settings: Any) -> None:
         settings.setdefault("environment", "development")
         self.clock = Clock()
-        self.upstream = FakeUpstream(model_reply())
+        self.upstream = provider_transport or FakeUpstream(model_reply())
         self.turnstile = FakeUpstream(siteverify_reply(clock=self.clock))
-        self.app: FastAPI = create_app(Settings(**settings))
-        self.app.state.provider_transport = self.upstream
-        self.app.state.turnstile_transport = self.turnstile
-        self.app.state.clock = self.clock
+        self.app: FastAPI = create_app(
+            Settings(**settings),
+            provider_transport=self.upstream,
+            turnstile_transport=self.turnstile,
+            clock=self.clock,
+        )
 
     def client(self, ip: str = PUBLIC_IP) -> TestClient:
         return TestClient(self.app, raise_server_exceptions=False, client=(ip, 50000))

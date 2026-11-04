@@ -43,11 +43,11 @@ Requests that fail cheap validation count nothing.
 Free mode is available only when `cf_account_id`, `cf_ai_token` and `turnstile_secret_key` are all set.
 `turnstile_expected_hostname` unset: the hostname is not compared. Set: it must be equal.
 
-## Test hooks (optional attributes on `app.state`, read on each request; unset = production behavior)
+## Test hooks (keyword arguments of `create_app` and `install()`; unset = production behavior; `app.state` is never read)
 
-- `app.state.provider_transport`: an `httpx2` transport passed as `transport=` to `provider_for` (also for `free`).
-- `app.state.turnstile_transport`: an `httpx2` transport for the siteverify call.
-- `app.state.clock`: `Callable[[], float]`, UTC epoch seconds, used by all windows, the quota and the `challenge_ts` age.
+- `create_app(..., provider_transport=...)` (forwarded to `install()`): an `httpx2` transport passed as `transport=` to `provider_for` (also for `free`).
+- `create_app(..., turnstile_transport=...)`: an `httpx2` transport for the siteverify call.
+- `create_app(..., clock=...)`: `Callable[[], float]`, UTC epoch seconds, used by all windows, the quota and the `challenge_ts` age.
 
 ## New modules
 
