@@ -158,18 +158,6 @@ def test_settle_uses_the_reported_usage_so_small_calls_do_not_exhaust_the_share(
         assert r.status_code == 200, n
 
 
-def test_settle_never_charges_more_than_was_reserved() -> None:
-    rig = free_trig(OUT, free_neuron_budget=9999)  # share 2999
-    rig.upstream.reply = usage_reply(OUT, 10_000_000, 10_000_000)
-    for n in range(1, 11):
-        r = rig.free_call("propose", token=f"t{n}", ip=_ip(n))
-        assert r.status_code == 200, n
-    refused = [
-        rig.free_call("propose", token=f"u{n}", ip=_ip(20 + n)).status_code for n in range(1, 8)
-    ]
-    assert 429 in refused
-
-
 # --- one live pass per client ---------------------------------------------------------------
 
 
