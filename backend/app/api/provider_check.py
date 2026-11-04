@@ -355,7 +355,7 @@ async def check_connection(
     if refused is not None:
         return refused
     # One check per client key first, then the shared pool; both are released on every path.
-    if not state.client_slots.try_acquire(key):
+    if not state.client_slots.try_acquire(hits.day_key):
         hits.refund()
         return _limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
     try:
@@ -366,7 +366,7 @@ async def check_connection(
         with slot:
             return await _run(state, plan, hits)
     finally:
-        state.client_slots.release(key)
+        state.client_slots.release(hits.day_key)
 
 
 async def _parse(request: Request, header: ProviderKeyHeader, state: CheckState) -> Plan | Response:

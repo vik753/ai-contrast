@@ -147,3 +147,27 @@ def test_custom_alternative_loopback_forms_are_refused_without_network(url: str)
     assert response.json()["error"].startswith("provider_")
     assert rig.upstream.seen == []
     assert HOSTNAME not in response.text
+
+
+def test_check_second_concurrent_check_from_one_slash_48_returns_503_busy() -> None:
+    rig = Rig(check_per_minute=1000)
+    gate = GateTransport()
+    rig.app.state.provider_transport = gate
+    body = json.dumps(valid_body()).encode()
+
+    async def scenario() -> AsgiRun:
+        first = asyncio.create_task(
+            drive(rig.app, _scope("2001:db8:1:1::1", len(body)), chunks(body))
+        )
+        for _ in range(500):
+            if gate.started >= 1:
+                break
+            await asyncio.sleep(0.01)
+        other_64 = await drive(rig.app, _scope("2001:db8:1:2::1", len(body)), chunks(body))
+        gate.release.set()
+        await first
+        return other_64
+
+    run = asyncio.run(scenario())
+    assert run.status == 503
+    assert json.loads(run.body) == {"error": "busy"}

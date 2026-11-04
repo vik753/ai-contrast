@@ -75,6 +75,10 @@ Order: S6-T0 (dependency approval) first; then S6-T1 (`app/net/` on `httpx2`); t
 
 ## Open follow-ups
 
+### Stage 7 follow-ups (from S6-T4)
+
+- Stage 7: make the tests/check helpers pass hooks to `install()` and delete the `app.state.*` fallback in `CheckState` (code review S6-T4).
+
 ### Stage 10 follow-ups (from stage 5b)
 
 - Stage 10: never restore names in model text at neutralized spans (`⟦…⟧`) or at tokens with non-`[` brackets.
