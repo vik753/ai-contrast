@@ -170,3 +170,30 @@ def gated_rig(gate: httpx2.AsyncBaseTransport, **settings: Any) -> TRig:
         clock=rig.clock,
     )
     return rig
+
+
+def usage_reply(text: str, prompt_tokens: int, completion_tokens: int) -> Any:
+    """An OpenAI-format answer that reports ``usage`` (the free provider path)."""
+
+    def reply(request: httpx2.Request) -> httpx2.Response:
+        body = {
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1,
+            "model": "test-model-1",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": text},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        }
+        return httpx2.Response(200, json=body)
+
+    return reply

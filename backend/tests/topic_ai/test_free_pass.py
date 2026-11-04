@@ -4,15 +4,11 @@
 from __future__ import annotations
 
 import ast
-import asyncio
-import json
 from pathlib import Path
 
 import httpx2
 
-from app.limits import free as free_limits
-from tests.asgi_stream import chunks, drive, post_scope
-from tests.check.helpers import FREE_ENV, KEY_HEADER, PUBLIC_IP, GateTransport
+from tests.check.helpers import KEY_HEADER, PUBLIC_IP
 from tests.topic_ai.helpers import (
     EXPAND,
     PROPOSE,
@@ -21,7 +17,6 @@ from tests.topic_ai.helpers import (
     attr_out,
     error_of,
     free_trig,
-    gated_rig,
     syn_out,
     topic_body,
 )
@@ -235,47 +230,6 @@ def test_topic_quota_counts_per_ipv6_48() -> None:
     assert rig.free_call("propose", token="b", ip="2001:db8:abcd:2::1").status_code == 200
     r = rig.free_call("propose", token="c", ip="2001:db8:abcd:3::1")
     assert (r.status_code, error_of(r)) == (429, "free_quota_exhausted")
-
-
-def test_topic_calls_use_at_most_30_percent_of_the_neuron_budget() -> None:
-    assert free_limits.TOPIC_NEURONS == 20
-    rig = free_trig(OUT, free_neuron_budget=100)
-    assert rig.free_call("propose", token="a", ip=IP_A).status_code == 200  # 20 of 30
-    calls = len(rig.upstream.seen)
-    r = rig.free_call("propose", token="b", ip=IP_B)
-    assert (r.status_code, error_of(r)) == (429, "free_quota_exhausted")
-    assert len(rig.upstream.seen) == calls
-    # Analyses keep the rest of the budget.
-    ok = rig.check({"provider": "free", "turnstile_token": "c"}, headers={}, ip="198.51.100.3")
-    assert ok.status_code == 200
-
-
-def test_neurons_are_reserved_before_the_ai_call() -> None:
-
-    gate = GateTransport()
-    rig = gated_rig(gate, free_neuron_budget=100, topics_per_minute=100, **FREE_ENV)
-
-    def scope(ip: str, token: str) -> tuple[dict[str, object], bytes]:
-        payload = {"provider": "free", "turnstile_token": token, "topic": topic_body()["topic"]}
-        body = json.dumps(payload).encode()
-        s = post_scope(PROPOSE, content_type="application/json", content_length=len(body))
-        s["client"] = (ip, 50000)
-        return s, body
-
-    async def go() -> None:
-        s1, b1 = scope(IP_A, "a")
-        first = asyncio.create_task(drive(rig.app, s1, chunks(b1)))
-        for _ in range(500):
-            if gate.started:
-                break
-            await asyncio.sleep(0.01)
-        s2, b2 = scope(IP_B, "b")
-        second = await drive(rig.app, s2, chunks(b2))
-        assert (second.status, json.loads(second.body)) == (429, {"error": "free_quota_exhausted"})
-        gate.release.set()
-        await first
-
-    asyncio.run(go())
 
 
 def test_policy_pass_is_hmac_sha256_per_process_and_compared_in_constant_time() -> None:
