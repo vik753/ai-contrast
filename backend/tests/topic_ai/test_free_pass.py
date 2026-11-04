@@ -12,7 +12,7 @@ import httpx2
 
 from app.limits import free as free_limits
 from tests.asgi_stream import chunks, drive, post_scope
-from tests.check.helpers import FREE_ENV, KEY_HEADER, GateTransport
+from tests.check.helpers import FREE_ENV, KEY_HEADER, PUBLIC_IP, GateTransport
 from tests.topic_ai.helpers import (
     EXPAND,
     PROPOSE,
@@ -27,7 +27,7 @@ from tests.topic_ai.helpers import (
 )
 
 APP = Path(__file__).resolve().parents[2] / "app"
-IP_A, IP_B = "198.51.100.1", "198.51.100.2"
+IP_A, IP_B = PUBLIC_IP, "198.51.100.2"
 OUT = attr_out(attr())
 
 

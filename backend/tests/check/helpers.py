@@ -56,10 +56,10 @@ def siteverify_reply(
     clock: Clock | None = None,
 ) -> Callable[[httpx2.Request], httpx2.Response]:
     """A siteverify answer. ``age`` is the age of the challenge in seconds."""
-    now = (clock or Clock()).now
+    source = clock or Clock()
 
     def reply(request: httpx2.Request) -> httpx2.Response:
-        ts = datetime.fromtimestamp(now - age, UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        ts = datetime.fromtimestamp(source.now - age, UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         body: dict[str, Any] = {"success": success, "hostname": hostname, "action": action}
         if success:
             body["challenge_ts"] = ts
