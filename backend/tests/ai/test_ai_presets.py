@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import SecretStr
+
 from app.ai.adapters.anthropic import AnthropicAdapter
 from app.ai.adapters.openai_compatible import OpenAICompatibleAdapter
 from app.ai.factory import provider_for
 from app.ai.port import AIProvider
 from app.ai.presets import PRESETS, AdapterKind, ConnectionConfigError, PresetId
-from pydantic import SecretStr
-
 from tests.ai.helpers import KEY, FakeUpstream, make_provider
 
 URLS = {

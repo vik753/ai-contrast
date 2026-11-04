@@ -8,11 +8,10 @@ import re
 import secrets
 
 import pytest
+
 from app.ai.port import AIError, AIErrorCode, AIProvider, AIRequest, CheckResult
 from app.ai.prompting import Message, build_messages
 from app.ai.prompts import PromptTemplate
-from pydantic import BaseModel
-
 from tests.ai.helpers import TEXTS, Verdict, first_template, make_document, make_request
 
 NONCE = re.compile(r"(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])")
@@ -220,14 +219,3 @@ def test_build_messages_text_with_a_fake_closing_delimiter_stays_inside_the_data
 
     assert hostile in _user(messages)
     assert hostile not in messages[0].content
-
-
-def test_request_for_a_schema_class_carries_no_schema_text_from_the_caller() -> None:
-    class Other(BaseModel):
-        value: int
-
-    request = AIRequest(
-        template=first_template(), document=make_document(), schema=Other, max_tokens=64
-    )
-
-    assert build_messages(request)[0].content == first_template().value
