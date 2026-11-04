@@ -24,6 +24,7 @@ from dataclasses import InitVar, dataclass
 from itertools import pairwise
 from typing import Final, NoReturn, final
 
+from app.injection import scan
 from app.pseudo import checksums
 from app.pseudo.detector import TooManyIdentifiersError, detect
 from app.pseudo.hits import HIGH
@@ -39,13 +40,23 @@ from app.safety.keywords import keyword_digit_spans
 from app.safety.placeholders import Placeholder, PlaceholderError, find_placeholders
 from app.segment.model import Clause
 from app.textclean import TextCleaner
+from app.topics.catalog import Catalog
+from app.topics.model import (
+    AttributeDefinition,
+    TopicDefinition,
+    TopicDefinitionError,
+    check_structure,
+)
+from app.topics.safety import TextKind, TopicTextError, check_topic_text
 
 __all__ = [
+    "ConfirmedAttribute",
     "ConfirmedTopic",
     "PseudonymizedClause",
     "PseudonymizedDocument",
     "PseudonymizedText",
     "SafetyError",
+    "confirm_topic",
     "document_digest",
     "safety_pass",
 ]
@@ -129,8 +140,44 @@ class PseudonymizedText:
 
 @final
 @dataclass(frozen=True, slots=True)
+class ConfirmedAttribute:
+    id: str
+    label: str
+    type: str
+    units: tuple[str, ...]
+    direction: str
+    order: tuple[str, ...]
+    values: tuple[str, ...]
+    value_ids: tuple[str, ...]
+    direction_source: str
+    token: InitVar[object]
+
+    def __post_init__(self, token: object) -> None:
+        _check(token, self, ConfirmedAttribute)
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        _no_subclass()
+
+    __copy__ = _refuse
+    __deepcopy__ = _refuse
+    __reduce__ = _refuse
+    __reduce_ex__ = _refuse
+
+
+@final
+@dataclass(frozen=True, slots=True)
 class ConfirmedTopic:
+    """A topic the client confirmed. Not bound to a document (ADR 0017 point 3)."""
+
+    domain: str | None
+    topic_id: str
     title: str
+    description: str
+    side: str
+    attributes: tuple[ConfirmedAttribute, ...]
+    synonyms_en: tuple[str, ...]
+    synonyms_uk: tuple[str, ...]
+    synonyms_ru: tuple[str, ...]
     token: InitVar[object]
 
     def __post_init__(self, token: object) -> None:
@@ -308,5 +355,109 @@ def safety_pass(
     return PseudonymizedDocument(
         untrusted.label,
         tuple(PseudonymizedClause(c.id, c.text, _SENTINEL) for c in untrusted.clauses),
+        _SENTINEL,
+    )
+
+
+MAX_TOPIC_BYTES: Final = 4096
+
+
+def _topic_bytes(definition: TopicDefinition) -> int:
+    parts: list[str] = [
+        definition.title,
+        definition.description,
+        definition.topic_id,
+        definition.side,
+        definition.domain or "",
+    ]
+    for attribute in definition.attributes:
+        parts += [attribute.id, attribute.label, *attribute.units, *attribute.values]
+        parts += [*attribute.order, *attribute.value_ids]
+    parts += [*definition.synonyms_en, *definition.synonyms_uk, *definition.synonyms_ru]
+    return sum(len(part.encode("utf-8")) for part in parts)
+
+
+def _checked(text: str, kind: TextKind, field: str, lang: str | None = None) -> None:
+    try:
+        check_topic_text(text, kind, lang)
+    except TopicTextError as error:
+        error.field = field
+        raise
+
+
+def _check_texts(definition: TopicDefinition) -> None:
+    _checked(definition.title, TextKind.NAME, "title")
+    if definition.description:
+        _checked(definition.description, TextKind.DESCRIPTION, "description")
+    for number, attribute in enumerate(definition.attributes):
+        where = f"attributes.{number}"
+        # The id is not shown, but a model reads it: Layer 2 sees it as words.
+        if scan(attribute.id.replace("_", " ")):
+            raise TopicTextError("topic_flagged", field=f"{where}.id")
+        _checked(attribute.label, TextKind.LABEL, f"{where}.label")
+        for index, value in enumerate(attribute.values):
+            _checked(value, TextKind.VALUE, f"{where}.values.{index}")
+    for lang, items in (
+        ("en", definition.synonyms_en),
+        ("uk", definition.synonyms_uk),
+        ("ru", definition.synonyms_ru),
+    ):
+        for index, synonym in enumerate(items):
+            _checked(synonym, TextKind.SYNONYM, f"synonyms_{lang}.{index}", lang)
+
+
+def _confirm_attribute(attribute: AttributeDefinition) -> ConfirmedAttribute:
+    return ConfirmedAttribute(
+        attribute.id,
+        attribute.label,
+        attribute.type,
+        attribute.units,
+        attribute.direction,
+        attribute.order,
+        attribute.values,
+        attribute.value_ids,
+        attribute.direction_source,
+        _SENTINEL,
+    )
+
+
+def confirm_topic(definition: TopicDefinition, *, catalog: Catalog | None = None) -> ConfirmedTopic:
+    """Check a topic definition and make the only topic value the AI layer accepts.
+
+    A catalog topic (``origin="catalog"``) must equal the catalog's own topic; its texts were
+    checked when the catalog was loaded. Any other topic passes the text safety pass, the
+    direction rule (only the catalog or the client sets a direction; a model-proposed
+    attribute stays ``none``) and the 4 KiB cap. Raises ``TopicDefinitionError`` or
+    ``TopicTextError``; neither holds any text.
+    """
+    check_structure(definition)
+    if definition.origin == "catalog":
+        if catalog is None:
+            raise TopicDefinitionError("invalid_topic_definition")
+        if not catalog.matches(definition):
+            raise TopicDefinitionError("catalog_topic_changed")
+    else:
+        for attribute in definition.attributes:
+            if attribute.direction != "none" and attribute.direction_source == "catalog":
+                raise TopicDefinitionError("invalid_direction")
+        if _topic_bytes(definition) > MAX_TOPIC_BYTES:
+            raise TopicDefinitionError("topic_too_large")
+        if (
+            catalog is not None
+            and definition.domain is not None
+            and not catalog.has_side(definition.domain, definition.side)
+        ):
+            raise TopicDefinitionError("invalid_topic_definition")
+        _check_texts(definition)
+    return ConfirmedTopic(
+        definition.domain,
+        definition.topic_id,
+        definition.title,
+        definition.description,
+        definition.side,
+        tuple(_confirm_attribute(attribute) for attribute in definition.attributes),
+        definition.synonyms_en,
+        definition.synonyms_uk,
+        definition.synonyms_ru,
         _SENTINEL,
     )

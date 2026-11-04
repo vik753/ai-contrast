@@ -1,0 +1,286 @@
+{
+  "id": "kasko",
+  "names": {"en": "Comprehensive motor insurance (KASKO)", "uk": "Добровільне страхування авто (КАСКО)", "ru": "Добровольное страхование авто (КАСКО)"},
+  "sides": [
+    {"id": "insured", "names": {"en": "Insured (policyholder)", "uk": "Страхувальник", "ru": "Страхователь"}},
+    {"id": "insurer", "names": {"en": "Insurer", "uk": "Страховик", "ru": "Страховщик"}}
+  ],
+  "topics": [
+    {
+      "id": "insured_risks",
+      "names": {"en": "Insured risks", "uk": "Страхові ризики", "ru": "Страховые риски"},
+      "descriptions": {"en": "Which events the policy covers (collision, theft, fire, natural events, vandalism).", "uk": "Які події покриває поліс (ДТП, крадіжка, пожежа, стихія, вандалізм).", "ru": "Какие события покрывает полис (ДТП, кража, пожар, стихия, вандализм)."},
+      "synonyms": {
+        "en": ["insured risk", "insured event", "covered risk", "perils covered", "scope of cover", "collision", "natural disaster", "vandalism"],
+        "uk": ["страхов ризик", "страхов випадк", "страхов под", "покриває", "перелік ризик", "дтп", "стихійн", "вандалізм"],
+        "ru": ["страхов риск", "страхов случа", "страхов событи", "покрывает", "перечень риск", "дтп", "стихийн", "вандализм"]
+      },
+      "attributes": [
+        {"id": "covered_risks", "labels": {"en": "Covered risks", "uk": "Покриті ризики", "ru": "Покрытые риски"}, "type": "categories",
+          "values": [
+            {"id": "collision", "labels": {"en": "Collision / accident", "uk": "ДТП", "ru": "ДТП"}},
+            {"id": "theft", "labels": {"en": "Theft", "uk": "Крадіжка", "ru": "Кража"}},
+            {"id": "fire", "labels": {"en": "Fire / explosion", "uk": "Пожежа / вибух", "ru": "Пожар / взрыв"}},
+            {"id": "natural_events", "labels": {"en": "Natural events", "uk": "Стихійні явища", "ru": "Стихийные явления"}},
+            {"id": "vandalism", "labels": {"en": "Vandalism / third-party acts", "uk": "Вандалізм / дії третіх осіб", "ru": "Вандализм / действия третьих лиц"}},
+            {"id": "falling_objects", "labels": {"en": "Falling objects", "uk": "Падіння предметів", "ru": "Падение предметов"}},
+            {"id": "glass", "labels": {"en": "Glass damage", "uk": "Пошкодження скла", "ru": "Повреждение стекол"}},
+            {"id": "military_risks", "labels": {"en": "War / military risks", "uk": "Воєнні ризики", "ru": "Военные риски"}}
+          ],
+          "directions": {"insured": "more_better", "insurer": "fewer_better"}}
+      ]
+    },
+    {
+      "id": "exclusions",
+      "names": {"en": "Exclusions", "uk": "Винятки зі страхового покриття", "ru": "Исключения из страхового покрытия"},
+      "descriptions": {"en": "Situations where the insurer does not pay or may refuse.", "uk": "Ситуації, коли страховик не виплачує або може відмовити.", "ru": "Ситуации, когда страховщик не платит или может отказать."},
+      "synonyms": {
+        "en": ["exclusion", "not covered", "shall not be liable", "refuse payment", "grounds for refusal", "intoxication", "without a licence"],
+        "uk": ["виключен", "виняток", "винятк", "не є страховим випадком", "не відшкодов", "підстави для відмов", "сп'янін", "без посвідчення"],
+        "ru": ["исключен", "изъяти", "не является страховым случаем", "не возмещ", "основания для отказ", "опьянени", "без удостоверения"]
+      },
+      "attributes": [
+        {"id": "excluded_situations", "labels": {"en": "Excluded situations", "uk": "Виключені ситуації", "ru": "Исключённые ситуации"}, "type": "categories",
+          "values": [
+            {"id": "intoxication", "labels": {"en": "Alcohol or drugs", "uk": "Алкоголь або наркотики", "ru": "Алкоголь или наркотики"}},
+            {"id": "no_licence", "labels": {"en": "Driver without licence", "uk": "Водій без посвідчення", "ru": "Водитель без удостоверения"}},
+            {"id": "unlisted_driver", "labels": {"en": "Driver not listed in policy", "uk": "Водій не вказаний у полісі", "ru": "Водитель не указан в полисе"}},
+            {"id": "commercial_use", "labels": {"en": "Commercial use or taxi", "uk": "Комерційне використання або таксі", "ru": "Коммерческое использование или такси"}},
+            {"id": "racing", "labels": {"en": "Racing or tests", "uk": "Змагання або випробування", "ru": "Соревнования или испытания"}},
+            {"id": "wear", "labels": {"en": "Wear and tear", "uk": "Знос і експлуатаційні дефекти", "ru": "Износ и эксплуатационные дефекты"}},
+            {"id": "war", "labels": {"en": "War and military actions", "uk": "Війна та воєнні дії", "ru": "Война и военные действия"}},
+            {"id": "late_notice", "labels": {"en": "Late notice of the event", "uk": "Несвоєчасне повідомлення", "ru": "Несвоевременное уведомление"}},
+            {"id": "left_scene", "labels": {"en": "Leaving the scene", "uk": "Залишення місця ДТП", "ru": "Оставление места ДТП"}}
+          ],
+          "directions": {"insured": "fewer_better", "insurer": "more_better"}},
+        {"id": "exclusions_text", "labels": {"en": "Other exclusions", "uk": "Інші винятки", "ru": "Прочие исключения"}, "type": "text", "directions": {"insured": "none", "insurer": "none"}}
+      ]
+    },
+    {
+      "id": "deductible",
+      "names": {"en": "Deductible", "uk": "Франшиза", "ru": "Франшиза"},
+      "descriptions": {"en": "The part of each loss the insured pays, fixed or as a share of the sum insured.", "uk": "Частина збитку, яку сплачує страхувальник, у сумі або у відсотках від страхової суми.", "ru": "Часть убытка, которую оплачивает страхователь, в сумме или в процентах от страховой суммы."},
+      "synonyms": {
+        "en": ["deductible", "excess", "own risk", "franchise", "self-participation"],
+        "uk": ["франшиз", "власн участь", "безумовн франшиз", "умовн франшиз"],
+        "ru": ["франшиз", "собственн участи", "безусловн франшиз", "условн франшиз"]
+      },
+      "attributes": [
+        {"id": "deductible_amount", "labels": {"en": "Deductible per event", "uk": "Франшиза за подію", "ru": "Франшиза за событие"}, "type": "amount", "units": ["UAH", "USD", "EUR", "percent_of_sum", "percent_of_loss"], "directions": {"insured": "lower_better", "insurer": "higher_better"}},
+        {"id": "deductible_scope", "labels": {"en": "Deductible applies", "uk": "Франшиза застосовується", "ru": "Франшиза применяется"}, "type": "enum",
+          "values": [
+            {"id": "annual_aggregate", "labels": {"en": "Once per policy year (aggregate)", "uk": "Раз на рік дії полісу (агрегатна)", "ru": "Раз в год действия полиса (агрегатная)"}},
+            {"id": "per_event", "labels": {"en": "Per event", "uk": "За кожною подією", "ru": "За каждым событием"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"insured": ["annual_aggregate", "per_event", "not_stated"], "insurer": ["per_event", "annual_aggregate", "not_stated"]}},
+        {"id": "deductible_type", "labels": {"en": "Deductible type", "uk": "Тип франшизи", "ru": "Тип франшизы"}, "type": "enum",
+          "values": [
+            {"id": "none", "labels": {"en": "No deductible", "uk": "Без франшизи", "ru": "Без франшизы"}},
+            {"id": "conditional", "labels": {"en": "Conditional (no payout below it)", "uk": "Умовна (не виплачується нижче неї)", "ru": "Условная (не выплачивается ниже неё)"}},
+            {"id": "unconditional", "labels": {"en": "Unconditional (always deducted)", "uk": "Безумовна (завжди віднімається)", "ru": "Безусловная (всегда вычитается)"}}
+          ],
+          "directions": {"insured": ["none", "conditional", "unconditional"], "insurer": ["unconditional", "conditional", "none"]}}
+      ]
+    },
+    {
+      "id": "sum_insured_depreciation",
+      "names": {"en": "Sum insured and depreciation", "uk": "Страхова сума та знос", "ru": "Страховая сумма и износ"},
+      "descriptions": {"en": "The maximum payout, whether it falls during the term, and the wear deduction.", "uk": "Максимальна виплата, чи зменшується вона протягом дії договору, та вирахування зносу.", "ru": "Максимальная выплата, уменьшается ли она в период действия договора, и вычет износа."},
+      "synonyms": {
+        "en": ["sum insured", "insured value", "limit of liability", "depreciation", "wear deduction", "actual value"],
+        "uk": ["страхова сум", "страхов вартіст", "ліміт відповідальн", "знос", "амортизац", "дійсна вартіст"],
+        "ru": ["страхова сумм", "страхов стоимост", "лимит ответственн", "износ", "амортизац", "действительн стоимост"]
+      },
+      "attributes": [
+        {"id": "sum_insured", "labels": {"en": "Sum insured", "uk": "Страхова сума", "ru": "Страховая сумма"}, "type": "amount", "units": ["UAH", "USD", "EUR"], "directions": {"insured": "higher_better", "insurer": "lower_better"}},
+        {"id": "depreciation_rate", "labels": {"en": "Depreciation per year", "uk": "Знос за рік", "ru": "Износ за год"}, "type": "percentage", "directions": {"insured": "lower_better", "insurer": "higher_better"}}
+      ]
+    },
+    {
+      "id": "payout_term",
+      "names": {"en": "Payout term", "uk": "Строк страхової виплати", "ru": "Срок страховой выплаты"},
+      "descriptions": {"en": "Time the insurer has to decide and pay after the documents arrive.", "uk": "Строк, протягом якого страховик ухвалює рішення та виплачує після отримання документів.", "ru": "Срок, в течение которого страховщик принимает решение и выплачивает после получения документов."},
+      "synonyms": {
+        "en": ["payout term", "within days", "pay within", "settlement period", "claim decision", "payment deadline"],
+        "uk": ["строк виплат", "протягом робочих днів", "страхов виплат", "страхов відшкодуван", "рішення про виплат", "термін виплат"],
+        "ru": ["срок выплат", "в течение рабочих дней", "страхов выплат", "страхов возмещен", "решение о выплат", "срок оплат"]
+      },
+      "attributes": [
+        {"id": "payout_days", "labels": {"en": "Days to pay", "uk": "Строк виплати", "ru": "Срок выплаты"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "lower_better", "insurer": "higher_better"}},
+        {"id": "payout_start_event", "labels": {"en": "Payout term starts from", "uk": "Строк рахується з", "ru": "Срок считается с"}, "type": "enum",
+          "values": [
+            {"id": "event_notice", "labels": {"en": "Notice of the event", "uk": "Повідомлення про подію", "ru": "Уведомление о событии"}},
+            {"id": "documents_received", "labels": {"en": "All documents received", "uk": "Отримання всіх документів", "ru": "Получение всех документов"}},
+            {"id": "decision_made", "labels": {"en": "Decision to pay", "uk": "Рішення про виплату", "ru": "Решение о выплате"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"insured": ["event_notice", "documents_received", "decision_made", "not_stated"], "insurer": ["decision_made", "documents_received", "event_notice", "not_stated"]}},
+        {"id": "decision_days", "labels": {"en": "Days to decide", "uk": "Строк ухвалення рішення", "ru": "Срок принятия решения"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "lower_better", "insurer": "higher_better"}}
+      ]
+    },
+    {
+      "id": "repair_method",
+      "names": {"en": "Repair - dealer or cash", "uk": "Ремонт - дилер чи грошова виплата", "ru": "Ремонт - дилер или денежная выплата"},
+      "descriptions": {"en": "How the loss is settled - repair at a chosen service, or payment by estimate.", "uk": "Як врегульовується збиток - ремонт на СТО чи виплата за калькуляцією.", "ru": "Как урегулируется убыток - ремонт на СТО или выплата по калькуляции."},
+      "synonyms": {
+        "en": ["dealer repair", "authorised service", "repair shop", "cash settlement", "estimate", "original parts", "repair cost"],
+        "uk": ["офіційн дилер", "станці технічн обслуговуван", "сто ", "калькуляц", "оригінальн запчастин", "грошов виплат", "вартість ремонт"],
+        "ru": ["официальн дилер", "станци техническ обслуживан", "сто ", "калькуляц", "оригинальн запчаст", "денежн выплат", "стоимость ремонт"]
+      },
+      "attributes": [
+        {"id": "settlement_method", "labels": {"en": "Settlement method", "uk": "Спосіб врегулювання", "ru": "Способ урегулирования"}, "type": "enum",
+          "values": [
+            {"id": "dealer_repair", "labels": {"en": "Repair at official dealer", "uk": "Ремонт у офіційного дилера", "ru": "Ремонт у официального дилера"}},
+            {"id": "partner_service", "labels": {"en": "Repair at insurer partner service", "uk": "Ремонт на СТО-партнері страховика", "ru": "Ремонт на СТО-партнёре страховщика"}},
+            {"id": "cash_estimate", "labels": {"en": "Cash by estimate", "uk": "Виплата за калькуляцією", "ru": "Выплата по калькуляции"}},
+            {"id": "insurer_choice", "labels": {"en": "Insurer chooses", "uk": "Вибір страховика", "ru": "Выбор страховщика"}}
+          ],
+          "directions": {"insured": ["dealer_repair", "cash_estimate", "partner_service", "insurer_choice"], "insurer": "none"}},
+        {"id": "parts_type", "labels": {"en": "Spare parts", "uk": "Запчастини", "ru": "Запчасти"}, "type": "enum",
+          "values": [
+            {"id": "original", "labels": {"en": "Original", "uk": "Оригінальні", "ru": "Оригинальные"}},
+            {"id": "analogue", "labels": {"en": "Analogue allowed", "uk": "Допускаються аналоги", "ru": "Допускаются аналоги"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"insured": ["original", "analogue", "not_stated"], "insurer": "none"}}
+      ]
+    },
+    {
+      "id": "notice_documents",
+      "names": {"en": "Notice and documents", "uk": "Повідомлення та документи", "ru": "Уведомление и документы"},
+      "descriptions": {"en": "Deadline to report an event and the documents the insured must supply.", "uk": "Строк повідомлення про подію та документи, які має надати страхувальник.", "ru": "Срок уведомления о событии и документы, которые должен предоставить страхователь."},
+      "synonyms": {
+        "en": ["notify the insurer", "notice of loss", "within hours", "police report", "required documents", "claim documents"],
+        "uk": ["повідомити страховик", "повідомлен про подію", "протягом годин", "довідк", "документи для виплат", "заява про виплат"],
+        "ru": ["уведомить страховщик", "уведомлен о событии", "в течение часов", "справк", "документы для выплат", "заявлен о выплат"]
+      },
+      "attributes": [
+        {"id": "notice_deadline", "labels": {"en": "Deadline to notify", "uk": "Строк повідомлення", "ru": "Срок уведомления"}, "type": "duration", "units": ["hours", "days", "working_days"], "directions": {"insured": "higher_better", "insurer": "lower_better"}},
+        {"id": "required_documents", "labels": {"en": "Required documents", "uk": "Обов'язкові документи", "ru": "Обязательные документы"}, "type": "categories",
+          "values": [
+            {"id": "police_report", "labels": {"en": "Police or authority report", "uk": "Довідка поліції чи органу", "ru": "Справка полиции или органа"}},
+            {"id": "claim_form", "labels": {"en": "Claim form", "uk": "Заява про виплату", "ru": "Заявление о выплате"}},
+            {"id": "vehicle_documents", "labels": {"en": "Vehicle documents", "uk": "Документи на авто", "ru": "Документы на авто"}},
+            {"id": "keys", "labels": {"en": "All keys", "uk": "Усі ключі", "ru": "Все ключи"}},
+            {"id": "photos", "labels": {"en": "Photos of damage", "uk": "Фото пошкоджень", "ru": "Фото повреждений"}}
+          ],
+          "directions": {"insured": "fewer_better", "insurer": "more_better"}}
+      ]
+    },
+    {
+      "id": "theft_conditions",
+      "names": {"en": "Theft conditions", "uk": "Умови щодо крадіжки", "ru": "Условия по краже"},
+      "descriptions": {"en": "Extra conditions for theft payouts - keys, anti-theft devices, waiting period.", "uk": "Додаткові умови виплати за крадіжку - ключі, протиугінні засоби, очікування.", "ru": "Дополнительные условия выплаты за кражу - ключи, противоугонные средства, ожидание."},
+      "synonyms": {
+        "en": ["theft", "stolen", "hijacking", "anti-theft", "immobilizer", "keys", "waiting period"],
+        "uk": ["крадіжк", "викрадення", "угон", "протиугон", "іммобілайзер", "ключ", "період очікуван"],
+        "ru": ["кража", "краж", "хищени", "угон", "противоугон", "иммобилайзер", "ключ", "период ожидан"]
+      },
+      "attributes": [
+        {"id": "theft_cover", "labels": {"en": "Theft cover", "uk": "Покриття крадіжки", "ru": "Покрытие кражи"}, "type": "enum",
+          "values": [
+            {"id": "covered", "labels": {"en": "Covered", "uk": "Покривається", "ru": "Покрывается"}},
+            {"id": "not_covered", "labels": {"en": "Not covered", "uk": "Не покривається", "ru": "Не покрывается"}},
+            {"id": "conditional", "labels": {"en": "Conditional", "uk": "За умови", "ru": "При условии"}},
+            {"id": "not_stated", "labels": {"en": "Not stated", "uk": "Не вказано", "ru": "Не указано"}}
+          ],
+          "directions": {"insured": ["covered", "conditional", "not_stated", "not_covered"], "insurer": ["not_covered", "conditional", "not_stated", "covered"]}},
+        {"id": "theft_waiting_days", "labels": {"en": "Waiting period for theft payout", "uk": "Очікування виплати за крадіжку", "ru": "Ожидание выплаты за кражу"}, "type": "duration", "units": ["days", "working_days", "months"], "directions": {"insured": "lower_better", "insurer": "higher_better"}}
+      ]
+    },
+    {
+      "id": "territory",
+      "names": {"en": "Territory", "uk": "Територія дії", "ru": "Территория действия"},
+      "descriptions": {"en": "Where the policy applies - Ukraine, Europe, other regions.", "uk": "Де діє поліс - Україна, Європа, інші регіони.", "ru": "Где действует полис - Украина, Европа, другие регионы."},
+      "synonyms": {
+        "en": ["territory", "geographical scope", "territorial limits", "europe", "abroad", "temporarily occupied"],
+        "uk": ["територі", "територіальн", "географічн", "європ", "за кордон", "тимчасово окупован"],
+        "ru": ["территори", "территориальн", "географическ", "европ", "за границ", "временно оккупирован"]
+      },
+      "attributes": [
+        {"id": "territory_scope", "labels": {"en": "Covered territory", "uk": "Територія покриття", "ru": "Территория покрытия"}, "type": "categories",
+          "values": [
+            {"id": "ukraine", "labels": {"en": "Ukraine", "uk": "Україна", "ru": "Украина"}},
+            {"id": "europe", "labels": {"en": "Europe", "uk": "Європа", "ru": "Европа"}},
+            {"id": "cis_other", "labels": {"en": "Other countries", "uk": "Інші країни", "ru": "Другие страны"}},
+            {"id": "excl_occupied", "labels": {"en": "Excludes occupied or combat areas", "uk": "Виключає окуповані чи бойові райони", "ru": "Исключает оккупированные или боевые районы"}}
+          ],
+          "directions": {"insured": "more_better", "insurer": "none"}}
+      ]
+    },
+    {
+      "id": "drivers_allowed",
+      "names": {"en": "Permitted drivers", "uk": "Допущені до керування", "ru": "Допущенные к управлению"},
+      "descriptions": {"en": "Who may drive - anyone, named drivers, or age and experience limits.", "uk": "Хто може керувати - будь-хто, названі особи або обмеження за віком і стажем.", "ru": "Кто может управлять - любой, названные лица или ограничения по возрасту и стажу."},
+      "synonyms": {
+        "en": ["permitted driver", "named driver", "authorised driver", "driving experience", "driver age", "any driver"],
+        "uk": ["допущен до керуван", "водії", "водій", "стаж", "вік водія", "необмежен коло"],
+        "ru": ["допущен к управлен", "водител", "стаж", "возраст водител", "неограничен круг"]
+      },
+      "attributes": [
+        {"id": "driver_scope", "labels": {"en": "Driver scope", "uk": "Коло водіїв", "ru": "Круг водителей"}, "type": "enum",
+          "values": [
+            {"id": "any_driver", "labels": {"en": "Any driver", "uk": "Будь-який водій", "ru": "Любой водитель"}},
+            {"id": "age_experience", "labels": {"en": "Age or experience limits", "uk": "Обмеження за віком або стажем", "ru": "Ограничения по возрасту или стажу"}},
+            {"id": "named_only", "labels": {"en": "Named drivers only", "uk": "Лише названі водії", "ru": "Только названные водители"}}
+          ],
+          "directions": {"insured": ["any_driver", "age_experience", "named_only"], "insurer": ["named_only", "age_experience", "any_driver"]}},
+        {"id": "min_experience", "labels": {"en": "Minimum driving experience", "uk": "Мінімальний стаж", "ru": "Минимальный стаж"}, "type": "duration", "units": ["years"], "directions": {"insured": "lower_better", "insurer": "higher_better"}}
+      ]
+    },
+    {
+      "id": "premium_instalments",
+      "names": {"en": "Premium and instalments", "uk": "Премія та розстрочка", "ru": "Премия и рассрочка"},
+      "descriptions": {"en": "Premium amount, payment schedule and the effect of a late payment.", "uk": "Розмір премії, графік оплати та наслідки прострочення.", "ru": "Размер премии, график оплаты и последствия просрочки."},
+      "synonyms": {
+        "en": ["premium", "instalment", "payment schedule", "late payment", "insurance fee"],
+        "uk": ["страхов премі", "страхов платіж", "розстрочк", "траш", "прострочен", "графік платеж"],
+        "ru": ["страхов преми", "страхов взнос", "рассрочк", "транш", "просрочк", "график платеж"]
+      },
+      "attributes": [
+        {"id": "premium_amount", "labels": {"en": "Total premium", "uk": "Загальна премія", "ru": "Общая премия"}, "type": "amount", "units": ["UAH", "USD", "EUR", "percent_of_sum"], "directions": {"insured": "lower_better", "insurer": "higher_better"}},
+        {"id": "late_payment_effect", "labels": {"en": "Effect of late instalment", "uk": "Наслідок прострочення траншу", "ru": "Последствие просрочки транша"}, "type": "enum",
+          "values": [
+            {"id": "cover_continues", "labels": {"en": "Cover continues", "uk": "Покриття триває", "ru": "Покрытие продолжается"}},
+            {"id": "suspended", "labels": {"en": "Cover suspended", "uk": "Покриття зупиняється", "ru": "Покрытие приостанавливается"}},
+            {"id": "terminated", "labels": {"en": "Contract terminated", "uk": "Договір припиняється", "ru": "Договор прекращается"}}
+          ],
+          "directions": {"insured": ["cover_continues", "suspended", "terminated"], "insurer": ["terminated", "suspended", "cover_continues"]}}
+      ]
+    },
+    {
+      "id": "termination_refund",
+      "names": {"en": "Termination and refund", "uk": "Припинення та повернення премії", "ru": "Прекращение и возврат премии"},
+      "descriptions": {"en": "How either side ends the contract and how much premium is returned.", "uk": "Як кожна сторона припиняє договір і яку частину премії повертають.", "ru": "Как каждая сторона прекращает договор и какую часть премии возвращают."},
+      "synonyms": {
+        "en": ["termination", "early termination", "cancel", "refund of premium", "unearned premium", "withdraw"],
+        "uk": ["припиненн", "дострокове", "розірванн", "повернен премі", "повернення страхов", "відмов від договор"],
+        "ru": ["прекращен", "досрочн", "расторжен", "возврат преми", "возврат страхов", "отказ от договор"]
+      },
+      "attributes": [
+        {"id": "refund_share", "labels": {"en": "Refund of unused premium", "uk": "Повернення невикористаної премії", "ru": "Возврат неиспользованной премии"}, "type": "percentage", "directions": {"insured": "higher_better", "insurer": "lower_better"}},
+        {"id": "termination_notice", "labels": {"en": "Notice to terminate", "uk": "Попередження про припинення", "ru": "Уведомление о прекращении"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "lower_better", "insurer": "none"}}
+      ]
+    },
+    {
+      "id": "subrogation",
+      "names": {"en": "Subrogation and recourse", "uk": "Суброгація та регрес", "ru": "Суброгация и регресс"},
+      "descriptions": {"en": "The insurer's right to claim from the guilty party, and from the insured in listed cases.", "uk": "Право страховика вимагати від винної особи та, у визначених випадках, від страхувальника.", "ru": "Право страховщика требовать с виновного лица и, в определённых случаях, со страхователя."},
+      "synonyms": {
+        "en": ["subrogation", "recourse", "right of claim", "recover from", "transfer of rights"],
+        "uk": ["суброгац", "регрес", "право вимоги", "перехід прав", "зворотн вимог"],
+        "ru": ["суброгац", "регресс", "право требовани", "переход прав", "обратн требован"]
+      },
+      "attributes": [
+        {"id": "recourse_against_insured", "labels": {"en": "Recourse against the insured", "uk": "Регрес до страхувальника", "ru": "Регресс к страхователю"}, "type": "enum",
+          "values": [
+            {"id": "none", "labels": {"en": "None", "uk": "Немає", "ru": "Нет"}},
+            {"id": "listed_cases", "labels": {"en": "Only listed cases", "uk": "Лише у зазначених випадках", "ru": "Только в указанных случаях"}},
+            {"id": "broad", "labels": {"en": "Broad or unspecified", "uk": "Широкий або невизначений", "ru": "Широкий или неопределённый"}}
+          ],
+          "directions": {"insured": ["none", "listed_cases", "broad"], "insurer": ["broad", "listed_cases", "none"]}}
+      ]
+    }
+  ]
+}

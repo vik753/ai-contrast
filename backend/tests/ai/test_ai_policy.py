@@ -125,8 +125,13 @@ def request_field_problems(source: str) -> list[str]:
             problems.append(f"{name}: unknown type {sorted(leaves - FIELD_ALLOWED)}")
         if "PseudonymizedDocument" in leaves:
             documents += 1
-            if ast.unparse(node.annotation) != "PseudonymizedDocument":
-                problems.append(f"{name}: the document field must be a plain PseudonymizedDocument")
+            if ast.unparse(node.annotation) not in {
+                "PseudonymizedDocument",
+                "PseudonymizedDocument | None",
+            }:
+                problems.append(
+                    f"{name}: the document field must be PseudonymizedDocument or optional"
+                )
     if documents != 1:
         problems.append(f"{documents} document fields; exactly one is required")
     return problems
@@ -281,7 +286,6 @@ def test_policy_surface_checker_accepts_clean_module_private_helpers_and_exempt_
         "class AIRequest:\n    documents: tuple[PseudonymizedDocument, ...]\n",
         "class AIRequest:\n    documents: list[PseudonymizedDocument]\n",
         "class AIRequest:\n    a: PseudonymizedDocument\n    b: PseudonymizedDocument\n",
-        "class AIRequest:\n    document: PseudonymizedDocument | None\n",
         "class AIRequest:\n    template: PromptTemplate\n",
         "class AIRequest:\n    document: PseudonymizedDocument\n    other: Foo\n",
     ],

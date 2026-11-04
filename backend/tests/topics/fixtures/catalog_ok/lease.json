@@ -1,0 +1,72 @@
+{
+  "id": "lease",
+  "names": {
+    "en": "Lease",
+    "uk": "Оренда",
+    "ru": "Аренда"
+  },
+  "sides": [
+    {
+      "id": "tenant",
+      "names": {
+        "en": "Tenant",
+        "uk": "Орендар",
+        "ru": "Арендатор"
+      }
+    },
+    {
+      "id": "landlord",
+      "names": {
+        "en": "Landlord",
+        "uk": "Орендодавець",
+        "ru": "Арендодатель"
+      }
+    }
+  ],
+  "topics": [
+    {
+      "id": "rent",
+      "names": {
+        "en": "Rent",
+        "uk": "Орендна плата",
+        "ru": "Арендная плата"
+      },
+      "descriptions": {
+        "en": "How much and how often the tenant pays.",
+        "uk": "Скільки і як часто платить орендар.",
+        "ru": "Сколько и как часто платит арендатор."
+      },
+      "synonyms": {
+        "en": [
+          "rent"
+        ],
+        "uk": [
+          "орендн"
+        ],
+        "ru": [
+          "арендн"
+        ]
+      },
+      "attributes": [
+        {
+          "id": "monthly_rent",
+          "labels": {
+            "en": "Monthly rent",
+            "uk": "Щомісячна плата",
+            "ru": "Ежемесячная плата"
+          },
+          "type": "amount",
+          "directions": {
+            "tenant": "lower_better",
+            "landlord": "higher_better"
+          },
+          "units": [
+            "UAH",
+            "USD",
+            "EUR"
+          ]
+        }
+      ]
+    }
+  ]
+}

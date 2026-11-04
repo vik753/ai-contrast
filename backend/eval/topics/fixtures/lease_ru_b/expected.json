@@ -1,0 +1,18 @@
+{
+  "fictional": true,
+  "domain": "lease",
+  "language": "ru",
+  "topics": [
+    {"topic_id": "rent_amount", "clauses": ["1.1"], "attributes": {"monthly_rent": {"value": 25000, "unit": "UAH", "clause": "1.1"}, "indexation_rate": {"value": 12, "clause": "1.1"}}},
+    {"topic_id": "deposit", "clauses": ["1.2"], "attributes": {"deposit_amount": {"value": 50000, "unit": "UAH", "clause": "1.2"}, "deposit_return_days": {"value": 10, "unit": "working_days", "clause": "1.2"}}},
+    {"topic_id": "term_renewal", "clauses": ["2.1"], "attributes": {"lease_term": {"value": 3, "unit": "years", "clause": "2.1"}, "renewal_option": {"value": "automatic", "clause": "2.1"}}},
+    {"topic_id": "utilities", "clauses": ["3.1"], "attributes": {"utilities_payer": {"value": "shared", "clause": "3.1"}}},
+    {"topic_id": "repairs_maintenance", "clauses": ["3.2"], "attributes": {"major_repairs_by": {"value": "tenant", "clause": "3.2"}}},
+    {"topic_id": "termination_notice", "clauses": ["4.1"], "attributes": {"tenant_notice_days": {"value": 14, "unit": "days", "clause": "4.1"}, "landlord_notice_days": {"value": 90, "unit": "days", "clause": "4.1"}}},
+    {"topic_id": "late_penalties", "clauses": ["5.1"], "attributes": {"late_penalty_rate": {"value": 0.1, "clause": "5.1"}, "grace_days": {"value": 10, "unit": "days", "clause": "5.1"}}},
+    {"topic_id": "sublease_use", "clauses": ["6.1"], "attributes": {"sublease_allowed": {"value": "covered", "clause": "6.1"}}},
+    {"topic_id": "landlord_access", "clauses": ["7.1"], "attributes": {"access_notice": {"value": 5, "unit": "working_days", "clause": "7.1"}}},
+    {"topic_id": "damage_liability", "clauses": ["8.1"], "attributes": {"damage_cap": {"value": 100000, "unit": "UAH", "clause": "8.1"}}}
+  ],
+  "absent_topics": []
+}

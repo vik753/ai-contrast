@@ -139,9 +139,8 @@ def test_check_ipv6_rotation_cannot_lock_out_an_ipv4_client() -> None:
 
 
 def test_check_third_request_in_flight_returns_503_busy_with_retry_after() -> None:
-    rig = Rig()
     gate = GateTransport()
-    rig.app.state.provider_transport = gate
+    rig = Rig(provider_transport=gate)
 
     async def scenario() -> None:
         body = json.dumps(valid_body()).encode()

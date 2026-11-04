@@ -1,0 +1,258 @@
+{
+  "id": "kasko",
+  "names": {
+    "en": "Comprehensive car insurance",
+    "uk": "КАСКО",
+    "ru": "КАСКО"
+  },
+  "sides": [
+    {
+      "id": "insured",
+      "names": {
+        "en": "Insured",
+        "uk": "Страхувальник",
+        "ru": "Страхователь"
+      }
+    },
+    {
+      "id": "insurer",
+      "names": {
+        "en": "Insurer",
+        "uk": "Страховик",
+        "ru": "Страховщик"
+      }
+    }
+  ],
+  "topics": [
+    {
+      "id": "deductible",
+      "names": {
+        "en": "Deductible",
+        "uk": "Франшиза",
+        "ru": "Франшиза"
+      },
+      "descriptions": {
+        "en": "The part of a loss that the insured pays.",
+        "uk": "Частина збитку, яку сплачує страхувальник.",
+        "ru": "Часть убытка, которую оплачивает страхователь."
+      },
+      "synonyms": {
+        "en": [
+          "deductible",
+          "excess"
+        ],
+        "uk": [
+          "франшиз",
+          "безумовна франшиза"
+        ],
+        "ru": [
+          "франшиз",
+          "безусловная франшиза"
+        ]
+      },
+      "attributes": [
+        {
+          "id": "deductible_amount",
+          "labels": {
+            "en": "Deductible amount",
+            "uk": "Розмір франшизи",
+            "ru": "Размер франшизы"
+          },
+          "type": "amount",
+          "directions": {
+            "insured": "lower_better",
+            "insurer": "higher_better"
+          },
+          "units": [
+            "UAH",
+            "USD",
+            "EUR",
+            "percent_of_sum"
+          ]
+        },
+        {
+          "id": "deductible_percent",
+          "labels": {
+            "en": "Deductible, % of sum",
+            "uk": "Франшиза, % суми",
+            "ru": "Франшиза, % суммы"
+          },
+          "type": "percentage",
+          "directions": {
+            "insured": "lower_better",
+            "insurer": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "theft_cover",
+      "names": {
+        "en": "Theft cover",
+        "uk": "Викрадення",
+        "ru": "Угон"
+      },
+      "descriptions": {
+        "en": "Whether theft of the car is covered.",
+        "uk": "Чи покрито викрадення автомобіля.",
+        "ru": "Покрыт ли угон автомобиля."
+      },
+      "synonyms": {
+        "en": [
+          "theft",
+          "stolen"
+        ],
+        "uk": [
+          "викраден",
+          "крадіжк"
+        ],
+        "ru": [
+          "угон",
+          "кража"
+        ]
+      },
+      "attributes": [
+        {
+          "id": "theft_status",
+          "labels": {
+            "en": "Theft status",
+            "uk": "Статус викрадення",
+            "ru": "Статус угона"
+          },
+          "type": "enum",
+          "values": [
+            {
+              "id": "covered",
+              "labels": {
+                "en": "Covered",
+                "uk": "Покрито",
+                "ru": "Покрыто"
+              }
+            },
+            {
+              "id": "not_covered",
+              "labels": {
+                "en": "Not covered",
+                "uk": "Не покрито",
+                "ru": "Не покрыто"
+              }
+            },
+            {
+              "id": "conditional",
+              "labels": {
+                "en": "Conditional",
+                "uk": "За умовою",
+                "ru": "По условию"
+              }
+            },
+            {
+              "id": "not_stated",
+              "labels": {
+                "en": "Not stated",
+                "uk": "Не вказано",
+                "ru": "Не указано"
+              }
+            }
+          ],
+          "directions": {
+            "insured": [
+              "covered",
+              "conditional",
+              "not_covered",
+              "not_stated"
+            ],
+            "insurer": "none"
+          }
+        },
+        {
+          "id": "payout_term",
+          "labels": {
+            "en": "Payout term",
+            "uk": "Строк виплати",
+            "ru": "Срок выплаты"
+          },
+          "type": "duration",
+          "directions": {
+            "insured": "lower_better",
+            "insurer": "higher_better"
+          },
+          "units": [
+            "days",
+            "working_days"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exclusions",
+      "names": {
+        "en": "Exclusions",
+        "uk": "Винятки",
+        "ru": "Исключения"
+      },
+      "descriptions": {
+        "en": "Events that the insurer does not pay for.",
+        "uk": "Події, за які страховик не платить.",
+        "ru": "События, за которые страховщик не платит."
+      },
+      "synonyms": {
+        "en": [
+          "exclusion"
+        ],
+        "uk": [
+          "виняток",
+          "винятк"
+        ],
+        "ru": [
+          "исключени"
+        ]
+      },
+      "attributes": [
+        {
+          "id": "excluded_events",
+          "labels": {
+            "en": "Excluded events",
+            "uk": "Виключені події",
+            "ru": "Исключённые события"
+          },
+          "type": "categories",
+          "values": [
+            {
+              "id": "war",
+              "labels": {
+                "en": "War",
+                "uk": "Війна",
+                "ru": "Война"
+              }
+            },
+            {
+              "id": "racing",
+              "labels": {
+                "en": "Racing",
+                "uk": "Перегони",
+                "ru": "Гонки"
+              }
+            }
+          ],
+          "directions": {
+            "insured": "fewer_better",
+            "insurer": "more_better"
+          }
+        },
+        {
+          "id": "notes",
+          "labels": {
+            "en": "Notes",
+            "uk": "Примітки",
+            "ru": "Примечания"
+          },
+          "type": "text",
+          "directions": {
+            "insured": "none",
+            "insurer": "none"
+          }
+        }
+      ]
+    }
+  ]
+}

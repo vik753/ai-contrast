@@ -91,21 +91,17 @@ class CheckState:
     """Per-app limits for the check endpoint. Holds no client data except counters by key.
 
     The three test hooks (``provider_transport``, ``turnstile_transport``, ``clock``) are typed
-    arguments of ``install()``. The existing tests also set the same names on ``app.state``
-    after the app is built, so a missing hook is read from there, type-checked (a value of
-    another type is ignored). Production leaves them unset.
+    arguments of ``install()``. Production leaves them unset.
     """
 
     def __init__(
         self,
-        app: FastAPI,
         settings: Settings,
         *,
         provider_transport: AITransport | None = None,
         turnstile_transport: AITransport | None = None,
         clock: Clock | None = None,
     ) -> None:
-        self._app = app
         self.settings = settings
         self.provider_hook = provider_transport
         self.turnstile_hook = turnstile_transport
@@ -133,25 +129,15 @@ class CheckState:
 
     def _clock(self, default: Clock) -> float:
         hook = self.clock_hook
-        if hook is None:
-            late = getattr(self._app.state, "clock", None)
-            hook = late if callable(late) else None
         return float(hook()) if hook is not None else default()
-
-    def _transport(self, fixed: AITransport | None, name: str) -> AITransport | None:
-        if fixed is not None:
-            return fixed
-        late = getattr(self._app.state, name, None)
-        return late if isinstance(late, AITransport) else None
 
     def now(self) -> float:
         return self._clock(time.time)
 
     def provider_transport(self, *, private: bool) -> AITransport | None:
         """The test hook, else (development switch, ``custom`` only) the unguarded transport."""
-        hook = self._transport(self.provider_hook, "provider_transport")
-        if hook is not None:
-            return hook
+        if self.provider_hook is not None:
+            return self.provider_hook
         if private:
             if self._private is None:
                 self._private = private_ai_transport()
@@ -159,7 +145,7 @@ class CheckState:
         return None
 
     def turnstile_transport(self) -> AITransport | None:
-        return self._transport(self.turnstile_hook, "turnstile_transport")
+        return self.turnstile_hook
 
     @property
     def free_available(self) -> bool:
@@ -182,7 +168,6 @@ def install(
     """Register the route and build the state (the keyword arguments are test hooks)."""
     app.include_router(router)
     app.state.check_state = CheckState(
-        app,
         settings,
         provider_transport=provider_transport,
         turnstile_transport=turnstile_transport,

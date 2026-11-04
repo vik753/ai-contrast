@@ -23,7 +23,13 @@ from pathlib import Path
 import pytest
 
 APP_DIR = Path(__file__).resolve().parents[1] / "app"
-GATE_TYPES = {"PseudonymizedDocument", "PseudonymizedClause", "PseudonymizedText", "ConfirmedTopic"}
+GATE_TYPES = {
+    "PseudonymizedDocument",
+    "PseudonymizedClause",
+    "PseudonymizedText",
+    "ConfirmedTopic",
+    "ConfirmedAttribute",
+}
 FORBIDDEN_ATTR_CALLS = {
     ("object", "__setattr__"),
     ("dataclasses", "replace"),
@@ -238,7 +244,7 @@ def test_policy_gate_names_are_defined_only_in_gate_py() -> None:
         if isinstance(n, ast.ClassDef) and n.name in GATE_TYPES
     ]
 
-    assert sorted(defining) == ["pseudo/gate.py"] * 4
+    assert sorted(defining) == ["pseudo/gate.py"] * 5
 
 
 def test_policy_no_forbidden_gate_construct_outside_gate_py() -> None:
