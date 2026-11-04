@@ -515,7 +515,8 @@ async def _run_free(state: CheckState, prepared: Prepared) -> Response:
             spent = 0
             state.quota.refund_topic_call(hits.day_key)  # the model did no work
         elif outcome.actual is not None:
-            spent = min(neurons, outcome.actual)
+            # The reservation only admits the call; the reported cost is charged in full.
+            spent = outcome.actual
     finally:
         state.quota.settle_topic(neurons, spent)
     return _free_reply(state, claim, outcome)

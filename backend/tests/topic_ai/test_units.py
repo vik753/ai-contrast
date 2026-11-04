@@ -11,7 +11,8 @@ from app.limits.free_pass import FreePassError, FreePasses
 from app.limits.hits import Hits
 from app.limits.window import FixedWindowLimiter
 from app.topics.ai import ProposeOut
-from tests.topic_ai.helpers import SUGGEST, free_trig, suggest_body
+from tests.topic_ai.helpers import SUGGEST, attr, attr_out, free_trig, suggest_body
+from tests.topic_ai.helpers import usage_reply as usage
 from tests.topics.helpers import confirmed
 
 NOW = 1_800_000_000.0
@@ -82,3 +83,12 @@ def test_free_suggest_checks_the_pass_before_the_sandbox() -> None:
     assert (r.status_code, r.json()["error"]) == (403, "free_pass_invalid")
     no_token = rig.post(SUGGEST, body, headers={})
     assert (no_token.status_code, no_token.json()["error"]) == (403, "turnstile_failed")
+
+
+def test_reported_usage_above_the_reservation_is_charged_in_full_and_fills_the_share() -> None:
+    out = attr_out(attr())
+    rig = free_trig(out, free_neuron_budget=9999)
+    rig.upstream.reply = usage(out, 100_000, 10)  # about 3200 Neurons, above the share of 2999
+    assert rig.free_call("propose", token="t1", ip="198.51.100.1").status_code == 200  # noqa: S106
+    second = rig.free_call("propose", token="t2", ip="198.51.100.2")  # noqa: S106
+    assert (second.status_code, second.json()["error"]) == (429, "free_quota_exhausted")

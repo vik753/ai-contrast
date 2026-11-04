@@ -61,6 +61,8 @@ Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety 
 
 ### Stage 7 follow-ups (from stage 6)
 
+- Stage 9: declare optional usage on the AIProvider port result (typed), replacing the getattr in topic_ai._reported (code review S7-T2 NIT).
+
 - Stage 7 (in S7-T1): make the tests/check helpers pass hooks to `install()` and delete the `app.state.*` fallback in `CheckState` (`provider_transport`, `turnstile_transport`, `clock`; code review S6-T4).
 - Stage 7 (in S7-T4): run the first AI eval (`ai-eval-engineer`) when the first real prompts arrive. Stage 6 has no real prompts, only the fixed connection probe.
 - Stage 7 (revised by ADR 0017 point 3): `ConfirmedTopic` is **not** bound to a document (it is the one cross-document string, ADR 0009). The builder that computes `PseudonymizedText.source` comes with the first call that carries such a text (stage 8 or 9).

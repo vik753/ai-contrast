@@ -104,5 +104,5 @@ def build_messages(request: AIRequest) -> tuple[Message, ...]:
 
 
 def data_chars(request: AIRequest) -> int:
-    """Characters of the data blocks of a request (the instructions are a fixed text)."""
-    return sum(len(text) for _, text in _blocks(request))
+    """Characters of everything sent: instructions, JSON schema, delimiters and data blocks."""
+    return sum(len(message.content) for message in build_messages(request))

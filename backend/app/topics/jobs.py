@@ -59,7 +59,9 @@ class Job:
 
     def neurons(self) -> int:
         """The worst case in Neurons: the input, the output cap, and a repair call (ADR 0017)."""
-        return topic_neurons(data_chars(self.request()), self.max_tokens, repair=True)
+        # ``topic_neurons`` counts three characters per token; Cyrillic needs about two.
+        chars = -(-data_chars(self.request()) * 3 // 2)
+        return topic_neurons(chars, self.max_tokens, repair=True)
 
 
 def propose_job(topic: ConfirmedTopic, definition: TopicDefinition) -> Job:
