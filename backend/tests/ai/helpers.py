@@ -18,13 +18,13 @@ from typing import Any
 
 import httpx2
 import pytest
+from opentelemetry import trace
+from pydantic import BaseModel, SecretStr
+
 from app.ai.factory import provider_for
 from app.ai.port import AIError, AIProvider, AIRequest
 from app.ai.presets import PresetId
 from app.ai.prompts import PromptTemplate
-from opentelemetry import trace
-from pydantic import BaseModel, SecretStr
-
 from app.pseudo.gate import PseudonymizedDocument, safety_pass
 from app.pseudo.lexicon import DETECTOR_VERSION
 from app.pseudo.untrusted import MaskedClause, UntrustedMaskedDocument
