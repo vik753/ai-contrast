@@ -1,7 +1,7 @@
 # ADR 0017 — Topic catalog: templates, typed attributes, custom and suggested topics
 
-- Status: proposed (tech lead, 2026-11-04; `security-reviewer` approved the design after round 2)
-- Date: 2026-11-04
+- Status: accepted (2026-11-05). Proposed by the tech lead on 2026-11-04; `security-reviewer` approved the design after round 2. Stage 7 is merged (PR #83, #84, #85, #86, #87). "Decisions made during stage 7" at the end lists what changed or was settled while building.
+- Date: 2026-11-04 (proposed), 2026-11-05 (accepted)
 - Related: ADR 0008 and 0015 (gate types, safety pass), ADR 0009 Layers 2 and 3 (schema-first topics, `ConfirmedTopic`, one document per call), ADR 0013 (browser storage), ADR 0016 (AI port, free mode), threat model T5, T6, T10, T11
 
 ## Context
@@ -76,6 +76,21 @@ Stage 7 builds the ADR 0009 Layer 2 detector because topics need it first; stage
 ### 8. Eval (first AI eval)
 
 `ai-eval-engineer` adds `backend/eval/topics/`. Recorded responses are keyed by a hash of the prompt template text, the schema and the model; a mismatch fails the run (the recordings must be refreshed in live mode). An adversarial case: Contract B tries to smuggle text through a suggestion (long description, instructions, identifiers) and the test proves none of it reaches a `ConfirmedTopic` or another document's call. for each domain, synthetic contracts (from `domain-analyst`) with expected topics; metrics: suggestion precision/recall against expected topics, attribute-proposal schema validity and type agreement on a fixed list of custom topic names, synonym coverage of hand-written stems, Layer 2 false-positive rate on honest topic names. Runs on a recorded-response mode in CI (no network, no key) and on a live mode locally with a key; the live numbers are recorded in the PR. Baseline file like the detector eval.
+
+## Decisions made during stage 7
+
+These points settle details of the sections above. Where a point differs from the text above, this section wins.
+
+1. **Catalog field names and units.** Units in JSON are `hours` (duration, added to the list `days`, `working_days`, `months`, `years`) and `percent_of_loss` (amount, share of each loss) next to `percent_of_sum`, `UAH`, `USD`, `EUR`. Field names are the ones in point 1 ("Field names"). The code is the reference: `app/topics/model.py` (`AMOUNT_UNITS`, `DURATION_UNITS`) and `app/topics/catalog.py`.
+2. **A domain and a side are required in v1.** The server refuses a topic without a catalog domain or with a side that is not in the domain's list (`invalid_topic_definition`). "No template" means a domain whose template topics are all turned off. The browser still shows an empty domain option; with it, Suggest, Propose and Confirm stay disabled.
+3. **Rule 6 is a combination rule, and Layer 2 and rule 6 are best effort.** Phrase lists can be bypassed (plurals, synonyms, word order, declined forms). Layer 2 matches stems, synonyms, datives, model names and colour ratings; rule 6 never refuses on a single word. The guarantees do not depend on them: ratings are computed by code, directions come only from the catalog or the client, and one document goes into one AI call.
+4. **Worst-case Neuron reservation, settled with real usage.** Before a free topic call the server reserves the worst case (`topic_neurons`: input at 3 characters per token, with the input length multiplied by 1.5 because Cyrillic needs about 2 characters per token; output at `max_tokens`; doubled for one repair call) against the per-client topic quota, the global budget and the 30 % topic share. After the call it settles with the usage the provider reported. If the provider reports none, the reservation stands. A call where the model did no work is refunded in full.
+5. **One live free pass per client.** A client key (IPv4 or IPv6 /48) holds at most one live pass. A new Turnstile solve replaces the old pass. The table has at most 10,000 passes (`FREE_PASS_MAX_ENTRIES`); 20 calls per pass (`FREE_PASS_MAX_CALLS`); 15 minutes.
+6. **Suggest reply `dropped`.** The suggest reply carries `dropped` as an object with counts per reason (`flagged`, `identifier`, `invalid`). The propose and expand replies carry `dropped` as one number. The browser shows the sum.
+7. **Catalog topics by id.** `confirm_topic()` refuses a catalog topic whose text differs from the catalog (`catalog_topic_changed`). The version check `catalog_version_mismatch` belongs to the topic selection of an analysis request (`app/topics/selection.py`, stage 9). The three topic AI endpoints refuse `origin: "catalog"` (`invalid_topic_definition`): they take only suggested and custom topics.
+8. **Suggest prompt input.** The prompt of `SUGGEST_TOPICS` holds the masked document only. The endpoint validates `domain` and `side` against the catalog, but does not put them in the prompt.
+9. **Docker build context is the repository root.** The backend image also holds `shared/topics/`. Compose uses `context: .` with `dockerfile: backend/Dockerfile`. The image sets `TOPICS_CATALOG_DIR=/app/shared/topics`. `backend/Dockerfile.dockerignore` is an allowlist (`*`, then `!backend/pyproject.toml`, `!backend/uv.lock`, `!backend/log_config.json`, `!backend/app/`, `!shared/topics/`). Stage 13: set the Render build context to the repository root and the Dockerfile path to `backend/Dockerfile`.
+10. **Own topic limit in the browser.** The browser keeps at most 10 own topics in total (suggested and custom together). The server cap per analysis request stays 10 suggested and 10 custom.
 
 ## Consequences
 

@@ -119,6 +119,8 @@ docker compose up --build
 ```
 
 Expected: the backend becomes healthy, then the frontend starts.
+The backend image is built from the repository root (`context: .`, `dockerfile: backend/Dockerfile`), because it also holds `shared/topics/`.
+To build it by hand, run `docker build -f backend/Dockerfile -t ai-contrast-backend .` from the repository root.
 Open http://localhost:5173 for the UI and http://localhost:8000/api/health for the backend health check.
 
 ```bash
