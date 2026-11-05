@@ -25,6 +25,15 @@ async def get_catalog(request: Request) -> Response:
     )
 
 
+def catalog_of(request: Request) -> Catalog:
+    """The catalog of the app (typed accessor of ``app.state``)."""
+    catalog = getattr(request.app.state, "catalog", None)
+    if not isinstance(catalog, Catalog):
+        msg = "app state is not configured"
+        raise TypeError(msg)
+    return catalog
+
+
 def install(app: FastAPI, catalog: Catalog) -> None:
     """Keep the catalog and its JSON body in the app state and register the route."""
     app.state.catalog = catalog

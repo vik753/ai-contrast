@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Annotated, Final
 
@@ -25,7 +26,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
 from app.ai.factory import provider_for
-from app.ai.port import AIError, AIErrorCode
+from app.ai.port import AIError, AIErrorCode, AIProvider
 from app.ai.presets import (
     PRESETS,
     ConnectionConfigError,
@@ -40,6 +41,8 @@ from app.extraction.limiter import ExtractionLimiter
 from app.http_limits import CHECK_PATH
 from app.limits.client_ip import client_key, daily_key
 from app.limits.free import CHECK_NEURONS, DAY_SECONDS, FreeQuota
+from app.limits.free_pass import FreePasses
+from app.limits.hits import Hits
 from app.limits.replay import ReplayTable
 from app.limits.slots import ClientSlots
 from app.limits.window import FixedWindowLimiter
@@ -57,8 +60,9 @@ MAX_TOKEN_CHARS: Final = 2048
 CHALLENGE_MAX_AGE_SECONDS: Final = 300.0
 CHALLENGE_FUTURE_SKEW_SECONDS: Final = 5.0
 MINUTE_SECONDS: Final = 60
+FREE_PASS_HEADER: Final = "x-free-pass"  # noqa: S105 - a header name, not a secret
 
-_STATUS: Final = {
+AI_STATUS: Final = {
     AIErrorCode.PROVIDER_AUTH_FAILED: 401,
     AIErrorCode.PROVIDER_MODEL_NOT_FOUND: 404,
     AIErrorCode.PROVIDER_RATE_LIMITED: 429,
@@ -68,7 +72,7 @@ _STATUS: Final = {
     AIErrorCode.PROVIDER_BAD_RESPONSE: 502,
 }
 # Errors that mean the model did no work: the reserved Neurons go back to the budget.
-_NO_COST: Final = frozenset(
+AI_NO_COST: Final = frozenset(
     {
         AIErrorCode.PROVIDER_AUTH_FAILED,
         AIErrorCode.PROVIDER_MODEL_NOT_FOUND,
@@ -118,8 +122,21 @@ class CheckState:
         self.minute = FixedWindowLimiter(settings.check_per_minute, MINUTE_SECONDS, keys, mono)
         self.day = FixedWindowLimiter(settings.check_per_day, DAY_SECONDS, keys, wall, aligned=True)
         self.quota = FreeQuota(
-            settings.free_calls_per_ip_per_day, settings.free_neuron_budget, keys, wall
+            settings.free_calls_per_ip_per_day,
+            settings.free_neuron_budget,
+            keys,
+            wall,
+            topic_calls_per_ip=settings.free_topic_calls_per_ip_per_day,
         )
+        # Topic endpoints (S7-T2) share the in-flight slots, the quota and the Turnstile replay
+        # table with the check; the rate limits and the free pass table are their own.
+        self.topic_minute = FixedWindowLimiter(
+            settings.topics_per_minute, MINUTE_SECONDS, keys, mono
+        )
+        self.topic_day = FixedWindowLimiter(
+            settings.topics_per_day, DAY_SECONDS, keys, wall, aligned=True
+        )
+        self.passes = FreePasses(settings.free_pass_max_entries, settings.free_pass_max_calls, wall)
         self.replay = ReplayTable(
             settings.turnstile_replay_max_entries, settings.turnstile_replay_seconds, wall
         )
@@ -175,7 +192,28 @@ def install(
     )
 
 
-def _state(request: Request) -> CheckState:
+class BusyError(Exception):
+    """No AI slot is free. Carries no data."""
+
+
+@contextmanager
+def ai_slots(state: CheckState, key: str) -> Iterator[None]:
+    """Hold one AI call of the client ``key`` and one place of the shared pool.
+
+    Raises ``BusyError`` on entry when either is taken. Both are released on every exit."""
+    if not state.client_slots.try_acquire(key):
+        raise BusyError
+    try:
+        slot = state.slots.try_slot()
+        if slot is None:
+            raise BusyError
+        with slot:
+            yield
+    finally:
+        state.client_slots.release(key)
+
+
+def check_state(request: Request) -> CheckState:
     state = getattr(request.app.state, "check_state", None)
     if not isinstance(state, CheckState):
         msg = "app state is not configured"
@@ -196,7 +234,9 @@ def _refusal(code: str) -> JSONResponse:
     return error_response(code, 422)
 
 
-def _plan(body: CheckBody, header: ProviderKeyHeader, settings: Settings) -> Plan | Response:
+def plan_connection(
+    body: CheckBody, header: ProviderKeyHeader, settings: Settings
+) -> Plan | Response:
     """Cheap validation only: no network, no counter."""
     try:
         preset = PresetId(body.provider)
@@ -230,7 +270,7 @@ def _keyed_plan(
         if preset is PresetId.CUSTOM:
             _check_custom_url(body.base_url, settings)
     except AIError as error:
-        return error_response(error.code.value, _STATUS[error.code])
+        return error_response(error.code.value, AI_STATUS[error.code])
     except ConnectionConfigError as error:
         return _refusal(error.code)
     if header.key is None:
@@ -246,40 +286,16 @@ def _check_custom_url(url: str | None, settings: Settings) -> None:
     checked_base_url(url, allow_private=private)
 
 
-def _limited(code: str, status: int, retry_after: int) -> JSONResponse:
+def limited(code: str, status: int, retry_after: int) -> JSONResponse:
     return error_response(code, status, {"Retry-After": str(max(1, retry_after))})
 
 
-@dataclass
-class Hits:
-    """The check hits that one request counted, so only they can be refunded."""
-
-    state: CheckState
-    minute_key: str
-    day_key: str
-    minute: bool = False
-    day: bool = False
-
-    def refund(self) -> None:
-        if self.day:
-            self.state.day.refund(self.day_key)
-            self.day = False
-        if self.minute:
-            self.state.minute.refund(self.minute_key)
-            self.minute = False
-
-
-def _count(hits: Hits) -> JSONResponse | None:
-    decision = hits.state.minute.hit(hits.minute_key)
-    if not decision.allowed:
-        return _limited("rate_limited", 429, decision.retry_after)
-    hits.minute = True
-    decision = hits.state.day.hit(hits.day_key)
-    if not decision.allowed:
-        hits.refund()
-        return _limited("rate_limited", 429, decision.retry_after)
-    hits.day = True
-    return None
+def count_hits(hits: Hits) -> JSONResponse | None:
+    """Count the hits; the 429 answer when a limit refuses."""
+    refused = hits.count()
+    if refused is None:
+        return None
+    return limited("rate_limited", 429, refused.retry_after)
 
 
 def _turnstile_ok(verdict: TurnstileVerdict, settings: Settings, now: float) -> bool:
@@ -294,7 +310,7 @@ def _turnstile_ok(verdict: TurnstileVerdict, settings: Settings, now: float) -> 
     return -CHALLENGE_FUTURE_SKEW_SECONDS <= age <= CHALLENGE_MAX_AGE_SECONDS
 
 
-async def _turnstile(state: CheckState, token: str | None) -> bool:
+async def verify_turnstile(state: CheckState, token: str | None) -> bool:
     """Verify and remember the token. ``False`` for every refusal and every error."""
     secret = state.settings.turnstile_secret_key
     if not token or secret is None or not state.replay.would_accept(token):
@@ -330,32 +346,28 @@ async def _read_body(request: Request) -> bytes | None:
 async def check_connection(
     request: Request, header: Annotated[ProviderKeyHeader, Depends(provider_key_header)]
 ) -> Response:
-    state = _state(request)
+    state = check_state(request)
     plan = await _parse(request, header, state)
     if isinstance(plan, Response):
         return plan
     key = client_key(request.scope, state.settings)
-    hits = Hits(state, key, daily_key(key))
-    refused = _count(hits)
+    hits = Hits(state.minute, state.day, key, daily_key(key))
+    refused = count_hits(hits)
     if refused is not None:
         return refused
-    # One check per client key first, then the shared pool; both are released on every path.
-    if not state.client_slots.try_acquire(hits.day_key):
-        hits.refund()
-        return _limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
     try:
-        slot = state.slots.try_slot()
-        if slot is None:
-            hits.refund()
-            return _limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
-        with slot:
+        with ai_slots(state, hits.day_key):
             return await _run(state, plan, hits)
-    finally:
-        state.client_slots.release(hits.day_key)
+    except BusyError:
+        hits.refund()
+        return limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
 
 
 async def _parse(request: Request, header: ProviderKeyHeader, state: CheckState) -> Plan | Response:
     """Body, cheap validation and free-mode availability. Counts nothing."""
+    if FREE_PASS_HEADER in request.headers:
+        # A free pass is for topic calls only (audience ``topics``).
+        return _refusal("unexpected_free_pass")
     raw = await _read_body(request)
     if raw is None:
         return early_error("upload_timeout", 408)
@@ -363,7 +375,7 @@ async def _parse(request: Request, header: ProviderKeyHeader, state: CheckState)
         body = CheckBody.model_validate_json(raw)
     except ValidationError:
         return _refusal("invalid_request")
-    plan = _plan(body, header, state.settings)
+    plan = plan_connection(body, header, state.settings)
     if isinstance(plan, Response):
         return plan
     if plan.preset is PresetId.FREE and not state.free_available:
@@ -374,7 +386,7 @@ async def _parse(request: Request, header: ProviderKeyHeader, state: CheckState)
 async def _run(state: CheckState, plan: Plan, hits: Hits) -> Response:
     if plan.preset is not PresetId.FREE:
         return (await _call(state, plan, plan.key, free_account=None))[0]
-    if not await _turnstile(state, plan.token):
+    if not await verify_turnstile(state, plan.token):
         # Counted, not refunded: the check limits bound a flood of bad tokens.
         return error_response("turnstile_failed", 403)
     token, account = state.settings.cf_ai_token, state.settings.cf_account_id
@@ -385,7 +397,7 @@ async def _run(state: CheckState, plan: Plan, hits: Hits) -> Response:
         if decision.reason != "ip":
             # The shared state refused, not this client: the request counts nothing.
             hits.refund()
-        return _limited("free_quota_exhausted", 429, decision.retry_after)
+        return limited("free_quota_exhausted", 429, decision.retry_after)
     spent = CHECK_NEURONS
     try:
         response, no_cost = await _call(state, plan, token, free_account=account.get_secret_value())
@@ -397,28 +409,35 @@ async def _run(state: CheckState, plan: Plan, hits: Hits) -> Response:
         state.quota.settle(CHECK_NEURONS, spent)
 
 
+def make_provider(
+    state: CheckState, plan: Plan, key: SecretStr, *, free_account: str | None
+) -> AIProvider:
+    """The provider of a plan. Raises ``ConnectionConfigError``."""
+    private = state.settings.allow_private_provider_urls and plan.preset is PresetId.CUSTOM
+    return provider_for(
+        plan.preset,
+        plan.model,
+        key,
+        plan.base_url,
+        transport=state.provider_transport(private=private),
+        free_account_id=free_account,
+        allow_private=private,
+    )
+
+
 async def _call(
     state: CheckState, plan: Plan, key: SecretStr | None, *, free_account: str | None
 ) -> tuple[Response, bool]:
     """Run the probe. Returns the answer and whether the model did no work (for the budget)."""
     if key is None:  # cheap validation guarantees a key for every non-free preset
         return error_response("invalid_provider_key", 422), True
-    private = state.settings.allow_private_provider_urls and plan.preset is PresetId.CUSTOM
     try:
-        provider = provider_for(
-            plan.preset,
-            plan.model,
-            key,
-            plan.base_url,
-            transport=state.provider_transport(private=private),
-            free_account_id=free_account,
-            allow_private=private,
-        )
+        provider = make_provider(state, plan, key, free_account=free_account)
         result = await provider.check()
     except ConnectionConfigError as error:
         return _refusal(error.code), True
     except AIError as error:
-        return error_response(error.code.value, _STATUS[error.code]), error.code in _NO_COST
+        return error_response(error.code.value, AI_STATUS[error.code]), error.code in AI_NO_COST
     if not result.ok:
         return error_response(AIErrorCode.PROVIDER_BAD_RESPONSE.value, 502), False
     return JSONResponse({"ok": True}), False

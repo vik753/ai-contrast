@@ -331,6 +331,7 @@ def test_preflight_extract_allowed_headers_stay_content_type_and_provider_key(
     assert allowed - {"accept", "accept-language", "content-language"} == {
         "content-type",
         "x-provider-key",
+        "x-free-pass",
     }
 
 

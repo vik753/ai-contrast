@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Final
 
-PATTERNS_VERSION: Final = "2026-11-04.1"
+PATTERNS_VERSION: Final = "2026-11-04.2"
 
 # Fixed strings of special, role and tag tokens. Always class "high".
 FIXED_TOKENS: Final = (
@@ -65,6 +65,23 @@ INSTRUCTION_TARGETS: Final = (
     "промпт*",
     "инструкци*",
     "указани*",
+)
+
+# "forget everything above": an ignore verb, a word of ALL_WORDS, then within two more words
+# a word of ABOVE_WORDS.
+ALL_WORDS: Final = ("everything", "all", "anything", "все", "всё", "усе", "всі", "всем")  # noqa: RUF001
+ABOVE_WORDS: Final = (
+    "above",
+    "before",
+    "earlier",
+    "prior",
+    "вище*",
+    "выше*",
+    "раніше",
+    "ранее",
+    "прежн*",
+    "попередн*",
+    "предыдущ*",
 )
 
 # "system prompt".

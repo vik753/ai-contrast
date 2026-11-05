@@ -20,9 +20,24 @@ from app.pseudo.gate import (
     document_digest,
 )
 
-__all__ = ["AIError", "AIErrorCode", "AIProvider", "AIRequest", "CheckResult", "ModelJson"]
+__all__ = [
+    "REPAIR_CAP",
+    "REPAIR_NOT_JSON",
+    "REPAIR_SCHEMA",
+    "AIError",
+    "AIErrorCode",
+    "AIProvider",
+    "AIRequest",
+    "CheckResult",
+    "ModelJson",
+]
 
 MAX_OUTPUT_TOKENS: Final = 16384
+# Repair codes of ``AIRequest.repair`` (ADR 0009: a repair call carries an error-code enum and
+# never the previous output). 0 is no repair; the texts live in ``app.ai.prompting``.
+REPAIR_NOT_JSON: Final = 1
+REPAIR_SCHEMA: Final = 2
+REPAIR_CAP: Final = 3
 
 # The parsed JSON object of a model answer. Schema validation happens in the caller.
 type ModelJson = dict[str, object]
@@ -70,6 +85,7 @@ class AIRequest:
     document: PseudonymizedDocument | None = None
     text: PseudonymizedText | None = None
     topic: ConfirmedTopic | None = None
+    repair: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.template, PromptTemplate):
@@ -96,6 +112,8 @@ class AIRequest:
             raise ValueError("text belongs to another document")  # noqa: TRY003
         if not (isinstance(self.schema, type) and issubclass(self.schema, BaseModel)):
             raise TypeError("schema must be a pydantic model class")  # noqa: TRY003
+        if type(self.repair) is not int or not 0 <= self.repair <= REPAIR_CAP:
+            raise ValueError("repair is out of range")  # noqa: TRY003
         if type(self.max_tokens) is not int or not 1 <= self.max_tokens <= MAX_OUTPUT_TOKENS:
             raise ValueError("max_tokens is out of range")  # noqa: TRY003
 

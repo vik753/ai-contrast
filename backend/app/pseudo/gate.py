@@ -389,11 +389,17 @@ def _check_texts(definition: TopicDefinition) -> None:
     _checked(definition.title, TextKind.NAME, "title")
     if definition.description:
         _checked(definition.description, TextKind.DESCRIPTION, "description")
+    # Ids are not shown, but a model can read them: Layer 2 sees them as words.
+    for field, identifier in (("side", definition.side), ("domain", definition.domain or "")):
+        if scan(identifier.replace("_", " ")):
+            raise TopicTextError("topic_flagged", field=field)
     for number, attribute in enumerate(definition.attributes):
         where = f"attributes.{number}"
-        # The id is not shown, but a model reads it: Layer 2 sees it as words.
         if scan(attribute.id.replace("_", " ")):
             raise TopicTextError("topic_flagged", field=f"{where}.id")
+        for index, value_id in enumerate(attribute.value_ids):
+            if scan(value_id.replace("_", " ")):
+                raise TopicTextError("topic_flagged", field=f"{where}.value_ids.{index}")
         _checked(attribute.label, TextKind.LABEL, f"{where}.label")
         for index, value in enumerate(attribute.values):
             _checked(value, TextKind.VALUE, f"{where}.values.{index}")

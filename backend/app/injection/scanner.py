@@ -59,6 +59,8 @@ class _WordSet:
 
 _IGNORE = _WordSet(p.IGNORE_VERBS)
 _TARGETS = _WordSet(p.INSTRUCTION_TARGETS)
+_ALL = _WordSet(p.ALL_WORDS)
+_ABOVE = _WordSet(p.ABOVE_WORDS)
 _SYSTEM = _WordSet(p.SYSTEM_WORDS)
 _PROMPT = _WordSet(p.PROMPT_WORDS)
 _RATE = _WordSet(p.RATE_VERBS)
@@ -168,6 +170,16 @@ def _first(follow: list[tuple[str, int, int]], words: _WordSet, limit: int) -> i
     return None
 
 
+def _everything_above(follow: list[tuple[str, int, int]]) -> int | None:
+    """End offset of "everything above" right after an ignore verb, else ``None``."""
+    for index, (word, _, _) in enumerate(follow[:2]):
+        if word in _ALL:
+            for later, _, end in follow[index + 1 : index + 3]:
+                if later in _ABOVE:
+                    return end
+    return None
+
+
 def _word_rules(view: str, out: list[_Raw]) -> None:
     for anchor in _WORD.finditer(view):
         word = anchor.group()
@@ -176,6 +188,8 @@ def _word_rules(view: str, out: list[_Raw]) -> None:
             target = _first(follow, _TARGETS, MAX_TARGET_DISTANCE)
             if target is not None:
                 out.append((anchor.start(), follow[target][2], "heuristic", "instruction"))
+            elif (above := _everything_above(follow)) is not None:
+                out.append((anchor.start(), above, "heuristic", "instruction"))
         elif word in _SYSTEM:
             follow = _follow(view, anchor.end())
             if follow and follow[0][0] in _PROMPT:

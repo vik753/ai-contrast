@@ -60,6 +60,16 @@ def app_state(request: Request) -> tuple[Settings, ExtractionLimiter]:
     return settings, limiter
 
 
+def extraction_slots(request: Request) -> tuple[ClientSlots, ExtractionLimiter]:
+    """The per-client and the shared extraction slots (typed accessor of ``app.state``)."""
+    client_slots = getattr(request.app.state, "client_slots", None)
+    limiter = getattr(request.app.state, "extraction_limiter", None)
+    if not isinstance(client_slots, ClientSlots) or not isinstance(limiter, ExtractionLimiter):
+        msg = "app state is not configured"
+        raise TypeError(msg)
+    return client_slots, limiter
+
+
 class BodyRejectedError(Exception):
     """The body read stopped early. ``status`` and ``code`` describe the answer."""
 

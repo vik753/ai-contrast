@@ -10,6 +10,11 @@ EXTRACT_PATH: Final = "/api/extract"
 SEGMENT_PATH: Final = "/api/segment"
 SAFETY_PATH: Final = "/api/safety-check"
 CHECK_PATH: Final = "/api/provider/check"
+SUGGEST_PATH: Final = "/api/topics/suggest"
+PROPOSE_PATH: Final = "/api/topics/propose-attributes"
+EXPAND_PATH: Final = "/api/topics/expand-synonyms"
+# Body cap of the topic endpoints that carry a topic only (ADR 0017 point 6).
+TOPIC_MAX_BODY_BYTES: Final = 16 * 1024
 # Body cap of the connection check: a short JSON object (ADR 0016 point 6).
 CHECK_MAX_BODY_BYTES: Final = 4096
 
