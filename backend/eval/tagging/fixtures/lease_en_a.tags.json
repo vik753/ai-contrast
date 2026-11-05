@@ -1,0 +1,26 @@
+{
+  "contract": "lease_en_a",
+  "clauses": {
+    "1": ["rent_amount", "deposit"],
+    "1.1": ["rent_amount"],
+    "1.2": ["deposit"],
+    "2": ["term_renewal"],
+    "2.1": ["term_renewal"],
+    "3": ["utilities", "repairs_maintenance"],
+    "3.1": ["utilities"],
+    "3.2": ["repairs_maintenance"],
+    "4": ["termination_notice"],
+    "4.1": ["termination_notice"],
+    "4.2": ["termination_notice"],
+    "5": ["late_penalties"],
+    "5.1": ["late_penalties"],
+    "6": ["sublease_use"],
+    "6.1": ["sublease_use"],
+    "7": ["landlord_access"],
+    "7.1": ["landlord_access"],
+    "8": ["damage_liability"],
+    "8.1": ["damage_liability"]
+  },
+  "other": [],
+  "risk_terms": []
+}
