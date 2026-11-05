@@ -55,6 +55,8 @@ Order: S8-T0 (tagging fixtures) and S8-T1 (keyword tagger, risk terms, caps) in 
 
 ## Open follow-ups
 
+- Stage 11: refresh preset model ids and model pairs (OpenAI, Gemini, Mistral, OpenRouter) against provider docs; pick pairs by the eval.
+
 ### Stage 9 follow-ups (from stage 7)
 
 - Stage 9: expose the confirmed masked documents from UploadForm to TopicPanel (`App` passes `NO_DOCUMENTS` today), which enables the "Suggest from my contracts" button.

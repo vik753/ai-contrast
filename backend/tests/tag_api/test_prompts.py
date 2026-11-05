@@ -6,8 +6,6 @@ from __future__ import annotations
 import json
 import re
 
-import pytest
-
 from app.ai.prompts import PromptTemplate
 from tests.tag_api.helpers import (
     TagRig,
@@ -87,7 +85,6 @@ def _check_models(**changes: object) -> set[str]:
     return {c[1] for c in rig.tags.of("check")}
 
 
-@pytest.mark.filterwarnings("ignore:The model:DeprecationWarning")
 def test_check_model_defaults_to_the_preset_strong_model() -> None:
     from app.ai.presets import MODEL_PAIRS, PresetId
 
