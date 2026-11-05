@@ -115,10 +115,11 @@ def test_keyword_tags_synonym_metacharacters_are_literal() -> None:
     assert _tags(["See tax.id here"], t)["c1"] == {"custom_1"}
 
 
-def test_keyword_tags_synonym_with_regex_syntax_does_not_raise() -> None:
-    t = topic(1, en=["a.b.c", "(cover", "cover)", "x/y/z", "100%"])
-    result = _tags(["axbxc cover xyz 100 percent"], t)
-    assert result["c1"] in (set(), {"custom_1"})
+def test_keyword_tags_regex_syntax_synonyms_match_literally_only() -> None:
+    t = topic(1, en=["a.bc", "(abc)", "a/bc", "a-bc"])
+    texts = ["axbc", "abc", "aabc", "a bcd", "aaaa bbbb", "xyz"]
+    result = _tags(texts, t)
+    assert all(v == set() for v in result.values())
 
 
 def test_keyword_tags_languages_are_all_used_whatever_the_text() -> None:
