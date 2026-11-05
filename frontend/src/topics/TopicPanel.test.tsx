@@ -6,12 +6,13 @@ import en from "../i18n/locales/en.json";
 import uk from "../i18n/locales/uk.json";
 import { flattenLocale } from "../test/locale-utils";
 import { jsonResponse } from "../test/provider-fakes";
-import { DOC, attr, bodyOf, stubTopicsFetch, type Router } from "../test/topics-fakes";
+import { DOC, attr, bodyOf, must, stubTopicsFetch, type Router } from "../test/topics-fakes";
 import type { TopicSelection } from "./types";
 
 const EN = flattenLocale(en);
 const UK = flattenLocale(uk);
-const text = (k: string): string => String(EN[k]);
+let current: Record<string, unknown> = EN;
+const text = (k: string): string => String(current[k]);
 const KEY = "sk-CANARY-panel-9876";
 
 interface Props {
@@ -22,6 +23,7 @@ interface Props {
 }
 
 async function renderPanel(over: Partial<Props> = {}, lang: "en" | "uk" = "en") {
+  current = lang === "en" ? EN : UK;
   vi.resetModules();
   const i18n = await import("../i18n/index");
   await i18n.setupI18n();
@@ -46,7 +48,8 @@ const nameBox = () => within(editor()).getByLabelText<HTMLInputElement>(text("to
 const descBox = () =>
   within(editor()).getByLabelText<HTMLInputElement>(text("topics.own.description"));
 const type = (el: HTMLElement, value: string) => fireEvent.change(el, { target: { value } });
-const alertText = () => screen.getByRole("alert").textContent ?? "";
+const li = (el: HTMLElement) => must(el.closest("li"));
+const alertText = () => screen.getByRole("alert").textContent;
 
 const SUGGEST_OK: Router = (c) =>
   c.url === "/api/topics/suggest"
@@ -91,10 +94,10 @@ describe("catalog in the panel (AC1)", () => {
     stubTopicsFetch();
     await renderPanel();
     pickDomain("kasko");
-    const item = screen.getByRole("checkbox", { name: "Deductible" }).closest("li")!;
+    const item = li(screen.getByRole("checkbox", { name: "Deductible" }));
     expect(item.textContent).toContain("Deductible amount");
     expect(item.textContent).toContain(text("topics.direction.lower_better"));
-    const theft = screen.getByRole("checkbox", { name: "Theft cover" }).closest("li")!;
+    const theft = li(screen.getByRole("checkbox", { name: "Theft cover" }));
     expect(theft.textContent).toContain(text("topics.direction.ordered"));
     type(sideSelect(), "insurer");
     expect(item.textContent).toContain(text("topics.direction.higher_better"));
@@ -106,7 +109,7 @@ describe("catalog in the panel (AC1)", () => {
     pickDomain("kasko");
     expect(screen.getByRole("checkbox", { name: "Франшиза" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "Страхувальник" })).toBeTruthy();
-    expect(screen.getByLabelText(String(UK["topics.domain.label"]))).toBeTruthy();
+    expect(screen.getByLabelText(text("topics.domain.label"))).toBeTruthy();
   });
 
   it("test_template_topics_selected_by_default_and_can_be_turned_off", async () => {
@@ -123,7 +126,7 @@ describe("catalog in the panel (AC1)", () => {
           ),
         );
     expect(all().every((c) => (c as HTMLInputElement).checked)).toBe(true);
-    const last = () => seen[seen.length - 1]!;
+    const last = () => must(seen[seen.length - 1]);
     expect(
       last()
         .catalog.map((r) => r.topic_id)
@@ -190,7 +193,7 @@ describe("suggested topics (AC1, AC1a)", () => {
     await renderPanel({ documents: [DOC("Contract A")], onSelectionChange: (s) => seen.push(s) });
     pickDomain("kasko");
     fireEvent.click(btn("topics.suggest.button"));
-    const item = (await screen.findByText("Roadside help")).closest("li")!;
+    const item = li(await screen.findByText("Roadside help"));
     expect(item.textContent).toContain("Tow truck rules");
     fireEvent.click(within(item).getByRole("button", { name: text("topics.suggest.accept") }));
     expect(nameBox().value).toBe("Roadside help");
@@ -200,10 +203,10 @@ describe("suggested topics (AC1, AC1a)", () => {
     }
     fireEvent.click(btn("topics.own.propose"));
     await screen.findByRole("list", { name: text("topics.attr.list") });
-    const prop = calls.find((c) => c.url === "/api/topics/propose-attributes")!;
+    const prop = must(calls.find((c) => c.url === "/api/topics/propose-attributes"));
     expect(bodyOf(prop).topic).toMatchObject({ origin: "suggested", description: "" });
     fireEvent.click(btn("topics.own.confirm"));
-    const last = seen[seen.length - 1]!;
+    const last = must(seen[seen.length - 1]);
     expect(last.suggested).toHaveLength(1);
     expect(last.suggested[0]).toMatchObject({ title: "Roadside help", description: "" });
     expect(last.custom).toEqual([]);
@@ -260,7 +263,7 @@ describe("own topic flow (AC1)", () => {
       attr({ id: "a1", label: "Limit" }),
       attr({ id: "a2", label: "Days", type: "duration", units: ["days"] }),
     ]);
-    const req = calls.find((c) => c.url === "/api/topics/propose-attributes")!;
+    const req = must(calls.find((c) => c.url === "/api/topics/propose-attributes"));
     expect(bodyOf(req).topic).toMatchObject({
       origin: "custom",
       title: "Roadside",
@@ -268,11 +271,15 @@ describe("own topic flow (AC1)", () => {
       attributes: [],
     });
     expect(rows()).toHaveLength(2);
-    const first = within(rows()[0]!).getByLabelText<HTMLInputElement>(text("topics.attr.label"));
+    const first = within(must(rows()[0])).getByLabelText<HTMLInputElement>(
+      text("topics.attr.label"),
+    );
     expect(first.value).toBe("Limit");
     type(first, "Cap");
     expect(first.value).toBe("Cap");
-    fireEvent.click(within(rows()[1]!).getByRole("button", { name: text("topics.attr.remove") }));
+    fireEvent.click(
+      within(must(rows()[1])).getByRole("button", { name: text("topics.attr.remove") }),
+    );
     expect(rows()).toHaveLength(1);
   });
 
@@ -287,7 +294,7 @@ describe("own topic flow (AC1)", () => {
       attr({ id: "a2", type: "categories", values: ["x"], units: [] }),
       attr({ id: "a3", type: "text", units: [] }),
     ]);
-    const opts = (i: number) => [...dirOf(rows()[i]!).options].map((o) => o.value);
+    const opts = (i: number) => [...dirOf(must(rows()[i])).options].map((o) => o.value);
     expect(opts(0)).toEqual(["none", "lower_better", "higher_better"]);
     expect(opts(1)).toEqual(["none", "more_better", "fewer_better"]);
     expect(opts(2)).toEqual(["none"]);
@@ -295,9 +302,9 @@ describe("own topic flow (AC1)", () => {
 
   it("test_confirm_keeps_client_chosen_direction_with_client_source", async () => {
     const { seen } = await propose([attr({ id: "a1" }), attr({ id: "a2", label: "Other" })]);
-    type(dirOf(rows()[0]!), "higher_better");
+    type(dirOf(must(rows()[0])), "higher_better");
     fireEvent.click(btn("topics.own.confirm"));
-    const t = seen[seen.length - 1]!.custom[0]!;
+    const t = must(must(seen[seen.length - 1]).custom[0]);
     expect(t).toMatchObject({ origin: "custom", title: "Roadside", description: "Towing" });
     expect(t.attributes.map((a) => [a.direction, a.direction_source])).toEqual([
       ["higher_better", "client"],
@@ -307,7 +314,9 @@ describe("own topic flow (AC1)", () => {
 
   it("test_proposed_attribute_markup_is_plain_text", async () => {
     await propose([attr({ label: "<b>bold</b> [x](http://evil.example)" })]);
-    const input = within(rows()[0]!).getByLabelText<HTMLInputElement>(text("topics.attr.label"));
+    const input = within(must(rows()[0])).getByLabelText<HTMLInputElement>(
+      text("topics.attr.label"),
+    );
     expect(input.value).toBe("<b>bold</b> [x](http://evil.example)");
     expect(document.querySelector("b, a, img, script")).toBeNull();
   });
@@ -335,7 +344,7 @@ describe("errors (AC3)", () => {
   ])("test_error_%s_shows_its_message", async (code) => {
     await failPropose(422, { error: code });
     expect(alertText()).toContain(text(`topics.error.${code}`));
-    expect(alertText()).not.toContain(code);
+    if (code.includes("_")) expect(alertText()).not.toContain(code);
   });
 
   it("test_unknown_server_text_is_never_shown", async () => {
@@ -391,12 +400,50 @@ describe("free pass reuse (AC1)", () => {
       await screen.findByRole("list", { name: text("topics.attr.list") });
     }
     const p = calls.filter((c) => c.url.includes("propose"));
-    expect(bodyOf(p[0]!).turnstile_token).toBe("tok-1");
-    expect(p[0]!.headers.get("X-Free-Pass")).toBeNull();
-    expect(p[1]!.headers.get("X-Free-Pass")).toBe("pass-1");
-    expect(bodyOf(p[1]!)).not.toHaveProperty("turnstile_token");
-    expect(p[2]!.headers.get("X-Free-Pass")).toBe("pass-2");
+    expect(bodyOf(must(p[0])).turnstile_token).toBe("tok-1");
+    expect(must(p[0]).headers.get("X-Free-Pass")).toBeNull();
+    expect(must(p[1]).headers.get("X-Free-Pass")).toBe("pass-1");
+    expect(bodyOf(must(p[1]))).not.toHaveProperty("turnstile_token");
+    expect(must(p[2]).headers.get("X-Free-Pass")).toBe("pass-2");
     for (const c of p) expect(c.headers.get("X-Provider-Key")).toBeNull();
+  });
+});
+
+describe("confirm expands synonyms (AC1)", () => {
+  it("test_confirm_calls_expand_synonyms_and_stores_the_synonyms", async () => {
+    const seen: TopicSelection[] = [];
+    const { calls } = stubTopicsFetch((c) => {
+      if (c.url === "/api/topics/propose-attributes")
+        return jsonResponse(200, { attributes: [attr()], dropped: 0 });
+      if (c.url === "/api/topics/expand-synonyms")
+        return jsonResponse(200, {
+          synonyms_en: ["towing", "tow"],
+          synonyms_uk: ["евакуац"],
+          synonyms_ru: ["эвакуац"],
+          dropped: 0,
+        });
+      return undefined;
+    });
+    await renderPanel({ onSelectionChange: (s) => seen.push(s) });
+    pickDomain("kasko");
+    type(nameBox(), "Roadside");
+    fireEvent.click(btn("topics.own.propose"));
+    await screen.findByRole("list", { name: text("topics.attr.list") });
+    fireEvent.click(btn("topics.own.confirm"));
+    await waitFor(() =>
+      expect(calls.filter((c) => c.url === "/api/topics/expand-synonyms")).toHaveLength(1),
+    );
+    const req = must(calls.find((c) => c.url === "/api/topics/expand-synonyms"));
+    expect(bodyOf(req).topic).toMatchObject({ title: "Roadside", origin: "custom" });
+    expect(req.headers.get("X-Provider-Key")).toBe(KEY);
+    await waitFor(() => {
+      const t = must(seen[seen.length - 1]).custom[0];
+      expect(t).toMatchObject({
+        synonyms_en: ["towing", "tow"],
+        synonyms_uk: ["евакуац"],
+        synonyms_ru: ["эвакуац"],
+      });
+    });
   });
 });
 

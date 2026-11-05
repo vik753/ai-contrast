@@ -1,7 +1,7 @@
 /** S7-T3 AC1, AC3 — API helpers: key and pass channels, pinned options, strict replies. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { jsonResponse } from "../test/provider-fakes";
-import { CATALOG, DOC, bodyOf, stubTopicsFetch, topic } from "../test/topics-fakes";
+import { CATALOG, DOC, bodyOf, must, stubTopicsFetch, topic } from "../test/topics-fakes";
 import { expandSynonyms, fetchCatalog, proposeAttributes, suggestTopics } from "./api";
 
 const KEY = "sk-CANARY-topics-1234";
@@ -14,7 +14,7 @@ describe("topic API helpers", () => {
     const { calls } = stubTopicsFetch();
     const r = await fetchCatalog();
     expect(r).toEqual({ ok: true, data: CATALOG });
-    const c = calls[0]!;
+    const c = must(calls[0]);
     expect(c.url).toBe("/api/topics/catalog");
     expect(c.method ?? "GET").toBe("GET");
     expect(c.body).toBeUndefined();
@@ -24,7 +24,7 @@ describe("topic API helpers", () => {
   it("test_suggestTopics_key_only_in_header_and_snake_case_body", async () => {
     const { calls } = stubTopicsFetch(() => jsonResponse(200, { suggestions: [], dropped: 0 }));
     await suggestTopics({ ...base, domain: "kasko", side: "insured", document: DOC("A") });
-    const c = calls[0]!;
+    const c = must(calls[0]);
     expect(c.url).toBe("/api/topics/suggest");
     expect(c.method).toBe("POST");
     expect(c.headers.get("X-Provider-Key")).toBe(KEY);
@@ -49,7 +49,7 @@ describe("topic API helpers", () => {
   it("test_free_pass_only_in_header", async () => {
     const { calls } = stubTopicsFetch(() => jsonResponse(200, { attributes: [], dropped: 0 }));
     await proposeAttributes({ provider: "free", freePass: "v1.topics.pass", topic: topic() });
-    const c = calls[0]!;
+    const c = must(calls[0]);
     expect(c.url).toBe("/api/topics/propose-attributes");
     expect(c.headers.get("X-Free-Pass")).toBe("v1.topics.pass");
     expect(c.headers.get("X-Provider-Key")).toBeNull();
@@ -63,8 +63,8 @@ describe("topic API helpers", () => {
       jsonResponse(200, { synonyms_en: [], synonyms_uk: [], synonyms_ru: [], dropped: 0 }),
     );
     await expandSynonyms({ provider: "free", turnstileToken: "tok", topic: topic() });
-    expect(calls[0]!.url).toBe("/api/topics/expand-synonyms");
-    expect(bodyOf(calls[0]!).turnstile_token).toBe("tok");
+    expect(must(calls[0]).url).toBe("/api/topics/expand-synonyms");
+    expect(bodyOf(must(calls[0])).turnstile_token).toBe("tok");
   });
 
   it("test_reply_free_pass_is_returned", async () => {

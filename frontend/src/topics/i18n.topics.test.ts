@@ -53,7 +53,7 @@ const REQUIRED = [
   ...["none", "lower_better", "higher_better", "more_better", "fewer_better", "ordered"].map(
     (d) => `direction.${d}`,
   ),
-  ...["too_large", "invalid_json", "forbidden_key", "invalid_shape", "too_many"].map(
+  ...["too_large", "invalid_json", "forbidden_key", "invalid_shape", "tooLong"].map(
     (c) => `import.error.${c}`,
   ),
   ...CODES.map((c) => `error.${c}`),
@@ -84,7 +84,7 @@ describe("topics locales", () => {
 });
 
 describe("topics sources", () => {
-  const files = readdirSync(__dirname).filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f));
+  const files = readdirSync(__dirname).filter((f) => /\.tsx?$/.test(f) && !f.includes(".test."));
   it("test_sources_exist", () => {
     expect(files).toEqual(
       expect.arrayContaining(["api.ts", "topicStore.ts", "transfer.ts", "TopicPanel.tsx"]),

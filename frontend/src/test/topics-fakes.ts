@@ -144,3 +144,9 @@ export const DOC = (label: string) => ({
   clauses: [{ id: "c1", text: "1. Text" }],
   acknowledgedUnmasked: [] as [string, number, number][],
 });
+
+/** Test-only narrowing without a non-null assertion. */
+export function must<T>(v: T | null | undefined): T {
+  if (v === null || v === undefined) throw new Error("expected a value");
+  return v;
+}

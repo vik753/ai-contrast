@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentType } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { stubTopicsFetch, topic } from "../test/topics-fakes";
+import { must, stubTopicsFetch, topic } from "../test/topics-fakes";
 
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.unstubAllGlobals());
@@ -24,10 +24,12 @@ it("test_clear_all_removes_saved_topics_and_memory", async () => {
   const dialogs = await screen
     .findAllByRole("dialog")
     .catch(() => screen.findAllByRole("alertdialog"));
-  const dialog = dialogs[dialogs.length - 1]!;
-  const confirm = within(dialog)
-    .getAllByRole("button")
-    .find((b) => !/cancel/i.test(b.textContent ?? ""))!;
+  const dialog = must(dialogs[dialogs.length - 1]);
+  const confirm = must(
+    within(dialog)
+      .getAllByRole("button")
+      .find((b) => !/cancel/i.test(b.textContent)),
+  );
   fireEvent.click(confirm);
   await waitFor(() => {
     expect(localStorage.getItem("aic.topics.v1")).toBeNull();

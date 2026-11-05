@@ -63,7 +63,8 @@ describe("importTopics / exportTopics", () => {
   });
 
   it("test_missing_key_is_invalid_shape", () => {
-    const { title: _title, ...rest } = topic();
+    const rest: Record<string, unknown> = { ...topic() };
+    delete rest.title;
     expect(code(file([rest]))).toBe("invalid_shape");
   });
 
