@@ -42,7 +42,6 @@ def code_of(text: str, kind: TextKind = N, lang: str | None = None) -> str | Non
         "Договір страхування",
         "м'який і м’який",
         "Pre-trial notice. Term",
-        "AI system liability",
         "Model year of the vehicle",
         "Штучний інтелект у договорі",
     ],

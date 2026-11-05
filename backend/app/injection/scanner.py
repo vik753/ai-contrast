@@ -20,16 +20,18 @@ from typing import Final, Literal
 from app.injection import patterns as p
 from app.pseudo.matching import fold
 
-__all__ = ["Hit", "scan"]
+__all__ = ["WORD", "Hit", "WordSet", "colour_rating", "matching_view", "scan"]
 
 WINDOW: Final = 200
-FOLLOW_WORDS: Final = 9
+FOLLOWWORDS: Final = 9
 MAX_TARGET_DISTANCE: Final = 8
 MAX_AS_DISTANCE: Final = 4
+MAX_LINKS: Final = 2
+MAX_BARE_FILLERS: Final = 3
 MAX_TOKEN_CHARS: Final = 40
 _PLACEHOLDER_MIN_LETTER_DOT: Final = 2
 
-_WORD: Final = re.compile(r"[^\W_]+")
+WORD: Final = re.compile(r"[^\W_]+")
 _TOKEN_BODY: Final = re.compile(r"[a-z0-9_ -]{1,40}\|>")
 _PLACEHOLDER: Final = re.compile(r"[^\[\]\s]{1,40}\]")
 _BASE64: Final = re.compile(rf"[A-Za-z0-9+/]{{{p.BASE64_MIN_RUN},}}={{0,2}}")
@@ -46,7 +48,7 @@ class Hit:
     end: int
 
 
-class _WordSet:
+class WordSet:
     """Folded whole words and folded stems."""
 
     def __init__(self, entries: tuple[str, ...]) -> None:
@@ -57,16 +59,46 @@ class _WordSet:
         return word in self.exact or word.startswith(self.stems)
 
 
-_IGNORE = _WordSet(p.IGNORE_VERBS)
-_TARGETS = _WordSet(p.INSTRUCTION_TARGETS)
-_ALL = _WordSet(p.ALL_WORDS)
-_ABOVE = _WordSet(p.ABOVE_WORDS)
-_SYSTEM = _WordSet(p.SYSTEM_WORDS)
-_PROMPT = _WordSet(p.PROMPT_WORDS)
-_RATE = _WordSet(p.RATE_VERBS)
-_AS = _WordSet(p.AS_WORDS)
-_DEEMED = _WordSet(p.DEEMED_WORDS)
-_RATING = _WordSet(p.RATING_WORDS)
+_IGNORE = WordSet(p.IGNORE_VERBS)
+_TARGETS = WordSet(p.INSTRUCTION_TARGETS)
+_ALL = WordSet(p.ALL_WORDS)
+_ABOVE = WordSet(p.ABOVE_WORDS)
+_SYSTEM = WordSet(p.SYSTEM_WORDS)
+_PROMPT = WordSet(p.PROMPT_WORDS)
+_RATE = WordSet(p.RATE_VERBS)
+_INSTRUCTION = WordSet(p.INSTRUCTION_WORDS)
+_FOR = WordSet(p.FOR_WORDS)
+_LINK = WordSet(p.LINK_WORDS)
+_THE = WordSet(p.THE_WORDS)
+_STRONG_AI = WordSet(p.AI_WORDS)
+_LANGUAGE = WordSet(p.LANGUAGE_WORDS)
+_MODEL = WordSet(p.MODEL_WORDS)
+_WEAK_AI = WordSet(p.WEAK_AI_WORDS)
+_HIDDEN = WordSet(p.HIDDEN_QUALIFIERS)
+_BARE_EN = WordSet(p.BARE_VERBS_EN)
+_BARE_UKRU = WordSet(p.BARE_VERBS_UKRU)
+_FILLERS = WordSet(p.BARE_FILLERS)
+_BARE_RATING_EN = WordSet(p.BARE_RATING_EN)
+_BARE_RATING_UKRU = WordSet(p.BARE_RATING_UKRU)
+_NEURAL = WordSet(p.NEURAL_WORDS)
+_NET = WordSet(p.NET_WORDS)
+_COLOUR = WordSet(p.COLOUR_WORDS)
+_COLOUR_OBJECT = WordSet(p.COLOUR_OBJECT_WORDS)
+_COLOUR_GIVE = WordSet(p.COLOUR_GIVE_VERBS)
+_CARD = WordSet(p.CARD_WORDS)
+_AS = WordSet(p.AS_WORDS)
+_DEEMED = WordSet(p.DEEMED_WORDS)
+_RATING = WordSet(p.RATING_WORDS)
+_ANCHORS = WordSet(
+    p.IGNORE_VERBS
+    + p.SYSTEM_WORDS
+    + p.RATE_VERBS
+    + p.DEEMED_WORDS
+    + p.INSTRUCTION_WORDS
+    + p.BARE_VERBS_EN
+    + p.BARE_VERBS_UKRU
+    + p.COLOUR_WORDS
+)
 _FIXED = tuple(fold(token) for token in p.FIXED_TOKENS)
 _ROLES = tuple(fold(label) for label in p.ROLE_LABELS)
 _TAGS = tuple(fold(tag) for tag in p.TAG_PREFIXES)
@@ -94,6 +126,11 @@ def _view(text: str) -> tuple[str, array[int] | None]:
     for index, piece in enumerate(pieces):
         source.extend([index] * len(piece))
     return view, source
+
+
+def matching_view(text: str) -> str:
+    """The folded matching view of ``text`` (NFKC, skeleton, lower case)."""
+    return _view(text)[0]
 
 
 def _find_all(view: str, needle: str) -> list[int]:
@@ -154,16 +191,16 @@ def _placeholders(view: str, out: list[_Raw]) -> None:
 
 
 def _follow(view: str, start: int) -> list[tuple[str, int, int]]:
-    """Up to ``FOLLOW_WORDS`` words after ``start``, within ``WINDOW`` characters."""
+    """Up to ``FOLLOWWORDS`` words after ``start``, within ``WINDOW`` characters."""
     words: list[tuple[str, int, int]] = []
-    for match in _WORD.finditer(view, start, start + WINDOW):
+    for match in WORD.finditer(view, start, start + WINDOW):
         words.append((match.group(), match.start(), match.end()))
-        if len(words) == FOLLOW_WORDS:
+        if len(words) == FOLLOWWORDS:
             break
     return words
 
 
-def _first(follow: list[tuple[str, int, int]], words: _WordSet, limit: int) -> int | None:
+def _first(follow: list[tuple[str, int, int]], words: WordSet, limit: int) -> int | None:
     for index, (word, _, _) in enumerate(follow[:limit]):
         if word in words:
             return index
@@ -180,29 +217,131 @@ def _everything_above(follow: list[tuple[str, int, int]]) -> int | None:
     return None
 
 
+Follow = list[tuple[str, int, int]]
+
+
+def _strong_at(follow: Follow, index: int) -> int | None:
+    """End offset of a strong AI word (or "language model") at ``follow[index]``."""
+    if index >= len(follow):
+        return None
+    word = follow[index][0]
+    if word in _STRONG_AI:
+        return follow[index][2]
+    if word == "a" and follow[index + 1 : index + 2] and follow[index + 1][0] == "i":
+        return follow[index + 1][2]  # the spaced "a i"
+    pair = (word in _LANGUAGE and follow[index + 1 : index + 2]) or (
+        word in _NEURAL and follow[index + 1 : index + 2]
+    )
+    if pair:
+        second = pair[0][0]
+        if (word in _LANGUAGE and second in _MODEL) or (word in _NEURAL and second in _NET):
+            return pair[0][2]
+    return None
+
+
+def colour_rating(back: list[str], follow: Follow) -> bool:
+    """A colour word near a quantifier, an object or a give verb; not "green card"."""
+    if follow and follow[0][0] in _CARD:
+        return False
+    near = [*back[-3:], *(word for word, _, _ in follow[:3])]
+    return any(word in _COLOUR_OBJECT or word in _COLOUR_GIVE for word in near)
+
+
+def _ends_phrase(view: str, end: int) -> bool:
+    """No word follows at ``end`` (only blanks, then punctuation, a line end or the end)."""
+    position = end
+    while position < len(view) and view[position] in " \t":
+        position += 1
+    return position >= len(view) or not view[position].isalnum()
+
+
+def _addressed_to_ai(view: str, follow: Follow, hidden: bool) -> int | None:
+    """End of "[linking words] for|to [articles] <AI word>" after an instruction word."""
+    direct = _strong_at(follow, 0)
+    if direct is not None:
+        return direct
+    index = 0
+    while index < MAX_LINKS and index < len(follow) and follow[index][0] in _LINK:
+        index += 1
+    if index >= len(follow) or follow[index][0] not in _FOR:
+        return None
+    index += 1
+    articles = 0
+    while articles < MAX_LINKS and index < len(follow) and follow[index][0] in _THE:
+        index += 1
+        articles += 1
+    strong = _strong_at(follow, index)
+    if strong is not None:
+        return strong
+    if index < len(follow) and follow[index][0] in _WEAK_AI:
+        end = follow[index][2]
+        return end if hidden or _ends_phrase(view, end) else None
+    return None
+
+
+def _bare_rating(word: str, follow: Follow) -> int | None:
+    """End of the rating word in "rate everything green": only linking words between."""
+    if word in _BARE_EN:
+        rating = _BARE_RATING_EN
+    elif word in _BARE_UKRU:
+        rating = _BARE_RATING_UKRU
+    else:
+        return None
+    for found, _, end in follow[: MAX_BARE_FILLERS + 1]:
+        if found in rating:
+            return end
+        if found not in _FILLERS:
+            return None
+    return None
+
+
+def _instruction_rule(
+    anchor: re.Match[str], back: list[str], follow: Follow, view: str
+) -> _Raw | None:
+    hidden = any(word in _HIDDEN for word in back[-2:])
+    end = _addressed_to_ai(view, follow, hidden)
+    if end is None and hidden:
+        end = anchor.end()
+    return None if end is None else (anchor.start(), end, "heuristic", "instruction")
+
+
+def _ignore_rule(anchor: re.Match[str], follow: Follow) -> _Raw | None:
+    target = _first(follow, _TARGETS, MAX_TARGET_DISTANCE)
+    if target is not None:
+        return (anchor.start(), follow[target][2], "heuristic", "instruction")
+    above = _everything_above(follow)
+    return None if above is None else (anchor.start(), above, "heuristic", "instruction")
+
+
+def _rate_rule(anchor: re.Match[str], word: str, follow: Follow) -> _Raw | None:
+    at = _first(follow, _AS, MAX_AS_DISTANCE)
+    if at is not None and at + 1 < len(follow) and follow[at + 1][0] in _RATING:
+        return (anchor.start(), follow[at + 1][2], "heuristic", "rating")
+    bare = _bare_rating(word, follow)
+    return None if bare is None else (anchor.start(), bare, "heuristic", "rating")
+
+
 def _word_rules(view: str, out: list[_Raw]) -> None:
-    for anchor in _WORD.finditer(view):
+    back: list[str] = []
+    for anchor in WORD.finditer(view):
         word = anchor.group()
-        if word in _IGNORE:
+        if word in _ANCHORS:
             follow = _follow(view, anchor.end())
-            target = _first(follow, _TARGETS, MAX_TARGET_DISTANCE)
-            if target is not None:
-                out.append((anchor.start(), follow[target][2], "heuristic", "instruction"))
-            elif (above := _everything_above(follow)) is not None:
-                out.append((anchor.start(), above, "heuristic", "instruction"))
-        elif word in _SYSTEM:
-            follow = _follow(view, anchor.end())
-            if follow and follow[0][0] in _PROMPT:
-                out.append((anchor.start(), follow[0][2], "heuristic", "instruction"))
-        elif word in _RATE:
-            follow = _follow(view, anchor.end())
-            at = _first(follow, _AS, MAX_AS_DISTANCE)
-            if at is not None and at + 1 < len(follow) and follow[at + 1][0] in _RATING:
-                out.append((anchor.start(), follow[at + 1][2], "heuristic", "rating"))
-        elif word in _DEEMED:
-            follow = _follow(view, anchor.end())
-            if follow and follow[0][0] in _RATING:
-                out.append((anchor.start(), follow[0][2], "heuristic", "rating"))
+            found: list[_Raw | None] = []
+            if word in _INSTRUCTION:
+                found.append(_instruction_rule(anchor, back, follow, view))
+            if word in _IGNORE:
+                found.append(_ignore_rule(anchor, follow))
+            if word in _SYSTEM and follow and follow[0][0] in _PROMPT:
+                found.append((anchor.start(), follow[0][2], "heuristic", "instruction"))
+            if word in _RATE or word in _BARE_EN or word in _BARE_UKRU:
+                found.append(_rate_rule(anchor, word, follow))
+            if word in _COLOUR and colour_rating(back, follow):
+                found.append((anchor.start(), anchor.end(), "heuristic", "rating"))
+            if word in _DEEMED and follow and follow[0][0] in _RATING:
+                found.append((anchor.start(), follow[0][2], "heuristic", "rating"))
+            out.extend(item for item in found if item is not None)
+        back = [*back[-2:], word]
 
 
 def _combine(raw: list[_Raw]) -> list[_Raw]:

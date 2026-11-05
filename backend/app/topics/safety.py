@@ -14,6 +14,7 @@ import unicodedata
 from typing import Final
 
 from app.injection import scan
+from app.injection.meta import has_meta_word
 from app.pseudo.detector import TooManyIdentifiersError, detect
 from app.pseudo.matching import SKELETON
 from app.segment.model import Clause
@@ -123,6 +124,11 @@ def _synonym_ok(text: str, lang: str | None) -> bool:
     return not any(word in stop for stop in lists)
 
 
+def _flagged(text: str) -> bool:
+    """A Layer 2 hit (any class) or a meta word (topics only)."""
+    return bool(scan(text)) or has_meta_word(text)
+
+
 def check_topic_text(text: str, kind: TextKind, lang: str | None = None) -> None:
     """Return ``None`` if the text is accepted; raise ``TopicTextError`` otherwise.
 
@@ -133,12 +139,18 @@ def check_topic_text(text: str, kind: TextKind, lang: str | None = None) -> None
         raise TopicTextError(INVALID)
     if TextCleaner().clean(text) != text:
         raise TopicTextError(INVALID)
-    if not _grammar_ok(text) or (kind is TextKind.SYNONYM and not _synonym_ok(text, lang)):
+    if not _grammar_ok(text):
+        # A look-alike spelling (full-width, math letters) fails the grammar; if it also
+        # holds a Layer 2 or meta-word hit, the more telling code wins.
+        raise TopicTextError(
+            FLAGGED if not _skeleton_has_bracket(text) and _flagged(text) else INVALID
+        )
+    if kind is TextKind.SYNONYM and not _synonym_ok(text, lang):
         raise TopicTextError(INVALID)
     if _skeleton_has_bracket(text):
         raise TopicTextError(INVALID)
     spans = _identifier_spans(text)
     if spans:
         raise TopicTextError(IDENTIFIER, spans)
-    if scan(text):
+    if _flagged(text):
         raise TopicTextError(FLAGGED)
