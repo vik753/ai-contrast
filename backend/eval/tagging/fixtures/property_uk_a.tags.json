@@ -1,0 +1,28 @@
+{
+  "contract": "property_uk_a",
+  "clauses": {
+    "1": ["insured_risks"],
+    "1.1": ["insured_risks"],
+    "2": ["exclusions"],
+    "2.1": ["exclusions"],
+    "3": ["sum_insured_limits"],
+    "3.1": ["sum_insured_limits"],
+    "3.2": ["sum_insured_limits"],
+    "3.3": ["sum_insured_limits"],
+    "4": ["deductible", "valuation_depreciation"],
+    "4.1": ["deductible"],
+    "4.2": ["valuation_depreciation"],
+    "5": ["payout_term"],
+    "5.1": ["payout_term"],
+    "6": ["notice_documents"],
+    "6.1": ["notice_documents"],
+    "7": ["insured_obligations"],
+    "7.1": ["insured_obligations"],
+    "8": ["premium_termination"],
+    "8.1": ["premium_termination"],
+    "9": ["subrogation"],
+    "9.1": ["subrogation"]
+  },
+  "other": [],
+  "risk_terms": []
+}

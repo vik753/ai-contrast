@@ -1,0 +1,23 @@
+{
+  "contract": "osago_ru_b",
+  "clauses": {
+    "1": ["liability_limits"],
+    "1.1": ["liability_limits"],
+    "1.2": ["deductible"],
+    "2": ["policy_territory"],
+    "2.1": ["policy_territory"],
+    "3": ["accident_notice"],
+    "3.1": ["accident_notice"],
+    "4": ["payout_term"],
+    "4.1": ["payout_term"],
+    "4.2": ["direct_settlement"],
+    "5": ["recourse"],
+    "5.1": ["recourse"],
+    "6": ["premium_bonus_malus"],
+    "6.1": ["premium_bonus_malus"],
+    "7": ["termination_refund"],
+    "7.1": ["termination_refund"]
+  },
+  "other": [],
+  "risk_terms": []
+}
