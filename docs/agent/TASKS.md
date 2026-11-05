@@ -3,81 +3,30 @@
 Format: one task per block. Goal, owner, branch, acceptance criteria (AC), threats touched (see `docs/security/threat-model.md`).
 Check a task only when it is merged to `main` with green CI.
 
-Finished stages 0 to 6: `docs/agent/TASKS-archive.md`.
+Finished stages 0 to 7: `docs/agent/TASKS-archive.md`.
 
-## Stage 7 — Topic catalog (ADR 0017)
-
-Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety pass) in parallel; S7-T2 (AI topic endpoints and free pass) after S7-T1; S7-T3 (browser) after S7-T2's API is fixed; S7-T4 (eval) after S7-T2; S7-T5 docs last.
-
-### S7-T0 Catalog content
-
-- Owner: `domain-analyst`. Branch: `feat/s7-catalog` (only `shared/topics/` and `backend/eval/topics/fixtures/`).
-- Four domain files per ADR 0017 point 1 (`kasko`, `osago`, `lease`, `property_insurance`) in EN/UK/RU: sides, 8–20 topics each with a description, typed attributes with directions per side, synonyms (stems for UK/RU case forms) for stage 8 keyword tags. Ukrainian law terms for UK/RU templates (КАСКО, ОСЦПВ/ОСАГО), neutral wording for EN.
-- Synthetic test contracts for the eval (2 per domain, at least one in each language, fictional values only) with the expected topic list and, per topic, the expected attribute values with clause references (for stage 9 too).
-- `README.md` in `shared/topics/` lists the domains, topic counts and the sources used.
-
-### S7-T1 Catalog loader, Layer 2 and topic safety pass (backend)
-
-- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s7-topics`. Threats: T5, T11.
-
-1. `app/topics/catalog.py`: Pydantic models and caps of ADR 0017 point 1; loader that fails startup on an invalid file; `catalog_version`; `GET /api/topics/catalog`. Tests use small synthetic catalogs, not S7-T0 content.
-2. `app/injection/`: Layer 2 per ADR 0017 point 4 (versioned pattern file, skeleton matching, linear-time, classes `heuristic`/`high`, spans), with the ADR 0009 token list and honest negatives.
-3. `app/topics/safety.py` per point 3 (cleaning, grammar, placeholder-free on skeleton, identifier detector, Layer 2) with codes `invalid_topic_text`, `topic_contains_identifier` (spans), `topic_flagged`.
-4. Gate: `ConfirmedTopic` holds the whole definition (point 3) with frozen `ConfirmedAttribute`; only `confirm_topic()` creates it; not bound to a document; the AST policy test is extended.
-5. `AIRequest`: `document` optional; each `PromptTemplate` declares its full field set (document / topic / text required or forbidden); enforced in `__post_init__`.
-6. Stage 6 follow-up: the `tests/check` helpers pass hooks to `install()`; the `app.state.*` fallback in `CheckState` is deleted.
-
-### S7-T2 AI topic endpoints and free pass (backend)
-
-- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s7-topic-ai`. After S7-T1. Threats: T1, T5, T6, T10, T11.
-
-1. Prompts and strict output schemas for `SUGGEST_TOPICS`, `PROPOSE_ATTRIBUTES`, `EXPAND_SYNONYMS` (point 5): caps, one repair attempt without the previous output, `ai_bad_output`.
-2. Endpoints of point 6 with the provider selection, server-side safety passes (suggest: masked document as in `/api/safety-check`; others: topic definition), body caps, per-IP limits, 1 AI call in flight per client and 2 per server (shared with `/api/provider/check`), every model text through the topic safety pass; one document per call (wire canary).
-3. Free pass (point 6): per-process HMAC key, `aud=topics`, 15 min, same /48, at most 20 calls, bounded nonce table that fails closed, `X-Free-Pass` header only, `compare_digest`; per-IP free topic quota (40/day) and Neuron budget reserved before the call; topic calls use at most 30 % of the daily Neuron budget.
-   3a. ADR 0017 point 3 cross-document rules: 4 KiB cap on non-catalog `ConfirmedTopic`, suggestion descriptions never in prompts, synonyms never sent to a model, model-proposed directions start as `none` (`direction_source`), catalog topics by id + `catalog_version`, caps per request; suggest input cap and extraction slot released before the AI call; 60 s AI deadline; value ids, side and domain are scanned by Layer 2 as words (like attribute ids) or never enter a prompt; `confirm_topic` is always called with the catalog.
-4. Log canary: no topic text, model output, key or pass in logs.
-5. `CLAUDE.md` Commands: `GET /api/topics/catalog` and one refused topic (`topic_flagged`) without any AI call.
-
-### S7-T3 Topic panel in the browser (frontend)
-
-- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s7-topic-ui`. After S7-T2's API is merged. Threats: T1, T3, T5.
-
-1. Topic panel per ADR 0017 point 7 (domain, side, template topics, suggested topics, own topics with attribute proposal and editing, confirm); every string in `en`/`uk`/`ru`; plain-text rendering of every model-provided string.
-   1a. Accepting a suggestion never copies its description into the client description field (test).
-2. Own topics: memory by default, opt-in `localStorage` `aic.topics.v1`, removed by Clear all; export/import JSON with a 256 KiB cap and strict validation.
-3. Errors `topic_contains_identifier` (highlight spans), `topic_flagged`, `ai_bad_output`, quota and busy codes mapped to messages.
-
-### S7-T4 Topic eval (first AI eval)
-
-- Owner: `ai-eval-engineer`. After S7-T2. Branch: `feat/s7-eval`.
-- `backend/eval/topics/` per ADR 0017 point 8: recorded-response mode in CI, live mode locally; baseline file; numbers in the PR.
-
-### S7-T5 Docs for stage 7
-
-- Owner: `docs-writer`. After S7-T0–T4 are merged.
-- ADR 0017 → accepted; threat model T5 (Layer 2 implemented, topic text rules), T10 (free pass), T11 (`ConfirmedTopic` as the only cross-document string); `CLAUDE.md` Commands; README (topics).
+Next: stage 8 (clause tagging). The tech lead writes its tasks here first (goal, acceptance criteria, threats touched).
 
 ## Open follow-ups
 
-### Stage 7 follow-ups (from stage 6)
-
-- Stage 9: declare optional usage on the AIProvider port result (typed), replacing the getattr in topic_ai._reported (code review S7-T2 NIT).
-
-- Stage 7 (in S7-T1): make the tests/check helpers pass hooks to `install()` and delete the `app.state.*` fallback in `CheckState` (`provider_transport`, `turnstile_transport`, `clock`; code review S6-T4).
-- Stage 7 (in S7-T4): run the first AI eval (`ai-eval-engineer`) when the first real prompts arrive. Stage 6 has no real prompts, only the fixed connection probe.
-- Stage 7 (revised by ADR 0017 point 3): `ConfirmedTopic` is **not** bound to a document (it is the one cross-document string, ADR 0009). The builder that computes `PseudonymizedText.source` comes with the first call that carries such a text (stage 8 or 9).
-
 ### Stage 9 follow-ups (from stage 7)
 
-- Stage 9: expose the confirmed masked documents from UploadForm to TopicPanel (enables Suggest).
+- Stage 9: expose the confirmed masked documents from UploadForm to TopicPanel (`App` passes `NO_DOCUMENTS` today), which enables the "Suggest from my contracts" button.
+- Stage 9: declare optional usage on the AIProvider port result (typed), replacing the `getattr` in `topic_ai._reported` (code review S7-T2 NIT).
+- Stage 9: ignore a free-pass reply that started before "Clear all" (the panel could store a pass after the data was cleared).
+- Stage 8 or 9: the builder that computes `PseudonymizedText.source` (`document_digest`) comes with the first call that carries such a text. `ConfirmedTopic` is not bound to a document (ADR 0017 point 3).
+- Stage 9: use `app/topics/selection.py` (caps per request, `catalog_version_mismatch`) in the analysis request.
 
 ### Stage 10 follow-ups (from stage 5b)
 
 - Stage 10: never restore names in model text at neutralized spans (`⟦…⟧`) or at tokens with non-`[` brackets.
 
-### Stage 11 follow-ups (from stage 5 and 5b)
+### Stage 11 follow-ups (from stage 5, 5b and 7)
 
 - Stage 11: eval case — harmful sentence repeated on every page (ADR 0014 point 5).
+- Stage 11: run the topic eval live with a provider key (`cd backend && AIC_EVAL_PROVIDER_KEY=... uv run --locked python -m eval.topics.run_eval --live --provider <preset> --model <id>`; see `backend/eval/topics/README.md`) and record the numbers. The CI baseline is a stub oracle.
+- Stage 11: refresh the stub recordings after any prompt or schema change (`--write-stub --write-baseline`).
+- Stage 11: more Layer 2 bypass probes (the first eval found two real bypasses; phrase lists stay bypassable). Add each new probe to the `attack` list of `backend/eval/topics/adversarial/contract_b.json`.
 - Stage 11: fresh held-out set for pseudonymization (the current one is no longer blind). Add these cases:
   - LOW: the fail-closed false positive `[A.ACCOUNT_1]; 4.2.` is refused by the safety check.
   - LOW: `ЄДРПОУ 34123457 кв. 5` is not detected, but the safety check refuses it.
@@ -108,9 +57,10 @@ Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety 
 - Stage 9: `contractTextHash` stays `null` after a text-hash failure. Handle this case.
 - Stage 10: `list()` parses every record (up to 100 × 2 MiB). Check the cost.
 
-### Stage 13 blockers and follow-ups (from stages 3 and 6)
+### Stage 13 blockers and follow-ups (from stages 3, 6 and 7)
 
 - Stage 13 blockers: header-read timeout / slowloris with `--limit-concurrency 32`, and kernel send buffers of cut-off connections (threat model T6 control 9).
+- Stage 13 (from stage 7): the Render service must build with the **repository root** as build context and `backend/Dockerfile` as the Dockerfile path. The image needs `shared/topics/`; `backend/Dockerfile.dockerignore` is the allowlist (threat model T8 control 12). Check that the deployed image starts with `TOPICS_CATALOG_DIR=/app/shared/topics` and that `GET /api/topics/catalog` answers.
 - Measure the 100-page PDF worst case on Render's CPU (9.3 s CPU here); lower `MAX_PDF_PAGES` or raise the wall limit if it exceeds 30 s.
 - Deploy checks (from stage 6):
   - No `__*__` placeholder is left in either `_headers` file (`frontend/public/_headers` has `__TURNSTILE_FRAME_ORIGIN__`; `frontend/turnstile/public/_headers` has `__APP_ORIGIN__`).

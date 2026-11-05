@@ -14,8 +14,8 @@ How to resume after a break: read this file, then continue with the first unchec
 | 5 | Clause splitting | done |
 | 5b | Pseudonymization | done |
 | 6 | Model connection | done |
-| 7 | Topic catalog | next |
-| 8 | Clause tagging | planned |
+| 7 | Topic catalog | done |
+| 8 | Clause tagging | next |
 | 9 | Analysis | planned |
 | 10 | Result table | planned |
 | 11 | Token economy and quality | planned |
@@ -105,3 +105,10 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-11-04 — Stage 6 done. ADR 0016 accepted; threat model T1, T2, T6, T9, T10, T11 updated; `CLAUDE.md` architecture rows and rule 8 note; README (providers, key storage, free mode); finished stage 6 moved to `docs/agent/TASKS-archive.md`; stage 13 deploy checks and customer actions listed in `docs/agent/TASKS.md`. Next: stage 7 (topic catalog).
 - Lesson: a PR with a merge conflict gets no CI run, so the checks look "pending" forever. Resolve the conflict first.
 - Lesson: the ruff first-party setting must be explicit in `pyproject.toml`; otherwise import sorting can differ between local runs and CI.
+- 2026-11-04 — PR #83 merged: stage 7 plan and ADR 0017 (proposed), two security design rounds.
+- 2026-11-05 — PR #84 merged (S7-T0 catalog content: four domains in `shared/topics/`, eight synthetic eval contracts; S7-T1 catalog loader and `GET /api/topics/catalog`, Layer 2 in `app/injection/`, topic safety pass, `ConfirmedTopic` with the whole definition, `AIRequest` field sets).
+- 2026-11-05 — PR #85 merged (S7-T2: `POST /api/topics/suggest`, `/propose-attributes`, `/expand-synonyms`; free pass with a per-process HMAC key; topic quota 40 per day; topic calls at most 30 % of the Neuron budget; worst-case reservation settled with provider usage). The Docker build context is now the repository root.
+- 2026-11-05 — PR #86 merged (S7-T4: first AI eval in `backend/eval/topics/`, recorded mode in CI, stub oracle baseline) and PR #87 merged (S7-T3: topic panel, own topics in memory or opt-in `localStorage`, export and import).
+- 2026-11-05 — Stage 7 done. ADR 0017 accepted with "Decisions made during stage 7"; threat model T5, T6, T8, T10, T11 updated; README (topics) and `CLAUDE.md` Commands (Docker build context; catalog and `topic_flagged` examples) updated; finished stage 7 moved to `docs/agent/TASKS-archive.md`; follow-ups for stages 9, 11 and 13 listed in `docs/agent/TASKS.md`. The Suggest button stays inactive until stage 9. Next: stage 8 (clause tagging).
+- Lesson: the eval found two real Layer 2 bypasses that the unit tests missed. Phrase lists are bypassable, so combine them with structural guarantees (ratings by code, directions only from the catalog or the client, one document per call).
+- Lesson: verify every push with `git ls-remote` (compare the remote head with the local commit). A push can look successful while the remote branch is behind.
