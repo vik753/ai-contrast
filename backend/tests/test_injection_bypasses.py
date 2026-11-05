@@ -100,6 +100,13 @@ META_WORDS = [
     "Prompt for the model",
 ]
 META_IN_CONTEXT = [
+    "Instructions for ChatGPT",
+    "A I assistant instructions",
+    "Claude instructions",
+    "Instructions for Gemini",
+    "Copilot directive",
+    "Prompt for Llama",
+    "Mistral instructions",
     "Cover for the assistant",
     "Notes for the language model",
     "Notes for the neural networks",
@@ -154,6 +161,8 @@ HONEST = [
     "Оценка выгодности",
     "AI system liability",
     "Assistant services",
+    "Mistral",
+    "Gemini",
     "Instructions",
     "Assistant",
     "Prompt",

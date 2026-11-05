@@ -227,6 +227,8 @@ def _strong_at(follow: Follow, index: int) -> int | None:
     word = follow[index][0]
     if word in _STRONG_AI:
         return follow[index][2]
+    if word == "a" and follow[index + 1 : index + 2] and follow[index + 1][0] == "i":
+        return follow[index + 1][2]  # the spaced "a i"
     pair = (word in _LANGUAGE and follow[index + 1 : index + 2]) or (
         word in _NEURAL and follow[index + 1 : index + 2]
     )

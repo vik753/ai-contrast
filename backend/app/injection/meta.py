@@ -41,6 +41,8 @@ def _ai_end(words: list[str], index: int) -> int | None:
     if word in _AI:
         return index + 1
     second = words[index + 1] if index + 1 < len(words) else ""
+    if word == "a" and second == "i":  # the spaced "a i"
+        return index + 2
     if (word in _LANGUAGE and second in _MODEL) or (word in _NEURAL and second in _NET):
         return index + 2
     return None
