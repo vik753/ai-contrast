@@ -78,6 +78,30 @@ def test_scan_honest_instruction_text_is_not_a_hit(text: str) -> None:
     assert scan(text) == [], text
 
 
-@pytest.mark.parametrize("text", NEGATIVES)
-def test_topic_safety_accepts_honest_instruction_text(text: str) -> None:
+# ADR 0017 point 3 rule 6: these honest texts are Layer 2 negatives but meta-words in a topic name.
+META_NAMES = [
+    "instructions for use",
+    "Instructions for use of the vehicle",
+    "інструкція з експлуатації",
+    "Інструкція з експлуатації автомобіля",
+    "инструкция по эксплуатации",
+    "Инструкция по эксплуатации",
+    "assistant manager",
+    "Instructions for the Insured",
+    "Інструкції для страхувальника",
+    "Инструкции для страхователя",
+]
+
+
+@pytest.mark.parametrize("text", META_NAMES)
+def test_topic_safety_refuses_honest_instruction_name_by_the_meta_word_rule(text: str) -> None:
+    assert text in NEGATIVES
+    with pytest.raises(TopicTextError) as info:
+        check_topic_text(text, TextKind.NAME)
+
+    assert info.value.code == "topic_flagged"
+
+
+@pytest.mark.parametrize("text", [t for t in NEGATIVES if t not in META_NAMES])
+def test_topic_safety_accepts_honest_text_without_meta_words(text: str) -> None:
     assert check_topic_text(text, TextKind.NAME) is None
