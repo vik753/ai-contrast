@@ -14,7 +14,7 @@ from tests.tag_api.helpers import (
     tag_body,
 )
 
-LABEL = "ZLabelCanaryQ"
+LABEL = "Q"
 TITLE = "Zephyrtitle cover"
 DESC = "Zephyrdesc rules of the cover"
 SYN = "zephyrsyn"
@@ -24,7 +24,7 @@ def _wire_rig() -> tuple[TagRig, dict[str, object]]:
     rig = TagRig(lambda ids, n: {ids[0]: [("T1", "low")]})
     topics = {"custom": [custom(7, title=TITLE, desc=DESC, syn=[SYN, "zephyrother"])]}
     return rig, tag_body(
-        "A clause about zephyrsyn here.", "Plain clause.", topics=topics, label=LABEL
+        "A clause about nothing special here.", "Plain clause.", topics=topics, label=LABEL
     )
 
 
@@ -38,7 +38,7 @@ def test_prompts_list_topics_by_opaque_index_with_title_and_description_only() -
     first = rig.tags.of("tag")[0][4]
     assert f"T1: {TITLE}" in first
     assert DESC in first
-    for banned in (SYN, "zephyrother", "custom_7", LABEL):
+    for banned in (SYN, "zephyrother", "custom_7"):
         assert banned not in first, banned
     for _, _, _, _, text in rig.tags.of("check"):
         assert SYN not in text

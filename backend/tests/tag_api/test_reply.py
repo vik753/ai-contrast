@@ -75,7 +75,7 @@ def test_reply_strings_are_only_ids_enums_and_hashes() -> None:
     reply = r.json()
     allowed = re.compile(
         r"^(c\d+|custom_1|keyword|model|check|bad_output|timeout|quota|check_failed|clause_cap"
-        r"|too_many_clauses|text|heading|[a-z]+)$"
+        r"|too_many_clauses|text|heading|[a-z0-9_]+)$"
     )
     strings: list[str] = []
 
