@@ -409,5 +409,83 @@
       "network": "The server cannot be reached. Check your connection.",
       "unknown": "The check failed for an unknown reason."
     }
+  },
+  "topics": {
+    "title": "Topics to compare",
+    "domain": {
+      "label": "Contract type",
+      "none": "Not chosen"
+    },
+    "side": {
+      "label": "Your side"
+    },
+    "templates": {
+      "heading": "Template topics"
+    },
+    "suggest": {
+      "button": "Suggest topics from my contracts",
+      "accept": "Accept",
+      "dropped": "{{count}} suggestions were dropped by the safety check."
+    },
+    "own": {
+      "heading": "Own topic",
+      "name": "Topic name",
+      "description": "Description (optional)",
+      "propose": "Propose attributes",
+      "confirm": "Add topic",
+      "list": "Your topics",
+      "remove": "Remove topic"
+    },
+    "attr": {
+      "list": "Attributes",
+      "label": "Attribute name",
+      "direction": "Better when",
+      "remove": "Remove attribute"
+    },
+    "persist": {
+      "label": "Keep my topics in this browser"
+    },
+    "export": {
+      "button": "Export topics"
+    },
+    "import": {
+      "label": "Import topics",
+      "error": {
+        "too_large": "The file is larger than 256 KiB.",
+        "invalid_json": "The file is not valid JSON.",
+        "forbidden_key": "The file contains a forbidden key.",
+        "invalid_shape": "The file does not have the expected structure.",
+        "too_many": "The file has too many topics, attributes or values, or a text is too long."
+      }
+    },
+    "direction": {
+      "none": "No preference",
+      "lower_better": "lower is better",
+      "higher_better": "higher is better",
+      "more_better": "more is better",
+      "fewer_better": "fewer is better",
+      "ordered": "ordered list of values"
+    },
+    "catalog": {
+      "offline": "The server did not answer. The built-in catalog is shown."
+    },
+    "working": "Working...",
+    "error": {
+      "topic_contains_identifier": "The text contains an identifier (a name, number or address). Remove the marked part.",
+      "topic_flagged": "The text was refused by the safety check. Change it.",
+      "invalid_topic_text": "The text is not allowed. Use letters, digits and simple punctuation only.",
+      "ai_bad_output": "The AI model gave an unusable answer. Try again.",
+      "free_quota_exhausted": "The free quota for today is used up. Try tomorrow or use your own API key.",
+      "busy": "The server has too many requests right now. Try again in a few seconds.",
+      "catalog_version_mismatch": "The catalog changed. Reload the page.",
+      "rate_limited": "Too many requests. Wait a minute and try again.",
+      "free_pass_invalid": "The free-mode pass is not valid. Run the Cloudflare check again.",
+      "free_pass_expired": "The free-mode pass expired. Run the Cloudflare check again.",
+      "free_pass_exhausted": "The free-mode pass has no calls left. Run the Cloudflare check again.",
+      "turnstile_failed": "The Cloudflare check failed. Try again.",
+      "network": "The server cannot be reached. Check your connection.",
+      "unknown": "The request failed for an unknown reason."
+    },
+    "open": "Choose topics"
   }
 }

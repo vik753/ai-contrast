@@ -1,20 +1,35 @@
 import i18next from "i18next";
 import { useEffect, useId, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
+import type { SafetyDocument } from "./api/safetyCheck";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { RatingIcon, type Rating } from "./components/RatingIcon";
 import { SOURCE_CODE_URL } from "./config";
-import { ProviderSettings } from "./provider/ProviderSettings";
+import { getKey } from "./provider/keyStore";
+import { ProviderSettings, type ProviderChoice } from "./provider/ProviderSettings";
+import { TopicPanel } from "./topics/TopicPanel";
 import { SettingsPanel } from "./settings/SettingsPanel";
 import { startupCleanup } from "./storage/historySetting";
 import { UploadForm } from "./upload/UploadForm";
 
 const RATINGS: readonly Rating[] = ["green", "yellow", "red"];
 
+const NO_DOCUMENTS: readonly SafetyDocument[] = [];
+
+/** The key is read from storage at render time; it is never kept in React state. */
+function keyOf(provider: string): { key?: string } {
+  if (provider === "free") return {};
+  const key = getKey(provider);
+  return key === null || key === "" ? {} : { key };
+}
+
 function Shell() {
   const { t } = useTranslation();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const panelId = useId();
+  const topicsId = useId();
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [choice, setChoice] = useState<ProviderChoice>({ provider: "free" });
 
   useEffect(() => {
     void startupCleanup();
@@ -52,7 +67,29 @@ function Shell() {
 
         {settingsOpen ? <SettingsPanel id={panelId} /> : null}
 
-        <ProviderSettings />
+        <ProviderSettings onChoiceChange={setChoice} />
+
+        <div className="card">
+          <button
+            type="button"
+            className="button button--quiet"
+            aria-expanded={topicsOpen}
+            aria-controls={topicsOpen ? topicsId : undefined}
+            onClick={() => {
+              setTopicsOpen((open) => !open);
+            }}
+          >
+            {t("topics.open")}
+          </button>
+        </div>
+        {topicsOpen ? (
+          <div id={topicsId}>
+            <TopicPanel
+              connection={{ ...choice, ...keyOf(choice.provider) }}
+              documents={NO_DOCUMENTS}
+            />
+          </div>
+        ) : null}
 
         <UploadForm />
 

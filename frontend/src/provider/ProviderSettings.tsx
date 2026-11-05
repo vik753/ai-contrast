@@ -13,8 +13,19 @@ const TOKEN_WAIT_MS = 30_000;
 
 type Outcome = CheckResult | null;
 
+export interface ProviderChoice {
+  provider: string;
+  model?: string;
+  baseUrl?: string;
+}
+
 /** AI provider settings: preset, model, key, connection test (ADR 0016 point 9). */
-export function ProviderSettings() {
+export function ProviderSettings({
+  onChoiceChange,
+}: {
+  /** Called when the preset, model, base URL or key changes. The key is not passed. */
+  onChoiceChange?: (choice: ProviderChoice) => void;
+} = {}) {
   const { t } = useTranslation(undefined, { i18n: i18next });
   const ids = {
     title: useId(),
@@ -34,6 +45,7 @@ export function ProviderSettings() {
   const [frameOn, setFrameOn] = useState(false);
   const [awaiting, setAwaiting] = useState(false);
   const [resetSignal, setResetSignal] = useState(0);
+  const [keyVersion, setKeyVersion] = useState(0);
 
   // The key field is uncontrolled: the key lives in storage, never in React state or the DOM text.
   const keyField = useRef<HTMLInputElement>(null);
@@ -50,6 +62,21 @@ export function ProviderSettings() {
     if (keyField.current) keyField.current.value = getKey(preset) ?? "";
   }, [preset]);
 
+  const report = useRef(onChoiceChange);
+  useEffect(() => {
+    report.current = onChoiceChange;
+  });
+  const modelValue = model.trim();
+  const baseUrlValue = baseUrl.trim();
+  useEffect(() => {
+    report.current?.({
+      provider: preset,
+      ...(isFree || modelValue === "" ? {} : { model: modelValue }),
+      ...(preset === "custom" && baseUrlValue !== "" ? { baseUrl: baseUrlValue } : {}),
+    });
+    // `keyVersion` re-reports after a key change so the parent re-reads the stored key.
+  }, [preset, isFree, modelValue, baseUrlValue, keyVersion]);
+
   useEffect(
     () =>
       subscribeKeysCleared(() => {
@@ -57,6 +84,7 @@ export function ProviderSettings() {
         tokenRef.current = null;
         setRemember(false);
         setOutcome(null);
+        setKeyVersion((n) => n + 1);
       }),
     [],
   );
@@ -146,6 +174,7 @@ export function ProviderSettings() {
   const onKeyInput = (value: string) => {
     if (value === "") forgetKey(preset);
     else setKey(preset, value, { remember });
+    setKeyVersion((n) => n + 1);
   };
 
   const onRemember = (checked: boolean) => {
@@ -159,6 +188,7 @@ export function ProviderSettings() {
     if (keyField.current) keyField.current.value = "";
     setRemember(false);
     setOutcome(null);
+    setKeyVersion((n) => n + 1);
   };
 
   const onTest = () => {
