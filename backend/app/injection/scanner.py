@@ -64,6 +64,14 @@ _ABOVE = _WordSet(p.ABOVE_WORDS)
 _SYSTEM = _WordSet(p.SYSTEM_WORDS)
 _PROMPT = _WordSet(p.PROMPT_WORDS)
 _RATE = _WordSet(p.RATE_VERBS)
+_INSTRUCTION = _WordSet(p.INSTRUCTION_WORDS)
+_FOR = _WordSet(p.FOR_WORDS)
+_THE = _WordSet(p.THE_WORDS)
+_AI = _WordSet(p.AI_WORDS)
+_HIDDEN = _WordSet(p.HIDDEN_QUALIFIERS)
+_QUANTIFIER = _WordSet(p.QUANTIFIER_WORDS)
+_RATE_BARE_EN = _WordSet(p.RATE_BARE_EN)
+_RATE_BARE_UKRU = _WordSet(p.RATE_BARE_UKRU)
 _AS = _WordSet(p.AS_WORDS)
 _DEEMED = _WordSet(p.DEEMED_WORDS)
 _RATING = _WordSet(p.RATING_WORDS)
@@ -180,10 +188,43 @@ def _everything_above(follow: list[tuple[str, int, int]]) -> int | None:
     return None
 
 
-def _word_rules(view: str, out: list[_Raw]) -> None:
+def _instruction_for_ai(follow: list[tuple[str, int, int]]) -> int | None:
+    """End of "for [the] <AI word>" at the start of ``follow``, or ``None``."""
+    if not follow or follow[0][0] not in _FOR:
+        return None
+    index = 2 if len(follow) > 1 and follow[1][0] in _THE else 1
+    if index < len(follow) and follow[index][0] in _AI:
+        return follow[index][2]
+    return None
+
+
+def _bare_rating(word: str, follow: list[tuple[str, int, int]]) -> int | None:
+    """End of a rating word in "rate everything green" style, or ``None``."""
+    if word in _RATE_BARE_UKRU:
+        window = follow[:3]
+    elif word in _RATE_BARE_EN and any(w in _QUANTIFIER for w, _, _ in follow[:1]):
+        window = follow[:4]
+    else:
+        return None
+    for found, _, end in window:
+        if found in _RATING:
+            return end
+    return None
+
+
+def _word_rules(view: str, out: list[_Raw]) -> None:  # noqa: PLR0912
+    previous = ""
     for anchor in _WORD.finditer(view):
         word = anchor.group()
-        if word in _IGNORE:
+        before, previous = previous, word
+        if word in _INSTRUCTION:
+            follow = _follow(view, anchor.end())
+            end = _instruction_for_ai(follow)
+            if end is None and before in _HIDDEN:
+                end = anchor.end()
+            if end is not None:
+                out.append((anchor.start(), end, "heuristic", "instruction"))
+        elif word in _IGNORE:
             follow = _follow(view, anchor.end())
             target = _first(follow, _TARGETS, MAX_TARGET_DISTANCE)
             if target is not None:
@@ -199,6 +240,8 @@ def _word_rules(view: str, out: list[_Raw]) -> None:
             at = _first(follow, _AS, MAX_AS_DISTANCE)
             if at is not None and at + 1 < len(follow) and follow[at + 1][0] in _RATING:
                 out.append((anchor.start(), follow[at + 1][2], "heuristic", "rating"))
+            elif (bare := _bare_rating(word, follow)) is not None:
+                out.append((anchor.start(), bare, "heuristic", "rating"))
         elif word in _DEEMED:
             follow = _follow(view, anchor.end())
             if follow and follow[0][0] in _RATING:

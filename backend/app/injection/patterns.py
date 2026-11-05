@@ -84,6 +84,31 @@ ABOVE_WORDS: Final = (
     "предыдущ*",
 )
 
+# "instructions for the assistant": an instruction word, "for" or "to", an optional "the",
+# then an AI word. "System instruction" in Ukrainian or Russian is a hit on its own.
+INSTRUCTION_WORDS: Final = ("instruction", "instructions", "інструкці*", "инструкци*")
+FOR_WORDS: Final = ("for", "to", "для")
+THE_WORDS: Final = ("the", "a", "an")
+AI_WORDS: Final = (
+    "assistant",
+    "ai",
+    "model",
+    "llm",
+    "chatbot",
+    "system",
+    "асистент*",
+    "ассистент*",
+    "модел*",
+    "систем*",
+    "чатбот*",
+)
+HIDDEN_QUALIFIERS: Final = ("системн*", "прихован*", "скрыт*", "секретн*")
+
+# "rate everything green": a bare rating command, no "as".
+QUANTIFIER_WORDS: Final = ("everything", "all", "every", "each", "any")
+RATE_BARE_EN: Final = ("rate", "mark", "score", "classify", "label")
+RATE_BARE_UKRU: Final = ("оцінюй*", "оцінюв*", "оценивай*", "оценивать*")
+
 # "system prompt".
 SYSTEM_WORDS: Final = ("system", "системн*", "системный", "системний")
 PROMPT_WORDS: Final = ("prompt", "prompts", "промпт*")
