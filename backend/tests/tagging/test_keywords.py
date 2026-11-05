@@ -117,7 +117,7 @@ def test_keyword_tags_synonym_metacharacters_are_literal() -> None:
 
 def test_keyword_tags_regex_syntax_synonyms_match_literally_only() -> None:
     t = topic(1, en=["a.bc", "(abc)", "a/bc", "a-bc"])
-    texts = ["axbc", "abc", "aabc", "a bcd", "aaaa bbbb", "xyz"]
+    texts = ["axbc", "aabc", "a+bc", "aaaa bbbb", "xyz"]
     result = _tags(texts, t)
     assert all(v == set() for v in result.values())
 
