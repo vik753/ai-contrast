@@ -1,11 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { SafetyDocument } from "../api/safetyCheck";
 import {
+  expandSynonyms,
   fetchCatalog,
   proposeAttributes,
   suggestTopics,
   type CommonRequest,
   type Suggestion,
+  type Sender,
   type TopicResult,
 } from "./api";
 import { bundledCatalog } from "./bundled";
@@ -18,6 +20,12 @@ import { topicStore } from "./topicStore";
 import { MAX_IMPORT_BYTES, exportTopics, importTopics, type ImportResult } from "./transfer";
 import { MAX_OWN_TOPICS, type Catalog, type TopicDefinition, type TopicSelection } from "./types";
 import { useT } from "./useT";
+import { getFrameOrigin } from "../provider/frameOrigin";
+import { TurnstileFrame } from "../provider/TurnstileFrame";
+import { isTokenFresh } from "../provider/turnstileProtocol";
+
+/** The wait for the frame token ends with an error after this time. */
+const TOKEN_WAIT_MS = 30_000;
 
 export interface TopicConnection {
   provider: string;
@@ -114,6 +122,10 @@ export function TopicPanel({
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
   const pass = useRef<string | null>(null);
+  const waiter = useRef<((token: string | null) => void) | null>(null);
+  const cachedToken = useRef<{ value: string; at: number } | null>(null);
+  const [frameOn, setFrameOn] = useState(false);
+  const [resetSignal, setResetSignal] = useState(0);
   const mounted = useRef(true);
   const own = useSyncExternalStore(topicStore.subscribe, topicStore.getTopics);
   const persisted = useSyncExternalStore(topicStore.subscribe, topicStore.isPersisted);
@@ -179,17 +191,69 @@ export function TopicPanel({
     setSideId(d?.sides[0]?.id ?? "");
   };
 
-  const common = (): CommonRequest => {
+  const acquireToken = (): Promise<string | null> => {
+    const c = cachedToken.current;
+    cachedToken.current = null;
+    if (c && isTokenFresh(c.at, Date.now())) {
+      setResetSignal((n) => n + 1);
+      return Promise.resolve(c.value);
+    }
+    try {
+      getFrameOrigin();
+    } catch {
+      return Promise.resolve(null);
+    }
+    setFrameOn(true);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        waiter.current = null;
+        resolve(null);
+      }, TOKEN_WAIT_MS);
+      waiter.current = (token) => {
+        clearTimeout(timer);
+        resolve(token);
+      };
+    });
+  };
+
+  const onFrameToken = (token: string) => {
+    const w = waiter.current;
+    if (w) {
+      waiter.current = null;
+      setResetSignal((n) => n + 1);
+      w(token);
+    } else {
+      cachedToken.current = { value: token, at: Date.now() };
+    }
+  };
+  const onFrameExpired = () => {
+    cachedToken.current = null;
+    setResetSignal((n) => n + 1);
+  };
+  const onFrameError = () => {
+    cachedToken.current = null;
+    const w = waiter.current;
+    waiter.current = null;
+    w?.(null);
+  };
+
+  /** Builds the request (free mode: pass, else token from the prop or the frame) and sends it. */
+  const run = async <T,>(send: Sender<T>): Promise<TopicResult<T>> => {
     const req: CommonRequest = { provider: connection.provider };
     if (connection.model !== undefined) req.model = connection.model;
     if (connection.baseUrl !== undefined) req.baseUrl = connection.baseUrl;
     if (connection.provider === "free") {
       if (pass.current !== null) req.freePass = pass.current;
       else if (turnstileToken !== undefined) req.turnstileToken = turnstileToken;
+      else {
+        const token = await acquireToken();
+        if (token === null) return { ok: false, code: "turnstile_failed" };
+        req.turnstileToken = token;
+      }
     } else if (connection.key !== undefined) {
       req.key = connection.key;
     }
-    return req;
+    return send(req);
   };
 
   /** Keeps the free pass in step with the reply and shows a failure. */
@@ -240,7 +304,9 @@ export function TopicPanel({
     const all: Suggestion[] = [];
     let skipped = 0;
     for (const document of documents) {
-      const r = await suggestTopics({ ...common(), domain: domainId, side: sideId, document });
+      const r = await run((req) =>
+        suggestTopics({ ...req, domain: domainId, side: sideId, document }),
+      );
       if (!mounted.current) return;
       if (!settle(r)) break;
       skipped += r.data.dropped;
@@ -259,7 +325,7 @@ export function TopicPanel({
     const topic = { ...draft(), attributes: [] };
     setBusy(true);
     setNotice(null);
-    const r = await proposeAttributes({ ...common(), topic });
+    const r = await run((req) => proposeAttributes({ ...req, topic }));
     if (!mounted.current) return;
     setBusy(false);
     const fieldText = (field: string | undefined) =>
@@ -276,11 +342,28 @@ export function TopicPanel({
     }));
   };
 
+  /** Adds the expanded synonyms to the stored topic. A failure shows its message; the topic stays. */
+  const expand = async (topic: TopicDefinition) => {
+    const r = await run((req) => expandSynonyms({ ...req, topic }));
+    if (!mounted.current) return;
+    if (!settle(r)) return;
+    const stored = topicStore.getTopics().find((x) => x.topic_id === topic.topic_id);
+    if (!stored) return;
+    topicStore.update(topic.topic_id, {
+      ...stored,
+      synonyms_en: r.data.synonyms_en,
+      synonyms_uk: r.data.synonyms_uk,
+      synonyms_ru: r.data.synonyms_ru,
+    });
+  };
+
   const onConfirm = () => {
     if (own.length >= MAX_OWN_TOPICS) return;
-    topicStore.add(draft());
+    const topic = draft();
+    topicStore.add(topic);
     setEditor(EMPTY_EDITOR);
     setNotice(null);
+    void expand(topic);
   };
 
   const onImport = async (input: HTMLInputElement) => {
@@ -310,10 +393,12 @@ export function TopicPanel({
     }
   };
 
-  const errorKey = (n: Notice) =>
-    (n.kind === "import"
-      ? `topics.import.error.${n.code}`
-      : `topics.error.${n.code}`) as "topics.error.unknown";
+  const errorKey = (n: Notice) => {
+    const code = n.kind === "import" && n.code === "too_many" ? "tooLong" : n.code;
+    return (
+      n.kind === "import" ? `topics.import.error.${code}` : `topics.error.${code}`
+    ) as "topics.error.unknown";
+  };
 
   return (
     <section className="card" aria-labelledby={titleId}>
@@ -330,6 +415,14 @@ export function TopicPanel({
         </div>
       ) : null}
       {offline ? <p className="note">{t("topics.catalog.offline")}</p> : null}
+      {connection.provider === "free" && frameOn ? (
+        <TurnstileFrame
+          onToken={onFrameToken}
+          onExpired={onFrameExpired}
+          onError={onFrameError}
+          resetSignal={resetSignal}
+        />
+      ) : null}
       {busy ? <p role="status">{t("topics.working")}</p> : null}
 
       {catalog ? (

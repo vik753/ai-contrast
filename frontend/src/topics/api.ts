@@ -41,6 +41,9 @@ export interface CommonRequest {
   freePass?: string;
 }
 
+/** A request function that takes the common fields. */
+export type Sender<T> = (req: CommonRequest) => Promise<TopicResult<T>>;
+
 export interface TopicFailure {
   ok: false;
   code: string;

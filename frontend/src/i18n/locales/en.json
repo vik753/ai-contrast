@@ -455,7 +455,7 @@
         "invalid_json": "The file is not valid JSON.",
         "forbidden_key": "The file contains a forbidden key.",
         "invalid_shape": "The file does not have the expected structure.",
-        "too_many": "The file has too many topics, attributes or values, or a text is too long."
+        "tooLong": "The file has too many topics, attributes or values, or a text is too long."
       }
     },
     "direction": {
