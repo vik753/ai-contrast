@@ -44,12 +44,8 @@ CATEGORIES = sorted(
     {a["category"] for a in json.loads(ADVERSARIAL_PATH.read_text(encoding="utf-8"))["attack"]}
 )
 
-_BYPASS = (
-    "S7-T4 review: Layer 2 and rule 6 pass 'Guidance to the neural network', 'Notes for the "
-    "neural networks' and a Russian perfective rating verb without a meta word"
-)
-KNOWN_GATE_FAILURES: dict[str, str] = {"fixed:instruction_bypass": _BYPASS}
-KNOWN_NONZERO_BASELINES: dict[str, str] = {"adversarial.fixed.leaks:instruction_bypass": _BYPASS}
+KNOWN_GATE_FAILURES: dict[str, str] = {}
+KNOWN_NONZERO_BASELINES: dict[str, str] = {}
 
 
 def _id(name: str) -> str:

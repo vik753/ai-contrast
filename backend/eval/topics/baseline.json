@@ -4,7 +4,7 @@
       "adversarial.fixed.leaks:hidden_chars": 0.0,
       "adversarial.fixed.leaks:identifier": 0.0,
       "adversarial.fixed.leaks:instruction": 0.0,
-      "adversarial.fixed.leaks:instruction_bypass": 3.0,
+      "adversarial.fixed.leaks:instruction_bypass": 0.0,
       "adversarial.fixed.leaks:long_description": 0.0,
       "adversarial.fixed.leaks:placeholder": 0.0,
       "adversarial.recorded.leaks:hidden_chars": 0.0,

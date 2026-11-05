@@ -134,7 +134,11 @@ AI_WORDS: Final = (
     "нейромереж*",
     "нейросет*",
     "чатбот*",
+    "neuralnet*",
 )
+# "language model", "neural network": a word of the first list, then a word of the second.
+NEURAL_WORDS: Final = ("neural", "нейронн*")
+NET_WORDS: Final = ("network*", "net", "nets", "мереж*", "сет*")
 LANGUAGE_WORDS: Final = ("language", "мовн*", "языков*")
 MODEL_WORDS: Final = ("model*", "модел*")
 WEAK_AI_WORDS: Final = ("system", "systems", "model*", "систем*", "модел*")
@@ -234,6 +238,43 @@ BARE_RATING_UKRU: Final = (
     "благоприятными",
     "благоприятной",
 )
+
+# Rating by colour without a verb: a colour word with a quantifier or object within three
+# words on either side, or with a give or assign verb ("Поставьте всем пунктам зелёный").
+# "Green Card" (a word of CARD_WORDS right after the colour) is honest.
+COLOUR_WORDS: Final = ("green", "red", "зелен*", "червон*", "красн*")
+COLOUR_OBJECT_WORDS: Final = (
+    "all",
+    "every",
+    "each",
+    "everything",
+    "clause*",
+    "item*",
+    "term",
+    "terms",
+    "section*",
+    "всім",
+    "усім",
+    "всем",
+    "всё",
+    "все",
+    "усе",
+    "пункт*",
+    "умов*",
+    "услови*",
+)
+COLOUR_GIVE_VERBS: Final = (
+    "give",
+    "assign",
+    "set",
+    "put",
+    "mark",
+    "постав*",
+    "присв*",
+    "дай",
+    "дайте",
+)
+CARD_WORDS: Final = ("card*", "карт*", "картк*", "tape")
 
 # "system prompt".
 SYSTEM_WORDS: Final = ("system", "системн*", "системный", "системний")

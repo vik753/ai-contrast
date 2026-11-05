@@ -20,7 +20,7 @@ from typing import Final, Literal
 from app.injection import patterns as p
 from app.pseudo.matching import fold
 
-__all__ = ["WORD", "Hit", "WordSet", "matching_view", "scan"]
+__all__ = ["WORD", "Hit", "WordSet", "colour_rating", "matching_view", "scan"]
 
 WINDOW: Final = 200
 FOLLOWWORDS: Final = 9
@@ -80,6 +80,12 @@ _BARE_UKRU = WordSet(p.BARE_VERBS_UKRU)
 _FILLERS = WordSet(p.BARE_FILLERS)
 _BARE_RATING_EN = WordSet(p.BARE_RATING_EN)
 _BARE_RATING_UKRU = WordSet(p.BARE_RATING_UKRU)
+_NEURAL = WordSet(p.NEURAL_WORDS)
+_NET = WordSet(p.NET_WORDS)
+_COLOUR = WordSet(p.COLOUR_WORDS)
+_COLOUR_OBJECT = WordSet(p.COLOUR_OBJECT_WORDS)
+_COLOUR_GIVE = WordSet(p.COLOUR_GIVE_VERBS)
+_CARD = WordSet(p.CARD_WORDS)
 _AS = WordSet(p.AS_WORDS)
 _DEEMED = WordSet(p.DEEMED_WORDS)
 _RATING = WordSet(p.RATING_WORDS)
@@ -91,6 +97,7 @@ _ANCHORS = WordSet(
     + p.INSTRUCTION_WORDS
     + p.BARE_VERBS_EN
     + p.BARE_VERBS_UKRU
+    + p.COLOUR_WORDS
 )
 _FIXED = tuple(fold(token) for token in p.FIXED_TOKENS)
 _ROLES = tuple(fold(label) for label in p.ROLE_LABELS)
@@ -220,9 +227,22 @@ def _strong_at(follow: Follow, index: int) -> int | None:
     word = follow[index][0]
     if word in _STRONG_AI:
         return follow[index][2]
-    if word in _LANGUAGE and index + 1 < len(follow) and follow[index + 1][0] in _MODEL:
-        return follow[index + 1][2]
+    pair = (word in _LANGUAGE and follow[index + 1 : index + 2]) or (
+        word in _NEURAL and follow[index + 1 : index + 2]
+    )
+    if pair:
+        second = pair[0][0]
+        if (word in _LANGUAGE and second in _MODEL) or (word in _NEURAL and second in _NET):
+            return pair[0][2]
     return None
+
+
+def colour_rating(back: list[str], follow: Follow) -> bool:
+    """A colour word near a quantifier, an object or a give verb; not "green card"."""
+    if follow and follow[0][0] in _CARD:
+        return False
+    near = [*back[-3:], *(word for word, _, _ in follow[:3])]
+    return any(word in _COLOUR_OBJECT or word in _COLOUR_GIVE for word in near)
 
 
 def _ends_phrase(view: str, end: int) -> bool:
@@ -276,7 +296,7 @@ def _bare_rating(word: str, follow: Follow) -> int | None:
 def _instruction_rule(
     anchor: re.Match[str], back: list[str], follow: Follow, view: str
 ) -> _Raw | None:
-    hidden = any(word in _HIDDEN for word in back)
+    hidden = any(word in _HIDDEN for word in back[-2:])
     end = _addressed_to_ai(view, follow, hidden)
     if end is None and hidden:
         end = anchor.end()
@@ -314,10 +334,12 @@ def _word_rules(view: str, out: list[_Raw]) -> None:
                 found.append((anchor.start(), follow[0][2], "heuristic", "instruction"))
             if word in _RATE or word in _BARE_EN or word in _BARE_UKRU:
                 found.append(_rate_rule(anchor, word, follow))
+            if word in _COLOUR and colour_rating(back, follow):
+                found.append((anchor.start(), anchor.end(), "heuristic", "rating"))
             if word in _DEEMED and follow and follow[0][0] in _RATING:
                 found.append((anchor.start(), follow[0][2], "heuristic", "rating"))
             out.extend(item for item in found if item is not None)
-        back = [*back[-1:], word]
+        back = [*back[-2:], word]
 
 
 def _combine(raw: list[_Raw]) -> list[_Raw]:
