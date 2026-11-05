@@ -22,6 +22,7 @@ import { MAX_OWN_TOPICS, type Catalog, type TopicDefinition, type TopicSelection
 import { useT } from "./useT";
 import { getFrameOrigin } from "../provider/frameOrigin";
 import { TurnstileFrame } from "../provider/TurnstileFrame";
+import { subscribeKeysCleared } from "../provider/keyStore";
 import { isTokenFresh } from "../provider/turnstileProtocol";
 
 /** The wait for the frame token ends with an error after this time. */
@@ -94,7 +95,9 @@ function download(text: string): void {
     a.href = url;
     a.download = "aicontrast-topics.json";
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 10_000);
   } catch {
     // No download available in this browser.
   }
@@ -120,7 +123,11 @@ export function TopicPanel({
   const [dropped, setDropped] = useState(0);
   const [editor, setEditor] = useState<EditorState>(EMPTY_EDITOR);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [expanding, setExpanding] = useState(0);
+  const [pendingImport, setPendingImport] = useState<TopicDefinition[] | null>(null);
+  const tokenWait = useRef<Promise<string | null> | null>(null);
+  const busy = working || expanding > 0;
   const pass = useRef<string | null>(null);
   const waiter = useRef<((token: string | null) => void) | null>(null);
   const cachedToken = useRef<{ value: string; at: number } | null>(null);
@@ -152,6 +159,20 @@ export function TopicPanel({
       controller.abort();
     };
   }, []);
+
+  useEffect(
+    () =>
+      subscribeKeysCleared(() => {
+        pass.current = null;
+        cachedToken.current = null;
+        const w = waiter.current;
+        waiter.current = null;
+        w?.(null);
+        setFrameOn(false);
+        setNotice(null);
+      }),
+    [],
+  );
 
   const domain = catalog?.domains.find((d) => d.id === domainId) ?? null;
 
@@ -192,6 +213,15 @@ export function TopicPanel({
   };
 
   const acquireToken = (): Promise<string | null> => {
+    if (tokenWait.current) return tokenWait.current;
+    const p = acquireFreshToken().finally(() => {
+      tokenWait.current = null;
+    });
+    tokenWait.current = p;
+    return p;
+  };
+
+  const acquireFreshToken = (): Promise<string | null> => {
     const c = cachedToken.current;
     cachedToken.current = null;
     if (c && isTokenFresh(c.at, Date.now())) {
@@ -299,7 +329,7 @@ export function TopicPanel({
 
   const onSuggest = async () => {
     if (domainId === "" || busy) return;
-    setBusy(true);
+    setWorking(true);
     setNotice(null);
     const all: Suggestion[] = [];
     let skipped = 0;
@@ -317,17 +347,17 @@ export function TopicPanel({
     if (!mounted.current) return;
     setSuggestions(all);
     setDropped(skipped);
-    setBusy(false);
+    setWorking(false);
   };
 
   const onPropose = async () => {
     if (domainId === "" || busy) return;
     const topic = { ...draft(), attributes: [] };
-    setBusy(true);
+    setWorking(true);
     setNotice(null);
     const r = await run((req) => proposeAttributes({ ...req, topic }));
     if (!mounted.current) return;
-    setBusy(false);
+    setWorking(false);
     const fieldText = (field: string | undefined) =>
       field === "title" ? topic.title : field === "description" ? topic.description : undefined;
     if (!settle(r, !r.ok ? fieldText(r.field) : undefined)) return;
@@ -344,8 +374,10 @@ export function TopicPanel({
 
   /** Adds the expanded synonyms to the stored topic. A failure shows its message; the topic stays. */
   const expand = async (topic: TopicDefinition) => {
+    setExpanding((n) => n + 1);
     const r = await run((req) => expandSynonyms({ ...req, topic }));
     if (!mounted.current) return;
+    setExpanding((n) => n - 1);
     if (!settle(r)) return;
     const stored = topicStore.getTopics().find((x) => x.topic_id === topic.topic_id);
     if (!stored) return;
@@ -381,8 +413,9 @@ export function TopicPanel({
     }
     if (!mounted.current) return;
     if (result.ok) {
-      topicStore.replaceAll(result.topics);
       setNotice(null);
+      if (topicStore.getTopics().length > 0) setPendingImport(result.topics);
+      else topicStore.replaceAll(result.topics);
     } else {
       setNotice({ kind: "import", code: result.code });
     }
@@ -394,6 +427,7 @@ export function TopicPanel({
   };
 
   const errorKey = (n: Notice) => {
+    // The import code is `too_many` (transfer.test); its locale key is `tooLong` (i18n test).
     const code = n.kind === "import" && n.code === "too_many" ? "tooLong" : n.code;
     return (
       n.kind === "import" ? `topics.import.error.${code}` : `topics.error.${code}`
@@ -488,6 +522,7 @@ export function TopicPanel({
                 <button
                   type="button"
                   className="button button--quiet button--small"
+                  aria-label={t("topics.own.removeNamed", { name: x.title })}
                   onClick={() => {
                     topicStore.remove(x.topic_id);
                   }}
@@ -498,6 +533,31 @@ export function TopicPanel({
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {pendingImport ? (
+        <div role="group" aria-label={t("topics.import.label")}>
+          <p>{t("topics.import.replace")}</p>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              topicStore.replaceAll(pendingImport);
+              setPendingImport(null);
+            }}
+          >
+            {t("topics.import.replaceYes")}
+          </button>{" "}
+          <button
+            type="button"
+            className="button button--quiet"
+            onClick={() => {
+              setPendingImport(null);
+            }}
+          >
+            {t("topics.import.cancel")}
+          </button>
+        </div>
       ) : null}
 
       <div className="provider__field provider__field--inline">
@@ -516,6 +576,7 @@ export function TopicPanel({
         <button
           type="button"
           className="button button--quiet"
+          disabled={own.length === 0}
           onClick={() => {
             download(exportTopics(topicStore.getTopics()));
           }}

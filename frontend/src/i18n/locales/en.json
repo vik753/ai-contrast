@@ -434,7 +434,8 @@
       "propose": "Propose attributes",
       "confirm": "Add topic",
       "list": "Your topics",
-      "remove": "Remove topic"
+      "remove": "Remove topic",
+      "removeNamed": "Remove topic: {{name}}"
     },
     "attr": {
       "list": "Attributes",
@@ -456,7 +457,10 @@
         "forbidden_key": "The file contains a forbidden key.",
         "invalid_shape": "The file does not have the expected structure.",
         "tooLong": "The file has too many topics, attributes or values, or a text is too long."
-      }
+      },
+      "replace": "Replacing your topics. Replace the topics in this browser with the imported ones?",
+      "replaceYes": "Replace",
+      "cancel": "Cancel"
     },
     "direction": {
       "none": "No preference",

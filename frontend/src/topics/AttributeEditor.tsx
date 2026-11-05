@@ -13,6 +13,7 @@ export function AttributeEditor({ attribute, onChange, onRemove }: Props) {
   const { t } = useT();
   const labelId = useId();
   const dirId = useId();
+  const nameId = useId();
   return (
     <li>
       <div className="provider__field">
@@ -50,9 +51,17 @@ export function AttributeEditor({ attribute, onChange, onRemove }: Props) {
           ))}
         </select>
       </div>
-      <button type="button" className="button button--quiet button--small" onClick={onRemove}>
+      <button
+        type="button"
+        className="button button--quiet button--small"
+        aria-describedby={nameId}
+        onClick={onRemove}
+      >
         {t("topics.attr.remove")}
       </button>
+      <span id={nameId} hidden>
+        {attribute.label}
+      </span>
     </li>
   );
 }

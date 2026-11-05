@@ -169,6 +169,12 @@ function parseSuggest(o: Record<string, unknown>): SuggestData | null {
   return { suggestions: out, dropped: o.dropped };
 }
 
+const ID_RE = /^[a-z0-9_]{1,64}$/;
+const cpLen = (s: string): number => Array.from(s).length;
+const textOk = (s: string, max: number): boolean => cpLen(s) >= 1 && cpLen(s) <= max;
+const listOk = (v: unknown, maxItems: number, maxText: number): v is string[] =>
+  isStrArray(v) && v.length <= maxItems && v.every((x) => textOk(x, maxText));
+
 function parsePropose(o: Record<string, unknown>): ProposeData | null {
   if (!onlyKeys(o, ["attributes", "dropped"]) || !isCount(o.dropped)) return null;
   const list = o.attributes;
@@ -176,10 +182,11 @@ function parsePropose(o: Record<string, unknown>): ProposeData | null {
   const out: AttributeDefinition[] = [];
   for (const a of list) {
     if (!isRecord(a) || !isStr(a.id) || !isStr(a.label) || !isStr(a.type)) return null;
+    if (!ID_RE.test(a.id) || !textOk(a.label, 200)) return null;
     if (!(ATTRIBUTE_TYPES as readonly string[]).includes(a.type)) return null;
     const units = a.units ?? [];
     const values = a.values ?? [];
-    if (!isStrArray(units) || !isStrArray(values) || values.length > 30) return null;
+    if (!listOk(units, 10, 32) || !listOk(values, 30, 60)) return null;
     out.push({
       id: a.id,
       label: a.label,
@@ -198,8 +205,7 @@ function parseExpand(o: Record<string, unknown>): ExpandData | null {
   if (!onlyKeys(o, ["synonyms_en", "synonyms_uk", "synonyms_ru", "dropped"])) return null;
   if (!isCount(o.dropped)) return null;
   const { synonyms_en: en, synonyms_uk: uk, synonyms_ru: ru } = o;
-  if (!isStrArray(en) || !isStrArray(uk) || !isStrArray(ru)) return null;
-  if (en.length > 40 || uk.length > 40 || ru.length > 40) return null;
+  if (!listOk(en, 40, 60) || !listOk(uk, 40, 60) || !listOk(ru, 40, 60)) return null;
   return { synonyms_en: en, synonyms_uk: uk, synonyms_ru: ru, dropped: o.dropped };
 }
 
