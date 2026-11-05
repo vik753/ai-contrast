@@ -1,6 +1,6 @@
 # ADR 0018 — Clause tagging: keyword tags, model tags, "Other" and the analysis pass
 
-- Status: proposed (tech lead, 2026-11-05; round 1 security changes included)
+- Status: proposed (tech lead, 2026-11-05; `security-reviewer` approved the design after round 2)
 - Date: 2026-11-05
 - Related: ADR 0009 (Layers 2–4; "tagging cannot hide a clause"; one document per call; every cap fails closed), ADR 0014 (clauses), ADR 0015 (safety pass, gate), ADR 0016 (AI port, limits, free mode), ADR 0017 (`ConfirmedTopic`, synonyms, Layer 2), threat model T5, T6, T10, T11
 
@@ -55,7 +55,7 @@ Stage 9 rates a topic using only the clauses tagged with it. If tagging misses a
 ### 8. Browser
 
 - `App` gets the confirmed masked documents from the upload flow (the pseudonymization preview) through a small **in-memory** store (never IndexedDB, `localStorage` or `sessionStorage`; emptied by "Clear all"), which also enables "Suggest" in the topic panel (stage 7 follow-up).
-- A "Tag clauses" step per document after topics are confirmed: progress per document, the result as a list of clauses with their topic chips (keyword / model / check, shown with an icon and text, not colour only), "Other" with risk-term marks, and the per-topic flags. The client cannot remove keyword tags; the client may add a tag to a clause. **Client tags** count towards the 120 keyword cap per topic and the 5-per-clause cap, their topic and clause ids are checked, and they may only add. Stage 9 never trusts a tagging result from the browser: it recomputes keyword tags, "Other" and Layer 2 itself (bound to the document digest and `tagging_version`) and accepts from the browser only client-added tags and the model/check tags it can re-verify by digest.
+- A "Tag clauses" step per document after topics are confirmed: progress per document, the result as a list of clauses with their topic chips (keyword / model / check, shown with an icon and text, not colour only), "Other" with risk-term marks, and the per-topic flags. The client cannot remove keyword tags; the client may add a tag to a clause. **Client tags** count towards the 120 keyword cap per topic and the 5-per-clause cap, their topic and clause ids are checked, and they may only add. Stage 9 never trusts a tagging result from the browser: it recomputes keyword tags, "Other" and Layer 2 itself (bound to the document digest and `tagging_version`) and accepts from the browser only client-added tags and the model/check tags that carry a valid **tag signature**: `/api/tag` returns `signature = HMAC-SHA256(per-process key, v1 | document digest | tagging_version | hash of the model and check tags)`; stage 9 refuses unsigned or mismatched model/check tags (a restart invalidates signatures, so the browser re-tags). Client tags stay add-only and capped.
 - Cost estimate before the step: number of calls and an estimate of tokens per document; shown with the model pair (full estimate in stage 11).
 
 ### 9. Eval
