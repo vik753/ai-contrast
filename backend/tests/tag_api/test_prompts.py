@@ -78,11 +78,43 @@ def test_tag_and_check_calls_use_their_own_model() -> None:
     assert {c[1] for c in rig.tags.of("check")} == {"gpt-strong-1"}
 
 
-def test_check_model_defaults_to_model() -> None:
+def _check_models(**changes: object) -> set[str]:
     rig = TagRig(lambda ids, n: {ids[0]: [("T1", "low")]})
     body = {k: v for k, v in tag_body("A clause about deductible.").items() if k != "check_model"}
-    rig.post(body)
+    assert rig.post({**body, **changes}).status_code == 200
+    return {c[1] for c in rig.tags.of("check")}
+
+
+def test_check_model_defaults_to_the_preset_strong_model() -> None:
+    from app.ai.presets import MODEL_PAIRS, PresetId
+
+    for preset in (PresetId.OPENAI, PresetId.ANTHROPIC):
+        pair = MODEL_PAIRS[preset]
+        models = _check_models(provider=preset.value, model=pair.cheap)
+        assert models == {pair.strong}, preset
+
+
+def test_check_model_given_wins_over_the_preset_strong_model() -> None:
+    from app.ai.presets import MODEL_PAIRS, PresetId
+
+    pair = MODEL_PAIRS[PresetId.OPENAI]
+    models = _check_models(model=pair.cheap, check_model="gpt-given-1")
+    assert models == {"gpt-given-1"}
+
+
+def test_check_model_for_custom_defaults_to_model() -> None:
+    rig = TagRig(lambda ids, n: {ids[0]: [("T1", "low")]})
+    body = {k: v for k, v in tag_body("A clause about deductible.").items() if k != "check_model"}
+    body.update(provider="custom", base_url="https://models.example.com/v1")
+    r = rig.post(body)
+    assert r.status_code == 200, r.text
     assert {c[1] for c in rig.tags.of("check")} == {"gpt-cheap-1"}
+
+
+def test_tag_prompt_states_the_languages_and_matching_by_meaning() -> None:
+    text = PromptTemplate.TAG_CLAUSES.value.lower()
+    for word in ("english", "ukrainian", "russian", "meaning"):
+        assert word in text, word
 
 
 def test_free_mode_uses_one_model_for_both_calls() -> None:

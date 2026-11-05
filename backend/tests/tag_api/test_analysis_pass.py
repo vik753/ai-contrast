@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from tests.check.helpers import CHECK, PUBLIC_IP
+from app.main import create_app
+from app.settings import Settings
+from tests.check.helpers import CHECK, FREE_ENV, PUBLIC_IP, GateTransport
 from tests.tag_api.helpers import (
     PASS_HEADER,
     TagRig,
@@ -14,6 +16,7 @@ from tests.tag_api.helpers import (
     tag_body,
 )
 from tests.topic_ai.helpers import PROPOSE, free_trig, topic_body
+from tests.topics.helpers import CATALOG_OK
 
 IP_A, IP_B = PUBLIC_IP, "198.51.100.2"
 LOW = lambda ids, n: {ids[0]: [("T1", "low")]}  # noqa: E731
@@ -243,3 +246,46 @@ def test_neurons_are_settled_from_reported_usage_so_many_small_calls_fit() -> No
     for n in range(8):
         r = rig.free_tag(pass_=pass_)
         assert r.status_code == 200, (n, r.text)
+
+
+# --- review findings: settlement without reported usage -------------------------------------
+
+
+def _hung_free_rig() -> tuple[TagRig, GateTransport]:
+    gate = GateTransport()  # never answers: every call ends by timeout
+    rig = TagRig()
+    rig.app = create_app(
+        Settings(
+            environment="development",
+            topics_catalog_dir=CATALOG_OK,
+            tag_per_minute=1000,
+            tag_per_day=10000,
+            tag_call_deadline_seconds=0.05,
+            free_neuron_budget=9999,
+            analysis_pass_max_neurons=9999,
+            analysis_pass_max_calls=100000,
+            **FREE_ENV,
+        ),
+        provider_transport=gate,
+        turnstile_transport=rig.turnstile,
+        clock=rig.clock,
+    )
+    return rig, gate
+
+
+def test_calls_that_time_out_are_settled_at_the_worst_case_not_zero() -> None:
+    rig, _ = _hung_free_rig()
+    pass_ = issue(rig)
+    codes = [rig.free_tag(pass_=pass_) for _ in range(40)]
+    refused = [r for r in codes if r.status_code in (403, 429)]
+    assert refused, "timeouts must consume the free Neuron budget"
+    assert {error_of(r) for r in refused} <= {"free_quota_exhausted", "analysis_pass_exhausted"}
+
+
+def test_hard_provider_error_does_not_settle_zero_when_calls_were_made() -> None:
+    rig = free_tag_rig(analysis_pass_max_neurons=9999, analysis_pass_max_calls=100000)
+    pass_ = issue(rig)
+    rig.tags.tag_fn = lambda ids, n: 401
+    codes = [rig.free_tag(pass_=pass_) for _ in range(40)]
+    assert any(r.status_code in (403, 429) for r in codes)
+    assert any(r.status_code == 401 for r in codes)
