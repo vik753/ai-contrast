@@ -243,6 +243,17 @@ curl -sS -i -X POST -H 'Content-Type: application/json' -H 'X-Provider-Key: sk-t
 Expected: status `422` and the body `{"error":"topic_flagged","field":"title"}`.
 The refusal comes from the topic safety pass; the server makes no outbound call.
 
+Check that `/api/tag` refuses a request before any AI call (S8-T2). The request has no topic; `$V` is the detector version from the safety check above, and the key is a dummy that is never sent:
+
+```bash
+curl -sS -i -X POST -H 'Content-Type: application/json' -H 'X-Provider-Key: sk-test-key' \
+  -d '{"provider":"openai","model":"gpt-4o-mini","domain":"kasko","side":"insured","document":{"label":"A","detector_version":"'"$V"'","clauses":[{"id":"c1","text":"1.1. The deductible is 5 percent."}],"acknowledged_unmasked":[]},"topics":{}}' \
+  http://127.0.0.1:8000/api/tag
+```
+
+Expected: status `422` and the body `{"error":"no_topics"}`. The server makes no outbound call.
+With at least one topic the reply holds ids, enums, counts and offsets only (`tags`, `other`, `risk`, `topics`, `layer2`, `signature`, ...), never clause or topic text.
+
 Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
 
 Backend checks (the same as CI):

@@ -23,6 +23,7 @@ from app.api import (
     provider_check,
     safety_check,
     segment,
+    tag,
     topic_ai,
     topics,
 )
@@ -42,7 +43,7 @@ from app.settings import Settings
 from app.topics.catalog import load_catalog
 
 CORS_ALLOWED_METHODS = ["GET", "POST"]
-CORS_ALLOWED_HEADERS = ["Content-Type", "X-Provider-Key", "X-Free-Pass"]
+CORS_ALLOWED_HEADERS = ["Content-Type", "X-Provider-Key", "X-Free-Pass", "X-Analysis-Pass"]
 # Production is cross-origin: the browser may read `Retry-After` only if it is exposed.
 CORS_EXPOSED_HEADERS = ["Retry-After"]
 
@@ -108,6 +109,7 @@ def create_app(
     )
     topics.install(app, load_catalog(settings.topics_catalog_dir))
     app.include_router(topic_ai.router)
+    app.include_router(tag.router)
 
     # A new guarded client per fetch; tests replace this attribute.
     app.state.google_client_factory = lambda: outbound_client(

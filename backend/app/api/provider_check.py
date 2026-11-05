@@ -39,6 +39,7 @@ from app.api.common import early_error, error_response
 from app.api.provider_key import ProviderKeyHeader, provider_key_header
 from app.extraction.limiter import ExtractionLimiter
 from app.http_limits import CHECK_PATH
+from app.limits.analysis_pass import AnalysisPasses
 from app.limits.client_ip import client_key, daily_key
 from app.limits.free import CHECK_NEURONS, DAY_SECONDS, FreeQuota
 from app.limits.free_pass import FreePasses
@@ -49,6 +50,7 @@ from app.limits.window import FixedWindowLimiter
 from app.net.ai_client import AITransport, private_ai_transport
 from app.net.turnstile import TurnstileError, TurnstileVerdict, verify
 from app.settings import Settings
+from app.tagging.signature import TagSigner
 
 router = APIRouter()
 
@@ -61,6 +63,8 @@ CHALLENGE_MAX_AGE_SECONDS: Final = 300.0
 CHALLENGE_FUTURE_SKEW_SECONDS: Final = 5.0
 MINUTE_SECONDS: Final = 60
 FREE_PASS_HEADER: Final = "x-free-pass"  # noqa: S105 - a header name, not a secret
+ANALYSIS_PASS_HEADER: Final = "x-analysis-pass"  # noqa: S105 - a header name, not a secret
+_PASS_PREFIX: Final = "v1."  # noqa: S105 - the start of our passes, not a secret
 
 AI_STATUS: Final = {
     AIErrorCode.PROVIDER_AUTH_FAILED: 401,
@@ -137,6 +141,18 @@ class CheckState:
             settings.topics_per_day, DAY_SECONDS, keys, wall, aligned=True
         )
         self.passes = FreePasses(settings.free_pass_max_entries, settings.free_pass_max_calls, wall)
+        # Tagging (S8-T2): its own rate limits and its own pass table (audience ``analysis``).
+        self.tag_minute = FixedWindowLimiter(settings.tag_per_minute, MINUTE_SECONDS, keys, mono)
+        self.tag_day = FixedWindowLimiter(
+            settings.tag_per_day, DAY_SECONDS, keys, wall, aligned=True
+        )
+        self.signer = TagSigner()
+        self.analysis = AnalysisPasses(
+            settings.free_pass_max_entries,
+            settings.analysis_pass_max_calls,
+            settings.analysis_pass_max_neurons,
+            wall,
+        )
         self.replay = ReplayTable(
             settings.turnstile_replay_max_entries, settings.turnstile_replay_seconds, wall
         )
@@ -184,12 +200,14 @@ def install(
 ) -> None:
     """Register the route and build the state (the keyword arguments are test hooks)."""
     app.include_router(router)
-    app.state.check_state = CheckState(
+    state = CheckState(
         settings,
         provider_transport=provider_transport,
         turnstile_transport=turnstile_transport,
         clock=clock,
     )
+    app.state.check_state = state
+    app.state.tag_signer = state.signer
 
 
 class BusyError(Exception):
@@ -313,7 +331,9 @@ def _turnstile_ok(verdict: TurnstileVerdict, settings: Settings, now: float) -> 
 async def verify_turnstile(state: CheckState, token: str | None) -> bool:
     """Verify and remember the token. ``False`` for every refusal and every error."""
     secret = state.settings.turnstile_secret_key
-    if not token or secret is None or not state.replay.would_accept(token):
+    if not token or secret is None or token.startswith(_PASS_PREFIX):
+        return False  # a pass of ours is never a Turnstile token
+    if not state.replay.would_accept(token):
         return False
     try:
         verdict = await verify(token, secret, transport=state.turnstile_transport())
@@ -363,11 +383,15 @@ async def check_connection(
         return limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
 
 
-async def _parse(request: Request, header: ProviderKeyHeader, state: CheckState) -> Plan | Response:
+async def _parse(  # noqa: PLR0911
+    request: Request, header: ProviderKeyHeader, state: CheckState
+) -> Plan | Response:
     """Body, cheap validation and free-mode availability. Counts nothing."""
     if FREE_PASS_HEADER in request.headers:
         # A free pass is for topic calls only (audience ``topics``).
         return _refusal("unexpected_free_pass")
+    if ANALYSIS_PASS_HEADER in request.headers:
+        return _refusal("unexpected_analysis_pass")
     raw = await _read_body(request)
     if raw is None:
         return early_error("upload_timeout", 408)

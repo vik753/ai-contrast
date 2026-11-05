@@ -145,11 +145,19 @@ def _safety(data: bytes, header: dict[str, object]) -> bytes:
     return run(data, max_clauses=_non_negative(header, "safety_max_clauses"))
 
 
+def _tag(data: bytes, header: dict[str, object]) -> bytes:
+    from app.tagging.child import run  # noqa: PLC0415 - after the limits
+
+    return run(data, max_clauses=_non_negative(header, "safety_max_clauses"))
+
+
 def _extract(kind: str, data: bytes, header: dict[str, object]) -> bytes:
     if kind == "segment":
         return _segment(data, header)
     if kind == "safety":
         return _safety(data, header)
+    if kind == "tag":
+        return _tag(data, header)
     from app.extraction.model import (  # noqa: PLC0415 - after the limits
         ExtractionError,
         ExtractionResult,

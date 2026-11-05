@@ -6,8 +6,9 @@ allowed origin carries the CORS headers.
 - The ``/api/extract`` path (any method): ``max_file_bytes``, error ``file_too_large``.
 - The ``/api/safety-check`` path (any method): ``max_safety_body_bytes``, error
   ``request_too_large``.
-- ``/api/topics/suggest``: ``max_safety_body_bytes``; ``/api/topics/propose-attributes`` and
-  ``/api/topics/expand-synonyms``: 16 KiB (error ``request_too_large``).
+- ``/api/tag`` and ``/api/topics/suggest``: ``max_safety_body_bytes``;
+  ``/api/topics/propose-attributes`` and ``/api/topics/expand-synonyms``: 16 KiB (error
+  ``request_too_large``).
 - The ``/api/provider/check`` path (any method): 4096 bytes, error ``request_too_large``.
 - The ``/api/segment`` path (any method): ``max_segment_body_bytes``, error
   ``request_too_large``.
@@ -43,6 +44,7 @@ from app.http_limits import (
     SAFETY_PATH,
     SEGMENT_PATH,
     SUGGEST_PATH,
+    TAG_PATH,
     TOPIC_MAX_BODY_BYTES,
     declared_length,
 )
@@ -84,6 +86,7 @@ class BodySizeLimitMiddleware:
         limits = {
             SAFETY_PATH: self.max_safety_body_bytes,
             SUGGEST_PATH: self.max_safety_body_bytes,
+            TAG_PATH: self.max_safety_body_bytes,
             PROPOSE_PATH: TOPIC_MAX_BODY_BYTES,
             EXPAND_PATH: TOPIC_MAX_BODY_BYTES,
             CHECK_PATH: CHECK_MAX_BODY_BYTES,

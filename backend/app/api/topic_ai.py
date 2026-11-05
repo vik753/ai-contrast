@@ -34,18 +34,26 @@ from app.ai.port import (
     AIProvider,
 )
 from app.ai.presets import ConnectionConfigError, PresetId
+from app.api.ai_shared import (
+    ACCEPTED_MEDIA_TYPE,
+    busy,
+    ok,
+    read_limited,
+    reported_neurons,
+    safety_error,
+    topic_error,
+)
 from app.api.common import (
-    BodyRejectedError,
     check_upload_headers,
     early_error,
     error_response,
     extraction_slots,
-    read_body,
     sandbox_limits,
 )
 from app.api.provider_check import (
     AI_NO_COST,
     AI_STATUS,
+    ANALYSIS_PASS_HEADER,
     BUSY_RETRY_AFTER_SECONDS,
     FREE_PASS_HEADER,
     BusyError,
@@ -64,7 +72,6 @@ from app.api.provider_key import provider_key_header
 from app.api.topics import catalog_of
 from app.http_limits import EXPAND_PATH, PROPOSE_PATH, SUGGEST_PATH, TOPIC_MAX_BODY_BYTES
 from app.limits.client_ip import client_key, daily_key
-from app.limits.free import usage_neurons
 from app.limits.free_pass import FreePassError
 from app.limits.hits import Hits
 from app.pseudo.gate import (
@@ -76,9 +83,6 @@ from app.pseudo.gate import (
 )
 from app.pseudo.untrusted import UntrustedMaskedDocument
 from app.safety.runner import (
-    MISMATCH,
-    SAFETY_TIMEOUT,
-    UNMASKED,
     SafetyRunError,
     run_safety_check,
 )
@@ -90,11 +94,8 @@ from app.topics.safety import TopicTextError
 
 router = APIRouter()
 
-NO_STORE: Final = {"Cache-Control": "no-store"}
 INVALID_DEFINITION: Final = "invalid_topic_definition"
-ACCEPTED_MEDIA_TYPE: Final = "application/json"
 MAX_REPAIRS: Final = 1
-_USAGE_FIELDS: Final = 2
 
 
 class SuggestBody(CheckBody):
@@ -115,20 +116,6 @@ class Free:
     issued: str | None
 
 
-def _busy() -> JSONResponse:
-    return limited("busy", 503, BUSY_RETRY_AFTER_SECONDS)
-
-
-def _topic_error(error: TopicTextError | TopicDefinitionError) -> JSONResponse:
-    body: dict[str, object] = {"error": error.code}
-    if isinstance(error, TopicTextError):
-        if error.field is not None:
-            body["field"] = error.field
-        if error.spans:
-            body["spans"] = [list(span) for span in error.spans]
-    return JSONResponse(body, status_code=422)
-
-
 def _confirm(
     definition: TopicDefinition, catalog: Catalog, *, no_attributes: bool
 ) -> ConfirmedTopic | Response:
@@ -142,11 +129,13 @@ def _confirm(
     try:
         return confirm_topic(definition, catalog=catalog)
     except (TopicDefinitionError, TopicTextError) as error:
-        return _topic_error(error)
+        return topic_error(error)
 
 
 def _free_header(request: Request, plan: Plan, body: CheckBody) -> Response | str | None:
     """The pass of the request, ``None`` if there is none, or a refusal."""
+    if ANALYSIS_PASS_HEADER in request.headers:
+        return error_response("unexpected_analysis_pass", 422)  # audience ``analysis``
     values = request.headers.getlist(FREE_PASS_HEADER)
     if not values:
         return None
@@ -162,15 +151,6 @@ def _free_header(request: Request, plan: Plan, body: CheckBody) -> Response | st
 def _count(state: CheckState, key: str) -> Hits | JSONResponse:
     hits = Hits(state.topic_minute, state.topic_day, key, daily_key(key))
     return count_hits(hits) or hits
-
-
-async def _read(request: Request, declared: int, settings: Settings, cap: int) -> bytes | Response:
-    try:
-        return await read_body(
-            request, declared, settings, max_bytes=cap, too_large_code="request_too_large"
-        )
-    except BodyRejectedError as rejected:
-        return early_error(rejected.code, rejected.status)
 
 
 def _parse[BodyT: CheckBody](model: type[BodyT], data: bytes) -> BodyT | Response:
@@ -200,7 +180,7 @@ async def _topic_body(request: Request, state: CheckState) -> TopicBody | Respon
     )
     if isinstance(checked, JSONResponse):
         return checked
-    raw = await _read(request, checked, state.settings, TOPIC_MAX_BODY_BYTES)
+    raw = await read_limited(request, checked, state.settings, TOPIC_MAX_BODY_BYTES)
     if isinstance(raw, Response):
         return raw
     return _parse(TopicBody, raw)
@@ -253,14 +233,6 @@ def _select(
 # --- suggest ------------------------------------------------------------------------------------
 
 
-def _safety_error(error: SafetyRunError) -> JSONResponse:
-    if error.code == UNMASKED:
-        spans = [list(span) for span in error.spans]
-        return JSONResponse({"error": error.code, "spans": spans}, status_code=422)
-    status = 409 if error.code == MISMATCH else 504 if error.code == SAFETY_TIMEOUT else 422
-    return error_response(error.code, status)
-
-
 async def _document_pass(
     settings: Settings, untrusted: UntrustedMaskedDocument
 ) -> PseudonymizedDocument | Response:
@@ -275,7 +247,7 @@ async def _document_pass(
             data, limits=sandbox_limits(settings), max_clauses=settings.segment_max_clauses
         )
     except SafetyRunError as error:
-        return _safety_error(error)
+        return safety_error(error)
     try:
         return await asyncio.to_thread(
             safety_pass, untrusted, max_clauses=settings.segment_max_clauses
@@ -302,7 +274,7 @@ async def _suggest_parse(
     request: Request, state: CheckState, declared: int
 ) -> tuple[SuggestBody, Plan, str | None] | Response:
     settings = state.settings
-    raw = await _read(request, declared, settings, settings.safety_max_body_bytes)
+    raw = await read_limited(request, declared, settings, settings.safety_max_body_bytes)
     if isinstance(raw, Response):
         return raw
     body = _parse(SuggestBody, raw)
@@ -376,7 +348,7 @@ async def _ai_stage(state: CheckState, prepared: Prepared) -> Response:
             return await _run(state, prepared)
     except BusyError:
         hits.refund()
-        return _busy()
+        return busy()
 
 
 async def _complete(provider: AIProvider, job: Job) -> BaseModel:
@@ -409,13 +381,6 @@ class Outcome:
     actual: int | None = None
 
 
-def _reported(provider: AIProvider) -> int | None:
-    usage = getattr(provider, "usage", None)
-    if not (isinstance(usage, tuple) and len(usage) == _USAGE_FIELDS):
-        return None
-    return usage_neurons(*usage)
-
-
 async def _execute(
     state: CheckState, plan: Plan, key: SecretStr, free_account: str | None, job: Job
 ) -> Outcome:
@@ -426,9 +391,9 @@ async def _execute(
     try:
         async with asyncio.timeout(state.settings.topic_ai_deadline_seconds):
             out = await _complete(provider, job)
-        return Outcome(job.finish(out), actual=_reported(provider))
+        return Outcome(job.finish(out), actual=reported_neurons(provider))
     except BadOutputError:
-        return Outcome(error_response("ai_bad_output", 502), actual=_reported(provider))
+        return Outcome(error_response("ai_bad_output", 502), actual=reported_neurons(provider))
     except AIError as error:
         return Outcome(
             error_response(error.code.value, AI_STATUS[error.code]),
@@ -438,17 +403,13 @@ async def _execute(
         return Outcome(error_response(AIErrorCode.PROVIDER_UNAVAILABLE.value, 502))
 
 
-def _ok(body: dict[str, object]) -> JSONResponse:
-    return JSONResponse(body, headers=NO_STORE)
-
-
 async def _run(state: CheckState, prepared: Prepared) -> Response:
     plan = prepared.plan
     if plan.preset is not PresetId.FREE:
         if plan.key is None:  # cheap validation guarantees a key for every non-free preset
             return error_response("invalid_provider_key", 422)
         outcome = await _execute(state, plan, plan.key, None, prepared.job)
-        return outcome.result if isinstance(outcome.result, Response) else _ok(outcome.result)
+        return outcome.result if isinstance(outcome.result, Response) else ok(outcome.result)
     return await _run_free(state, prepared)
 
 
@@ -531,8 +492,8 @@ def _free_reply(state: CheckState, claim: Free, outcome: Outcome) -> Response:
             state.passes.refund(claim.nonce)
         return outcome.result
     if claim.issued is not None:
-        return _ok({**outcome.result, "free_pass": claim.issued})
-    return _ok(outcome.result)
+        return ok({**outcome.result, "free_pass": claim.issued})
+    return ok(outcome.result)
 
 
 def _claim(state: CheckState, pass_value: str | None, day_key: str) -> Free | Response:

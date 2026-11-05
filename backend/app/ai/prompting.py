@@ -13,8 +13,9 @@ import secrets
 from dataclasses import dataclass
 from typing import Final, Literal
 
-from app.ai.port import AIError, AIErrorCode, AIRequest
-from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument
+from app.ai.port import AIError, AIErrorCode, AIRequest, TaggingRequest
+from app.ai.prompts import PromptTemplate
+from app.pseudo.gate import ConfirmedTopic, PseudonymizedClause, PseudonymizedDocument
 
 __all__ = ["CHECK_MAX_TOKENS", "CHECK_PROBE", "Message", "build_messages", "data_chars"]
 
@@ -49,10 +50,20 @@ def _document_text(document: PseudonymizedDocument) -> str:
     return "\n\n".join(lines)
 
 
+_SCHEMA_IN_TEMPLATE: Final = frozenset({PromptTemplate.TAG_CLAUSES, PromptTemplate.CHECK_TAGS})
+
+
 def _instructions(request: AIRequest) -> str:
-    """The template text and the JSON schema of the answer (from the class, never a string)."""
-    schema = json.dumps(request.schema.model_json_schema(), sort_keys=True, separators=(",", ":"))
-    text = f"{request.template.value}\n\nJSON schema of the answer:\n{schema}"
+    """The template text and the JSON schema of the answer (from the class, never a string).
+
+    The tagging templates carry their schema in the template text itself."""
+    if request.template in _SCHEMA_IN_TEMPLATE:
+        text = request.template.value
+    else:
+        schema = json.dumps(
+            request.schema.model_json_schema(), sort_keys=True, separators=(",", ":")
+        )
+        text = f"{request.template.value}\n\nJSON schema of the answer:\n{schema}"
     if request.repair:
         text += (
             f"\n\nYour previous answer was refused (error code: {_REPAIR_TEXTS[request.repair]}). "
@@ -76,6 +87,28 @@ def _topic_text(topic: ConfirmedTopic) -> str:
     return "\n".join(lines)
 
 
+def _line(text: str) -> str:
+    """One line of text: every run of white space becomes one space."""
+    return " ".join(text.split())
+
+
+def _clause_ref(clause: PseudonymizedClause, number: int) -> str:
+    return clause.id if _SAFE_ID.fullmatch(clause.id) else f"c{number}"
+
+
+def _topics_text(request: TaggingRequest) -> str:
+    """``T<k>: <name> - <description>``: name and description only (ADR 0018 point 3)."""
+    numbers = request.topic_numbers or tuple(range(1, len(request.topics) + 1))
+    lines: list[str] = []
+    for number in numbers:
+        topic = request.topics[number - 1]
+        line = f"T{number}: {_line(topic.title)}"
+        if topic.description:
+            line += f" - {_line(topic.description)}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _blocks(request: AIRequest) -> list[tuple[str, str]]:
     blocks: list[tuple[str, str]] = []
     if request.document is not None:
@@ -84,6 +117,15 @@ def _blocks(request: AIRequest) -> list[tuple[str, str]]:
         blocks.append(("TEXT", request.text.text))
     if request.topic is not None:
         blocks.append(("TOPIC", _topic_text(request.topic)))
+    if isinstance(request, TaggingRequest):
+        blocks.append(("TOPICS", _topics_text(request)))
+        if request.pairs and request.document is not None:
+            clauses = request.document.clauses
+            lines = [
+                f"{_clause_ref(clauses[position], position + 1)} T{number}"
+                for position, number in request.pairs
+            ]
+            blocks.append(("PAIRS", "\n".join(lines)))
     return blocks
 
 
