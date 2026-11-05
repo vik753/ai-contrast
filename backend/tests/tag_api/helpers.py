@@ -45,7 +45,30 @@ def check_out(answers: Mapping[tuple[str, str], bool]) -> str:
     )
 
 
-def _completion(text: str, prompt: int = 20, completion: int = 10) -> httpx2.Response:
+def _flat(content: Any) -> str:
+    """Text of a message content: a string or a list of blocks (Anthropic)."""
+    if isinstance(content, list):
+        return "\n".join(str(b.get("text", "")) if isinstance(b, dict) else str(b) for b in content)
+    return str(content)
+
+
+def _completion(
+    text: str, prompt: int = 20, completion: int = 10, *, anthropic: bool = False
+) -> httpx2.Response:
+    if anthropic:
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "test-model-1",
+                "content": [{"type": "text", "text": text}],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": prompt, "output_tokens": completion},
+            },
+        )
     body = {
         "id": "chatcmpl-1",
         "object": "chat.completion",
@@ -79,32 +102,34 @@ class TagUpstream(FakeUpstream):
     @staticmethod
     def text_of(seen: Seen) -> str:
         data = json.loads(seen.body)
-        return "\n".join(str(m.get("content")) for m in data["messages"])
+        return "\n".join(_flat(m.get("content")) for m in data["messages"])
 
     def _answer(self, request: httpx2.Request) -> httpx2.Response:
         from app.ai.prompts import PromptTemplate
 
         data = json.loads(request.content)
         msgs = data["messages"]
-        full = "\n".join(str(m["content"]) for m in msgs)
-        users = "\n".join(str(m["content"]) for m in msgs if m["role"] != "system")
+        anthropic = request.url.path.endswith("/messages")
+        system = _flat(data.get("system", "")) if anthropic else ""
+        full = "\n".join([system, *(_flat(m["content"]) for m in msgs)])
+        users = "\n".join(_flat(m["content"]) for m in msgs if m["role"] != "system")
         model = str(data.get("model"))
         if PromptTemplate.CHECK_TAGS.value in full:
             pairs = re.findall(r"^(c\d+) (T\d+)$", full, re.M)
             self.calls.append(("check", model, [], pairs, full))
             result = self.check_fn(pairs)
             if isinstance(result, dict):
-                return _completion(check_out(result))
+                return _completion(check_out(result), anthropic=anthropic)
         else:
             ids = list(dict.fromkeys(re.findall(r"\bc\d+\b", users)))
             n_topics = len(set(re.findall(r"^T(\d+):", full, re.M)))
             self.calls.append(("tag", model, ids, [], full))
             result = self.tag_fn(ids, n_topics)
             if isinstance(result, dict):
-                return _completion(tag_out(result))
+                return _completion(tag_out(result), anthropic=anthropic)
         if isinstance(result, int):
             return httpx2.Response(result, json={"error": {"message": "x"}})
-        return _completion(str(result))
+        return _completion(str(result), anthropic=anthropic)
 
     def of(self, kind: str) -> list[tuple[str, str, list[str], list[tuple[str, str]], str]]:
         return [c for c in self.calls if c[0] == kind]
