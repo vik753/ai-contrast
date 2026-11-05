@@ -1,0 +1,29 @@
+{
+  "contract": "kasko_uk_b",
+  "clauses": {
+    "1": ["insured_risks"],
+    "1.1": ["insured_risks"],
+    "1.2": ["theft_conditions", "insured_risks"],
+    "2": ["exclusions"],
+    "2.1": ["exclusions"],
+    "3": ["sum_insured_depreciation", "deductible"],
+    "3.1": ["sum_insured_depreciation"],
+    "3.2": ["sum_insured_depreciation"],
+    "3.3": ["deductible"],
+    "4": ["payout_term", "repair_method"],
+    "4.1": ["payout_term"],
+    "4.2": ["repair_method"],
+    "5": ["notice_documents"],
+    "5.1": ["notice_documents"],
+    "6": ["territory"],
+    "6.1": ["territory"],
+    "7": ["drivers_allowed"],
+    "7.1": ["drivers_allowed"],
+    "8": ["premium_instalments"],
+    "8.1": ["premium_instalments"],
+    "9": ["termination_refund"],
+    "9.1": ["termination_refund"]
+  },
+  "other": [],
+  "risk_terms": []
+}

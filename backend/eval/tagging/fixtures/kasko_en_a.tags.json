@@ -1,0 +1,29 @@
+{
+  "contract": "kasko_en_a",
+  "clauses": {
+    "1": ["insured_risks"],
+    "1.1": ["insured_risks"],
+    "2": ["exclusions"],
+    "2.1": ["exclusions"],
+    "3": ["sum_insured_depreciation", "deductible"],
+    "3.1": ["sum_insured_depreciation"],
+    "3.2": ["sum_insured_depreciation"],
+    "3.3": ["deductible"],
+    "4": ["payout_term", "repair_method"],
+    "4.1": ["payout_term"],
+    "4.2": ["repair_method"],
+    "5": ["notice_documents"],
+    "5.1": ["notice_documents"],
+    "5.2": ["notice_documents"],
+    "6": ["territory"],
+    "6.1": ["territory"],
+    "7": ["premium_instalments"],
+    "7.1": ["premium_instalments"],
+    "8": ["termination_refund"],
+    "8.1": ["termination_refund"],
+    "9": ["subrogation"],
+    "9.1": ["subrogation"]
+  },
+  "other": [],
+  "risk_terms": []
+}
