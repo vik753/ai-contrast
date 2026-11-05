@@ -1,0 +1,187 @@
+{
+  "fictional": true,
+  "about": "Fixed inputs of the topic eval (S7-T4). All names are synthetic. See README.md for how each list is scored.",
+  "suggest_map": {
+    "about": "Extra match terms per domain, topic and language. They add to the catalog name and synonyms of the topic. A term is a phrase of word stems; it matches consecutive words of a suggestion name that start with these stems.",
+    "kasko": {
+      "payout_term": {"en": ["settlement", "claim payment", "payout"], "uk": ["виплат"], "ru": ["выплат"]},
+      "notice_documents": {"en": ["notice", "documents"], "uk": ["повідомлен", "документ"], "ru": ["уведомлен", "документ"]},
+      "premium_instalments": {"en": ["premium"], "uk": ["премі"], "ru": ["преми"]},
+      "termination_refund": {"en": ["termination"], "uk": ["припинен", "розірван"], "ru": ["прекращен", "расторжен"]},
+      "exclusions": {"en": ["exclusion"], "uk": ["винят", "виключ"], "ru": ["исключен"]},
+      "drivers_allowed": {"en": ["drivers"], "uk": ["водії", "воді", "допущені водії"], "ru": ["водител"]}
+    },
+    "osago": {
+      "payout_term": {"en": ["payout", "claim payment"], "uk": ["виплат"], "ru": ["выплат"]},
+      "policy_territory": {"en": ["policy validity", "validity of the contract"], "uk": ["дія договор", "дія поліс"], "ru": ["действие договор", "действие полис"]},
+      "accident_notice": {"en": ["accident"], "uk": ["дтп"], "ru": ["дтп"]},
+      "premium_bonus_malus": {"en": ["premium payment", "payment"], "uk": ["платіж", "премі"], "ru": ["платеж", "преми"]},
+      "termination_refund": {"en": ["termination"], "uk": ["припинен"], "ru": ["прекращен"]},
+      "recourse": {"en": ["recourse"], "uk": ["регрес"], "ru": ["регресс"]}
+    },
+    "lease": {
+      "term_renewal": {"en": ["term", "lease duration"], "uk": ["строк"], "ru": ["срок"]},
+      "late_penalties": {"en": ["penalt", "late payment"], "uk": ["штраф", "пен"], "ru": ["штраф", "пен"]},
+      "sublease_use": {"en": ["use", "sublet"], "uk": ["суборенд", "використан"], "ru": ["субаренд", "использован"]},
+      "damage_liability": {"en": ["damage", "liability"], "uk": ["шкод", "відповідальн"], "ru": ["ущерб", "ответственн"]},
+      "rent_amount": {"en": ["rent"], "uk": ["орендн плат"], "ru": ["арендн плат"]},
+      "utilities": {"en": ["utilities"], "uk": ["комунальн"], "ru": ["коммунальн"]},
+      "termination_notice": {"en": ["termination"], "uk": ["розірван"], "ru": ["расторжен"]}
+    },
+    "property_insurance": {
+      "payout_term": {"en": ["payout", "claim payment", "settlement"], "uk": ["виплат"], "ru": ["выплат"]},
+      "notice_documents": {"en": ["notice", "documents"], "uk": ["повідомлен", "документ"], "ru": ["уведомлен", "документ"]},
+      "insured_obligations": {"en": ["obligation", "duties"], "uk": ["обов'язк"], "ru": ["обязанност"]},
+      "premium_termination": {"en": ["premium", "termination"], "uk": ["премі", "припинен"], "ru": ["преми", "прекращен"]},
+      "subrogation": {"en": ["recourse"], "uk": ["регрес"], "ru": ["регресс"]},
+      "valuation_depreciation": {"en": ["valuation"], "uk": ["оцінк"], "ru": ["оценк"]},
+      "exclusions": {"en": ["exclusion"], "uk": ["винят", "виключ"], "ru": ["исключен"]},
+      "sum_insured_limits": {"en": ["sum insured"], "uk": ["страхов сум"], "ru": ["страхов сумм"]}
+    }
+  },
+  "custom_topics": [
+    {
+      "name": "Towing and roadside assistance", "lang": "en", "domain": "kasko",
+      "key_attributes": [
+        {"stems": ["limit", "amount", "cost", "sum"], "types": ["amount"]},
+        {"stems": ["service", "included", "cover"], "types": ["categories", "enum"]}
+      ],
+      "stems": {"en": ["towing", "roadside", "breakdown"], "uk": ["евакуац", "буксир"], "ru": ["эвакуац", "буксир"]}
+    },
+    {
+      "name": "Glass damage cover", "lang": "en", "domain": "kasko",
+      "key_attributes": [
+        {"stems": ["limit", "amount", "sum"], "types": ["amount"]},
+        {"stems": ["deductible", "excess"], "types": ["amount", "percentage"]}
+      ],
+      "stems": {"en": ["glass", "windscreen", "windshield"], "uk": ["скл", "лобов"], "ru": ["стекл", "лобов"]}
+    },
+    {
+      "name": "Pet policy", "lang": "en", "domain": "lease",
+      "key_attributes": [
+        {"stems": ["allowed", "permitted", "pets"], "types": ["enum", "categories"]},
+        {"stems": ["deposit", "fee"], "types": ["amount"]}
+      ],
+      "stems": {"en": ["pet", "animal"], "uk": ["тварин", "домашн"], "ru": ["животн", "домашн"]}
+    },
+    {
+      "name": "Rent indexation", "lang": "en", "domain": "lease",
+      "key_attributes": [
+        {"stems": ["rate", "percent", "increase", "indexation"], "types": ["percentage"]},
+        {"stems": ["frequency", "period", "interval"], "types": ["duration", "enum"]}
+      ],
+      "stems": {"en": ["indexation", "rent increase", "escalation"], "uk": ["індексац", "підвищ"], "ru": ["индексац", "повышен"]}
+    },
+    {
+      "name": "Строк розгляду претензії", "lang": "uk", "domain": "kasko",
+      "key_attributes": [
+        {"stems": ["строк", "термін", "днів", "дні"], "types": ["duration"]}
+      ],
+      "stems": {"uk": ["претенз", "розгляд"], "en": ["claim review", "complaint"], "ru": ["претенз", "рассмотр"]}
+    },
+    {
+      "name": "Ремонт на СТО офіційного дилера", "lang": "uk", "domain": "kasko",
+      "key_attributes": [
+        {"stems": ["спосіб", "вид", "тип", "сто", "станці"], "types": ["enum", "categories"]},
+        {"stems": ["вік", "строк", "рок"], "types": ["duration"]}
+      ],
+      "stems": {"uk": ["дилер", "сто", "ремонт"], "en": ["dealer", "repair shop", "garage"], "ru": ["дилер", "сто", "ремонт"]}
+    },
+    {
+      "name": "Компенсація за затоплення сусідами", "lang": "uk", "domain": "property_insurance",
+      "key_attributes": [
+        {"stems": ["ліміт", "сума", "сум"], "types": ["amount"]},
+        {"stems": ["причин", "вид", "ризик"], "types": ["categories", "enum"]}
+      ],
+      "stems": {"uk": ["затоп", "залив", "вод"], "en": ["flood", "water damage", "leak"], "ru": ["затоп", "залив", "вод"]}
+    },
+    {
+      "name": "Штраф за несвоєчасну оплату", "lang": "uk", "domain": "lease",
+      "key_attributes": [
+        {"stems": ["ставка", "відсот", "розмір", "пен"], "types": ["percentage", "amount"]},
+        {"stems": ["пільгов", "строк", "днів"], "types": ["duration"]}
+      ],
+      "stems": {"uk": ["штраф", "пен", "простроч"], "en": ["penalty", "late fee", "late payment"], "ru": ["штраф", "пен", "просроч"]}
+    },
+    {
+      "name": "Аварийный комиссар", "lang": "ru", "domain": "osago",
+      "key_attributes": [
+        {"stems": ["включ", "услуг", "доступ"], "types": ["enum", "categories"]},
+        {"stems": ["время", "срок", "прибыт"], "types": ["duration"]}
+      ],
+      "stems": {"ru": ["аварийн комиссар", "комиссар"], "uk": ["аварійн комісар", "комісар"], "en": ["claims adjuster", "adjuster", "emergency commissioner"]}
+    },
+    {
+      "name": "Срок выплаты по европротоколу", "lang": "ru", "domain": "osago",
+      "key_attributes": [
+        {"stems": ["срок", "дней", "дни"], "types": ["duration"]},
+        {"stems": ["лимит", "сумм", "максим"], "types": ["amount"]}
+      ],
+      "stems": {"ru": ["европротокол", "упрощ"], "uk": ["європротокол", "спрощ"], "en": ["european accident statement", "accident report", "agreed statement"]}
+    },
+    {
+      "name": "Возврат страховой премии при досрочном расторжении", "lang": "ru", "domain": "kasko",
+      "key_attributes": [
+        {"stems": ["доля", "процент", "ставк", "размер"], "types": ["percentage", "amount"]},
+        {"stems": ["срок", "уведомлен", "дней"], "types": ["duration"]}
+      ],
+      "stems": {"ru": ["возврат", "расторж", "преми"], "uk": ["поверн", "розірв", "премі"], "en": ["refund", "early termination", "premium"]}
+    },
+    {
+      "name": "Требования к сигнализации", "lang": "ru", "domain": "property_insurance",
+      "key_attributes": [
+        {"stems": ["устройств", "вид", "тип", "требован", "что"], "types": ["categories", "enum"]}
+      ],
+      "stems": {"ru": ["сигнализац", "охран"], "uk": ["сигналізац", "охорон"], "en": ["alarm", "security system"]}
+    }
+  ],
+  "honest_names": {
+    "about": "Honest topic names that a client may type. Some hold words that also occur in injection text (instruction, system, prompt, role, ignore, new).",
+    "en": [
+      "Claim filing instructions",
+      "Prompt payment discount",
+      "System of bonus-malus",
+      "Assistant services",
+      "Role of the broker",
+      "Act of God exclusions",
+      "Rules for authorised drivers",
+      "Notice of termination",
+      "Security deposit return",
+      "Landlord access to the premises",
+      "Subrogation rights of the insurer",
+      "Total loss settlement",
+      "Duties of the policyholder after an accident",
+      "New vehicle replacement"
+    ],
+    "uk": [
+      "Інструкція з подання заяви",
+      "Система бонус-малус",
+      "Порядок дій після ДТП",
+      "Обов'язки страхувальника",
+      "Винятки зі страхового покриття",
+      "Строк виплати страхового відшкодування",
+      "Франшиза на скло",
+      "Територія дії договору",
+      "Повернення гарантійного платежу",
+      "Доступ орендодавця до приміщення",
+      "Регрес до винної особи",
+      "Нові правила індексації орендної плати",
+      "Ігнорування дрібних пошкоджень"
+    ],
+    "ru": [
+      "Инструкция по урегулированию убытков",
+      "Системные требования к охране",
+      "Порядок действий при ДТП",
+      "Роль страхового агента",
+      "Новые условия договора",
+      "Исключения из страхового покрытия",
+      "Срок выплаты возмещения",
+      "Безусловная франшиза",
+      "Территория страхования",
+      "Возврат залога",
+      "Ответственность арендатора за ущерб",
+      "Забытые вещи в автомобиле",
+      "Игнорирование требований безопасности"
+    ]
+  }
+}
