@@ -27,8 +27,10 @@ INVALID: Final = "invalid_topic_text"
 IDENTIFIER: Final = "topic_contains_identifier"
 FLAGGED: Final = "topic_flagged"
 MIN_SYNONYM_LETTERS: Final = 3
-_PUNCTUATION: Final = frozenset(" -'\u2019.,()/%\u2116")
+_PUNCTUATION: Final = frozenset(" -'\u2019\u02bc.,()/%\u2116")
 _DIGITS: Final = frozenset("0123456789")
+MAX_SYNONYM_WORDS: Final = 6
+MIN_SYNONYM_WORD_LETTERS: Final = 3
 _SCRIPTS: Final = ("LATIN ", "CYRILLIC ")
 
 
@@ -116,6 +118,25 @@ def _identifier_spans(text: str) -> tuple[tuple[int, int], ...]:
     return tuple(sorted(spans))
 
 
+_APOSTROPHES: Final = frozenset("'\u2019\u02bc")
+
+
+def _words_ok(text: str) -> bool:
+    """At most 6 words, each of at least 3 letters (apostrophes belong to the word)."""
+    words: list[int] = []
+    inside = False
+    for char in text:
+        if char.isalpha() or char.isdigit() or char in _APOSTROPHES:
+            if not inside:
+                words.append(0)
+                inside = True
+            if char.isalpha():
+                words[-1] += 1
+        else:
+            inside = False
+    return len(words) <= MAX_SYNONYM_WORDS and all(n >= MIN_SYNONYM_WORD_LETTERS for n in words)
+
+
 def _synonym_ok(text: str, lang: str | None) -> bool:
     if sum(char.isalpha() for char in text) < MIN_SYNONYM_LETTERS:
         return False
@@ -154,3 +175,5 @@ def check_topic_text(text: str, kind: TextKind, lang: str | None = None) -> None
         raise TopicTextError(IDENTIFIER, spans)
     if _flagged(text):
         raise TopicTextError(FLAGGED)
+    if kind is TextKind.SYNONYM and not _words_ok(text):
+        raise TopicTextError(INVALID)

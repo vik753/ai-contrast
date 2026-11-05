@@ -12,9 +12,9 @@
       "names": {"en": "Liability limits", "uk": "Ліміти відповідальності", "ru": "Лимиты ответственности"},
       "descriptions": {"en": "Maximum payout per event for property damage and for life and health.", "uk": "Максимальна виплата за одну подію за шкоду майну та за життя і здоров'я.", "ru": "Максимальная выплата за одно событие за вред имуществу и за жизнь и здоровье."},
       "synonyms": {
-        "en": ["limit of liability", "liability limit", "maximum payout", "per event", "property damage", "life and health"],
-        "uk": ["ліміт відповідальн", "страхов сум", "максимальн виплат", "шкод майну", "життю та здоров", "один потерпіл"],
-        "ru": ["лимит ответственн", "страхов сумм", "максимальн выплат", "вред имуществу", "жизни и здоровь", "одного потерпевш"]
+        "en": ["liability", "liability limit", "maximum payout", "per event", "property damage", "life and health"],
+        "uk": ["ліміт відповідальн", "страхов сум", "максимальн виплат", "шкод майну", "здоров", "один потерпіл"],
+        "ru": ["лимит ответственн", "страхов сумм", "максимальн выплат", "вред имуществу", "здоровь", "одного потерпевш"]
       },
       "attributes": [
         {"id": "limit_property", "labels": {"en": "Limit for property damage", "uk": "Ліміт за шкоду майну", "ru": "Лимит за вред имуществу"}, "type": "amount", "units": ["UAH", "EUR"], "directions": {"insured": "higher_better", "insurer": "lower_better", "injured_party": "higher_better"}},
@@ -66,9 +66,9 @@
       "names": {"en": "Notice of an accident", "uk": "Повідомлення про ДТП", "ru": "Уведомление о ДТП"},
       "descriptions": {"en": "Deadline and form in which the policyholder reports the accident to the insurer.", "uk": "Строк і форма, у якій страхувальник повідомляє страховика про ДТП.", "ru": "Срок и форма, в которой страхователь уведомляет страховщика о ДТП."},
       "synonyms": {
-        "en": ["notify the insurer", "notice of accident", "accident report", "European protocol", "within working days"],
+        "en": ["notify the insurer", "accident", "accident report", "European protocol", "within working days"],
         "uk": ["повідомити страховик", "повідомлен про дтп", "європротокол", "протягом робочих днів", "повідомлення про подію"],
-        "ru": ["уведомить страховщик", "уведомлен о дтп", "европротокол", "в течение рабочих дней", "уведомление о событии"]
+        "ru": ["уведомить страховщик", "уведомлен", "европротокол", "течение рабочих дней", "уведомление"]
       },
       "attributes": [
         {"id": "notice_deadline", "labels": {"en": "Deadline to notify", "uk": "Строк повідомлення", "ru": "Срок уведомления"}, "type": "duration", "units": ["hours", "days", "working_days"], "directions": {"insured": "higher_better", "insurer": "lower_better", "injured_party": "none"}}
@@ -79,9 +79,9 @@
       "names": {"en": "Payout term", "uk": "Строк виплати", "ru": "Срок выплаты"},
       "descriptions": {"en": "Time to decide on the claim and to pay the injured party.", "uk": "Строк на рішення за заявою та виплату потерпілому.", "ru": "Срок на решение по заявлению и выплату потерпевшему."},
       "synonyms": {
-        "en": ["payout term", "pay within", "settlement period", "decision on payment", "claim"],
+        "en": ["payout term", "pay within", "settlement period", "decision", "claim"],
         "uk": ["строк виплат", "страхов відшкодуван", "рішення про виплат", "протягом днів", "заява про відшкодуван"],
-        "ru": ["срок выплат", "страхов возмещен", "решение о выплат", "в течение дней", "заявление о возмещен"]
+        "ru": ["срок выплат", "страхов возмещен", "выплат", "течение дней", "возмещен"]
       },
       "attributes": [
         {"id": "payout_days", "labels": {"en": "Days to pay", "uk": "Строк виплати", "ru": "Срок выплаты"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "none", "insurer": "higher_better", "injured_party": "lower_better"}},
@@ -121,7 +121,7 @@
       "names": {"en": "Recourse against the policyholder", "uk": "Регрес до страхувальника", "ru": "Регресс к страхователю"},
       "descriptions": {"en": "Cases where the insurer, after paying, claims the amount back from the insured.", "uk": "Випадки, коли страховик після виплати вимагає суму від страхувальника.", "ru": "Случаи, когда страховщик после выплаты требует сумму со страхователя."},
       "synonyms": {
-        "en": ["recourse", "regress", "reimburse the insurer", "right of recovery", "intoxication", "left the scene"],
+        "en": ["recourse", "regress", "reimburse the insurer", "recovery", "intoxication", "left the scene"],
         "uk": ["регрес", "зворотн вимог", "відшкодувати страховику", "право вимоги", "сп'янін", "залишив місце дтп"],
         "ru": ["регресс", "обратн требован", "возместить страховщику", "право требовани", "опьянени", "оставил место дтп"]
       },
@@ -143,7 +143,7 @@
       "names": {"en": "Premium and bonus-malus", "uk": "Премія та бонус-малус", "ru": "Премия и бонус-малус"},
       "descriptions": {"en": "Premium amount and the discount or surcharge for driving history.", "uk": "Розмір премії та знижка чи надбавка залежно від історії водіння.", "ru": "Размер премии и скидка или надбавка в зависимости от истории вождения."},
       "synonyms": {
-        "en": ["premium", "tariff", "bonus-malus", "discount", "surcharge", "payment of premium"],
+        "en": ["premium", "tariff", "bonus-malus", "discount", "surcharge", "premium"],
         "uk": ["страхов премі", "страховий платіж", "тариф", "бонус-малус", "знижк", "надбавк"],
         "ru": ["страхов преми", "страхов взнос", "тариф", "бонус-малус", "скидк", "надбавк"]
       },

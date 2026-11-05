@@ -11,7 +11,7 @@
       "names": {"en": "Insured risks", "uk": "Страхові ризики", "ru": "Страховые риски"},
       "descriptions": {"en": "Which events the policy covers (collision, theft, fire, natural events, vandalism).", "uk": "Які події покриває поліс (ДТП, крадіжка, пожежа, стихія, вандалізм).", "ru": "Какие события покрывает полис (ДТП, кража, пожар, стихия, вандализм)."},
       "synonyms": {
-        "en": ["insured risk", "insured event", "covered risk", "perils covered", "scope of cover", "collision", "natural disaster", "vandalism"],
+        "en": ["insured risk", "insured event", "covered risk", "perils covered", "scope cover", "collision", "natural disaster", "vandalism"],
         "uk": ["страхов ризик", "страхов випадк", "страхов под", "покриває", "перелік ризик", "дтп", "стихійн", "вандалізм"],
         "ru": ["страхов риск", "страхов случа", "страхов событи", "покрывает", "перечень риск", "дтп", "стихийн", "вандализм"]
       },
@@ -35,9 +35,9 @@
       "names": {"en": "Exclusions", "uk": "Винятки зі страхового покриття", "ru": "Исключения из страхового покрытия"},
       "descriptions": {"en": "Situations where the insurer does not pay or may refuse.", "uk": "Ситуації, коли страховик не виплачує або може відмовити.", "ru": "Ситуации, когда страховщик не платит или может отказать."},
       "synonyms": {
-        "en": ["exclusion", "not covered", "shall not be liable", "refuse payment", "grounds for refusal", "intoxication", "without a licence"],
-        "uk": ["виключен", "виняток", "винятк", "не є страховим випадком", "не відшкодов", "підстави для відмов", "сп'янін", "без посвідчення"],
-        "ru": ["исключен", "изъяти", "не является страховым случаем", "не возмещ", "основания для отказ", "опьянени", "без удостоверения"]
+        "en": ["exclusion", "not covered", "liable", "refuse payment", "grounds for refusal", "intoxication", "licence"],
+        "uk": ["виключен", "виняток", "винятк", "страховим випадком", "відшкодов", "підстави для відмов", "сп'янін", "без посвідчення"],
+        "ru": ["исключен", "изъяти", "является страховым случаем", "возмещ", "основания для отказ", "опьянени", "без удостоверения"]
       },
       "attributes": [
         {"id": "excluded_situations", "labels": {"en": "Excluded situations", "uk": "Виключені ситуації", "ru": "Исключённые ситуации"}, "type": "categories",
@@ -88,7 +88,7 @@
       "names": {"en": "Sum insured and depreciation", "uk": "Страхова сума та знос", "ru": "Страховая сумма и износ"},
       "descriptions": {"en": "The maximum payout, whether it falls during the term, and the wear deduction.", "uk": "Максимальна виплата, чи зменшується вона протягом дії договору, та вирахування зносу.", "ru": "Максимальная выплата, уменьшается ли она в период действия договора, и вычет износа."},
       "synonyms": {
-        "en": ["sum insured", "insured value", "limit of liability", "depreciation", "wear deduction", "actual value"],
+        "en": ["sum insured", "insured value", "liability", "depreciation", "wear deduction", "actual value"],
         "uk": ["страхова сум", "страхов вартіст", "ліміт відповідальн", "знос", "амортизац", "дійсна вартіст"],
         "ru": ["страхова сумм", "страхов стоимост", "лимит ответственн", "износ", "амортизац", "действительн стоимост"]
       },
@@ -104,7 +104,7 @@
       "synonyms": {
         "en": ["payout term", "within days", "pay within", "settlement period", "claim decision", "payment deadline"],
         "uk": ["строк виплат", "протягом робочих днів", "страхов виплат", "страхов відшкодуван", "рішення про виплат", "термін виплат"],
-        "ru": ["срок выплат", "в течение рабочих дней", "страхов выплат", "страхов возмещен", "решение о выплат", "срок оплат"]
+        "ru": ["срок выплат", "течение рабочих дней", "страхов выплат", "страхов возмещен", "выплат", "срок оплат"]
       },
       "attributes": [
         {"id": "payout_days", "labels": {"en": "Days to pay", "uk": "Строк виплати", "ru": "Срок выплаты"}, "type": "duration", "units": ["days", "working_days"], "directions": {"insured": "lower_better", "insurer": "higher_better"}},
@@ -151,9 +151,9 @@
       "names": {"en": "Notice and documents", "uk": "Повідомлення та документи", "ru": "Уведомление и документы"},
       "descriptions": {"en": "Deadline to report an event and the documents the insured must supply.", "uk": "Строк повідомлення про подію та документи, які має надати страхувальник.", "ru": "Срок уведомления о событии и документы, которые должен предоставить страхователь."},
       "synonyms": {
-        "en": ["notify the insurer", "notice of loss", "within hours", "police report", "required documents", "claim documents"],
+        "en": ["notify the insurer", "notice", "within hours", "police report", "required documents", "claim documents"],
         "uk": ["повідомити страховик", "повідомлен про подію", "протягом годин", "довідк", "документи для виплат", "заява про виплат"],
-        "ru": ["уведомить страховщик", "уведомлен о событии", "в течение часов", "справк", "документы для выплат", "заявлен о выплат"]
+        "ru": ["уведомить страховщик", "уведомлен", "течение часов", "справк", "документы для выплат", "выплат"]
       },
       "attributes": [
         {"id": "notice_deadline", "labels": {"en": "Deadline to notify", "uk": "Строк повідомлення", "ru": "Срок уведомления"}, "type": "duration", "units": ["hours", "days", "working_days"], "directions": {"insured": "higher_better", "insurer": "lower_better"}},
@@ -195,8 +195,8 @@
       "descriptions": {"en": "Where the policy applies - Ukraine, Europe, other regions.", "uk": "Де діє поліс - Україна, Європа, інші регіони.", "ru": "Где действует полис - Украина, Европа, другие регионы."},
       "synonyms": {
         "en": ["territory", "geographical scope", "territorial limits", "europe", "abroad", "temporarily occupied"],
-        "uk": ["територі", "територіальн", "географічн", "європ", "за кордон", "тимчасово окупован"],
-        "ru": ["территори", "территориальн", "географическ", "европ", "за границ", "временно оккупирован"]
+        "uk": ["територі", "територіальн", "географічн", "європ", "кордон", "тимчасово окупован"],
+        "ru": ["территори", "территориальн", "географическ", "европ", "границ", "временно оккупирован"]
       },
       "attributes": [
         {"id": "territory_scope", "labels": {"en": "Covered territory", "uk": "Територія покриття", "ru": "Территория покрытия"}, "type": "categories",
@@ -215,8 +215,8 @@
       "descriptions": {"en": "Who may drive - anyone, named drivers, or age and experience limits.", "uk": "Хто може керувати - будь-хто, названі особи або обмеження за віком і стажем.", "ru": "Кто может управлять - любой, названные лица или ограничения по возрасту и стажу."},
       "synonyms": {
         "en": ["permitted driver", "named driver", "authorised driver", "driving experience", "driver age", "any driver"],
-        "uk": ["допущен до керуван", "водії", "водій", "стаж", "вік водія", "необмежен коло"],
-        "ru": ["допущен к управлен", "водител", "стаж", "возраст водител", "неограничен круг"]
+        "uk": ["керуван", "водії", "водій", "стаж", "вік водія", "необмежен коло"],
+        "ru": ["управлен", "водител", "стаж", "возраст водител", "неограничен круг"]
       },
       "attributes": [
         {"id": "driver_scope", "labels": {"en": "Driver scope", "uk": "Коло водіїв", "ru": "Круг водителей"}, "type": "enum",
@@ -254,9 +254,9 @@
       "names": {"en": "Termination and refund", "uk": "Припинення та повернення премії", "ru": "Прекращение и возврат премии"},
       "descriptions": {"en": "How either side ends the contract and how much premium is returned.", "uk": "Як кожна сторона припиняє договір і яку частину премії повертають.", "ru": "Как каждая сторона прекращает договор и какую часть премии возвращают."},
       "synonyms": {
-        "en": ["termination", "early termination", "cancel", "refund of premium", "unearned premium", "withdraw"],
+        "en": ["termination", "early termination", "cancel", "refund", "unearned premium", "withdraw"],
         "uk": ["припиненн", "дострокове", "розірванн", "повернен премі", "повернення страхов", "відмов від договор"],
-        "ru": ["прекращен", "досрочн", "расторжен", "возврат преми", "возврат страхов", "отказ от договор"]
+        "ru": ["прекращен", "досрочн", "расторжен", "возврат преми", "возврат страхов", "отказ"]
       },
       "attributes": [
         {"id": "refund_share", "labels": {"en": "Refund of unused premium", "uk": "Повернення невикористаної премії", "ru": "Возврат неиспользованной премии"}, "type": "percentage", "directions": {"insured": "higher_better", "insurer": "lower_better"}},
@@ -268,7 +268,7 @@
       "names": {"en": "Subrogation and recourse", "uk": "Суброгація та регрес", "ru": "Суброгация и регресс"},
       "descriptions": {"en": "The insurer's right to claim from the guilty party, and from the insured in listed cases.", "uk": "Право страховика вимагати від винної особи та, у визначених випадках, від страхувальника.", "ru": "Право страховщика требовать с виновного лица и, в определённых случаях, со страхователя."},
       "synonyms": {
-        "en": ["subrogation", "recourse", "right of claim", "recover from", "transfer of rights"],
+        "en": ["subrogation", "recourse", "claim", "recover from", "transfer"],
         "uk": ["суброгац", "регрес", "право вимоги", "перехід прав", "зворотн вимог"],
         "ru": ["суброгац", "регресс", "право требовани", "переход прав", "обратн требован"]
       },
