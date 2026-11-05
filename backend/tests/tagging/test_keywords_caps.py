@@ -108,7 +108,7 @@ def _prefix_topics(rng: random.Random) -> list:  # type: ignore[type-arg]
 def _run_or_fail_closed(cl: list[TagClause], topics: list) -> None:  # type: ignore[type-arg]
     try:
         keyword_tags(cl, topics)
-    except TagMergeError as error:  # noqa: PT017
+    except TagMergeError as error:
         assert error.code == "keyword_budget_exceeded"
 
 
