@@ -322,12 +322,56 @@ RATING_WORDS: Final = (
     "сприятлив*",
 )
 
-# Topic meta-word rule (ADR 0017 point 3 rule 6; topics only). A topic text is refused when a
-# word belongs to INSTRUCTION_WORDS or AI_WORDS, when "language model" appears
-# (LANGUAGE_WORDS then MODEL_WORDS), or when a rating verb is followed by a colour or
-# favourable word in any form (only BARE_FILLERS may stand between). "rating" counts only
-# before "as".
-META_RATE_VERBS: Final = ("rate", "rated", "rates", "оцін*", "оцен*")
+# Topic meta-word rule (ADR 0017 point 3 rule 6; topics only). A single word never refuses a
+# topic text ("Prompt payment", "Assistant services", "Instructions of the insurer" are honest).
+# A text is refused when it holds
+#  (a) an AI word (AI_WORDS, "language model", "neural network") with an instruction word, a
+#      rating verb or a colour word, or an AI word right after "for", "to" or "для";
+#  (b) an instruction word with a hidden qualifier (HIDDEN_QUALIFIERS);
+#  (c) a rating verb followed by a colour or favourable word (only BARE_FILLERS between), or a
+#      colour word with a quantifier or object (see COLOUR_*).
+# META_INSTRUCTION_WORDS count alone; META_ADDRESS_WORDS (whole words only) count when "for",
+# "to", "для" or an AI word follows. "rating" counts only before "as".
+META_INSTRUCTION_WORDS: Final = (
+    "instruction*",
+    "directive*",
+    "guidance",
+    "директив*",
+    "інструкц*",
+    "вказівк*",
+    "инструкц*",
+    "указани*",
+)
+META_ADDRESS_WORDS: Final = (
+    "prompt",
+    "prompts",
+    "command",
+    "commands",
+    "промпт",
+    "промпти",
+    "промпты",
+    "команда",
+    "команди",
+    "команду",
+    "команды",
+)
+META_RATE_VERBS: Final = (
+    "rate",
+    "rated",
+    "rates",
+    "оцени",
+    "оцените",
+    "оценить",
+    "оценивай",
+    "оценивайте",
+    "оценивать",
+    "оціни",
+    "оцініть",
+    "оцінити",
+    "оцінюй",
+    "оцінюйте",
+    "оцінювати",
+)
 META_RATING_AS: Final = ("rating",)
 META_RATING_WORDS: Final = (
     "green",
