@@ -136,9 +136,10 @@ def test_merge_drop_counts_check_tags_with_model_tags() -> None:
 
 
 def test_merge_drop_keeps_keyword_tags_of_the_topic() -> None:
-    kw = {c: set() for c in _ids(61)}
+    kw = {c: set() for c in _ids(62)}
     kw["c1"] = {A}
-    r = _merge(clauses(61), keyword=kw, model_high={c: {A} for c in _ids(61)})
+    r = _merge(clauses(62), keyword=kw, model_high={c: {A} for c in _ids(62)})
+    assert r.topics[A].model_tags_dropped
     assert r.tags["c1"] == {A: "keyword"}
     assert "c1" not in r.other
     assert "c2" in r.other

@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.tagging.keywords import KEYWORD_RULES_VERSION, keyword_tags
 
 from .helpers import clause, topic
@@ -110,16 +112,24 @@ def test_keyword_tags_phrase_does_not_span_heading_and_text() -> None:
 
 
 def test_keyword_tags_synonym_metacharacters_are_literal() -> None:
-    t = topic(1, en=["tax.id"])
-    assert _tags(["taxxid", "tax-id", "taxid"], t) == {"c1": set(), "c2": set(), "c3": set()}
-    assert _tags(["See tax.id here"], t)["c1"] == {"custom_1"}
+    t = topic(1, en=["tax.num"])
+    assert _tags(["taxxnum", "taxnum", "tax_num"], t) == {"c1": set(), "c2": set(), "c3": set()}
+    assert _tags(["See tax.num here"], t)["c1"] == {"custom_1"}
 
 
-def test_keyword_tags_regex_syntax_synonyms_match_literally_only() -> None:
-    t = topic(1, en=["a.bc", "(abc)", "a/bc", "a-bc"])
-    texts = ["axbc", "aabc", "a+bc", "aaaa bbbb", "xyz"]
-    result = _tags(texts, t)
-    assert all(v == set() for v in result.values())
+@pytest.mark.parametrize(
+    ("synonym", "text"),
+    [
+        ("abc.def", "abcxdef"),
+        ("abc.def", "abc+def"),
+        ("(abc)", "xabc"),
+        ("abc/def", "abcxdef"),
+        ("abc-def", "abcxdef"),
+        ("abc-def", "abc+def"),
+    ],
+)
+def test_keyword_tags_regex_syntax_synonyms_match_literally_only(synonym: str, text: str) -> None:
+    assert _tags([text], topic(1, en=[synonym])) == {"c1": set()}
 
 
 def test_keyword_tags_languages_are_all_used_whatever_the_text() -> None:

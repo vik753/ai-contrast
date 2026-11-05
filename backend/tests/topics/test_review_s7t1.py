@@ -116,6 +116,10 @@ def _pair(n: int) -> str:
     return chr(97 + n % 26) + chr(97 + (n * 7 + 3) % 26)
 
 
+SYN_UK = 0
+SYN_RU = 20
+
+
 def _capped(attr_id: str) -> dict[str, Any]:
     words = [
         "alpha",
@@ -134,13 +138,19 @@ def _capped(attr_id: str) -> dict[str, Any]:
         text = " ".join(words[(n + i) % len(words)] for i in range(40))
         return text[:size].rstrip()
 
+    def syn(n: int) -> str:
+        # Six words (the synonym rule), unique per n.
+        return " ".join([*(words[(n + i) % 10] for i in range(5)), words[(n // 10) % 10] + "x"])
+
     return {
         "title": line(0, 80),
         "description": line(1, 200),
         "attributes": tuple(
             attribute(id=f"{attr_id}{chr(97 + n)}"[:47], label=line(n + 2, 120)) for n in range(12)
         ),
-        "synonyms_en": tuple(line(n + 3, 55) + " " + _pair(n) for n in range(32)),
+        "synonyms_en": tuple(syn(n) for n in range(40)),
+        "synonyms_uk": tuple(syn(n + 40) for n in range(SYN_UK)),
+        "synonyms_ru": tuple(syn(n + 80) for n in range(SYN_RU)),
     }
 
 

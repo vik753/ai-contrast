@@ -93,7 +93,7 @@ def _prefix_topics(rng: random.Random) -> list:  # type: ignore[type-arg]
     topics = []
     for n in range(1, 21):
         syns: set[str] = set()
-        while len(syns) < 120:
+        while len(syns) < 120:  # 40 per language list (ADR 0017 cap)
             words: list[str] = []
             while len(words) < 6:
                 candidate = [*words, rng.choice(SHORT)]
@@ -101,7 +101,8 @@ def _prefix_topics(rng: random.Random) -> list:  # type: ignore[type-arg]
                     break
                 words = candidate
             syns.add(" ".join(words))
-        topics.append(topic(n, en=sorted(syns)))
+        ordered = sorted(syns)
+        topics.append(topic(n, en=ordered[:40], uk=ordered[40:80], ru=ordered[80:]))
     return topics
 
 
