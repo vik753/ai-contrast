@@ -63,6 +63,12 @@ Stage 9 rates a topic using only the clauses tagged with it. If tagging misses a
 
 `ai-eval-engineer` adds `backend/eval/tagging/`: per clause the expected topics from the S7-T0 fixtures (`expected.json` clause references, extended by `domain-analyst` where needed); metrics: per-topic recall and precision of keyword tags alone and of keyword + model tags, share of clauses in "Other", risk-term recall on "Other"; adversarial cases: a clause that tells the tagger to skip it, a document that floods one topic to hit the cap; recorded mode in CI (stub recordings as in stage 7) and live mode locally.
 
+### 10. Implementation notes (S8-T2 review)
+
+- The merge (which also scans the risk terms of "Other" clauses, after model tags are known) runs in a worker thread, not in the child. Measured at 300,000 characters in 2,000 clauses: about 0.13 s of CPU, so it is bounded by the document cap.
+- Free settlement charges the worst case of the request when any call did not complete (timeout, transport error, hard error, cancellation); only a request whose calls all reported usage is charged the reported Neurons.
+- Check calls use `check_model`, else the strong model of the preset (`custom`: the cheap model; `free`: the one model).
+
 ## Consequences
 
 - Positive: no clause can disappear from the analysis; keyword tags make tagging work even without a model; the analysis pass gives free mode a clear per-analysis budget.

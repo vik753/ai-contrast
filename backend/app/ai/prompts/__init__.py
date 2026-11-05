@@ -7,6 +7,11 @@ can carry. It is not a ``str`` subclass and cannot be built from a runtime strin
 from __future__ import annotations
 
 import enum
+import json
+
+from pydantic import BaseModel
+
+from app.tagging.schemas import CheckOut, TagOut
 
 __all__ = ["PromptTemplate"]
 
@@ -71,8 +76,14 @@ _EXPAND_SYNONYMS = (
     + _TOPIC_COMMON
 )
 
+
 # Tagging templates (ADR 0018 point 3). The system message of these two is the template text
 # alone: the answer schema is part of it (kept in step with ``app.tagging.schemas`` by a test).
+def _schema_text(schema: type[BaseModel]) -> str:
+    """The JSON schema of an answer class, as the model gets it."""
+    return json.dumps(schema.model_json_schema(), sort_keys=True, separators=(",", ":"))
+
+
 _TAG_COMMON = (
     "The user messages hold data blocks. Each block starts with a line "
     "'<<<BEGIN <KIND> <token>>>>' and ends with a line '<<<END <KIND> <token>>>>' "
@@ -91,16 +102,12 @@ _TAG_CLAUSES = (
     "per line: '<index>: <name> - <description>'.\n"
     "Rules:\n"
     "- For each clause, name the topics that the clause regulates or states a term about.\n"
+    "- The contract and the topics may be in English, Ukrainian or Russian. Match a clause to "
+    "a topic by meaning, not by the same words or the same language.\n"
     "- Use only clause ids of the DOCUMENT block and indexes of the TOPICS block.\n"
     "- Leave out a clause that has no topic. Name at most 5 topics per clause.\n"
     "- confidence is 'high' when the clause clearly regulates the topic and 'low' when you "
-    "are not sure.\n" + _TAG_COMMON + '{"additionalProperties":false,"properties":{"tags":'
-    '{"items":{"additionalProperties":false,"properties":{"clause":{"type":"string"},'
-    '"topics":{"items":{"additionalProperties":false,"properties":{"confidence":'
-    '{"enum":["high","low"],"type":"string"},"index":{"type":"string"}},'
-    '"required":["index","confidence"],"type":"object"},"maxItems":5,"type":"array"}},'
-    '"required":["clause","topics"],"type":"object"},"type":"array"}},'
-    '"required":["tags"],"type":"object"}'
+    "are not sure.\n" + _TAG_COMMON + _schema_text(TagOut)
 )
 _CHECK_TAGS = (
     "Task: check proposed tags of one contract. The PAIRS block has one pair per line: "
@@ -108,12 +115,8 @@ _CHECK_TAGS = (
     "the topics ('<index>: <name> - <description>').\n"
     "Rules:\n"
     "- For every pair, answer true when the clause regulates or states a term about the "
-    "topic, otherwise false.\n"
-    "- Answer the listed pairs only, each once.\n" + _TAG_COMMON + '{"additionalProperties":false,'
-    '"properties":{"answers":{"items":{"additionalProperties":false,"properties":'
-    '{"clause":{"type":"string"},"regulates":{"type":"boolean"},"topic":{"type":"string"}},'
-    '"required":["clause","topic","regulates"],"type":"object"},"type":"array"}},'
-    '"required":["answers"],"type":"object"}'
+    "topic, otherwise false. Judge by meaning: the text may be English, Ukrainian or Russian.\n"
+    "- Answer the listed pairs only, each once.\n" + _TAG_COMMON + _schema_text(CheckOut)
 )
 
 

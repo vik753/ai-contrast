@@ -66,6 +66,7 @@ class ModelState:
     check_yes: dict[str, set[str]] = field(default_factory=dict)
     failures: set[str] = field(default_factory=set)
     calls: int = 0
+    completed: int = 0  # calls that returned an answer (the provider reports their usage)
 
 
 async def _complete[ResultT](
@@ -82,6 +83,7 @@ async def _complete[ResultT](
         try:
             async with asyncio.timeout(deadline):
                 raw = await provider.complete_json(make(repair))
+            state.completed += 1
         except AIError as error:
             if error.code is not AIErrorCode.PROVIDER_BAD_RESPONSE:
                 raise

@@ -185,3 +185,15 @@ class FreeQuota:
     def settle_analysis(self, estimate: int, actual: int) -> None:
         """Replace the reserved ``estimate`` of an analysis request by the ``actual`` Neurons."""
         self._settle(estimate, actual, topic=False, analysis=True)
+
+
+_USAGE_FIELDS: Final = 2
+
+
+def reported_neurons(provider: object) -> int | None:
+    """The Neurons a provider reported so far (``usage`` = input and output tokens), or
+    ``None`` when it reports no usage."""
+    usage = getattr(provider, "usage", None)
+    if not (isinstance(usage, tuple) and len(usage) == _USAGE_FIELDS):
+        return None
+    return usage_neurons(*usage)

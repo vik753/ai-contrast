@@ -10,10 +10,8 @@ from typing import Final
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
-from app.ai.port import AIProvider
 from app.api.common import BodyRejectedError, early_error, error_response, read_body
 from app.api.provider_check import BUSY_RETRY_AFTER_SECONDS, limited
-from app.limits.free import usage_neurons
 from app.safety.runner import MISMATCH, SAFETY_TIMEOUT, UNMASKED, SafetyRunError
 from app.settings import Settings
 from app.topics.model import TopicDefinitionError
@@ -25,14 +23,12 @@ __all__ = [
     "busy",
     "ok",
     "read_limited",
-    "reported_neurons",
     "safety_error",
     "topic_error",
 ]
 
 NO_STORE: Final = {"Cache-Control": "no-store"}
 ACCEPTED_MEDIA_TYPE: Final = "application/json"
-_USAGE_FIELDS: Final = 2
 
 
 def busy() -> JSONResponse:
@@ -70,11 +66,3 @@ async def read_limited(
         )
     except BodyRejectedError as rejected:
         return early_error(rejected.code, rejected.status)
-
-
-def reported_neurons(provider: AIProvider) -> int | None:
-    """The Neurons the provider reported so far, ``None`` when it reports no usage."""
-    usage = getattr(provider, "usage", None)
-    if not (isinstance(usage, tuple) and len(usage) == _USAGE_FIELDS):
-        return None
-    return usage_neurons(*usage)

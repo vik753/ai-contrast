@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from typing import Final, Literal
 
 from app.ai.port import AIError, AIErrorCode, AIRequest, TaggingRequest
-from app.ai.prompts import PromptTemplate
 from app.pseudo.gate import ConfirmedTopic, PseudonymizedClause, PseudonymizedDocument
 
 __all__ = ["CHECK_MAX_TOKENS", "CHECK_PROBE", "Message", "build_messages", "data_chars"]
@@ -50,20 +49,15 @@ def _document_text(document: PseudonymizedDocument) -> str:
     return "\n\n".join(lines)
 
 
-_SCHEMA_IN_TEMPLATE: Final = frozenset({PromptTemplate.TAG_CLAUSES, PromptTemplate.CHECK_TAGS})
-
-
 def _instructions(request: AIRequest) -> str:
     """The template text and the JSON schema of the answer (from the class, never a string).
 
-    The tagging templates carry their schema in the template text itself."""
-    if request.template in _SCHEMA_IN_TEMPLATE:
-        text = request.template.value
-    else:
-        schema = json.dumps(
-            request.schema.model_json_schema(), sort_keys=True, separators=(",", ":")
-        )
-        text = f"{request.template.value}\n\nJSON schema of the answer:\n{schema}"
+    A template that already carries the schema of this class (the tagging templates) is sent
+    as it is."""
+    schema = json.dumps(request.schema.model_json_schema(), sort_keys=True, separators=(",", ":"))
+    text = request.template.value
+    if not text.endswith(schema):
+        text = f"{text}\n\nJSON schema of the answer:\n{schema}"
     if request.repair:
         text += (
             f"\n\nYour previous answer was refused (error code: {_REPAIR_TEXTS[request.repair]}). "

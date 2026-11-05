@@ -247,6 +247,10 @@ class Plan:
     key: SecretStr | None
     token: str | None
 
+    def with_model(self, model: str) -> Plan:
+        """The same connection with another model (the check model of tagging)."""
+        return Plan(self.preset, model, self.base_url, self.key, self.token)
+
 
 def _refusal(code: str) -> JSONResponse:
     return error_response(code, 422)

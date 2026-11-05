@@ -39,7 +39,6 @@ from app.api.ai_shared import (
     busy,
     ok,
     read_limited,
-    reported_neurons,
     safety_error,
     topic_error,
 )
@@ -72,6 +71,7 @@ from app.api.provider_key import provider_key_header
 from app.api.topics import catalog_of
 from app.http_limits import EXPAND_PATH, PROPOSE_PATH, SUGGEST_PATH, TOPIC_MAX_BODY_BYTES
 from app.limits.client_ip import client_key, daily_key
+from app.limits.free import reported_neurons
 from app.limits.free_pass import FreePassError
 from app.limits.hits import Hits
 from app.pseudo.gate import (

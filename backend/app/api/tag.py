@@ -18,24 +18,22 @@ Turnstile token and gets an ``analysis_pass`` in the reply; later calls send it 
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
-from dataclasses import dataclass, replace
-from typing import Final, get_args
+from dataclasses import dataclass
+from typing import Final
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import SecretStr, ValidationError
 
-from app.ai.port import AIError, AIProvider
-from app.ai.presets import ConnectionConfigError, PresetId, checked_model
+from app.ai.port import AIProvider
+from app.ai.presets import MODEL_PAIRS, ConnectionConfigError, PresetId, checked_model
 from app.api.ai_shared import (
     ACCEPTED_MEDIA_TYPE,
     busy,
     ok,
     read_limited,
-    reported_neurons,
     safety_error,
     topic_error,
 )
@@ -47,7 +45,6 @@ from app.api.common import (
     sandbox_limits,
 )
 from app.api.provider_check import (
-    AI_NO_COST,
     AI_STATUS,
     ANALYSIS_PASS_HEADER,
     BUSY_RETRY_AFTER_SECONDS,
@@ -69,29 +66,27 @@ from app.http_limits import TAG_PATH
 from app.limits.client_ip import client_key, daily_key
 from app.limits.free_pass import FreePassError
 from app.limits.hits import Hits
-from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument, SafetyError, safety_pass
 from app.pseudo.untrusted import UntrustedMaskedDocument
 from app.safety.child import digest_of
 from app.safety.runner import SafetyRunError
-from app.settings import Settings
-from app.tagging.ai_steps import ModelState, run_model_steps
-from app.tagging.batches import MAX_BATCHES, plan_batches, worst_case
-from app.tagging.child import ChildTopic
-from app.tagging.clauses import clauses_of
-from app.tagging.merge import Failure, TaggingResult, merge_tags
-from app.tagging.runner import KEYWORD_BUDGET_EXCEEDED, TagChildOk, run_tag_child
-from app.tagging.version import tagging_version
-from app.topics.catalog import Catalog
+from app.tagging.run import (
+    JobPlan,
+    JobRefusedError,
+    Outcome,
+    TagJob,
+    plan_job,
+    prepare_job,
+    run_tagging,
+)
+from app.tagging.runner import KEYWORD_BUDGET_EXCEEDED
 from app.topics.model import TopicDefinitionError
 from app.topics.safety import TopicTextError
-from app.topics.selection import TopicSelection, TopicSelectionError, resolve_topics
+from app.topics.selection import TopicSelection, TopicSelectionError
 
 router = APIRouter()
 
 logger = logging.getLogger("ai_contrast.tagging")
 
-INVALID_DEFINITION: Final = "invalid_topic_definition"
-_FAILURES: Final = frozenset(get_args(Failure))
 _STATUS: Final = {"catalog_version_mismatch": 409}
 
 
@@ -105,32 +100,32 @@ class TagBody(CheckBody):
 
 @dataclass(frozen=True)
 class Prepared:
-    """Everything the AI stage needs. ``calls`` and ``neurons`` are the worst case."""
+    """Everything the AI stage needs."""
 
     plan: Plan
     check_plan: Plan
     pass_value: str | None
     hits: Hits
-    document: PseudonymizedDocument
-    topics: tuple[ConfirmedTopic, ...]
-    child: TagChildOk
-    batches: tuple[tuple[str, ...], ...]
-    calls: int
-    neurons: int
-    chars: int
-
-
-@dataclass(frozen=True)
-class Outcome:
-    """The reply or an error; the AI calls made; the Neurons spent (``None``: no model work)."""
-
-    result: dict[str, object] | JSONResponse
-    calls: int = 0
-    spent: int = 0
-    no_cost: bool = False
+    job: TagJob
 
 
 # --- request checks (nothing is counted) ----------------------------------------------------------
+
+
+def _check_plan(plan: Plan, body: TagBody) -> Plan | Response:
+    """The plan of the check calls: ``check_model``, else the strong model of the preset
+    (``custom``: the model itself; ``free``: one model, no ``check_model``)."""
+    if plan.preset is PresetId.FREE:
+        if body.check_model is not None:
+            return error_response("unexpected_model", 422)
+        return plan
+    if body.check_model is None:
+        pair = MODEL_PAIRS.get(plan.preset)
+        return plan if pair is None else plan.with_model(pair.strong)
+    try:
+        return plan.with_model(checked_model(body.check_model))
+    except ConnectionConfigError as error:
+        return error_response(error.code, 422)
 
 
 def _select(  # noqa: PLR0911
@@ -140,17 +135,11 @@ def _select(  # noqa: PLR0911
     plan = plan_connection(body, provider_key_header(request), state.settings)
     if isinstance(plan, Response):
         return plan
-    check_plan = plan
-    if plan.preset is PresetId.FREE:
-        if body.check_model is not None:
-            return error_response("unexpected_model", 422)
-        if not state.free_available:
-            return error_response("free_mode_unavailable", 503)
-    elif body.check_model is not None:
-        try:
-            check_plan = replace(plan, model=checked_model(body.check_model))
-        except ConnectionConfigError as error:
-            return error_response(error.code, 422)
+    check_plan = _check_plan(plan, body)
+    if isinstance(check_plan, Response):
+        return check_plan
+    if plan.preset is PresetId.FREE and not state.free_available:
+        return error_response("free_mode_unavailable", 503)
     values = request.headers.getlist(ANALYSIS_PASS_HEADER)
     if not values:
         return plan, check_plan, None
@@ -163,36 +152,17 @@ def _select(  # noqa: PLR0911
     return plan, check_plan, values[0]
 
 
-def _resolve(request: Request, body: TagBody) -> tuple[ConfirmedTopic, ...] | Response:
-    catalog: Catalog = catalog_of(request)
-    if not catalog.has_side(body.domain, body.side):
-        return error_response(INVALID_DEFINITION, 422)
+def _plan(request: Request, state: CheckState, body: TagBody) -> JobPlan | Response:
     try:
-        topics = resolve_topics(body.topics, catalog)
+        return plan_job(
+            body.document, body.topics, catalog_of(request), state.settings, body.domain, body.side
+        )
+    except JobRefusedError as refusal:
+        return error_response(refusal.code, refusal.status)
     except TopicSelectionError as error:
         return error_response(error.code, _STATUS.get(error.code, 422))
     except (TopicDefinitionError, TopicTextError) as error:
         return topic_error(error)
-    if not topics:
-        return error_response("no_topics", 422)
-    if len({topic.topic_id for topic in topics}) != len(topics):
-        return error_response("duplicate_topic", 422)
-    return topics
-
-
-def _limits(
-    settings: Settings, body: TagBody, topics: tuple[ConfirmedTopic, ...]
-) -> tuple[tuple[tuple[str, ...], ...], int, int, int] | Response:
-    """Batches, the worst case ``(calls, Neurons)`` and the characters of clause text."""
-    lengths = [len(clause.text) for clause in body.document.clauses]
-    chars = sum(lengths)
-    ranges = plan_batches(lengths)
-    if chars > settings.tag_max_document_chars or len(ranges) > MAX_BATCHES:
-        return error_response("document_too_large_for_tagging", 422)
-    ids = [clause.id for clause in body.document.clauses]
-    batches = tuple(tuple(ids[start:end]) for start, end in ranges)
-    calls, neurons = worst_case(ranges, lengths, topics)
-    return batches, calls, neurons, chars
 
 
 def _free_precheck(  # noqa: PLR0913, PLR0917, PLR0911
@@ -229,44 +199,6 @@ def _free_precheck(  # noqa: PLR0913, PLR0917, PLR0911
     return None
 
 
-# --- sandbox -------------------------------------------------------------------------------------
-
-
-async def _document_pass(
-    settings: Settings, body: TagBody, topics: tuple[ConfirmedTopic, ...]
-) -> tuple[PseudonymizedDocument, TagChildOk] | Response:
-    """Run the sandbox child, then make the gate object (it can only be made in this process,
-    so the same pass runs here, in a thread, on the same already accepted input)."""
-    child_topics = [
-        ChildTopic(
-            topic_id=topic.topic_id,
-            synonyms_en=list(topic.synonyms_en),
-            synonyms_uk=list(topic.synonyms_uk),
-            synonyms_ru=list(topic.synonyms_ru),
-        )
-        for topic in topics
-    ]
-    try:
-        child = await run_tag_child(
-            body.document,
-            child_topics,
-            keyword_budget=settings.keyword_step_budget,
-            limits=sandbox_limits(settings),
-            max_clauses=settings.segment_max_clauses,
-        )
-    except SafetyRunError as error:
-        if error.code == KEYWORD_BUDGET_EXCEEDED:
-            return error_response(KEYWORD_BUDGET_EXCEEDED, 422)
-        return safety_error(error)
-    try:
-        document = await asyncio.to_thread(
-            safety_pass, body.document, max_clauses=settings.segment_max_clauses
-        )
-    except SafetyError:
-        return error_response("safety_failed", 422)
-    return document, child
-
-
 # --- the extraction stage ------------------------------------------------------------------------
 
 
@@ -286,29 +218,29 @@ async def _extraction(  # noqa: PLR0911
     if isinstance(selected, Response):
         return selected
     plan, check_plan, pass_value = selected
-    topics = _resolve(request, body)
-    if isinstance(topics, Response):
-        return topics
-    limits = _limits(settings, body, topics)
-    if isinstance(limits, Response):
-        return limits
-    batches, calls, neurons, chars = limits
+    job_plan = _plan(request, state, body)
+    if isinstance(job_plan, Response):
+        return job_plan
     key = client_key(request.scope, settings)
     hits = Hits(state.tag_minute, state.tag_day, key, daily_key(key))
     refused = count_hits(hits)
     if refused is not None:
         return refused
     digest = digest_of(body.document.label, ((c.id, c.text) for c in body.document.clauses))
-    precheck = _free_precheck(state, plan, pass_value, hits, calls, neurons, digest, chars)
+    precheck = _free_precheck(
+        state, plan, pass_value, hits, job_plan.calls, job_plan.neurons, digest, job_plan.chars
+    )
     if precheck is not None:
         return precheck
-    passed = await _document_pass(settings, body, topics)
-    if isinstance(passed, Response):
-        return passed
-    document, child = passed
-    return Prepared(
-        plan, check_plan, pass_value, hits, document, topics, child, batches, calls, neurons, chars
-    )
+    try:
+        job = await prepare_job(job_plan, body.document, settings, sandbox_limits(settings))
+    except SafetyRunError as error:
+        if error.code == KEYWORD_BUDGET_EXCEEDED:
+            return error_response(KEYWORD_BUDGET_EXCEEDED, 422)
+        return safety_error(error)
+    except JobRefusedError as refusal:
+        return error_response(refusal.code, refusal.status)
+    return Prepared(plan, check_plan, pass_value, hits, job)
 
 
 @router.post(TAG_PATH)
@@ -348,127 +280,36 @@ async def tag(request: Request) -> Response:
         return busy()
 
 
-# --- the model steps and the reply ------------------------------------------------------------
-
-
-def _merge_failures(failures: set[str]) -> list[Failure]:
-    """The failures that ``merge_tags`` knows; a failed check is handled by the caller."""
-    return [f for f in sorted(failures) if f in _FAILURES and f != "check_failed"]  # type: ignore[misc]
-
-
-def _reply(
-    state: CheckState, prepared: Prepared, result: TaggingResult, model: ModelState
-) -> dict[str, object]:
-    reasons = set(result.incomplete_reasons)
-    if "check_failed" in model.failures:
-        reasons.add("check_failed")
-    version = tagging_version()
-    digest = prepared.child.digest
-    signature = state.signer.sign(
-        digest=digest,
-        tagging_version=version,
-        tags={clause_id: dict(by_topic) for clause_id, by_topic in result.tags.items()},
-    )
-    return {
-        "digest": digest,
-        "tagging_version": version,
-        "signature": signature,
-        "tags": {
-            clause_id: [{"topic_id": topic, "source": source} for topic, source in by_topic.items()]
-            for clause_id, by_topic in result.tags.items()
-        },
-        "other": result.other,
-        "risk": {
-            clause_id: [list(span) for span in spans] for clause_id, spans in result.risk.items()
-        },
-        "topics": {
-            topic_id: {
-                "keyword_clauses": status.keyword_clauses,
-                "model_clauses": status.model_clauses,
-                "model_asserted": status.model_asserted,
-                "model_tags_dropped": status.model_tags_dropped,
-                "not_analyzed": status.not_analyzed,
-            }
-            for topic_id, status in result.topics.items()
-        },
-        "missing_topics": [] if reasons else list(result.missing_topics),
-        "layer2": {
-            clause_id: {
-                "text": [list(hit) for hit in hits.text],
-                "heading": [list(hit) for hit in hits.heading],
-            }
-            for clause_id, hits in prepared.child.layer2.items()
-        },
-        "model_tagging_incomplete": bool(reasons),
-        "incomplete_reasons": sorted(reasons),
-    }
-
-
-def _spent(providers: list[AIProvider], worst: int) -> int:
-    """Neurons spent: the reported usage; the worst case when a provider reports none."""
-    total = 0
-    for provider in providers:
-        reported = reported_neurons(provider)
-        if reported is None:
-            return worst
-        total += reported
-    return total
-
-
-def _hard(error: AIError, model: ModelState, spent: int) -> Outcome:
-    no_cost = error.code in AI_NO_COST
-    return Outcome(
-        error_response(error.code.value, AI_STATUS[error.code]),
-        calls=model.calls,
-        spent=spent,
-        no_cost=no_cost,
-    )
+# --- the model steps ---------------------------------------------------------------------------
 
 
 async def _tagging(
     state: CheckState, prepared: Prepared, key: SecretStr, free_account: str | None
-) -> Outcome:
-    """The model steps under the overall deadline, the merge and the reply."""
-    settings = state.settings
+) -> Outcome | Response:
+    """Build the providers (one per distinct model) and run the job."""
     try:
         tag_provider = make_provider(state, prepared.plan, key, free_account=free_account)
-        same = prepared.check_plan.model == prepared.plan.model
-        check_provider = (
-            tag_provider
-            if same
-            else make_provider(state, prepared.check_plan, key, free_account=free_account)
-        )
-    except ConnectionConfigError as error:
-        return Outcome(error_response(error.code, 422), no_cost=True)
-    providers = [tag_provider] if same else [tag_provider, check_provider]
-    model = ModelState()
-    try:
-        async with asyncio.timeout(settings.tag_deadline_seconds):
-            await run_model_steps(
-                prepared.document,
-                prepared.topics,
-                prepared.batches,
-                tag_provider,
-                check_provider,
-                model,
-                settings.tag_call_deadline_seconds,
+        check_provider: AIProvider = tag_provider
+        if prepared.check_plan.model != prepared.plan.model:
+            check_provider = make_provider(
+                state, prepared.check_plan, key, free_account=free_account
             )
-    except TimeoutError:
-        model.failures.add("timeout")
-    except AIError as error:
-        return _hard(error, model, _spent(providers, 0) if model.calls else 0)
-    spent = _spent(providers, prepared.neurons)
-    result = await asyncio.to_thread(
-        merge_tags,
-        clauses=clauses_of(prepared.document),
-        topics=prepared.topics,
-        keyword=prepared.child.keyword_sets(),
-        model_high=model.high,
-        model_low=model.low,
-        check_yes=model.check_yes,
-        failures=_merge_failures(model.failures),
+    except ConnectionConfigError as error:
+        return error_response(error.code, 422)
+    return await run_tagging(
+        prepared.job, tag_provider, check_provider, state.settings, state.signer
     )
-    return Outcome(_reply(state, prepared, result, model), calls=model.calls, spent=spent)
+
+
+def _finish(outcome: Outcome, issued: str | None) -> Response:
+    if outcome.reply is None:
+        code = outcome.hard
+        if code is None:  # a hard error always carries its code
+            return error_response("provider_bad_response", 502)
+        return error_response(code.value, AI_STATUS[code])
+    if issued is not None:
+        return ok({**outcome.reply, "analysis_pass": issued})
+    return ok(outcome.reply)
 
 
 async def _run(state: CheckState, prepared: Prepared) -> Response:
@@ -477,55 +318,32 @@ async def _run(state: CheckState, prepared: Prepared) -> Response:
     if plan.preset is not PresetId.FREE:
         if plan.key is None:  # cheap validation guarantees a key for every non-free preset
             return error_response("invalid_provider_key", 422)
-        outcome = await _tagging(state, prepared, plan.key, None)
-        response = _finish(outcome, None)
+        done = await _tagging(state, prepared, plan.key, None)
+        response = done if isinstance(done, Response) else _finish(done, None)
     else:
         response = await _run_free(state, prepared)
     logger.info(
         "tag status=%d batches=%d clauses=%d duration_ms=%d",
         response.status_code,
-        len(prepared.batches),
-        len(prepared.document.clauses),
+        len(prepared.job.plan.batches),
+        len(prepared.job.document.clauses),
         (time.monotonic() - started) * 1000,
     )
     return response
 
 
-def _finish(outcome: Outcome, issued: str | None) -> Response:
-    if isinstance(outcome.result, Response):
-        return outcome.result
-    if issued is not None:
-        return ok({**outcome.result, "analysis_pass": issued})
-    return ok(outcome.result)
+# --- free mode: admission, reservation and settlement ---------------------------------------------
 
 
-async def _run_free(  # noqa: PLR0911
-    state: CheckState, prepared: Prepared
-) -> Response:
-    settings = state.settings
-    token, account = settings.cf_ai_token, settings.cf_account_id
-    if token is None or account is None:  # checked before; keeps the types honest
-        return error_response("free_mode_unavailable", 503)
+def _reserve(state: CheckState, prepared: Prepared) -> tuple[str, str | None] | Response:
+    """Reserve the worst case from the quota and the pass (or issue a new pass).
+
+    Returns the pass nonce and the pass text when this call issued it. On a refusal nothing
+    stays reserved and the request counts nothing."""
+    plan = prepared.job.plan
     hits, pass_value = prepared.hits, prepared.pass_value
-    if pass_value is None and not await verify_turnstile(state, prepared.plan.token):
-        # Counted, not refunded: the rate limits bound a flood of bad tokens.
-        return error_response("turnstile_failed", 403)
-    # The worst case is reserved before the first call (the pass table is checked again, the
-    # state may have changed while the sandbox ran).
-    refused = _free_precheck(
-        state,
-        prepared.plan,
-        pass_value,
-        hits,
-        prepared.calls,
-        prepared.neurons,
-        prepared.child.digest,
-        prepared.chars,
-    )
-    if refused is not None:
-        return refused
     start = pass_value is None
-    decision = state.quota.reserve_analysis(hits.day_key, prepared.neurons, start=start)
+    decision = state.quota.reserve_analysis(hits.day_key, plan.neurons, start=start)
     if not decision.allowed:
         if decision.reason != "ip":
             # The shared state refused, not this client: the request counts nothing.
@@ -533,35 +351,16 @@ async def _run_free(  # noqa: PLR0911
         return limited("free_quota_exhausted", 429, decision.retry_after)
     claim = _claim(state, prepared)
     if isinstance(claim, Response):
-        state.quota.settle_analysis(prepared.neurons, 0)
+        state.quota.settle_analysis(plan.neurons, 0)
         if start:
             state.quota.refund_call(hits.day_key)
         hits.refund()
-        return claim
-    nonce, issued = claim
-    spent = prepared.neurons
-    calls = prepared.calls
-    try:
-        outcome = await _tagging(state, prepared, token, account.get_secret_value())
-        calls, spent = outcome.calls, outcome.spent
-        if outcome.no_cost:
-            spent = 0 if not outcome.calls else outcome.spent
-            if start and not outcome.calls:
-                state.quota.refund_call(hits.day_key)  # the model did no work
-    finally:
-        state.quota.settle_analysis(prepared.neurons, spent)
-        state.analysis.settle(nonce, (prepared.calls, calls), (prepared.neurons, spent))
-    if isinstance(outcome.result, Response) and issued is not None:
-        state.analysis.discard(nonce)  # a new pass is never given out with an error
-        return outcome.result
-    return _finish(outcome, issued)
+    return claim
 
 
 def _claim(state: CheckState, prepared: Prepared) -> tuple[str, str | None] | Response:
-    """Take the worst case from the pass, or issue a new pass (it replaces the client's old one).
-
-    Returns the nonce and the pass text when this call issued it."""
-    hits, pass_value = prepared.hits, prepared.pass_value
+    """Take the worst case from the pass, or issue a new pass (it replaces the client's old one)."""
+    hits, pass_value, plan = prepared.hits, prepared.pass_value, prepared.job.plan
     issued: str | None = None
     if pass_value is not None:
         try:
@@ -573,7 +372,58 @@ def _claim(state: CheckState, prepared: Prepared) -> tuple[str, str | None] | Re
         if made is None:
             return error_response("analysis_pass_unavailable", 503)
         issued, nonce = made
-    state.analysis.reserve(
-        nonce, prepared.calls, prepared.neurons, prepared.child.digest, prepared.chars
-    )
+    state.analysis.reserve(nonce, plan.calls, plan.neurons, prepared.job.child.digest, plan.chars)
     return nonce, issued
+
+
+def _settle(  # noqa: PLR0913
+    state: CheckState, prepared: Prepared, nonce: str, calls: int, spent: int, *, refund: bool
+) -> None:
+    plan = prepared.job.plan
+    state.quota.settle_analysis(plan.neurons, spent)
+    state.analysis.settle(nonce, (plan.calls, calls), (plan.neurons, spent))
+    if refund:
+        state.quota.refund_call(prepared.hits.day_key)  # the model did no work
+
+
+async def _run_free(state: CheckState, prepared: Prepared) -> Response:
+    settings = state.settings
+    token, account = settings.cf_ai_token, settings.cf_account_id
+    if token is None or account is None:  # checked before; keeps the types honest
+        return error_response("free_mode_unavailable", 503)
+    plan, hits, pass_value = prepared.job.plan, prepared.hits, prepared.pass_value
+    if pass_value is None and not await verify_turnstile(state, prepared.plan.token):
+        # Counted, not refunded: the rate limits bound a flood of bad tokens.
+        return error_response("turnstile_failed", 403)
+    # The pass table is checked again: the state may have changed while the sandbox ran.
+    refused = _free_precheck(
+        state,
+        prepared.plan,
+        pass_value,
+        hits,
+        plan.calls,
+        plan.neurons,
+        prepared.job.child.digest,
+        plan.chars,
+    )
+    if refused is not None:
+        return refused
+    claim = _reserve(state, prepared)
+    if isinstance(claim, Response):
+        return claim
+    nonce, issued = claim
+    calls, spent = plan.calls, plan.neurons
+    done: Outcome | Response | None = None
+    try:
+        done = await _tagging(state, prepared, token, account.get_secret_value())
+        if isinstance(done, Response):  # the model did no work
+            calls, spent = 0, 0
+        else:
+            calls, spent = done.calls, done.spent
+    finally:
+        # A cancelled or failed run keeps the reserved worst case.
+        _settle(state, prepared, nonce, calls, spent, refund=pass_value is None and calls == 0)
+    failed = isinstance(done, Response) or done.reply is None
+    if failed and issued is not None:
+        state.analysis.discard(nonce)  # a new pass is never given out with an error
+    return done if isinstance(done, Response) else _finish(done, issued)
