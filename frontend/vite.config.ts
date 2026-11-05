@@ -6,6 +6,8 @@ const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://localhost:80
 export default defineConfig({
   plugins: [react()],
   server: {
+    // `shared/topics` (repo root) is bundled as the offline catalog (ADR 0017 point 1).
+    fs: { allow: [".", "../shared/topics"] },
     proxy: {
       "/api": {
         target: apiProxyTarget,
