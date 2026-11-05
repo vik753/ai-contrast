@@ -53,5 +53,5 @@ def test_policy_tagging_never_compiles_a_pattern_at_call_time(
 
     monkeypatch.setattr(re, "_compile", recording)
     before = len(seen)
-    keyword_tags([clause(1, "a (b* c+")], [topic(1, en=["tax.id", "road side"])])
+    keyword_tags([clause(1, "a (b* c+")], [topic(1, en=["taxes.ides", "road side"])])
     assert len(seen) == before

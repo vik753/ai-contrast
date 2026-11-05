@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.injection import Hit, scan
-from app.tagging.model import TagClause
+from app.tagging.model import TagClause, ensure_unique_ids
 
 __all__ = ["ClauseHits", "clause_hits"]
 
@@ -20,7 +20,8 @@ class ClauseHits:
 
 
 def clause_hits(clauses: Sequence[TagClause]) -> dict[str, ClauseHits]:
-    """Only clauses with at least one hit."""
+    """Only clauses with at least one hit. Duplicate ids are refused."""
+    ensure_unique_ids(clauses)
     result: dict[str, ClauseHits] = {}
     for clause in clauses:
         text = scan(clause.text)

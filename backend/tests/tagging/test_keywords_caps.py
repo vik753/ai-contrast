@@ -109,7 +109,8 @@ def _run_or_fail_closed(cl: list[TagClause], topics: list) -> None:  # type: ign
     try:
         keyword_tags(cl, topics)
     except TagMergeError as error:
-        assert error.code == "keyword_budget_exceeded"
+        if error.code != "keyword_budget_exceeded":
+            raise
 
 
 def test_keyword_tags_shared_prefix_phrases_finish_within_two_seconds_or_fail_closed() -> None:

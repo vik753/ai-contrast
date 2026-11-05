@@ -12,8 +12,8 @@
       "descriptions": {"en": "Monthly rent and how it may change during the term.", "uk": "Щомісячна орендна плата та як вона може змінюватися протягом строку.", "ru": "Ежемесячная арендная плата и как она может меняться в течение срока."},
       "synonyms": {
         "en": ["rent", "monthly rent", "rental fee", "indexation", "rent increase", "payment date"],
-        "uk": ["орендн плат", "оренд плат", "плата за найм", "індексац", "підвищен плат", "строк оплат"],
-        "ru": ["арендн плат", "аренд плат", "плата за найм", "индексац", "повышен плат", "срок оплат"]
+        "uk": ["орендн плат", "оренд плат", "плата", "індексац", "підвищен плат", "строк оплат"],
+        "ru": ["арендн плат", "аренд плат", "плата", "индексац", "повышен плат", "срок оплат"]
       },
       "attributes": [
         {"id": "monthly_rent", "labels": {"en": "Monthly rent", "uk": "Щомісячна плата", "ru": "Ежемесячная плата"}, "type": "amount", "units": ["UAH", "USD", "EUR"], "directions": {"tenant": "lower_better", "landlord": "higher_better"}},
@@ -25,7 +25,7 @@
       "names": {"en": "Security deposit", "uk": "Забезпечувальний депозит", "ru": "Обеспечительный депозит"},
       "descriptions": {"en": "Size of the deposit, grounds to keep it and the return term.", "uk": "Розмір депозиту, підстави утримання та строк повернення.", "ru": "Размер депозита, основания удержания и срок возврата."},
       "synonyms": {
-        "en": ["deposit", "security deposit", "guarantee payment", "return of deposit", "withhold"],
+        "en": ["deposit", "security deposit", "guarantee payment", "deposit", "withhold"],
         "uk": ["депозит", "завдат", "гарантійн плат", "забезпечувальн", "повернен депозит", "утрим"],
         "ru": ["депозит", "залог", "гарантийн плат", "обеспечительн", "возврат депозит", "удержан"]
       },
@@ -39,7 +39,7 @@
       "names": {"en": "Term and renewal", "uk": "Строк та продовження", "ru": "Срок и продление"},
       "descriptions": {"en": "Length of the lease and the right to extend it.", "uk": "Тривалість оренди та право її продовжити.", "ru": "Длительность аренды и право её продлить."},
       "synonyms": {
-        "en": ["term of lease", "lease term", "renewal", "extension", "pre-emptive right", "expiry"],
+        "en": ["lease term", "lease term", "renewal", "extension", "pre-emptive right", "expiry"],
         "uk": ["строк оренд", "строк дії договор", "продовжен", "пролонгац", "переважне право", "закінченн строк"],
         "ru": ["срок аренд", "срок действия договор", "продлен", "пролонгац", "преимущественн право", "окончани срок"]
       },
@@ -113,9 +113,9 @@
       "names": {"en": "Late payment and penalties", "uk": "Прострочення та штрафи", "ru": "Просрочка и штрафы"},
       "descriptions": {"en": "Penalty rate, grace period and other contractual penalties.", "uk": "Розмір пені, пільговий строк та інші договірні штрафи.", "ru": "Размер пени, льготный срок и другие договорные штрафы."},
       "synonyms": {
-        "en": ["penalty", "late fee", "interest on arrears", "grace period", "fine", "liquidated damages"],
-        "uk": ["пен", "штраф", "неустойк", "прострочен", "пільговий період", "відсотки за"],
-        "ru": ["пен", "штраф", "неустойк", "просрочк", "льготный период", "проценты за"]
+        "en": ["penalty", "late fee", "arrears", "grace period", "fine", "liquidated damages"],
+        "uk": ["пен", "штраф", "неустойк", "прострочен", "пільговий період", "відсотки"],
+        "ru": ["пен", "штраф", "неустойк", "просрочк", "льготный период", "проценты"]
       },
       "attributes": [
         {"id": "late_penalty_rate", "labels": {"en": "Penalty per day of delay", "uk": "Пеня за день прострочення", "ru": "Пеня за день просрочки"}, "type": "percentage", "directions": {"tenant": "lower_better", "landlord": "higher_better"}},
@@ -127,9 +127,9 @@
       "names": {"en": "Sublease and use", "uk": "Суборенда та використання", "ru": "Субаренда и использование"},
       "descriptions": {"en": "Whether subletting and pets are allowed and for what purpose the premises may be used.", "uk": "Чи дозволені суборенда та тварини і для чого можна використовувати приміщення.", "ru": "Разрешены ли субаренда и животные и для чего можно использовать помещение."},
       "synonyms": {
-        "en": ["sublease", "sublet", "assignment", "permitted use", "pets", "purpose of use"],
-        "uk": ["суборенд", "передач у користуван", "цільове призначен", "тварин", "використання приміщ"],
-        "ru": ["субаренд", "передач в пользовани", "целевое назначен", "животн", "использован помещ"]
+        "en": ["sublease", "sublet", "assignment", "permitted use", "pets", "purpose"],
+        "uk": ["суборенд", "користуван", "цільове призначен", "тварин", "використання приміщ"],
+        "ru": ["субаренд", "пользовани", "целевое назначен", "животн", "использован помещ"]
       },
       "attributes": [
         {"id": "sublease_allowed", "labels": {"en": "Sublease", "uk": "Суборенда", "ru": "Субаренда"}, "type": "enum",
@@ -156,8 +156,8 @@
       "descriptions": {"en": "When and with what notice the landlord may enter the premises.", "uk": "Коли та з яким попередженням орендодавець може входити в приміщення.", "ru": "Когда и с каким уведомлением арендодатель может входить в помещение."},
       "synonyms": {
         "en": ["access", "inspection", "enter the premises", "viewing", "prior notice"],
-        "uk": ["доступ", "огляд", "огляду", "вхід до приміщ", "попереднє повідомлен", "перевірк стану"],
-        "ru": ["доступ", "осмотр", "вход в помещ", "предварительн уведомлен", "проверк состоян"]
+        "uk": ["доступ", "огляд", "огляду", "приміщ", "попереднє повідомлен", "перевірк стану"],
+        "ru": ["доступ", "осмотр", "помещ", "предварительн уведомлен", "проверк состоян"]
       },
       "attributes": [
         {"id": "access_notice", "labels": {"en": "Notice before entry", "uk": "Попередження перед входом", "ru": "Уведомление перед входом"}, "type": "duration", "units": ["hours", "days", "working_days"], "directions": {"tenant": "higher_better", "landlord": "lower_better"}}
@@ -168,7 +168,7 @@
       "names": {"en": "Liability for damage and handover", "uk": "Відповідальність за шкоду та передача", "ru": "Ответственность за ущерб и передача"},
       "descriptions": {"en": "Condition at handover and who bears damage and losses.", "uk": "Стан приміщення при передачі та хто несе шкоду і збитки.", "ru": "Состояние помещения при передаче и кто несёт ущерб и убытки."},
       "synonyms": {
-        "en": ["damage", "handover", "acceptance certificate", "inventory", "liability", "return of premises"],
+        "en": ["damage", "handover", "acceptance certificate", "inventory", "liability", "return premises"],
         "uk": ["шкод", "акт приймання", "опис майна", "відповідальн", "повернен приміщ", "пошкодженн"],
         "ru": ["ущерб", "акт приём", "опись имущества", "ответственн", "возврат помещ", "поврежден"]
       },

@@ -13,22 +13,38 @@ linearly with the text.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import Final
 
 from app.pseudo.matching import fold
+from app.tagging.model import TagMergeError
 
-__all__ = ["PhraseIndex", "folded_view"]
+__all__ = ["Budget", "PhraseIndex", "match_view", "view_with_source"]
 
 _WORD: Final = re.compile(r"[^\W_]+")
 _SPACE: Final = re.compile(r"\s+")
+_IN_WORD_APOSTROPHE: Final = re.compile(r"(?<=\w)'(?=\w)")
+_APOSTROPHES: Final = {0x2019: ord("'"), 0x02BC: ord("'")}
+_JOINER: Final = "\u02bc"  # a letter, so an apostrophe between letters stays inside the word
 _Key = tuple[str | None, int]
 
+# Steps (word-start probes and live-state lookups) one call may spend (fail closed).
+DEFAULT_BUDGET: Final = 1_000_000
 
-def folded_view(text: str) -> tuple[str, list[int] | None]:
-    """The folded view (NFKC, skeleton, lower case) and, when its length differs from
-    ``text``, the source index of every view character."""
-    view = fold(text)
+
+def match_view(text: str) -> str:
+    """NFKC, skeleton and lower case; the apostrophes U+0027, U+2019 and U+02BC between
+    letters become one in-word character. Same length as ``fold(text)``."""
+    view = fold(text).translate(_APOSTROPHES)
+    if "'" in view:
+        view = _IN_WORD_APOSTROPHE.sub(_JOINER, view)
+    return view
+
+
+def view_with_source(text: str) -> tuple[str, list[int] | None]:
+    """``match_view`` and, when its length differs from ``text``, the source index of every
+    view character."""
+    view = match_view(text)
     if len(view) == len(text):
         return view, None
     pieces: list[str] = []
@@ -36,13 +52,22 @@ def folded_view(text: str) -> tuple[str, list[int] | None]:
     for char in text:
         piece = cache.get(char)
         if piece is None:
-            piece = cache[char] = fold(char)
+            piece = cache[char] = match_view(char)
         pieces.append(piece)
     view = "".join(pieces)
     source: list[int] = []
     for index, piece in enumerate(pieces):
         source.extend([index] * len(piece))
     return view, source
+
+
+class Budget:
+    """A step counter shared by the calls of one request."""
+
+    __slots__ = ("left",)
+
+    def __init__(self, steps: int = DEFAULT_BUDGET) -> None:
+        self.left = steps
 
 
 class _Stem:
@@ -54,7 +79,7 @@ class _Stem:
 
 
 def _parse(entry: str, *, exact_marker: bool) -> tuple[list[tuple[str, bool]], list[str]]:
-    view = fold(entry)
+    view = match_view(entry)
     words: list[tuple[str, bool]] = []
     seps: list[str] = []
     previous_end = -1
@@ -77,11 +102,13 @@ class PhraseIndex:
         self._ids: dict[tuple[str, bool], int] = {}
         self._children: list[dict[_Key, int]] = [{}]
         self._keys: list[list[str]] = [[]]
+        self._subtree: list[set[str]] = [set()]
         for key, text in entries:
             words, seps = _parse(text, exact_marker=exact_marker)
             if not words:
                 continue
             node = 0
+            path = [0]
             for index, (word, exact) in enumerate(words):
                 sid = self._stem_id(word, exact)
                 edge: _Key = (seps[index - 1] if index else None, sid)
@@ -90,10 +117,14 @@ class PhraseIndex:
                     child = len(self._children)
                     self._children.append({})
                     self._keys.append([])
+                    self._subtree.append(set())
                     self._children[node][edge] = child
                 node = child
+                path.append(child)
             if key not in self._keys[node]:
                 self._keys[node].append(key)
+            for on_path in path:
+                self._subtree[on_path].add(key)
 
     def _stem_id(self, word: str, exact: bool) -> int:
         known = self._ids.get((word, exact))
@@ -125,14 +156,22 @@ class PhraseIndex:
             found.append(exact)
         return found
 
-    def find(self, view: str) -> list[tuple[str, int, int]]:
-        out: list[tuple[str, int, int]] = []
+    def _walk(  # noqa: PLR0912
+        self, view: str, found: set[str] | None, budget: Budget | None
+    ) -> Iterator[tuple[int, int, int]]:
+        """Yield ``(node, start, end)`` for every complete entry. With ``found`` (keys already
+        found, updated by the caller) live states that cannot add a new key are dropped."""
         active: dict[int, int] = {}  # node -> start of the match
         previous_end = 0
         children = self._children
+        subtree = self._subtree
         for match in _WORD.finditer(view):
             start, end = match.span()
             ids = self._stems_of(match.group())
+            if budget is not None:
+                budget.left -= 1 + len(ids) * (1 + len(active))
+                if budget.left < 0:
+                    raise TagMergeError("keyword_budget_exceeded")
             reached: dict[int, int] = {}
             if ids:
                 if active:
@@ -149,8 +188,26 @@ class PhraseIndex:
                         reached.setdefault(child, start)
             active = {}
             for node, begun in reached.items():
-                out.extend((key, begun, end) for key in self._keys[node])
+                if found is not None and subtree[node] <= found:
+                    continue
+                if self._keys[node]:
+                    yield node, begun, end
                 if children[node]:
                     active[node] = begun
             previous_end = end
-        return out
+
+    def find_keys(self, view: str, budget: Budget | None = None) -> set[str]:
+        """The keys with at least one match. No per-hit output; raises
+        ``TagMergeError("keyword_budget_exceeded")`` when the budget is spent."""
+        found: set[str] = set()
+        for node, _, _ in self._walk(view, found, budget):
+            found.update(self._keys[node])
+        return found
+
+    def find(self, view: str) -> list[tuple[str, int, int]]:
+        """Every match as ``(key, start, end)`` into the view (small entry sets only)."""
+        return [
+            (key, begun, end)
+            for node, begun, end in self._walk(view, None, None)
+            for key in self._keys[node]
+        ]

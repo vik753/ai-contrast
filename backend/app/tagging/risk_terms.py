@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 from typing import Final
 
-from app.tagging.phrases import PhraseIndex, folded_view
+from app.tagging.phrases import PhraseIndex, view_with_source
 
 __all__ = ["RISK_TERMS", "RISK_TERMS_VERSION", "scan_risk"]
 
@@ -32,6 +32,8 @@ RISK_TERMS: Final[tuple[str, ...]] = (
     "terminat",
     "indemn",
     "liquidated damages",
+    "sole$ discretion",
+    "at$ its$ discretion",
     # Ukrainian
     "штраф",
     "пеня$",
@@ -43,6 +45,8 @@ RISK_TERMS: Final[tuple[str, ...]] = (
     "неустойк",
     "не$ відшкодов",
     "не$ покрива",
+    "не$ підляга відшкодуван",
+    "без$ відшкодуван",
     "виключен",
     "в$ односторонн",
     "відмов",
@@ -55,6 +59,8 @@ RISK_TERMS: Final[tuple[str, ...]] = (
     "не$ возмеща",
     "не$ возмести",
     "не$ покрыва",
+    "не$ подлежит возмещен",
+    "без$ возмещен",
     "исключен",
     "в$ одностороннем",
     "отказ",
@@ -72,7 +78,7 @@ def scan_risk(text: str) -> list[tuple[int, int]]:
     """``[start, end)`` offsets into ``text`` of every hit, sorted; each starts at a word."""
     if not text:
         return []
-    view, source = folded_view(text)
+    view, source = view_with_source(text)
     spans: set[tuple[int, int]] = set()
     for _, start, end in _INDEX.find(view):
         if source is None:

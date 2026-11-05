@@ -11,10 +11,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Literal, get_args
 
 from app.pseudo.gate import ConfirmedTopic
-from app.tagging.model import TagClause, TagMergeError
+from app.tagging.model import TagClause, TagMergeError, ensure_unique_ids
 from app.tagging.risk_terms import scan_risk
 
 __all__ = ["TaggingResult", "TopicStatus", "merge_tags"]
@@ -28,11 +28,20 @@ MAX_KEYWORD_CLAUSES_PER_TOPIC: Final = 120
 CHECK_FAILED: Final = "check_failed"
 
 Pairs = Mapping[str, Set[str]]
+Source = Literal["keyword", "model", "check", "client"]
+Failure = Literal["bad_output", "timeout", "quota", "check_failed"]
+Reason = Literal["bad_output", "timeout", "quota", "check_failed", "clause_cap"]
+_FAILURES: Final = frozenset(get_args(Failure))
 
 
 @dataclass(frozen=True, slots=True)
 class TopicStatus:
+    """``keyword_clauses``: clauses with a keyword or client tag. ``model_asserted``: all
+    model and check pairs seen (also those on keyword-tagged clauses). ``model_clauses``:
+    clauses whose tag has the source model or check (0 after a drop)."""
+
     keyword_clauses: int
+    model_asserted: int
     model_clauses: int
     model_tags_dropped: bool
     not_analyzed: str | None
@@ -40,13 +49,25 @@ class TopicStatus:
 
 @dataclass(frozen=True, slots=True)
 class TaggingResult:
-    tags: dict[str, dict[str, str]]
+    """The merged tags of one document.
+
+    ``tags``: every clause id -> ``{topic_id: source}``. ``other``: ids (document order) of
+    clauses without a usable tag. ``risk``: one key for **every** "Other" clause with a
+    risk-term hit in its text or heading; the value holds the text spans and may be empty
+    (heading-only hit). ``risk_heading``: heading spans for the same clauses.
+
+    Caps: at most 5 model/check tags per clause and, separately, at most 5 client tags per
+    clause (refused above); keyword tags are not capped. Overflow of the per-clause model
+    cap adds the reason ``clause_cap``.
+    """
+
+    tags: dict[str, dict[str, Source]]
     other: list[str]
     risk: dict[str, list[tuple[int, int]]]
     risk_heading: dict[str, list[tuple[int, int]]]
     topics: dict[str, TopicStatus]
     model_tagging_incomplete: bool
-    incomplete_reasons: tuple[str, ...]
+    incomplete_reasons: tuple[Reason, ...]
     missing_topics: tuple[str, ...]
 
 
@@ -67,12 +88,14 @@ def _model_candidates(  # noqa: PLR0913, PLR0917
     check_yes: Pairs,
     *,
     check_ok: bool,
-) -> dict[str, dict[str, str]]:
-    """Model and check pairs per clause after the per-clause cap (5, high before low,
-    then topic order). Pairs that are also keyword tags do not use a slot."""
-    result: dict[str, dict[str, str]] = {}
+) -> tuple[dict[str, dict[str, Source]], bool]:
+    """Model and check pairs per clause after the per-clause cap (5, high before low, then
+    topic order). Pairs that are also keyword tags do not use a slot. The flag tells that
+    a clause had more pairs than slots."""
+    result: dict[str, dict[str, Source]] = {}
+    overflow = False
     for clause_id in clause_ids:
-        pairs: dict[str, str] = {}
+        pairs: dict[str, Source] = {}
         for topic_id in high.get(clause_id, ()):
             if topic_id in topic_order:
                 pairs[topic_id] = "model"
@@ -85,7 +108,7 @@ def _model_candidates(  # noqa: PLR0913, PLR0917
             continue
         own = keyword.get(clause_id, set())
         ranked = sorted(pairs.items(), key=lambda item: (item[1] != "model", topic_order[item[0]]))
-        kept: dict[str, str] = {}
+        kept: dict[str, Source] = {}
         slots = 0
         for topic_id, source in ranked:
             if topic_id in own:
@@ -93,11 +116,13 @@ def _model_candidates(  # noqa: PLR0913, PLR0917
             elif slots < MAX_MODEL_TAGS_PER_CLAUSE:
                 kept[topic_id] = source
                 slots += 1
+            else:
+                overflow = True
         result[clause_id] = kept
-    return result
+    return result, overflow
 
 
-def merge_tags(  # noqa: PLR0913
+def merge_tags(  # noqa: PLR0913, PLR0912
     *,
     clauses: Sequence[TagClause],
     topics: Sequence[ConfirmedTopic],
@@ -106,38 +131,48 @@ def merge_tags(  # noqa: PLR0913
     model_low: Pairs | None = None,
     check_yes: Pairs | None = None,
     client: Pairs | None = None,
-    failures: Sequence[str] = (),
+    failures: Sequence[Failure] = (),
 ) -> TaggingResult:
+    ensure_unique_ids(clauses)
+    if any(f not in _FAILURES for f in failures):
+        raise TagMergeError("invalid_failure")
     clause_ids = [c.id for c in clauses]
-    id_set = set(clause_ids)
     topic_order = {t.topic_id: i for i, t in enumerate(topics)}
     client = client or {}
-    _check_client(client, id_set, set(topic_order))
-    reasons = tuple(sorted(set(failures)))
-    candidates = _model_candidates(
+    _check_client(client, set(clause_ids), set(topic_order))
+    reasons_set: set[Reason] = set(failures)
+    candidates, overflow = _model_candidates(
         clause_ids,
         topic_order,
         keyword,
         model_high or {},
         model_low or {},
         check_yes or {},
-        check_ok=CHECK_FAILED not in reasons,
+        check_ok="check_failed" not in reasons_set,
     )
+    if overflow:
+        reasons_set.add("clause_cap")
+    reasons = tuple(sorted(reasons_set))
 
-    # Per topic cap: too many model-tagged clauses drop every model tag of the topic.
+    # Per topic cap: only model pairs that add a clause (no keyword tag there) count; too
+    # many drop every model tag of the topic.
     asserted: dict[str, int] = dict.fromkeys(topic_order, 0)
-    for pairs in candidates.values():
+    adding: dict[str, int] = dict.fromkeys(topic_order, 0)
+    for clause_id, pairs in candidates.items():
+        own = keyword.get(clause_id, set())
         for topic_id in pairs:
             asserted[topic_id] += 1
-    dropped = {t for t, n in asserted.items() if n > MAX_MODEL_CLAUSES_PER_TOPIC}
+            if topic_id not in own:
+                adding[topic_id] += 1
+    dropped = {t for t, n in adding.items() if n > MAX_MODEL_CLAUSES_PER_TOPIC}
 
     keyword_count: dict[str, int] = dict.fromkeys(topic_order, 0)
-    tags: dict[str, dict[str, str]] = {}
+    tags: dict[str, dict[str, Source]] = {}
     for clause_id in clause_ids:
         own = {t for t in keyword.get(clause_id, ()) if t in topic_order}
         mine = {t for t in client.get(clause_id, ()) if t in topic_order}
         model = candidates.get(clause_id, {})
-        merged: dict[str, str] = {}
+        merged: dict[str, Source] = {}
         for topic_id in sorted(own | mine | set(model), key=topic_order.__getitem__):
             if topic_id in own:
                 merged[topic_id] = "keyword"
@@ -169,15 +204,16 @@ def merge_tags(  # noqa: PLR0913
         modelled = sum(1 for t in tags.values() if t.get(topic_id) in {"model", "check"})
         status[topic_id] = TopicStatus(
             keyword_clauses=keyword_count[topic_id],
+            model_asserted=asserted[topic_id],
             model_clauses=modelled,
             model_tags_dropped=topic_id in dropped,
             not_analyzed="too_many_clauses" if topic_id in not_analyzed else None,
         )
 
-    incomplete = bool(reasons)
+    # Incomplete tagging (including a clause cap overflow) never yields a missing topic.
     missing = (
         ()
-        if incomplete
+        if reasons
         else tuple(
             t
             for t in topic_order
@@ -200,7 +236,7 @@ def merge_tags(  # noqa: PLR0913
         risk=risk,
         risk_heading=risk_heading,
         topics=status,
-        model_tagging_incomplete=incomplete,
+        model_tagging_incomplete=bool(reasons),
         incomplete_reasons=reasons,
         missing_topics=missing,
     )
