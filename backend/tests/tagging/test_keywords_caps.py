@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import random
 import time
+import tracemalloc
+
+import pytest
 
 from app.tagging.keywords import keyword_tags
-from app.tagging.model import TagClause
+from app.tagging.model import TagClause, TagMergeError
 
 from .helpers import clause, pseudo_word, topic
 
@@ -79,3 +82,66 @@ def test_keyword_tags_at_caps_still_finds_planted_synonyms() -> None:
     cl[137] = clause(138, "prefix words and franchise here")
     topics.append(topic(51, en=["franchise"]))
     assert "custom_51" in keyword_tags(cl, topics)["c138"]
+
+
+# --- review finding: shared-prefix synonyms and repeated short words (HIGH) ----------------
+
+SHORT = ["aaa", "aab", "aaaa", "aaab", "aba", "abb", "aaba", "abaa"]
+
+
+def _prefix_topics(rng: random.Random) -> list:  # type: ignore[type-arg]
+    topics = []
+    for n in range(1, 21):
+        syns: set[str] = set()
+        while len(syns) < 120:
+            words: list[str] = []
+            while len(words) < 6:
+                candidate = [*words, rng.choice(SHORT)]
+                if len(" ".join(candidate)) > 60:
+                    break
+                words = candidate
+            syns.add(" ".join(words))
+        topics.append(topic(n, en=sorted(syns)))
+    return topics
+
+
+def _run_or_fail_closed(cl: list[TagClause], topics: list) -> None:  # type: ignore[type-arg]
+    try:
+        keyword_tags(cl, topics)
+    except TagMergeError as error:  # noqa: PT017
+        assert error.code == "keyword_budget_exceeded"
+
+
+def test_keyword_tags_shared_prefix_phrases_finish_within_two_seconds_or_fail_closed() -> None:
+    topics = _prefix_topics(random.Random(21))
+    cl = [clause(1, ("aaa " * 10_000)[:40_000])]
+    elapsed = _cpu(lambda: _run_or_fail_closed(cl, topics))
+    assert elapsed < 2.0
+
+
+def test_keyword_tags_mixed_short_words_clause_finishes_within_two_seconds_or_fails_closed() -> (
+    None
+):
+    rng = random.Random(22)
+    topics = _prefix_topics(rng)
+    text = " ".join(rng.choice(SHORT) for _ in range(9_000))[:40_000]
+    cl = [clause(1, text)]
+    assert _cpu(lambda: _run_or_fail_closed(cl, topics)) < 2.0
+
+
+def test_keyword_tags_shared_prefix_phrases_use_bounded_memory() -> None:
+    topics = _prefix_topics(random.Random(23))
+    cl = [clause(1, ("aaa aab " * 5_000)[:40_000])]
+    tracemalloc.start()
+    try:
+        _run_or_fail_closed(cl, topics)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert peak < 100 * 1024 * 1024
+
+
+def test_keyword_tags_duplicate_clause_ids_are_refused() -> None:
+    with pytest.raises(TagMergeError) as info:
+        keyword_tags([clause(1, "franchise"), clause(1, "other")], [topic(1, en=["franchise"])])
+    assert info.value.code == "duplicate_clause_id"

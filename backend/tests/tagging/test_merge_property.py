@@ -76,7 +76,7 @@ def test_merge_caps_hold_for_random_input(seed: int) -> None:
         assert status.model_clauses == modelled
         if status.model_tags_dropped:
             assert modelled == 0
-        has_failure = bool(kwargs["failures"])
-        if has_failure:
+        if r.model_tagging_incomplete:
             assert tid not in r.missing_topics
-    assert r.model_tagging_incomplete == bool(kwargs["failures"])
+    assert set(kwargs["failures"]) <= set(r.incomplete_reasons)
+    assert r.model_tagging_incomplete == bool(r.incomplete_reasons)
