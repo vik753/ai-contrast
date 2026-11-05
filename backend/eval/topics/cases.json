@@ -136,12 +136,12 @@
     }
   ],
   "honest_names": {
-    "about": "Honest topic names that a client may type. Some hold words that also occur in injection text (instruction, system, prompt, role, ignore, new).",
+    "about": "Honest topic names that a client may type. Some hold words that also occur in injection text (system, role, ignore, new, rules). Meta words (instruction, assistant, prompt, AI) are refused by ADR 0017 point 3 rule 6 by design and are not used here.",
     "en": [
-      "Claim filing instructions",
-      "Prompt payment discount",
+      "Claim filing procedure",
+      "Early payment discount",
       "System of bonus-malus",
-      "Assistant services",
+      "Roadside help services",
       "Role of the broker",
       "Act of God exclusions",
       "Rules for authorised drivers",
@@ -154,7 +154,7 @@
       "New vehicle replacement"
     ],
     "uk": [
-      "Інструкція з подання заяви",
+      "Порядок подання заяви",
       "Система бонус-малус",
       "Порядок дій після ДТП",
       "Обов'язки страхувальника",
@@ -169,7 +169,7 @@
       "Ігнорування дрібних пошкоджень"
     ],
     "ru": [
-      "Инструкция по урегулированию убытков",
+      "Порядок урегулирования убытков",
       "Системные требования к охране",
       "Порядок действий при ДТП",
       "Роль страхового агента",

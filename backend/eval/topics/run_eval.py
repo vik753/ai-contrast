@@ -81,6 +81,7 @@ from app.topics.catalog import Catalog, load_catalog
 from app.topics.jobs import BadOutputError, Job, expand_job, propose_job, suggest_job
 from app.topics.model import TopicDefinition, TopicDefinitionError
 from app.topics.safety import TextKind, TopicTextError, check_topic_text
+from eval.topics.oracle import MAX_SUGGESTIONS, OracleProvider
 
 HERE: Final = Path(__file__).resolve().parent
 FIXTURES: Final = HERE / "fixtures"
@@ -93,10 +94,16 @@ STUB_MODEL: Final = "oracle-v1"
 KEY_ENV: Final = "AIC_EVAL_PROVIDER_KEY"
 CF_ACCOUNT_ENV: Final = "AIC_EVAL_CF_ACCOUNT_ID"
 BASELINE_TOLERANCE: Final = 0.01
-MAX_SUGGESTIONS: Final = 8
 LIVE_DEADLINE_SECONDS: Final = 60.0
 # Metrics where a higher value is worse (the regression check is reversed).
 LOWER_IS_BETTER: Final = ("layer2.", "adversarial.")
+# Informational (not gated) while the baseline is a stub.
+INFORMATIONAL: Final = ("expand.stem_coverage", "propose.key_attribute_recall")
+STUB_LABEL: Final = (
+    " [STUB numbers: oracle, not a model; suggest.* is optimistic: the match map was written "
+    "after reading the fixtures; expand.stem_coverage and propose.key_attribute_recall are "
+    "informational]"
+)
 SCHEMAS: Final[dict[PromptTemplate, type[BaseModel]]] = {
     PromptTemplate.SUGGEST_TOPICS: SuggestOut,
     PromptTemplate.PROPOSE_ATTRIBUTES: ProposeOut,
@@ -281,120 +288,6 @@ class RecordingProvider:
             self.latency_ms.append(int((time.monotonic() - start) * 1000))
         self.attempts.append(answer)
         return answer
-
-
-# --- the stub oracle -------------------------------------------------------------------------
-
-_HEADING: Final = re.compile(r"\d{1,2}\.\s+([^\d\n\[][^\n\[]{0,58})")
-_DESCRIPTION: Final = {
-    "en": "What the contract says about this subject.",
-    "uk": "Що договір каже про цю тему.",
-    "ru": "Что договор говорит об этой теме.",
-}
-_ORACLE_RULES: Final = (
-    # (name stems, id, type, labels en/uk/ru, units, values en/uk/ru)
-    (
-        ("term", "period", "review", "payout", "выплат", "виплат", "строк", "срок", "розгляд"),
-        "term_days",
-        "duration",
-        ("Term in days", "Строк у днях", "Срок в днях"),
-        ("days",),
-        None,
-    ),
-    (
-        ("indexation", "refund", "penalt", "штраф", "поверн", "возврат", "індекс", "индекс"),
-        "rate_percent",
-        "percentage",
-        ("Rate, percent", "Ставка, відсоток", "Ставка, процент"),
-        (),
-        None,
-    ),
-    (
-        ("assistance", "cover", "pet", "ремонт", "сигнал", "затоп", "комиссар", "тварин"),
-        "included_items",
-        "categories",
-        ("Included items", "Що включено", "Что включено"),
-        (),
-        (("basic", "extended"), ("базовий", "розширений"), ("базовый", "расширенный")),
-    ),
-)
-
-
-def _lang_of(text: str) -> str:
-    lowered = text.lower()
-    if not any("Ѐ" <= char <= "ӿ" for char in lowered):
-        return "en"
-    if any(char in "іїєґ" for char in lowered):
-        return "uk"
-    return "ru"
-
-
-class OracleProvider:
-    """A deterministic local stand-in for a model. Suggest: the section headings of the
-    document (at most 8); for a document with an injection it answers like a fully
-    compromised model. Propose: keyword rules. Expand: stems of the name in its own language
-    only. It reads gate objects, as an adapter does, and never sees a raw string input."""
-
-    def __init__(self, attack: Sequence[dict[str, str]]) -> None:
-        self._attack = attack
-
-    async def check(self) -> CheckResult:
-        return CheckResult(ok=True)
-
-    async def complete_json(self, request: AIRequest) -> ModelJson:
-        if request.document is not None:
-            return self._suggest(request.document)
-        if request.topic is None:
-            raise AIError(AIErrorCode.PROVIDER_BAD_REQUEST) from None
-        if request.template is PromptTemplate.PROPOSE_ATTRIBUTES:
-            return self._propose(request.topic.title)
-        return self._expand(request.topic.title)
-
-    def _suggest(self, document: PseudonymizedDocument) -> ModelJson:
-        texts = [clause.text for clause in document.clauses]
-        if any("SYSTEM NOTE FOR THE AI" in text for text in texts):
-            return {
-                "topics": [
-                    {"name": a["name"], "description": a["description"]} for a in self._attack
-                ]
-            }
-        lang = _lang_of(" ".join(texts))
-        names = [m.group(1).strip() for t in texts if (m := _HEADING.fullmatch(t.strip()))]
-        topics = [{"name": n, "description": _DESCRIPTION[lang]} for n in names[:MAX_SUGGESTIONS]]
-        return {"topics": topics}
-
-    def _propose(self, name: str) -> ModelJson:
-        index = ("en", "uk", "ru").index(_lang_of(name))
-        lowered = name.lower()
-        attributes: list[dict[str, object]] = [
-            {
-                "id": "limit_amount",
-                "label": ("Limit amount", "Сума ліміту", "Сумма лимита")[index],
-                "type": "amount",
-                "units": ["UAH"],
-            }
-        ]
-        for stems, attr_id, kind, labels, units, values in _ORACLE_RULES:
-            if any(stem in lowered for stem in stems):
-                item: dict[str, object] = {"id": attr_id, "label": labels[index], "type": kind}
-                if units:
-                    item["units"] = list(units)
-                if values:
-                    item["values"] = list(values[index])
-                attributes.append(item)
-        attributes.append(
-            {"id": "conditions", "label": ("Conditions", "Умови", "Условия")[index], "type": "text"}
-        )
-        return {"attributes": attributes}
-
-    def _expand(self, name: str) -> ModelJson:
-        lang = _lang_of(name)
-        words = [w.lower() for w in _WORD.findall(name) if len(w) >= 4]  # noqa: PLR2004
-        stems = [w if lang == "en" else w[:6] for w in words]
-        own = [name.lower(), *stems]
-        lists: ModelJson = {"synonyms_en": [], "synonyms_uk": [], "synonyms_ru": []}
-        lists[f"synonyms_{lang}"] = list(dict.fromkeys(own))
-        return lists
 
 
 # --- running ---------------------------------------------------------------------------------
@@ -680,13 +573,18 @@ def adversarial_metrics(
     data = _json(ADVERSARIAL_PATH)
     attack = data["attack"]
     other = masked_document(_json(FIXTURES / "kasko_en_a" / "contract.json")["blocks"], "A")
-    items = [{"name": a["name"], "description": a["description"]} for a in attack]
-    fixed_out = SuggestOut.model_validate({"topics": items})
-    fixed = suggest_job(masked_document(data["blocks"], "B")).finish(fixed_out)
-    for category, count in leaks(cat, _items(fixed, "suggestions"), attack, other).items():
+    job = suggest_job(masked_document(data["blocks"], "B"))
+    fixed: dict[str, int] = defaultdict(int)
+    # An answer holds at most 8 topics: the fixed attack runs in answers of 8.
+    for start in range(0, len(attack), MAX_SUGGESTIONS):
+        chunk = attack[start : start + MAX_SUGGESTIONS]
+        items = [{"name": a["name"], "description": a["description"]} for a in chunk]
+        reply = job.finish(SuggestOut.model_validate({"topics": items}))
+        for category, count in leaks(cat, _items(reply, "suggestions"), chunk, other).items():
+            fixed[category] += count
+    for category, count in fixed.items():
         metrics[f"adversarial.fixed.leaks:{category}"] = float(count)
-    reply = results["suggest/adversarial_b"].reply
-    recorded = _items(reply, "suggestions")
+    recorded = _items(results["suggest/adversarial_b"].reply, "suggestions")
     for category, count in leaks(cat, recorded, attack, other).items():
         metrics[f"adversarial.recorded.leaks:{category}"] = float(count)
 
@@ -723,9 +621,19 @@ def evaluate(
     return dict(sorted(metrics.items())), {"stub": recording["stub"], **info(results, recording)}
 
 
-def regressions(current: dict[str, float], baseline: dict[str, float]) -> list[str]:
+def informational(name: str, *, stub: bool) -> bool:
+    """Not gated: set by hand-written stems that a stub cannot judge (until a live baseline)."""
+    return stub and name.startswith(INFORMATIONAL)
+
+
+def regressions(
+    current: dict[str, float], baseline: dict[str, float], *, stub: bool = True
+) -> list[str]:
+    """Gated metrics that got worse than the baseline by more than the tolerance."""
     found: list[str] = []
     for name, base in baseline.items():
+        if name in current and informational(name, stub=stub):
+            continue
         if name not in current:
             found.append(f"{name}: missing (baseline {base})")
         elif name.startswith(LOWER_IS_BETTER):
@@ -735,6 +643,17 @@ def regressions(current: dict[str, float], baseline: dict[str, float]) -> list[s
             found.append(f"{name}: {current[name]:.4f} < baseline {base:.4f}")
     found.extend(f"{name}: not in baseline" for name in current if name not in baseline)
     return found
+
+
+def improvements(current: dict[str, float], baseline: dict[str, float]) -> list[str]:
+    """Leak and Layer 2 false-positive counts below the baseline: tighten the baseline."""
+    return [
+        f"{name}: {current[name]:g} < baseline {base:g}: tighten the baseline"
+        for name, base in baseline.items()
+        if name.startswith(LOWER_IS_BETTER)
+        and name in current
+        and current[name] < base - BASELINE_TOLERANCE
+    ]
 
 
 # --- command line ----------------------------------------------------------------------------
@@ -762,7 +681,7 @@ def _write(path: Path, data: object) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--recorded", action="store_true", help="replay recordings (default)")
@@ -773,29 +692,64 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--model")
     parser.add_argument("--base-url")
     parser.add_argument("--write-baseline", action="store_true")
+    parser.add_argument(
+        "--accept-regressions",
+        action="store_true",
+        help="let --write-baseline store numbers that are worse than the baseline",
+    )
+    return parser
+
+
+def _refresh(args: argparse.Namespace, parser: argparse.ArgumentParser) -> str:
+    """Write a live or a stub recording; return its name."""
+    cases = build_cases(catalog())
+    attack = _json(ADVERSARIAL_PATH)["attack"]
+    if args.live:
+        if not (args.provider and args.model):
+            parser.error("--live needs --provider and --model")
+        name = f"{_slug(args.provider)}__{_slug(args.model)}"
+        data = record(cases, _live_factory(args), args.model, stub=False, provider=args.provider)
+    else:
+        name = STUB_NAME
+        data = record(cases, lambda: OracleProvider(attack), STUB_MODEL, stub=True, provider="stub")
+    _write(RECORDINGS / f"{name}.json", data)
+    return name
+
+
+def _print(
+    name: str, metrics: dict[str, float], extra: dict[str, Any], base: dict[str, float]
+) -> tuple[list[str], list[str]]:
+    """Print the table; return the regressions and the improvements against ``base``."""
+    sys.stdout.write(f"== {name}{STUB_LABEL if extra['stub'] else ''}\n")
+    for metric, value in metrics.items():
+        before = base.get(metric)
+        delta = "" if before is None else f"  (baseline {before:g}, delta {value - before:+.4f})"
+        if informational(metric, stub=extra["stub"]):
+            delta += "  [informational]"
+        sys.stdout.write(f"  {metric:45s} {value:g}{delta}\n")
+    sys.stdout.write(f"  info: {json.dumps(extra)}\n")
+    found = regressions(metrics, base, stub=extra["stub"]) if base else []
+    better = improvements(metrics, base)
+    sys.stdout.writelines(f"  REGRESSION {line}\n" for line in found)
+    sys.stdout.writelines(f"  IMPROVED {line}\n" for line in better)
+    return found, better
+
+
+def _baseline_diff(metrics: dict[str, float], base: dict[str, float]) -> None:
+    changed = sorted({m for m in metrics if base.get(m) != metrics[m]} | set(base) - set(metrics))
+    sys.stdout.writelines(f"  BASELINE {m}: {base.get(m)} -> {metrics.get(m)}\n" for m in changed)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _parser()
     args = parser.parse_args(argv)
     RECORDINGS.mkdir(exist_ok=True)
-    names = (
-        [args.recording] if args.recording else sorted(p.stem for p in RECORDINGS.glob("*.json"))
-    )
     if args.live or args.write_stub:
-        cat = catalog()
-        cases = build_cases(cat)
-        attack = _json(ADVERSARIAL_PATH)["attack"]
-        if args.live:
-            if not (args.provider and args.model):
-                parser.error("--live needs --provider and --model")
-            name = f"{_slug(args.provider)}__{_slug(args.model)}"
-            data = record(
-                cases, _live_factory(args), args.model, stub=False, provider=args.provider
-            )
-        else:
-            name = STUB_NAME
-            data = record(
-                cases, lambda: OracleProvider(attack), STUB_MODEL, stub=True, provider="stub"
-            )
-        _write(RECORDINGS / f"{name}.json", data)
-        names = [name]
+        names = [_refresh(args, parser)]
+    elif args.recording:
+        names = [args.recording]
+    else:
+        names = sorted(p.stem for p in RECORDINGS.glob("*.json"))
     baseline = _json(BASELINE_PATH) if BASELINE_PATH.is_file() else {}
     failed = False
     for name in names:
@@ -804,23 +758,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         except RecordingError as error:
             sys.stderr.write(f"FAIL {error}\n")
             return 2
-        label = " [STUB numbers: oracle, not a model]" if extra["stub"] else ""
-        sys.stdout.write(f"== {name}{label}\n")
         base = baseline.get(name, {}).get("metrics", {})
-        for metric, value in metrics.items():
-            before = base.get(metric)
-            delta = (
-                "" if before is None else f"  (baseline {before:g}, delta {value - before:+.4f})"
-            )
-            sys.stdout.write(f"  {metric:45s} {value:g}{delta}\n")
-        sys.stdout.write(f"  info: {json.dumps(extra)}\n")
-        if args.write_baseline:
-            baseline[name] = {"stub": extra["stub"], "metrics": metrics}
-        elif name in baseline:
-            found = regressions(metrics, base)
-            for line in found:
-                sys.stdout.write(f"  REGRESSION {line}\n")
-            failed = failed or bool(found)
+        found, better = _print(name, metrics, extra, base)
+        if not args.write_baseline:
+            failed = failed or bool(found or better)
+            continue
+        _baseline_diff(metrics, base)
+        if found and not args.accept_regressions:
+            sys.stderr.write(f"FAIL {name}: regressions; use --accept-regressions to store\n")
+            return 1
+        baseline[name] = {"stub": extra["stub"], "metrics": metrics}
     if args.write_baseline:
         BASELINE_PATH.write_text(
             json.dumps(baseline, indent=2, sort_keys=True) + "\n", encoding="utf-8"
