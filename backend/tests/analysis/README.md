@@ -89,3 +89,20 @@ Run: `cd backend && uv run --locked pytest tests/analysis -q`. All tests fail wi
   "згідно з Правилами", "указанных выше") and caps the green.
 - Number check: a number word the code cannot parse ("half", "two hundred", "півтора", "полтора") next to a unit
   word of the value's unit is `number_mismatch`; "десять (45)" (words contradict digits) is a mismatch for any value.
+
+## PR #98 review additions
+
+- `DocumentIndex` (frozen, pure, built once per document, **no module-level cache**) and
+  `build_document_index(clauses: Sequence[Clause]) -> DocumentIndex`. It holds whatever the rules need
+  (normalized texts, number map, marker and override positions). `apply_green_rules(ctx, finding, index=None)` and
+  `verify_value(ctx, v, index=None)` accept it; with `None` they build one. Results are identical either way.
+  Budget: building plus 100 findings over a 264,000-character document (NBSP, Cyrillic) in under 3 s.
+- A reference to a parent number ("Section 4", "Розділ 4", "Раздел 4") covers its sub-clauses (4.1, 4.2 ...),
+  at dot boundaries only (not 40.1). A reference in another clause's **heading** counts like one in its text.
+- `check_exceptions` also fires when (a) a parent clause body (number "4" for "4.x") holds an exception marker,
+  (b) a clause in the quoted clause's outgoing reference closure holds one.
+- Number check, fail closed (`number_mismatch` for any claimed value): a currency before the number with a scale
+  word or suffix after it ("USD 10 million", "$10 million", "10 тис. грн", "10 млн грн", "5k", "2 bn"); digits followed
+  by disagreeing words ("10 (eleven)"); ranges ("UAH 1 000-100 000", "0-50 %", "from 5 to 10 days", "від 5 до 10");
+  two different separators ("1.2,3", "1,5.2"); a single space group of 3 digits after a 1-digit head ("5 100 days").
+- Startup: `import app.main` loads the lexicon; with `LEXICON_DIR` pointing at a bad directory the import fails.
