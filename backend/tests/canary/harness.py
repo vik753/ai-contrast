@@ -287,6 +287,9 @@ def run_cell(path: str, location: str, group: str = "all") -> CellRun:
 # --------------------------------------------------------------------- stage 6 plug-in
 
 
+PLACEHOLDER_LABEL = re.compile(r"\[([A-Z])\.[A-Z][A-Z_]*_[0-9]+\]")
+
+
 class WireCapture:
     """Collects everything an ``AIProvider`` adapter would put on the wire.
 
@@ -304,3 +307,15 @@ class WireCapture:
 
     def leaks(self, needles: Iterable[str]) -> list[str]:
         return find_leaks(needles, *self.captured)
+
+    def label_mixes(self) -> list[str]:
+        """Captured requests (entries) that hold placeholders of two or more labels.
+
+        One AI request carries one document (ADR 0009, ADR 0019 point 10); a placeholder is
+        ``[<label>.<CLASS>_<n>]``. Returns the sorted label sets, one per offending entry."""
+        mixes: list[str] = []
+        for entry in self.captured:
+            labels = sorted(set(PLACEHOLDER_LABEL.findall(entry)))
+            if len(labels) > 1:
+                mixes.append("+".join(labels))
+        return mixes
