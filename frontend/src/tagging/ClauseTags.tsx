@@ -15,6 +15,8 @@ const ICONS: Record<ChipSource, string> = {
 /** Typed-key bridge: the keys are built from closed enums. */
 export function useTk() {
   const { t } = useT();
+  // Keys are built from closed enums and are checked by the locale tests, so the typed-key
+  // check of i18next cannot help here: the cast is deliberate and the options type is plain.
   return (key: string, options?: Record<string, string | number>): string =>
     t(key as "tagging.title", (options ?? {}) as never) as unknown as string;
 }

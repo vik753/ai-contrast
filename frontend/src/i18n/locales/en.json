@@ -583,6 +583,7 @@
       "network": "The server cannot be reached. Check your connection.",
       "unknown": "The request failed for an unknown reason."
     },
-    "removeTag": "Remove tag: {{topic}}"
+    "removeTag": "Remove tag: {{topic}}",
+    "stale": "The topics changed after this result. Tag again to update it."
   }
 }

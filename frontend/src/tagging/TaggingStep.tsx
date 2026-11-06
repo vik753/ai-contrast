@@ -4,19 +4,18 @@
  * Everything from the server is rendered as plain text. Client tags only add; keyword, model and
  * check tags cannot be removed.
  */
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getFrameOrigin } from "../provider/frameOrigin";
 import { TurnstileFrame } from "../provider/TurnstileFrame";
 import type { TopicConnection } from "../topics/TopicPanel";
 import type { TopicSelection } from "../topics/types";
 import { Chip, Layer2Badge, RiskText, useTk } from "./ClauseTags";
+import { MAX_CLIENT_PER_TOPIC, MAX_NON_KEYWORD_PER_CLAUSE, setClientTags } from "./clientTags";
 import { estimateTagging, modelPairOf } from "./estimate";
 import type { MaskedDoc } from "./maskedDocsStore";
-import { tagDocument, type TagReply } from "./tagApi";
+import { tagDocument, type TagReply, type TagRequest } from "./tagApi";
 
 const TOKEN_WAIT_MS = 30_000;
-const MAX_CLIENT_PER_TOPIC = 120;
-const MAX_NON_KEYWORD_PER_CLAUSE = 5;
 
 export interface TaggingResult {
   label: string;
@@ -34,6 +33,12 @@ export interface TaggingStepProps {
   selection: TopicSelection;
   topicNames?: Readonly<Record<string, string>>;
   onResultsChange?: (results: readonly TaggingResult[]) => void;
+}
+
+/** A result with the signature of the topic selection it was made for. */
+interface Stored {
+  result: TaggingResult;
+  sig: string;
 }
 
 type Status = "pending" | "running" | "done" | "failed";
@@ -64,7 +69,7 @@ export function TaggingStep({
   const tk = useTk();
   const titleId = useId();
   const [status, setStatus] = useState<Readonly<Record<string, Status>>>({});
-  const [results, setResults] = useState<Readonly<Record<string, TaggingResult>>>({});
+  const [results, setResults] = useState<Readonly<Record<string, Stored>>>({});
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [frameOn, setFrameOn] = useState(false);
@@ -72,6 +77,12 @@ export function TaggingStep({
   const waiter = useRef<((token: string | null) => void) | null>(null);
   const controller = useRef<AbortController | null>(null);
   const free = connection.provider === "free";
+  const docsRef = useRef(documents);
+  const usedPropToken = useRef<string | null>(null);
+  const sig = useMemo(() => JSON.stringify(selection), [selection]);
+  useLayoutEffect(() => {
+    docsRef.current = documents;
+  });
 
   useEffect(() => {
     mounted.current = true;
@@ -84,14 +95,57 @@ export function TaggingStep({
     };
   }, []);
 
-  // A result belongs to the document text it was made for: another digest hides it.
-  const shown = useMemo(
+  // Documents left (Clear all or removal): stop the run and settle a pending Turnstile wait.
+  const runLabel = useRef<{ label: string; digest: string } | null>(null);
+  const [runningDoc, setRunningDoc] = useState<{ label: string; digest: string } | null>(null);
+  const [seenDocs, setSeenDocs] = useState(documents);
+  // State is reset while rendering (no effect): none left forgets everything; a removed
+  // running document only ends the run.
+  if (seenDocs !== documents) {
+    setSeenDocs(documents);
+    const cur = runningDoc;
+    const gone =
+      cur !== null && !documents.some((d) => d.label === cur.label && d.digest === cur.digest);
+    if (documents.length === 0) {
+      setRunning(false);
+      setRunningDoc(null);
+      setFrameOn(false);
+      setStatus({});
+      setError(null);
+      setResults({});
+    } else if (gone) {
+      setRunning(false);
+      setRunningDoc(null);
+      setFrameOn(false);
+    }
+  }
+  useEffect(() => {
+    const cur = runLabel.current;
+    const gone =
+      cur !== null && !documents.some((d) => d.label === cur.label && d.digest === cur.digest);
+    if (documents.length === 0 || gone) {
+      controller.current?.abort();
+      controller.current = null;
+      runLabel.current = null;
+      const w = waiter.current;
+      waiter.current = null;
+      w?.(null);
+    }
+  }, [documents]);
+
+  // A result belongs to the document text it was made for: another digest hides it. A result
+  // made for another topic selection is stale: shown with a notice, not reported onward.
+  const visible = useMemo(
     () =>
       documents.flatMap((d) => {
         const r = results[d.label];
-        return r?.digest === d.digest ? [r] : [];
+        return r?.result.digest === d.digest ? [r] : [];
       }),
     [documents, results],
+  );
+  const shown = useMemo(
+    () => visible.filter((r) => r.sig === sig).map((r) => r.result),
+    [visible, sig],
   );
   const notify = useRef(onResultsChange);
   useEffect(() => {
@@ -148,9 +202,12 @@ export function TaggingStep({
   const start = async () => {
     if (running || ids.length === 0) return;
     const docs = [...documents];
+    const current = (d: MaskedDoc): boolean =>
+      docsRef.current.some((x) => x.label === d.label && x.digest === d.digest);
     const { domain, side } = domainSide(selection);
     controller.current?.abort();
     const ctl = new AbortController();
+    const stopped = (): boolean => ctl.signal.aborted;
     controller.current = ctl;
     setRunning(true);
     setError(null);
@@ -159,8 +216,13 @@ export function TaggingStep({
     // A new analysis never reuses an old pass.
     let pass: string | null = null;
     for (const doc of docs) {
+      // A document removed since the start is never sent.
+      if (stopped()) break;
+      if (!current(doc)) continue;
+      runLabel.current = { label: doc.label, digest: doc.digest };
+      setRunningDoc(runLabel.current);
       setOne(doc.label, "running");
-      const req: Parameters<typeof tagDocument>[0] = {
+      const req: TagRequest = {
         provider: connection.provider,
         domain,
         side,
@@ -169,10 +231,14 @@ export function TaggingStep({
       };
       if (free) {
         if (pass !== null) req.analysisPass = pass;
-        else if (turnstileToken !== undefined) req.turnstileToken = turnstileToken;
-        else {
+        else if (turnstileToken !== undefined && usedPropToken.current !== turnstileToken) {
+          // The prop token is one-time: a later Start gets a fresh one from the frame.
+          usedPropToken.current = turnstileToken;
+          req.turnstileToken = turnstileToken;
+        } else {
           const token = await acquireToken();
-          if (!mounted.current) return;
+          if (!mounted.current || stopped()) return;
+          if (!current(doc)) continue;
           if (token === null) {
             setOne(doc.label, "failed");
             setError("turnstile_failed");
@@ -186,8 +252,9 @@ export function TaggingStep({
         if (connection.baseUrl !== undefined) req.baseUrl = connection.baseUrl;
         if (connection.key !== undefined) req.key = connection.key;
       }
+      if (stopped()) return;
       const r = await tagDocument(req, ctl.signal);
-      if (!mounted.current || ctl.signal.aborted) return;
+      if (!mounted.current || stopped()) return;
       if (!r.ok) {
         if (r.code.startsWith("analysis_pass_")) pass = null;
         setOne(doc.label, "failed");
@@ -208,19 +275,35 @@ export function TaggingStep({
         reply: r.data,
         clientTags: {},
       };
-      setResults((prev) => ({ ...prev, [doc.label]: result }));
+      setResults((prev) => ({ ...prev, [doc.label]: { result, sig } }));
       setOne(doc.label, "done");
     }
-    if (mounted.current) setRunning(false);
+    if (mounted.current && controller.current === ctl) {
+      runLabel.current = null;
+      setRunningDoc(null);
+      setRunning(false);
+    }
   };
 
   const changeClient = (label: string, clauseId: string, next: string[]) => {
+    const doc = documents.find((d) => d.label === label);
+    if (!doc) return;
+    const allowed = new Set(ids);
+    const clauseIds = new Set(doc.clauses.map((c) => c.id));
     setResults((prev) => {
-      const r = prev[label];
-      if (!r) return prev;
-      const tags = Object.fromEntries(Object.entries(r.clientTags).filter(([k]) => k !== clauseId));
-      if (next.length > 0) tags[clauseId] = next;
-      return { ...prev, [label]: { ...r, clientTags: tags } };
+      const stored = prev[label];
+      // A stale result takes no new tags; the caps are enforced here, not only by the button.
+      if (stored?.sig !== sig) return prev;
+      const tags = setClientTags(
+        stored.result.reply,
+        stored.result.clientTags,
+        clauseId,
+        next,
+        allowed,
+        clauseIds,
+      );
+      if (tags === null) return prev;
+      return { ...prev, [label]: { ...stored, result: { ...stored.result, clientTags: tags } } };
     });
   };
 
@@ -268,12 +351,13 @@ export function TaggingStep({
         ))}
       </ul>
       {documents.map((d) => {
-        const r = shown.find((x) => x.label === d.label);
+        const r = visible.find((x) => x.result.label === d.label);
         return r ? (
           <DocumentResult
             key={d.label}
             doc={d}
-            result={r}
+            result={r.result}
+            stale={r.sig !== sig}
             selectedIds={ids}
             nameOf={nameOf}
             onClient={(clauseId, next) => {
@@ -289,12 +373,14 @@ export function TaggingStep({
 function DocumentResult({
   doc,
   result,
+  stale,
   selectedIds,
   nameOf,
   onClient,
 }: {
   doc: MaskedDoc;
   result: TaggingResult;
+  stale: boolean;
   selectedIds: readonly string[];
   nameOf: (id: string) => string;
   onClient: (clauseId: string, next: string[]) => void;
@@ -303,8 +389,13 @@ function DocumentResult({
   const { reply, clientTags } = result;
   const label = doc.label;
   const textOf = new Map(doc.clauses.map((c) => [c.id, c.text]));
+  // Client tags that are rendered: clauses of this document, no duplicate of a reply tag.
+  const renderedClient = (clauseId: string): string[] =>
+    (clientTags[clauseId] ?? []).filter(
+      (id) => !(reply.tags[clauseId] ?? []).some((x) => x.topic_id === id),
+    );
   const clientCount = (topic: string): number =>
-    Object.values(clientTags).filter((l) => l.includes(topic)).length;
+    doc.clauses.filter((c) => renderedClient(c.id).includes(topic)).length;
   const offered = [...new Set(selectedIds)].filter(
     (id) => (reply.topics[id]?.keyword_clauses ?? 0) + clientCount(id) < MAX_CLIENT_PER_TOPIC,
   );
@@ -313,6 +404,7 @@ function DocumentResult({
     <>
       <div data-testid={`tag-result-${label}`}>
         <h3>{label}</h3>
+        {stale ? <p className="note">{tk("tagging.stale")}</p> : null}
         {reply.model_tagging_incomplete ? (
           <div data-testid={`tag-incomplete-${label}`} className="note">
             {reply.incomplete_reasons.map((reason) => (
@@ -345,9 +437,7 @@ function DocumentResult({
         <ol className="tag-clauses">
           {doc.clauses.map((c) => {
             const tags = reply.tags[c.id] ?? [];
-            const client = (clientTags[c.id] ?? []).filter(
-              (id) => !tags.some((x) => x.topic_id === id),
-            );
+            const client = renderedClient(c.id);
             const has = new Set([...tags.map((x) => x.topic_id), ...client]);
             const nonKeyword = tags.filter((x) => x.source !== "keyword").length + client.length;
             const capped = nonKeyword >= MAX_NON_KEYWORD_PER_CLAUSE;
@@ -387,14 +477,16 @@ function DocumentResult({
                 {[...classes].map((cls) => (
                   <Layer2Badge key={cls} cls={cls} />
                 ))}
-                <AddTag
-                  options={options}
-                  capped={capped}
-                  nameOf={nameOf}
-                  onAdd={(id) => {
-                    onClient(c.id, [...client, id]);
-                  }}
-                />
+                {stale ? null : (
+                  <AddTag
+                    options={options}
+                    capped={capped}
+                    nameOf={nameOf}
+                    onAdd={(id) => {
+                      onClient(c.id, [...client, id]);
+                    }}
+                  />
+                )}
               </li>
             );
           })}
