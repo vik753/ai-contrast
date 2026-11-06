@@ -261,7 +261,7 @@ def _import_main(lexicon_dir: Path | None) -> subprocess.CompletedProcess[str]:
     if lexicon_dir is not None:
         env["LEXICON_DIR"] = str(lexicon_dir)
     return subprocess.run(
-        [sys.executable, "-I", "-c", "import app.main"],
+        [sys.executable, "-c", "import app.main"],
         cwd=BACKEND,
         env={**env, "PYTHONPATH": str(BACKEND)},
         capture_output=True,
@@ -272,7 +272,10 @@ def _import_main(lexicon_dir: Path | None) -> subprocess.CompletedProcess[str]:
 
 
 def test_importing_app_main_with_bad_lexicon_dir_fails(tmp_path: Path) -> None:
-    assert _import_main(tmp_path).returncode != 0
+    r = _import_main(tmp_path)
+    assert r.returncode != 0
+    assert "LexiconError" in r.stderr
+    assert "ModuleNotFoundError" not in r.stderr
 
 
 def test_importing_app_main_with_default_lexicon_succeeds() -> None:
