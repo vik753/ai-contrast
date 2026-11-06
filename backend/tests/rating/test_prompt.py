@@ -123,7 +123,6 @@ def test_request_rate_topic_is_an_airequest_with_one_document_and_a_topic() -> N
             OtherRatingOut,
             2048,
             side="insured",
-            side="insured",
             language=EN,
         ),
         lambda: RateOtherRequest(
