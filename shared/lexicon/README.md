@@ -11,10 +11,10 @@ The function does, in this order:
 
 1. Unicode NFKC.
 2. Case folding (`casefold`).
-3. The UTS #39 confusable skeleton, so that look-alike letters (Latin `a`, Cyrillic `а`) compare equal.
-4. `ё` becomes `е`.
-5. All apostrophes fold to U+0027: `'`, U+2019, U+2018, `` ` ``, U+02BC, U+FF07.
-6. All hyphens and dashes fold to U+002D: U+2010 to U+2015, U+2011, U+2212 (and the ASCII hyphen).
+3. `ё` becomes `е` (before the skeleton, so the skeleton cannot turn it into another letter first).
+4. All apostrophes fold to U+0027: `'`, U+2019, U+2018, `` ` ``, U+02BC, U+FF07.
+5. All hyphens and dashes fold to U+002D: U+2010 to U+2015, U+2011, U+2212 (and the ASCII hyphen).
+6. The UTS #39 confusable skeleton, so that look-alike letters (Latin `a`, Cyrillic `а`) compare equal.
 7. Runs of whitespace fold to one space.
 
 Entries are normalized once at load time with this function. A second, different normalizer anywhere in the verification code is a defect (it opens a bypass: text that looks like an exception marker to the reader but not to the code).
@@ -25,6 +25,8 @@ Entries are normalized once at load time with this function. A second, different
 - **Word-start prefix.** An entry matches only at the start of a word in the text. The last word of an entry may be a stem, so `крім`, `кроме`, `винятком`, `лишь` also match longer forms (`лишь`, `кроме того`). EN entries must also end at a word boundary.
 - **Longest match** wins at one position.
 - Over-matching is accepted (over-capping is cheaper than a missed exception). The eval measures the rate of capped greens on honest contracts.
+
+**Overlaps.** A phrase that is both in `clause_references.json` `self_reference` and in `relative_references.json` is a relative reference: `relative_references` wins, and the green is capped (`unresolved_reference`).
 
 ## Files
 
