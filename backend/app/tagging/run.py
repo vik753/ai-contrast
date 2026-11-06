@@ -8,7 +8,7 @@ here logs text; the merge logs counts only.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass
 from typing import Final
 
@@ -22,7 +22,8 @@ from app.tagging.ai_steps import ModelState, run_model_steps
 from app.tagging.batches import MAX_BATCHES, plan_batches, worst_case
 from app.tagging.child import ChildTopic
 from app.tagging.clauses import clauses_of
-from app.tagging.merge import Failure, TaggingResult, merge_tags
+from app.tagging.merge import Failure, Reason, TaggingResult, merge_tags
+from app.tagging.model import TagClause
 from app.tagging.runner import TagChildOk, run_tag_child
 from app.tagging.signature import TagSigner
 from app.tagging.version import tagging_version
@@ -34,14 +35,19 @@ __all__ = [
     "JobRefusedError",
     "Outcome",
     "TagJob",
+    "finish_tags",
+    "model_phase",
     "plan_job",
     "prepare_job",
     "run_tagging",
 ]
 
 INVALID_DEFINITION: Final = "invalid_topic_definition"
-# The failures ``merge_tags`` knows; a failed check is handled here (its pairs never reach it).
+# Failures passed to ``merge_tags``. A failed check is not: ``merge_tags`` would then drop the
+# check tags of every batch, but ADR 0018 point 3 drops only the low tags of the failed check
+# call (``run_model_steps`` never records them). ``finish_tags`` adds the reason afterwards.
 _MERGE_FAILURES: Final[tuple[Failure, ...]] = ("bad_output", "timeout", "quota")
+CHECK_FAILED: Final[Reason] = "check_failed"
 
 
 class JobRefusedError(Exception):
@@ -157,12 +163,8 @@ def _spent(providers: Sequence[AIProvider], model: ModelState, worst: int) -> in
     return total
 
 
-def _reply(
-    signer: TagSigner, job: TagJob, result: TaggingResult, model: ModelState
-) -> dict[str, object]:
+def _reply(signer: TagSigner, job: TagJob, result: TaggingResult) -> dict[str, object]:
     reasons = set(result.incomplete_reasons)
-    if "check_failed" in model.failures:
-        reasons.add("check_failed")
     version = tagging_version()
     digest = job.child.digest
     signature = signer.sign(
@@ -205,6 +207,62 @@ def _reply(
     }
 
 
+async def model_phase(  # noqa: PLR0913, PLR0917
+    state: ModelState,
+    document: PseudonymizedDocument,
+    topics: Sequence[ConfirmedTopic],
+    batches: Sequence[Sequence[str]],
+    tag_provider: AIProvider,
+    check_provider: AIProvider,
+    *,
+    deadline: float,
+    call_deadline: float,
+) -> None:
+    """The model steps under the overall deadline, writing into ``state``. A deadline hit adds
+    ``timeout`` and keeps what the finished calls found; a hard provider error is raised as
+    ``AIError`` and ``state`` still holds the call counts (for charging)."""
+    try:
+        async with asyncio.timeout(deadline):
+            await run_model_steps(
+                document, topics, batches, tag_provider, check_provider, state, call_deadline
+            )
+    except TimeoutError:
+        state.failures.add("timeout")
+
+
+def finish_tags(
+    clauses: Sequence[TagClause],
+    topics: Sequence[ConfirmedTopic],
+    keyword: Mapping[str, Set[str]],
+    model: ModelState,
+) -> TaggingResult:
+    """The merge after the AI calls (pure): caps, "Other", risk terms and the incomplete
+    reasons, including ``check_failed`` (then no missing-topic finding)."""
+    result = merge_tags(
+        clauses=clauses,
+        topics=topics,
+        keyword=keyword,
+        model_high=model.high,
+        model_low=model.low,
+        check_yes=model.check_yes,
+        failures=[f for f in _MERGE_FAILURES if f in model.failures],
+    )
+    if CHECK_FAILED not in model.failures:
+        return result
+    reasons = tuple(sorted({*result.incomplete_reasons, CHECK_FAILED}))
+    # A new value, not ``dataclasses.replace`` (banned in modules that use gate types).
+    return TaggingResult(
+        tags=result.tags,
+        other=result.other,
+        risk=result.risk,
+        risk_heading=result.risk_heading,
+        topics=result.topics,
+        model_tagging_incomplete=True,
+        incomplete_reasons=reasons,
+        missing_topics=(),
+    )
+
+
 async def run_tagging(
     job: TagJob,
     tag_provider: AIProvider,
@@ -216,31 +274,22 @@ async def run_tagging(
     providers = [tag_provider] if check_provider is tag_provider else [tag_provider, check_provider]
     model = ModelState()
     try:
-        async with asyncio.timeout(settings.tag_deadline_seconds):
-            await run_model_steps(
-                job.document,
-                job.plan.topics,
-                job.plan.batches,
-                tag_provider,
-                check_provider,
-                model,
-                settings.tag_call_deadline_seconds,
-            )
-    except TimeoutError:
-        model.failures.add("timeout")
+        await model_phase(
+            model,
+            job.document,
+            job.plan.topics,
+            job.plan.batches,
+            tag_provider,
+            check_provider,
+            deadline=settings.tag_deadline_seconds,
+            call_deadline=settings.tag_call_deadline_seconds,
+        )
     except AIError as error:
         return Outcome(
             None, error.code, model.calls, _spent(providers, model, job.plan.neurons) or 0
         )
     result = await asyncio.to_thread(
-        merge_tags,
-        clauses=clauses_of(job.document),
-        topics=job.plan.topics,
-        keyword=job.child.keyword_sets(),
-        model_high=model.high,
-        model_low=model.low,
-        check_yes=model.check_yes,
-        failures=[f for f in _MERGE_FAILURES if f in model.failures],
+        finish_tags, clauses_of(job.document), job.plan.topics, job.child.keyword_sets(), model
     )
     spent = _spent(providers, model, job.plan.neurons)
-    return Outcome(_reply(signer, job, result, model), None, model.calls, spent)
+    return Outcome(_reply(signer, job, result), None, model.calls, spent)

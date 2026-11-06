@@ -1,0 +1,3590 @@
+{
+ "stub": true,
+ "about": "STUB recording from a deterministic local oracle (eval/tagging/oracle.py), not a model. Its numbers measure the harness only; replace it with a live run.",
+ "provider": "stub",
+ "model": "oracle-v1",
+ "check_model": "oracle-v1",
+ "keys": {
+  "TAG_CLAUSES": "decf8c2a4612fbd7d06f68dc704dfea9c0fbeffe5f5fa04be5797f2ae165b388",
+  "CHECK_TAGS": "1318c9e0f6c453027b129f5afa5d726d78b928f1cc058d5b1c563e04c87a55b7"
+ },
+ "cases": {
+  "flood": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "10f311169c3568d807f1f7d464cc41123e73de9fa748736eef25983f8dd4d693",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c19",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c20",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c21",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c22",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c23",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c24",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c25",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c26",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c27",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c28",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c29",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c30",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c31",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c32",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c33",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c34",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c35",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c36",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c37",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c38",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c39",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c40",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "template": "TAG_CLAUSES",
+     "input": "074bad6da1e9fb268e51460e687de603da71b10d70a19680cd9e2320f5667bee",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c41",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c42",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c43",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c44",
+        "topics": [
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c45",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c46",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c47",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c48",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c49",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c50",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c51",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c52",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c53",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c54",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c55",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c56",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c57",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c58",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c59",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c60",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c61",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c62",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c63",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c64",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c65",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c66",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c67",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c68",
+        "topics": [
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c69",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c70",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c71",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c72",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c73",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c74",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c75",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c76",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c77",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c78",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c79",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "kasko_en_a": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "a542717031ce7f244d2bb9335dfc7c17f7d59bdc7ff1eb71137ffaa54dcd8b2b",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "low"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c19",
+        "topics": [
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c20",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c21",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c22",
+        "topics": [
+         {
+          "index": "T13",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c23",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T13",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "template": "CHECK_TAGS",
+     "input": "51cbcf9ef824c81da35d324468c9d6e80bbca76adea3cc0d01602f532a714fdc",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "answers": [
+       {
+        "clause": "c17",
+        "topic": "T9",
+        "regulates": true
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "kasko_uk_b": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "a84acaff08d1bdad89afbfb6f499605748a0434c6f9bdb3a9550757bc137067e",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c19",
+        "topics": [
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c20",
+        "topics": [
+         {
+          "index": "T11",
+          "confidence": "high"
+         },
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c21",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c22",
+        "topics": [
+         {
+          "index": "T12",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c23",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T11",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "lease_en_a": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "57cc5e86bd8ad4377ec364135d631a09b321680d97903f41140ca27e150536af",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "low"
+         },
+         {
+          "index": "T6",
+          "confidence": "low"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T8",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c19",
+        "topics": [
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c20",
+        "topics": [
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "template": "CHECK_TAGS",
+     "input": "7a744a4816c72dac18a9ea87817bfb64692e81d715c8559785a32ae185591743",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "answers": [
+       {
+        "clause": "c12",
+        "topic": "T3",
+        "regulates": true
+       },
+       {
+        "clause": "c12",
+        "topic": "T6",
+        "regulates": true
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "lease_ru_b": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "10098775b4d1856db60525581a27032cd1b93b704dfd29624fd003879bbf6a53",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T8",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c19",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "osago_ru_b": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "a8b3054b3472de8b49160a4f701d989e03ab8f8e772faf58f475de5507dda764",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "osago_uk_a": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "70d460030551ae382efa2141770f3c7b9614e0daf9134d053480f51eba74f4c5",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "property_en_b": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "1c85a75652951725b6f1d48dbbfb16b30a921f65643c87b017c428702015800f",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "low"
+         },
+         {
+          "index": "T3",
+          "confidence": "low"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "low"
+         },
+         {
+          "index": "T3",
+          "confidence": "low"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c19",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c21",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "template": "CHECK_TAGS",
+     "input": "e0872e671340147ea1bb22661b86a954bf6d09729175235ba6918a2fb33b575f",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "answers": [
+       {
+        "clause": "c3",
+        "topic": "T1",
+        "regulates": true
+       },
+       {
+        "clause": "c3",
+        "topic": "T3",
+        "regulates": true
+       },
+       {
+        "clause": "c8",
+        "topic": "T1",
+        "regulates": true
+       },
+       {
+        "clause": "c8",
+        "topic": "T3",
+        "regulates": true
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "property_uk_a": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "369d9598f2a037064a2d70e19ccda3671a359ed8e51a33e19cd43a23af05efaa",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c8",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c9",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c13",
+        "topics": [
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c16",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c17",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c18",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c19",
+        "topics": [
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c20",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         },
+         {
+          "index": "T9",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c21",
+        "topics": [
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c22",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T2",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T6",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "skip_me": {
+   "calls": [
+    {
+     "template": "TAG_CLAUSES",
+     "input": "2e70070a97316265bb07dfc47ee1bdd75b613a7548c434b531ad350e8bb446b6",
+     "latency_ms": 0,
+     "usage": null,
+     "answer": {
+      "tags": [
+       {
+        "clause": "c1",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c2",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c3",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T8",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c4",
+        "topics": [
+         {
+          "index": "T2",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c5",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T10",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c6",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T3",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c7",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c10",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c11",
+        "topics": [
+         {
+          "index": "T7",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c12",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c14",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         },
+         {
+          "index": "T5",
+          "confidence": "high"
+         }
+        ]
+       },
+       {
+        "clause": "c15",
+        "topics": [
+         {
+          "index": "T1",
+          "confidence": "high"
+         },
+         {
+          "index": "T4",
+          "confidence": "high"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}
