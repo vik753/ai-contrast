@@ -1,4 +1,3 @@
-# ruff: noqa: PLR2004, PLR0911
 """Quote check (whitespace folding only) and expansion to the sentence (ADR 0019 point 3.1-3.2)."""
 
 from __future__ import annotations
@@ -15,6 +14,9 @@ _WS: Final = re.compile(r"\s+")
 _ODD_WS: Final = re.compile(r"[^\S ]| {2}")
 _TERMS: Final = frozenset(".;!?")
 _TOKEN_MAX: Final = 16
+_CLOSERS: Final = frozenset(")]\"'»\u201d\u2019\u203a")
+_MAX_CLOSERS: Final = 3
+_NUMBER_DOTS: Final = 2
 
 
 def _fold(text: str) -> tuple[str, list[int] | None, list[int] | None]:
@@ -43,7 +45,7 @@ def _fold(text: str) -> tuple[str, list[int] | None, list[int] | None]:
 
 
 def verify_quote(clause: Clause, quote: str) -> QuoteCheck:
-    """Every occurrence of the quote in ``clause.text`` (non-overlapping), as offsets."""
+    """Every occurrence of the quote in ``clause.text`` (overlapping too), as offsets."""
     needle = _WS.sub(" ", quote).strip(" ")
     if not needle:
         return QuoteCheck(False, ())
@@ -56,7 +58,7 @@ def verify_quote(clause: Clause, quote: str) -> QuoteCheck:
             spans.append((i, j))
         else:
             spans.append((starts[i], ends[j - 1]))
-        i = folded.find(needle, j)
+        i = folded.find(needle, i + 1)  # overlapping occurrences count too
     return QuoteCheck(bool(spans), tuple(spans))
 
 
@@ -71,28 +73,41 @@ class _Abbreviations:
 _DEFAULT: Final = _Abbreviations(LEXICON.never_end, LEXICON.may_end)
 
 
-def _is_end(text: str, i: int, ab: _Abbreviations) -> bool:
+def _sentence_end(text: str, i: int, ab: _Abbreviations) -> int | None:
+    """Offset after the sentence end at ``text[i]``, or ``None`` when it is not one.
+
+    The terminator may be followed by up to three closing quotes or brackets (``."``, ``.)``);
+    they belong to the sentence. Then whitespace or the end of the text must follow."""
     n = len(text)
-    if i + 1 < n and not text[i + 1].isspace():
+    k = i + 1
+    while k < n and k - i <= _MAX_CLOSERS and text[k] in _CLOSERS:
+        k += 1
+    if k < n and not text[k].isspace():
+        return None
+    if text[i] != "." or not _abbreviation_blocks(text, i, k, ab):
+        return k
+    return None
+
+
+def _abbreviation_blocks(text: str, i: int, k: int, ab: _Abbreviations) -> bool:
+    """Is the period at ``text[i]`` part of an abbreviation or a clause number?"""
+    t = i
+    while t > 0 and i - t < _TOKEN_MAX and not text[t - 1].isspace() and text[t - 1] != "(":
+        t -= 1
+    if i - t >= _TOKEN_MAX:
         return False
-    if text[i] != ".":
-        return True
-    k = i
-    while k > 0 and i - k < _TOKEN_MAX and not text[k - 1].isspace() and text[k - 1] != "(":
-        k -= 1
-    if i - k >= _TOKEN_MAX:
-        return True
-    token = text[k : i + 1].lower()
-    if token.count(".") >= 2 and token.replace(".", "").isdigit():
-        return False  # a clause number such as "4.2."
+    token = text[t : i + 1].lower()
+    if token.count(".") >= _NUMBER_DOTS and token.replace(".", "").isdigit():
+        return True  # a clause number such as "4.2."
     if token in ab.never:
-        return False
+        return True
     if token in ab.may:
-        j = i + 1
+        n = len(text)
+        j = k
         while j < n and text[j].isspace():
             j += 1
-        return j >= n or text[j].isupper() or text[j].isdigit()
-    return True
+        return not (j >= n or text[j].isupper() or text[j].isdigit())
+    return False
 
 
 def expand_quote(
@@ -107,13 +122,20 @@ def expand_quote(
         if abbreviations is None
         else _Abbreviations(frozenset(a.lower() for a in abbreviations), frozenset())
     )
-    i = start - 1
-    while i >= 0 and not (text[i] in _TERMS and _is_end(text, i, ab)):
-        i -= 1
-    s = i + 1
+    s = 0
+    for i in range(start - 1, -1, -1):
+        if text[i] in _TERMS:
+            found = _sentence_end(text, i, ab)
+            if found is not None:
+                s = min(found, start)
+                break
     while s < start and text[s].isspace():
         s += 1
-    j = max(end - 1, start)
-    while j < n and not (text[j] in _TERMS and _is_end(text, j, ab)):
-        j += 1
-    return s, min(j + 1, n)
+    e = n
+    for j in range(max(end - 1, start), n):
+        if text[j] in _TERMS:
+            found = _sentence_end(text, j, ab)
+            if found is not None:
+                e = found
+                break
+    return s, e

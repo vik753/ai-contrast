@@ -38,6 +38,12 @@ _TRANSLATE: Final = {
 }
 
 
+# Order of steps. The lexicon README lists NFKC, case folding, yo as ye, apostrophes, dashes, the
+# UTS #39 skeleton, whitespace. Here the apostrophe and dash maps run right after NFKC and
+# before the skeleton, and ``fold_view`` is upper case, skeleton, lower case, with the capital
+# yo mapped like the capital ye. The result is the same: the maps touch only punctuation, the
+# skeleton leaves punctuation of those kinds alone, and a skeleton applied to ye gives the
+# same letter as to yo. Whitespace runs are one flexible separator in ``PhraseIndex``.
 def _tidy(view: str) -> str:
     view = view.replace("ё", "е")
     if "'" in view:
@@ -101,12 +107,16 @@ class Markers:
         if not text:
             return []
         view, source = normalize(text)
+        return self.find_in(view, source)
+
+    def find_in(self, view: str, source: Source | None) -> list[tuple[int, int]]:
+        """``find`` on a text that ``normalize`` already processed."""
         return [
             span_to_source(source, a, b) for _, a, b in self._index.find(view.replace("-", " "))
         ]
 
-    def first(self, text: str) -> tuple[int, int] | None:
-        found = self.find(text)
+    def first_in(self, view: str, source: Source | None) -> tuple[int, int] | None:
+        found = self.find_in(view, source)
         return found[0] if found else None
 
 

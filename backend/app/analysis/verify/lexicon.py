@@ -56,6 +56,7 @@ class Lexicon:
     percent_marks: Words
     units: dict[str, Words]
     number_words: dict[str, dict[Decimal, tuple[str, ...]]]
+    scale_words: Words
     never_end: frozenset[str]
     may_end: frozenset[str]
 
@@ -152,6 +153,7 @@ def load_lexicon(directory: Path | None = None) -> Lexicon:
         percent_marks=_words("unit_words.json", units.get("percent_marks")),
         units={u: _words("unit_words.json", unit_map[u], allow_note=True) for u in _UNITS},
         number_words=_numbers({k: nums.get(k) for k in LANGS}),
+        scale_words=_words("number_words.json", nums.get("scale_words")),
         never_end=frozenset(e.lower() for lang in LANGS for e in never[lang]),
         may_end=frozenset(e.lower() for lang in LANGS for e in may[lang]),
     )

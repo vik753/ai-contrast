@@ -1,9 +1,13 @@
-# ruff: noqa: RUF001, PLR2004, PLR0911, PLR0912, PLR0915, TRY003, E501
+# ruff: noqa: RUF001
 """Number and unit check (ADR 0019 point 3.3 ``number_mismatch``). Linear scan, lexicon data only.
 
-Forms: digits, decimal comma or point, thousands separated by spaces or repeated groups ("1.000.000"; a single
-separator and three digits is ambiguous and unmatchable), words 0-100 in EN/UK/RU, and "десять (10)" (words
-and digits are one number; if they disagree the number is unmatchable).
+Read forms: digits, a decimal comma or point, thousands in space groups ("100 000") or repeated
+groups ("1.000.000"), words 0-100 in EN/UK/RU (21-99 as compounds) and "десять (10)" or
+"10 (десять)" (words and digits are one number). Fail closed: every other form is unmatchable
+(``None``): a single separator with three digits ("2.500", "1,000"), two kinds of separators
+that are not thousands plus decimals, "5 100" outside currencies, words and digits that
+disagree, number words that are not read ("half", "two hundred"), a scale word or suffix after
+the number ("10 million", "5k"), and ranges ("5 to 10", "1 000-100 000").
 """
 
 from __future__ import annotations
@@ -18,13 +22,23 @@ from app.analysis.verify.text import normalize
 
 __all__ = ["number_values"]
 
+_SPACES: Final = "   "
 _TOKEN: Final = re.compile(r"(?P<num>\d+(?:[   ]\d{3}(?!\d))*(?:[.,]\d+)*)|(?P<word>[^\W\d_]+)")
 _WORD: Final = re.compile(r"[^\W\d_]+")
+_SPACE_SPLIT: Final = re.compile(r"[   ]")
 _MAX_DIGITS: Final = 40
 _GAP_CHARS: Final = "  -)"
 _MAX_GAP: Final = 6
+_MAX_RANGE_GAP: Final = 12
 _QUALIFIER_REACH: Final = 60
+_LOOKBACK: Final = 40
+_PAREN_REACH: Final = 8
+_GROUP: Final = 3
+_KINDS: Final = 2
+_UNIT_MAX: Final = 9
+_TENS: Final = frozenset(range(20, 100, 10))
 _CURRENCY: Final = frozenset({"UAH", "USD", "EUR"})
+_READ: Final = frozenset(Decimal(i) for i in (*range(20), *range(20, 100, 10), 100))
 
 
 class _Tok(NamedTuple):
@@ -40,8 +54,14 @@ class _Cand(NamedTuple):
     value: Decimal | None
 
 
+class _Words(NamedTuple):
+    value: Decimal | None  # None: listed but not read
+    next: int  # token index after the words
+    end: int  # view offset after the words
+
+
 class _Phrases:
-    """Whole-word phrases keyed by their first word; symbols are entries not starting with a letter."""
+    """Whole-word phrases keyed by first word; entries not starting with a letter are symbols."""
 
     def __init__(self, entries: list[str]) -> None:
         self.words: dict[str, list[str]] = {}
@@ -60,25 +80,20 @@ class _Phrases:
         """End of a phrase starting exactly at ``j``, or ``None``."""
         if j >= len(view):
             return None
-        if view[j].isalnum():
-            m = _WORD.match(view, j)
-            if m is None:
-                return None
-            for entry in self.words.get(m.group(), ()):
-                k = j + len(entry)
-                if view.startswith(entry, j) and (
-                    not entry[-1].isalnum() or k >= len(view) or not view[k].isalnum()
-                ):
-                    return k
-            return None
-        for entry in self.symbols:
-            if view.startswith(entry, j):
-                return j + len(entry)
+        if not view[j].isalnum():
+            return next((j + len(s) for s in self.symbols if view.startswith(s, j)), None)
+        m = _WORD.match(view, j)
+        for entry in self.words.get(m.group(), ()) if m else ():
+            k = j + len(entry)
+            if view.startswith(entry, j) and (
+                not entry[-1].isalnum() or k >= len(view) or not view[k].isalnum()
+            ):
+                return k
         return None
 
     def ends_at(self, view: str, k: int) -> bool:
         """A phrase that ends right before ``k`` (symbol or whole word)."""
-        before = view[max(0, k - 40) : k]
+        before = view[max(0, k - _LOOKBACK) : k]
         for entry in self._all:
             if before.endswith(entry):
                 cut = len(before) - len(entry)
@@ -87,28 +102,28 @@ class _Phrases:
         return False
 
 
-def _build_phrases(per_lang: dict[str, tuple[str, ...]]) -> _Phrases:
+def _build(per_lang: dict[str, tuple[str, ...]]) -> _Phrases:
     return _Phrases([e for lang in LANGS for e in per_lang[lang]])
 
 
-_MARKS: Final = _build_phrases(LEXICON.percent_marks)
-_UNITS: Final = {u: _build_phrases(w) for u, w in LEXICON.units.items()}
-
-
-_READ: Final = frozenset(Decimal(i) for i in (*range(20), *range(20, 100, 10), 100))
+_MARKS: Final = _build(LEXICON.percent_marks)
+_SCALES: Final = _build(LEXICON.scale_words)
+_UNITS: Final = {u: _build(w) for u, w in LEXICON.units.items()}
+_RANGE_WORDS: Final = frozenset(
+    {"-", *(normalize(w)[0] for lang in LANGS for w in LEXICON.ref_range_words[lang])}
+)
 
 
 def _phrase_table() -> dict[tuple[str, ...], tuple[Decimal, bool]]:
-    """Number phrases (value, read). Only 0-100 are read by the code; every other listed
-    form (halves, hundreds, thousands) is known but unmatchable (fail closed)."""
+    """Number phrases as (value, read). Only 0-100 are read; every other listed form (halves,
+    hundreds, thousands) is known but unmatchable."""
     table: dict[tuple[str, ...], tuple[Decimal, bool]] = {}
     for lang in LANGS:
         for value, entries in LEXICON.number_words[lang].items():
-            read = value in _READ
             for raw in entries:
                 key = tuple(_WORD.findall(normalize(raw)[0]))
-                if table.setdefault(key, (value, read)) != (value, read):
-                    raise LexiconError("number_words.json: phrase with two values")
+                if table.setdefault(key, (value, value in _READ)) != (value, value in _READ):
+                    raise LexiconError("number_words.json: phrase with two values")  # noqa: TRY003
     return table
 
 
@@ -116,103 +131,166 @@ _PHRASES: Final = _phrase_table()
 _MAX_PHRASE: Final = max(len(k) for k in _PHRASES)
 _FIRST_WORDS: Final = frozenset(k[0] for k in _PHRASES)
 _WORDS: Final = {k[0]: int(v) for k, (v, read) in _PHRASES.items() if read and len(k) == 1}
-# Number words that are in no list: next to a unit word they make the number unmatchable.
-_UNREAD_EXACT: Final = frozenset(
-    normalize(w)[0] for w in ("quarter", "billion", "billions", "thousands", "millions")
-)
+# Number words in no list: next to a unit word they make the number unmatchable.
+_UNLISTED: Final = frozenset(normalize(w)[0] for w in ("quarter", "billion", "billions"))
 
 
-def _parse(raw: str) -> Decimal | None:
+def _mixed(s: str, last: int) -> Decimal | None:
+    """Both kinds of separator: thousands groups of three, then a decimal part."""
+    other = "," if s[last] == "." else "."
+    groups = s[:last].split(other)
+    if other in s[last + 1 :] or s[last] in s[:last]:
+        return None
+    if not (1 <= len(groups[0]) <= _GROUP and all(len(g) == _GROUP for g in groups[1:])):
+        return None
+    return Decimal("".join(groups) + "." + s[last + 1 :])
+
+
+def _parse(raw: str, *, currency: bool) -> Decimal | None:
     if len(raw) > _MAX_DIGITS:
         return None
-    s = re.sub(r"[   ]", "", raw)
+    parts = _SPACE_SPLIT.split(raw)
+    if len(parts) == _KINDS and len(parts[0]) == 1 and not currency:
+        return None  # "5 100": two numbers or one amount, unreadable outside currencies
+    return _separated("".join(parts))
+
+
+def _separated(s: str) -> Decimal | None:
     seps = [ch for ch in s if ch in ".,"]
     if not seps:
         return Decimal(s)
-    last = max(s.rfind("."), s.rfind(","))
-    if len(set(seps)) == 2:
-        dec = s[last]
-        other = "," if dec == "." else "."
-        head = s[:last]
-        if dec in head:
+    if len(set(seps)) == _KINDS:
+        return _mixed(s, max(s.rfind("."), s.rfind(",")))
+    groups = s.split(seps[0])
+    if len(groups) > _KINDS:
+        ok = 1 <= len(groups[0]) <= _GROUP and all(len(g) == _GROUP for g in groups[1:])
+        return Decimal("".join(groups)) if ok else None
+    head, tail = groups
+    if len(tail) == _GROUP and head != "0":
+        return None  # "2.500", "1,000": decimal or thousands, unreadable
+    return Decimal(head + "." + tail)
+
+
+class _Scan:
+    """Candidates (numbers in digits or words) of one view."""
+
+    def __init__(self, view: str, *, currency: bool) -> None:
+        self.view = view
+        self.currency = currency
+        self.toks = [
+            _Tok(m.lastgroup == "num", m.start(), m.end(), m.group()) for m in _TOKEN.finditer(view)
+        ]
+
+    def joined(self, a: _Tok, b: _Tok) -> bool:
+        return not b.num and self.view[a.end : b.start].strip(_SPACES + "-") == ""
+
+    def phrase_at(self, i: int) -> tuple[tuple[Decimal, bool], int] | None:
+        toks = self.toks
+        if toks[i].num or toks[i].text not in _FIRST_WORDS:
             return None
-        return Decimal(head.replace(other, "") + "." + s[last + 1 :])
-    kind = seps[0]
-    groups = s.split(kind)
-    if len(groups) > 2:
-        if 1 <= len(groups[0]) <= 3 and all(len(g) == 3 for g in groups[1:]):
-            return Decimal("".join(groups))
-        return None
-    ip, fp = groups
-    if len(fp) == 3 and ip != "0":
-        return None  # "2.500", "1,000": decimal or thousands, unreadable (fail closed)
-    return Decimal(ip + "." + fp)
-
-
-def _candidates(view: str) -> list[_Cand]:
-    toks = [
-        _Tok(m.lastgroup == "num", m.start(), m.end(), m.group()) for m in _TOKEN.finditer(view)
-    ]
-    n = len(toks)
-    out: list[_Cand] = []
-
-    def joined(a: _Tok, b: _Tok) -> bool:
-        return not b.num and view[a.end : b.start].strip("  -") == ""
-
-    def compound(a: _Tok, b: _Tok) -> bool:
-        return not b.num and view[a.end : b.start].replace("and", " ").strip(" \u00a0-") == ""
-
-    i = 0
-    last_word_end = -1  # token index right after the last number word read
-    while i < n:
-        t = toks[i]
-        if t.num:
-            out.append(_Cand(t.start, t.end, _parse(t.text)))
-            i += 1
-            continue
-        hit: tuple[Decimal, bool] | None = None
-        used = 0
-        if t.text in _FIRST_WORDS:
-            for length in range(min(_MAX_PHRASE, n - i), 0, -1):
-                seg = toks[i : i + length]
-                if not all(joined(seg[k], seg[k + 1]) for k in range(length - 1)):
-                    continue
+        for length in range(min(_MAX_PHRASE, len(toks) - i), 0, -1):
+            seg = toks[i : i + length]
+            if all(self.joined(seg[k], seg[k + 1]) for k in range(length - 1)):
                 hit = _PHRASES.get(tuple(x.text for x in seg))
                 if hit is not None:
-                    used = length
-                    break
-        if hit is None:
-            if t.text in _UNREAD_EXACT:
-                out.append(_Cand(t.start, t.end, None))
-            i += 1
-            continue
-        if not hit[1]:
-            out.append(_Cand(t.start, toks[i + used - 1].end, None))
-            i += used
-            continue
-        value = int(hit[0])
-        adjacent = i == last_word_end and compound(toks[i - 1], t)
+                    return hit, length
+        return None
+
+    def words_at(self, i: int) -> _Words | None:
+        """Number words at token ``i``: a phrase, or tens plus units ("двадцять п'ять")."""
+        found = self.phrase_at(i)
+        if found is None:
+            return None
+        (value, read), used = found
         j = i + used
-        end = toks[j - 1].end
-        if 20 <= value <= 90 and value % 10 == 0 and j < n and joined(toks[j - 1], toks[j]):
-            unit_digit = _WORDS.get(toks[j].text, 0)
-            if 1 <= unit_digit <= 9:
-                value += unit_digit
-                end = toks[j].end
-                j += 1
-        last_word_end = j
-        result: Decimal | None = None if adjacent else Decimal(value)
-        if j < n and toks[j].num and view[end : toks[j].start].strip("  ") == "(":
-            close = view[toks[j].end : toks[j].end + 8].lstrip()
-            if close.startswith(")"):
-                digits = _parse(toks[j].text)
-                if digits != result:
-                    result = None
-                end = toks[j].end + 8 - len(close) + 1
-                j += 1
-        out.append(_Cand(t.start, end, result))
-        i = j
-    return out
+        end = self.toks[j - 1].end
+        if not read:
+            return _Words(None, j, end)
+        number = int(value)
+        if number in _TENS and j < len(self.toks) and self.joined(self.toks[j - 1], self.toks[j]):
+            unit = _WORDS.get(self.toks[j].text, 0)
+            if 1 <= unit <= _UNIT_MAX:
+                return _Words(Decimal(number + unit), j + 1, self.toks[j].end)
+        return _Words(value, j, end)
+
+    def paren_close(self, end: int) -> int | None:
+        """Offset after a ``)`` that follows ``end``, or ``None``."""
+        rest = self.view[end : end + _PAREN_REACH]
+        stripped = rest.lstrip()
+        return end + len(rest) - len(stripped) + 1 if stripped.startswith(")") else None
+
+    def digits_then_words(self, i: int) -> tuple[_Cand, int] | None:
+        """ "10 (десять)": the digits and the words must agree."""
+        toks = self.toks
+        t = toks[i]
+        if i + 1 >= len(toks) or toks[i + 1].num:
+            return None
+        if self.view[t.end : toks[i + 1].start].strip(_SPACES) != "(":
+            return None
+        words = self.words_at(i + 1)
+        close = self.paren_close(words.end) if words else None
+        if words is None or close is None:
+            return None
+        digits = _parse(t.text, currency=self.currency)
+        return _Cand(t.start, close, digits if digits == words.value else None), words.next
+
+    def words_then_digits(self, start: int, words: _Words) -> tuple[_Cand, int]:
+        """ "десять (10)": one number written twice."""
+        toks = self.toks
+        value, j, end = words.value, words.next, words.end
+        if j < len(toks) and toks[j].num and self.view[end : toks[j].start].strip(_SPACES) == "(":
+            close = self.paren_close(toks[j].end)
+            if close is not None:
+                digits = _parse(toks[j].text, currency=self.currency)
+                return _Cand(start, close, value if digits == value else None), j + 1
+        return _Cand(start, end, value), j
+
+    def candidates(self) -> list[_Cand]:
+        toks = self.toks
+        out: list[_Cand] = []
+        i = 0
+        last_words_end = -1  # token index after the last number words
+        while i < len(toks):
+            t = toks[i]
+            if t.num:
+                pair = self.digits_then_words(i)
+                if pair is not None:
+                    out.append(pair[0])
+                    i = pair[1]
+                else:
+                    out.append(_Cand(t.start, t.end, _parse(t.text, currency=self.currency)))
+                    i += 1
+                continue
+            words = self.words_at(i)
+            if words is None:
+                if t.text in _UNLISTED:
+                    out.append(_Cand(t.start, t.end, None))
+                i += 1
+                continue
+            cand, nxt = self.words_then_digits(t.start, words)
+            if i == last_words_end and self.compound(toks[i - 1], t):
+                cand = _Cand(cand.start, cand.end, None)  # "two five", "two and fifty"
+            out.append(cand)
+            last_words_end = words.next
+            i = nxt
+        return self.mark_ranges(out)
+
+    def compound(self, a: _Tok, b: _Tok) -> bool:
+        return (
+            not b.num and self.view[a.end : b.start].replace("and", " ").strip(_SPACES + "-") == ""
+        )
+
+    def mark_ranges(self, cands: list[_Cand]) -> list[_Cand]:
+        """ "5 to 10", "1 000-100 000": both ends are unmatchable."""
+        out = list(cands)
+        for k in range(1, len(out)):
+            a, b = out[k - 1], out[k]
+            gap = self.view[a.end : b.start]
+            tokens = gap.replace("-", " - ").split() if len(gap) <= _MAX_RANGE_GAP else []
+            if tokens and all(t in _RANGE_WORDS for t in tokens):
+                out[k - 1] = _Cand(a.start, a.end, None)
+                out[k] = _Cand(b.start, b.end, None)
+        return out
 
 
 def _after_gap(view: str, j: int) -> int:
@@ -222,47 +300,58 @@ def _after_gap(view: str, j: int) -> int:
     return k
 
 
-def _unit_check(unit: str | None) -> Callable[[str, _Cand], bool]:
-    if unit is None or unit.startswith("percent"):
-        qualifiers = None if unit is None else _qualifiers(unit)
-
-        def percent(view: str, cand: _Cand) -> bool:
-            mark_end = _MARKS.match_at(view, _after_gap(view, cand.end))
-            if mark_end is None:
-                return False
-            if qualifiers is None:
-                return True
-            return any(
-                view.find(q, mark_end, mark_end + _QUALIFIER_REACH + len(q)) >= 0
-                for q in qualifiers
-            )
-
-        return percent
-    phrases = _UNITS[unit]
-
-    def plain(view: str, cand: _Cand) -> bool:
-        if phrases.match_at(view, _after_gap(view, cand.end)) is not None:
-            return True
-        if unit in _CURRENCY:
-            k = cand.start
-            if k > 0 and view[k - 1] == " ":
-                k -= 1
-            return phrases.ends_at(view, k)
-        return False
-
-    return plain
-
-
 def _qualifiers(unit: str) -> list[str]:
     return [normalize(e)[0] for lang in LANGS for e in LEXICON.units[unit][lang]]
 
 
+# A check returns (matches the unit, a scale word follows the number).
+_Check = Callable[[str, _Cand], tuple[bool, bool]]
+
+
+def _percent_check(unit: str | None) -> _Check:
+    qualifiers = None if unit is None else _qualifiers(unit)
+
+    def check(view: str, cand: _Cand) -> tuple[bool, bool]:
+        mark_end = _MARKS.match_at(view, _after_gap(view, cand.end))
+        if mark_end is None:
+            return False, False
+        if qualifiers is None:
+            return True, False
+        return any(
+            view.find(q, mark_end, mark_end + _QUALIFIER_REACH + len(q)) >= 0 for q in qualifiers
+        ), False
+
+    return check
+
+
+def _plain_check(unit: str) -> _Check:
+    phrases = _UNITS[unit]
+
+    def check(view: str, cand: _Cand) -> tuple[bool, bool]:
+        k = cand.start - 1 if cand.start > 0 and view[cand.start - 1] == " " else cand.start
+        before = unit in _CURRENCY and phrases.ends_at(view, k)
+        gap_end = _after_gap(view, cand.end)
+        scale_end = _SCALES.match_at(view, gap_end)
+        if scale_end is not None:
+            after = phrases.match_at(view, _after_gap(view, scale_end)) is not None
+            return after or before, True
+        return phrases.match_at(view, gap_end) is not None or before, False
+
+    return check
+
+
 def number_values(text: str, unit: str | None) -> set[Decimal | None]:
-    """Distinct numbers of ``unit`` in ``text`` (``None``: a number with disagreeing digits and
-    words, or too long to read). ``unit=None`` means a plain percentage. An unknown unit gives
+    """Distinct numbers of ``unit`` in ``text``; ``None`` stands for a number that cannot be
+    read (see the module note). ``unit=None`` means a plain percentage. An unknown unit gives
     ``{None}``."""
     if unit is not None and unit not in _UNITS:
         return {None}
     view, _ = normalize(text)
-    check = _unit_check(unit)
-    return {c.value for c in _candidates(view) if check(view, c)}
+    percent = unit is None or unit.startswith("percent")
+    check = _percent_check(unit) if percent else _plain_check(unit or "")
+    found: set[Decimal | None] = set()
+    for cand in _Scan(view, currency=unit in _CURRENCY).candidates():
+        matched, scaled = check(view, cand)
+        if matched:
+            found.add(None if scaled else cand.value)
+    return found

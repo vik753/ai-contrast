@@ -16,9 +16,20 @@ from typing import Final
 
 from app.analysis.verify.lexicon import LANGS, LEXICON
 from app.analysis.verify.model import Clause, ClosureEntry
-from app.analysis.verify.text import normalize, span_to_source
+from app.analysis.verify.text import Source, normalize, span_to_source
 
-__all__ = ["Reference", "covers", "find_references", "number_key", "reference_closure"]
+__all__ = [
+    "NEEDED_CAP",
+    "NumberTable",
+    "Reference",
+    "covers",
+    "find_references",
+    "find_references_in",
+    "number_key",
+    "reference_closure",
+]
+
+NEEDED_CAP: Final = 1000
 
 _NUMBER: Final = re.compile(r"\d+(?:\.\d+)*")
 _WINDOW: Final = 40
@@ -61,11 +72,14 @@ def number_key(number: str) -> tuple[int, ...] | None:
 
 
 def covers(ref: Reference, number: str) -> bool:
-    """Does the reference name the clause number?"""
+    """Does the reference name the clause number? A parent number covers its sub-clauses
+    ("4" covers "4.1" but not "40.1"); a range covers the numbers between its ends."""
     if ref.high is None:
-        return ref.low == number
+        return number == ref.low or number.startswith(ref.low + ".")
     low, high, key = number_key(ref.low), number_key(ref.high), number_key(number)
-    return low is not None and high is not None and key is not None and low <= key <= high
+    if low is None or high is None or key is None:
+        return False
+    return low <= key and (key <= high or key[: len(high)] == high)
 
 
 def _gap_tokens(view: str, a: int, b: int) -> list[str] | None:
@@ -78,6 +92,13 @@ def _gap_tokens(view: str, a: int, b: int) -> list[str] | None:
 def find_references(text: str, known: Collection[str] = frozenset()) -> list[Reference]:
     """Clause numbers and ranges named in ``text``, in order of appearance."""
     view, source = normalize(text)
+    return find_references_in(view, source, known)
+
+
+def find_references_in(
+    view: str, source: Source | None, known: Collection[str] = frozenset()
+) -> list[Reference]:
+    """``find_references`` on a text that ``normalize`` already processed."""
     found: list[Reference] = []
     prev: re.Match[str] | None = None
     prev_is_ref = False
@@ -121,40 +142,59 @@ def find_references(text: str, known: Collection[str] = frozenset()) -> list[Ref
     return found
 
 
+class NumberTable:
+    """Clause numbers of one document: exact lookup and sorted keys for ranges."""
+
+    def __init__(self, clauses: Iterable[Clause]) -> None:
+        by_number: dict[str, list[str]] = {}
+        keyed: list[tuple[tuple[int, ...], str]] = []
+        for clause in clauses:
+            if clause.number is not None:
+                by_number.setdefault(clause.number, []).append(clause.id)
+                key = number_key(clause.number)
+                if key is not None:
+                    keyed.append((key, clause.id))
+        keyed.sort()
+        self.by_number = by_number
+        self._keys = [k for k, _ in keyed]
+        self._ids = [i for _, i in keyed]
+
+    def resolve(self, refs: Iterable[Reference], own: str, max_refs: int) -> ClosureEntry:
+        """Distinct clauses named by ``refs`` (not ``own``), in order. ``needed`` stops
+        counting at ``NEEDED_CAP`` so a wide range cannot cost more than that."""
+        seen: dict[str, None] = {}
+        for ref in refs:
+            if ref.high is None:
+                targets: Iterable[str] = self.by_number.get(ref.low, ())
+            else:
+                low, high = number_key(ref.low), number_key(ref.high)
+                if low is None or high is None:
+                    continue
+                targets = self._ids[bisect_left(self._keys, low) : bisect_right(self._keys, high)]
+            for target in targets:
+                if target != own:
+                    seen.setdefault(target, None)
+                if len(seen) >= NEEDED_CAP:
+                    break
+            if len(seen) >= NEEDED_CAP:
+                break
+        ordered = tuple(seen)
+        return ClosureEntry(ordered[:max_refs], len(ordered), len(ordered) > max_refs)
+
+
 def reference_closure(
     clauses: Sequence[Clause], start_ids: Iterable[str], max_refs: int = 5
 ) -> dict[str, ClosureEntry]:
     """Per start clause: distinct clauses referenced by number (depth 1), at most ``max_refs``."""
-    by_number: dict[str, list[str]] = {}
+    table = NumberTable(clauses)
     by_id: dict[str, Clause] = {}
-    keyed: list[tuple[tuple[int, ...], str]] = []
     for clause in clauses:
         by_id.setdefault(clause.id, clause)
-        if clause.number is not None:
-            by_number.setdefault(clause.number, []).append(clause.id)
-            key = number_key(clause.number)
-            if key is not None:
-                keyed.append((key, clause.id))
-    keyed.sort()
-    keys = [k for k, _ in keyed]
     result: dict[str, ClosureEntry] = {}
     for sid in start_ids:
         start = by_id.get(sid)
         if start is None or sid in result:
             continue
-        seen: dict[str, None] = {}
-        for ref in find_references(start.text, by_number.keys()):
-            if ref.high is None:
-                targets: Iterable[str] = by_number.get(ref.low, ())
-            else:
-                low, high = number_key(ref.low), number_key(ref.high)
-                if low is None or high is None:
-                    continue
-                lo, hi = bisect_left(keys, low), bisect_right(keys, high)
-                targets = [cid for _, cid in keyed[lo:hi]]
-            for target in targets:
-                if target != sid:
-                    seen.setdefault(target, None)
-        ordered = tuple(seen)
-        result[sid] = ClosureEntry(ordered[:max_refs], len(ordered), len(ordered) > max_refs)
+        refs = find_references(start.text, table.by_number.keys())
+        result[sid] = table.resolve(refs, sid, max_refs)
     return result
