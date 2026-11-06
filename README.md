@@ -9,8 +9,8 @@ Every finding has a rating for your side of the deal, an explanation and a verif
 - 🟡 **Attention** needed
 - 🔴 **Unfavorable** or risky for you
 
-> **Status:** in development. Stage 0 (project rules), stage 1 (scaffold), stage 2 (file upload), stage 3 (text extraction), stage 4 (browser hash and cache), stage 5 (clause splitting), stage 5b (pseudonymization), stage 6 (model connection) and stage 7 (topic catalog) are done. See [`docs/plan.md`](docs/plan.md).
-> You can add contracts and files, the server extracts their text and splits it into clauses, you check the masked identifiers, you test the connection to an AI provider, and you prepare the topics. Contract comparison is not built yet.
+> **Status:** in development. Stage 0 (project rules), stage 1 (scaffold), stage 2 (file upload), stage 3 (text extraction), stage 4 (browser hash and cache), stage 5 (clause splitting), stage 5b (pseudonymization), stage 6 (model connection), stage 7 (topic catalog) and stage 8 (clause tagging) are done. See [`docs/plan.md`](docs/plan.md).
+> You can add contracts and files, the server extracts their text and splits it into clauses, you check the masked identifiers, you test the connection to an AI provider, you prepare the topics, and you tag the clauses by topic. Contract comparison is not built yet.
 
 ## Principles
 
@@ -42,13 +42,37 @@ A topic is a subject of comparison, for example "Deductible" or "Payment term". 
 
 - **Domain and side.** Choose a domain (KASKO, OSAGO, lease or property insurance) and your side in it (for example insured, insurer, tenant or landlord). The domain and the side are required for AI suggestions and for your own topics.
 - **Templates.** Each domain has ready topics in English, Ukrainian and Russian. All are selected by default. You can turn each one off. A template topic has typed attributes (amounts, percentages, durations, lists of values) and a direction for your side, for example "lower is better". The catalog lives in [`shared/topics/`](shared/topics/README.md).
-- **Suggestions.** The button "Suggest from my contracts" asks the AI for topics, one call for each contract. It reads only the masked text. You accept each suggestion yourself. The suggestion text is checked before you see it, and refused names are counted as "dropped". This button needs confirmed masked contracts; in this build it stays inactive until stage 9 connects the panel to them.
+- **Suggestions.** The button "Suggest from my contracts" asks the AI for topics, one call for each contract. It reads only the masked text. You accept each suggestion yourself. The suggestion text is checked before you see it, and refused names are counted as "dropped". This button needs confirmed masked contracts. Since stage 8 the panel gets them from the upload flow (kept in memory only).
 - **Own topics.** Write a name and an optional description, press "Propose attributes", edit the attribute list and confirm. The AI proposes attributes without any contract text. The direction of an attribute starts at "none", and you choose it. Names and descriptions must not contain identifiers; the panel marks the offending part. Text that tries to address an AI is refused: reword the name.
 - **Limit.** You can keep up to 10 own topics.
 - **Storage.** Own topics stay in memory. "Save my topics on this device" is opt-in and writes them to `localStorage` (key `aic.topics.v1`; names, descriptions, attributes and synonyms, never contract text). "Delete all data" removes them.
 - **Export and import.** You can export your topics as a JSON file and import them back. Import is checked strictly: at most 256 KiB, a fixed shape and the same limits as the server. A file that fails is rejected as a whole.
 
 In free mode, the first topic call solves a Cloudflare check and gives a short pass (15 minutes, 20 calls), so you do not solve a check for every topic. Topic calls have their own daily quota. Details: [`docs/adr/0017-topic-catalog.md`](docs/adr/0017-topic-catalog.md).
+
+## Tagging clauses
+
+After you confirm the topics, the "Tag clauses" step assigns each clause to the topics it regulates. It works on one contract at a time and reads only the masked text.
+
+- **Keywords first.** The server matches the synonyms of each topic in every clause (headings included). A model can only add tags. It never removes a keyword tag.
+- **Model tags.** A cheap model tags clauses in batches. For uncertain tags, a strong model answers a yes/no check. The step shows the model pair and a cost estimate before it starts.
+- **"Other".** A clause with no tag goes to "Other". The server marks the clauses in "Other" that contain risk terms (for example penalty, exclusion, unilateral termination). Nothing is dropped: every clause is tagged or in "Other".
+- **Caps fail closed.** If a topic gets too many tags, the model tags of that topic are dropped, or the topic is shown as "not analyzed" (🟡). The page then says why.
+- **Your tags.** You can add a tag to a clause. You cannot remove a keyword tag.
+- **Free mode.** The first tag call solves one Cloudflare check. The pass covers one analysis (30 minutes, at most 2 contracts).
+
+Nothing is stored. Details: [`docs/adr/0018-clause-tagging.md`](docs/adr/0018-clause-tagging.md).
+
+### Tagging eval
+
+The eval measures tag recall and precision against expected tags in the fixtures, the share of clauses in "Other", and two attack contracts (a clause that tells the tagger to skip it, and a topic flood). The CI baseline uses recorded stub answers. The first baseline: keyword recall 0.81, precision 0.89, hidden clauses 0.
+
+```bash
+cd backend
+uv run --locked python -m eval.tagging.run_eval
+```
+
+Expected: the metrics for each case. See [`backend/eval/tagging/README.md`](backend/eval/tagging/README.md) for live mode and options.
 
 ## AI providers and your key
 

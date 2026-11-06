@@ -3,58 +3,11 @@
 Format: one task per block. Goal, owner, branch, acceptance criteria (AC), threats touched (see `docs/security/threat-model.md`).
 Check a task only when it is merged to `main` with green CI.
 
-Finished stages 0 to 7: `docs/agent/TASKS-archive.md`.
-
-## Stage 8 — Clause tagging (ADR 0018)
-
-Order: S8-T0 (tagging fixtures) and S8-T1 (keyword tagger, risk terms, caps) in parallel; S8-T2 (`/api/tag` with model tags, check calls and the analysis pass) after S8-T1; S8-T3 (browser) after S8-T2's API is fixed; S8-T4 (eval) after S8-T2; S8-T5 docs last.
-
-### S8-T0 Tagging fixtures
-
-- Owner: `domain-analyst`. Branch: `feat/s8-fixtures` (only `backend/eval/tagging/fixtures/` and the S7-T0 fixtures' `expected.json`).
-- For each of the 8 S7-T0 contracts: expected topic ids per clause id (all topics a clause regulates, not only the main one), expected "Other" clauses, and risk-term clauses. Add two adversarial contracts: one with a clause that tells the tagger to skip it, one that floods one topic (more than 60 clauses mentioning it in passing). Avoid `: ` and `«»` in any text that may become topic text.
-
-### S8-T1 Keyword tagger, risk terms and caps (backend)
-
-- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s8-keywords`. Threats: T5, T6.
-
-1. `app/tagging/keywords.py`: synonym matching per ADR 0018 point 2 (skeleton view, word-start stems, phrases with flexible whitespace, headings included), linear time without regexes built from synonyms; adversarial tests at the caps (2,000 clauses × 50 topics × 40 synonyms) within the CPU limit.
-2. `app/tagging/risk_terms.py`: checked-in EN/UK/RU risk-term list and scan of "Other" clauses (point 4).
-3. `app/tagging/merge.py`: merge of keyword, model, check and client tags (client tags count towards the keyword caps, ids checked, add only); the `model_tagging_incomplete` flag and the missing-topic rule (only with complete tagging); the caps and rules of point 5 (model tags only add; model-tag cap per clause and per topic with "drop all model tags of the topic" + `model_tags_dropped`; keyword overflow → `not_analyzed` + clauses also to "Other"); missing topics; never a clause lost (property test: every clause is tagged or in "Other").
-4. Layer 2 per clause (point 6) as a pure function returning hits. Keyword tags, risk terms and Layer 2 run in the sandbox child together with the safety pass.
-5. `tagging_version` hash.
-
-### S8-T2 `/api/tag` with model tags, check calls and the analysis pass (backend)
-
-- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s8-tag`. After S8-T1. Threats: T1, T5, T6, T10, T11.
-
-1. `PromptTemplate` `TAG_CLAUSES` and `CHECK_TAGS` (one document required, topic text allowed only as opaque-index lists built from `ConfirmedTopic`s); strict schemas; batches per point 3; one repair, then the batch falls back to keyword tags.
-2. Cheap/strong model pair per preset (ADR 0018 point 3); the request may name both; `free` uses one model.
-3. `POST /api/tag` per point 1: safety pass in the sandbox, extraction slot released before AI calls, topic resolution with `selection.py`, `keyword_budget_exceeded` from the keyword step is a refusal (never continue with empty keyword tags), token budget check before any call (`document_too_large_for_tagging`), whole worst case reserved before the first call, at most 60 batches and a 5-minute overall deadline, shared AI slots and limits, 60 s per call, reply shape of point 1 (ids, enums, counts, offsets only; `model_tagging_incomplete` with reasons). The reply carries the tag signature (per-process HMAC over digest, `tagging_version` and the hash of model/check tags).
-4. Analysis pass (point 7): `aud=analysis` (refused elsewhere; `/api/tag` refuses `aud=topics`), 30 min, /48, one live per client per audience, bounded table recording ≤ 2 document digests and total size, per-pass Neuron and call caps, charges the free analysis quota once, reserve/settle per call; free size limits counted from characters (3,000 per page).
-5. The `PseudonymizedText.source` builder is not needed here (tagging carries no `PseudonymizedText`); keep the follow-up for stage 9.
-6. Log and wire canaries: no clause text, topic text or model output in logs; one document per call.
-
-### S8-T3 Tagging step in the browser (frontend)
-
-- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s8-tag-ui`. After S8-T2's API is merged. Threats: T1, T3, T5.
-
-1. Confirmed masked documents from the upload flow are exposed to `App` (a small in-memory store, emptied by Clear all, never persisted) and to `TopicPanel` (enables Suggest).
-2. "Tag clauses" step per ADR 0018 point 8: model pair shown, cost estimate, progress per document, clauses with topic chips (keyword / model / check / client with icon and text), "Other" with risk-term marks, per-topic flags, client-added tags; Layer 2 flags shown per clause; every string en/uk/ru; plain text only.
-3. Free mode uses the analysis pass (`X-Analysis-Pass`), one Turnstile per analysis, shared with the provider panel's frame logic.
-
-### S8-T4 Tagging eval
-
-- Owner: `ai-eval-engineer`. After S8-T2 and S8-T0. Branch: `feat/s8-eval`.
-- `backend/eval/tagging/` per ADR 0018 point 9: recorded mode in CI (stub labelled), live mode locally; baseline; the two adversarial contracts.
-
-### S8-T5 Docs for stage 8
-
-- Owner: `docs-writer`. After S8-T0–T4 are merged.
-- ADR 0018 → accepted; threat model T5 (tagging cannot hide a clause), T6 (tag endpoint limits), T10 (analysis pass), T11; `CLAUDE.md` Commands (`/api/tag` with a dummy key and a keyword-only path if it exists, or a refused request); README.
+Finished stages 0 to 8: `docs/agent/TASKS-archive.md`.
 
 ## Open follow-ups
 
+- Stage 9: recompute keyword tags, "Other" and Layer 2 on the server, and accept only signed model/check tags and client tags (ADR 0018 point 8).
 - Stage 11: refresh preset model ids and model pairs (OpenAI, Gemini, Mistral, OpenRouter) against provider docs; pick pairs by the eval.
 
 ### Stage 9 follow-ups (from stage 7)

@@ -15,8 +15,8 @@ How to resume after a break: read this file, then continue with the first unchec
 | 5b | Pseudonymization | done |
 | 6 | Model connection | done |
 | 7 | Topic catalog | done |
-| 8 | Clause tagging | next |
-| 9 | Analysis | planned |
+| 8 | Clause tagging | done |
+| 9 | Analysis | next |
 | 10 | Result table | planned |
 | 11 | Token economy and quality | planned |
 | 12 | Security audit | planned |
@@ -110,5 +110,6 @@ How to resume after a break: read this file, then continue with the first unchec
 - 2026-11-05 — PR #85 merged (S7-T2: `POST /api/topics/suggest`, `/propose-attributes`, `/expand-synonyms`; free pass with a per-process HMAC key; topic quota 40 per day; topic calls at most 30 % of the Neuron budget; worst-case reservation settled with provider usage). The Docker build context is now the repository root.
 - 2026-11-05 — PR #86 merged (S7-T4: first AI eval in `backend/eval/topics/`, recorded mode in CI, stub oracle baseline) and PR #87 merged (S7-T3: topic panel, own topics in memory or opt-in `localStorage`, export and import).
 - 2026-11-05 — Stage 7 done. ADR 0017 accepted with "Decisions made during stage 7"; threat model T5, T6, T8, T10, T11 updated; README (topics) and `CLAUDE.md` Commands (Docker build context; catalog and `topic_flagged` examples) updated; finished stage 7 moved to `docs/agent/TASKS-archive.md`; follow-ups for stages 9, 11 and 13 listed in `docs/agent/TASKS.md`. The Suggest button stays inactive until stage 9. Next: stage 8 (clause tagging).
+- 2026-11-06 — Stage 8 done (plan #89): S8-T0 tagging fixtures (#91); S8-T1 keyword tagger, risk terms, caps and merge (#90); S8-T2 `POST /api/tag` (#92) (tag and check calls, tag signature, analysis pass `aud=analysis`); S8-T3 "Tag clauses" step and in-memory document store in the browser (enables Suggest, #94); S8-T4 tagging eval in `backend/eval/tagging/` (recorded stub baseline: keyword recall 0.81, precision 0.89, hidden clauses 0; #93). ADR 0018 accepted; threat model T5, T6, T10, T11, README and `CLAUDE.md` Commands (`/api/tag` refused request) updated; finished stage 8 moved to `docs/agent/TASKS-archive.md`. Next: stage 9 (analysis).
 - Lesson: the eval found two real Layer 2 bypasses that the unit tests missed. Phrase lists are bypassable, so combine them with structural guarantees (ratings by code, directions only from the catalog or the client, one document per call).
 - Lesson: verify every push with `git ls-remote` (compare the remote head with the local commit). A push can look successful while the remote branch is behind.
