@@ -59,6 +59,7 @@ __all__ = [
     "confirm_topic",
     "document_digest",
     "safety_pass",
+    "subset_document",
 ]
 
 _SENTINEL: Final = object()
@@ -212,6 +213,25 @@ def document_digest(document: PseudonymizedDocument) -> str:
         digest.update(len(part).to_bytes(8, "big"))
         digest.update(part.encode("utf-8"))
     return digest.hexdigest()
+
+
+def subset_document(
+    document: PseudonymizedDocument, clause_ids: Sequence[str]
+) -> PseudonymizedDocument:
+    """A document made of some clauses of an already checked document (same clause objects).
+
+    Used to send a batch of clauses to the AI layer (ADR 0018). The order of the original
+    document is kept. Raises ``ValueError`` for an unknown or repeated id."""
+    wanted = set(clause_ids)
+    known = {clause.id for clause in document.clauses}
+    if len(wanted) != len(clause_ids) or not wanted <= known:
+        msg = "unknown or repeated clause id"
+        raise ValueError(msg)
+    return PseudonymizedDocument(
+        document.label,
+        tuple(clause for clause in document.clauses if clause.id in wanted),
+        _SENTINEL,
+    )
 
 
 def _detector_clauses(texts: list[str]) -> list[Clause]:

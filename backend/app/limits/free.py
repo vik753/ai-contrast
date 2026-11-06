@@ -85,6 +85,9 @@ class FreeQuota:
         )
         self._topic_cap = neuron_budget * TOPIC_BUDGET_PERCENT // 100
         self._topic_spent = 0
+        # Analyses (tagging and stage 9) use the rest of the budget (ADR 0018 point 7).
+        self._analysis_cap = neuron_budget - self._topic_cap
+        self._analysis_spent = 0
 
     @staticmethod
     def _day_of(now: float) -> int:
@@ -97,6 +100,7 @@ class FreeQuota:
             self._day = day
             self._spent = 0
             self._topic_spent = 0
+            self._analysis_spent = 0
         return now
 
     def _until_midnight(self, now: float) -> int:
@@ -108,30 +112,43 @@ class FreeQuota:
         return max(0, self._budget - self._spent)
 
     def _reserve(
-        self, key: str, neurons: int, calls: FixedWindowLimiter, *, topic: bool
+        self,
+        key: str,
+        neurons: int,
+        calls: FixedWindowLimiter | None,
+        *,
+        topic: bool,
+        analysis: bool = False,
     ) -> QuotaDecision:
         if neurons < 1:
             msg = "neurons must be positive"
             raise ValueError(msg)
         now = self._roll()
-        over_share = topic and self._topic_spent + neurons > self._topic_cap
+        over_share = (topic and self._topic_spent + neurons > self._topic_cap) or (
+            analysis and self._analysis_spent + neurons > self._analysis_cap
+        )
         if self._spent + neurons > self._budget or over_share:
             return QuotaDecision(False, self._until_midnight(now), "budget")
-        decision = calls.hit(key)
-        if not decision.allowed:
-            # A key without a fresh entry is refused only because the table is full.
-            reason: Reason = "ip" if calls.has(key) else "table"
-            return QuotaDecision(False, decision.retry_after, reason)
+        if calls is not None:
+            decision = calls.hit(key)
+            if not decision.allowed:
+                # A key without a fresh entry is refused only because the table is full.
+                reason: Reason = "ip" if calls.has(key) else "table"
+                return QuotaDecision(False, decision.retry_after, reason)
         self._spent += neurons
         if topic:
             self._topic_spent += neurons
+        if analysis:
+            self._analysis_spent += neurons
         return QuotaDecision(True)
 
-    def _settle(self, estimate: int, actual: int, *, topic: bool) -> None:
+    def _settle(self, estimate: int, actual: int, *, topic: bool, analysis: bool = False) -> None:
         self._roll()
         self._spent = max(0, self._spent - estimate + max(0, actual))
         if topic:
             self._topic_spent = max(0, self._topic_spent - estimate + max(0, actual))
+        if analysis:
+            self._analysis_spent = max(0, self._analysis_spent - estimate + max(0, actual))
 
     def reserve(self, key: str, neurons: int) -> QuotaDecision:
         """Count one call for ``key`` and reserve ``neurons``, or refuse and count nothing."""
@@ -156,3 +173,27 @@ class FreeQuota:
     def refund_topic_call(self, key: str) -> None:
         """Undo the per-key call of a ``reserve_topic`` whose model did no work."""
         self._topic_calls.refund(key)
+
+    def reserve_analysis(self, key: str, neurons: int, *, start: bool) -> QuotaDecision:
+        """Reserve the worst-case ``neurons`` of an analysis request from the analysis share.
+
+        ``start`` is the request that starts an analysis (it verified Turnstile): only that
+        one counts a call against the per-key daily limit."""
+        calls = self._calls if start else None
+        return self._reserve(key, neurons, calls, topic=False, analysis=True)
+
+    def settle_analysis(self, estimate: int, actual: int) -> None:
+        """Replace the reserved ``estimate`` of an analysis request by the ``actual`` Neurons."""
+        self._settle(estimate, actual, topic=False, analysis=True)
+
+
+_USAGE_FIELDS: Final = 2
+
+
+def reported_neurons(provider: object) -> int | None:
+    """The Neurons a provider reported so far (``usage`` = input and output tokens), or
+    ``None`` when it reports no usage."""
+    usage = getattr(provider, "usage", None)
+    if not (isinstance(usage, tuple) and len(usage) == _USAGE_FIELDS):
+        return None
+    return usage_neurons(*usage)

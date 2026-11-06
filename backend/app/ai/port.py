@@ -30,6 +30,7 @@ __all__ = [
     "AIRequest",
     "CheckResult",
     "ModelJson",
+    "TaggingRequest",
 ]
 
 MAX_OUTPUT_TOKENS: Final = 16384
@@ -70,11 +71,16 @@ class CheckResult:
 # Field set of each template: (document, topic, text) each "required", "optional" or "forbidden"
 # (ADR 0017 point 5; ADR 0009: attribute proposal and synonym expansion take no document).
 _FIELD_SETS: dict[PromptTemplate, tuple[str, str, str]] = {
+    PromptTemplate.TAG_CLAUSES: ("required", "forbidden", "forbidden"),
+    PromptTemplate.CHECK_TAGS: ("required", "forbidden", "forbidden"),
     PromptTemplate.DOCUMENT_JSON: ("required", "optional", "optional"),
     PromptTemplate.SUGGEST_TOPICS: ("required", "forbidden", "forbidden"),
     PromptTemplate.PROPOSE_ATTRIBUTES: ("forbidden", "required", "forbidden"),
     PromptTemplate.EXPAND_SYNONYMS: ("forbidden", "required", "forbidden"),
 }
+
+
+_TAGGING_TEMPLATES = frozenset({PromptTemplate.TAG_CLAUSES, PromptTemplate.CHECK_TAGS})
 
 
 @dataclass(frozen=True)
@@ -90,6 +96,8 @@ class AIRequest:
     def __post_init__(self) -> None:
         if not isinstance(self.template, PromptTemplate):
             raise TypeError("template has a wrong type")  # noqa: TRY003
+        if self.template in _TAGGING_TEMPLATES and not isinstance(self, TaggingRequest):
+            raise TypeError("the fields do not fit the template")  # noqa: TRY003
         checks = (
             (self.document, PseudonymizedDocument),
             (self.text, PseudonymizedText),
@@ -116,6 +124,38 @@ class AIRequest:
             raise ValueError("repair is out of range")  # noqa: TRY003
         if type(self.max_tokens) is not int or not 1 <= self.max_tokens <= MAX_OUTPUT_TOKENS:
             raise ValueError("max_tokens is out of range")  # noqa: TRY003
+
+
+@dataclass(frozen=True)
+class TaggingRequest(AIRequest):
+    """A tagging call (ADR 0018 point 3): the request of ``TAG_CLAUSES`` or ``CHECK_TAGS``.
+
+    ``topics`` are listed as ``T1..Tn`` (number = position + 1) with name and description only;
+    ``topic_numbers`` selects which are listed (all when empty). ``pairs`` (``CHECK_TAGS`` only)
+    are asked ``(clause position in document, topic number)`` pairs: numbers, never text.
+    The fields live here, not in ``AIRequest``, which stays free of tuples and text."""
+
+    topics: tuple[ConfirmedTopic, ...] = ()
+    pairs: tuple[tuple[int, int], ...] = ()
+    topic_numbers: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.template not in _TAGGING_TEMPLATES:
+            raise TypeError("the fields do not fit the template")  # noqa: TRY003
+        if not self.topics or not all(isinstance(t, ConfirmedTopic) for t in self.topics):
+            raise TypeError("topics are missing or have a wrong type")  # noqa: TRY003
+        asking = self.template is PromptTemplate.CHECK_TAGS
+        if asking != bool(self.pairs) or (not asking and self.topic_numbers):
+            raise TypeError("the fields do not fit the template")  # noqa: TRY003
+        numbers = self.topic_numbers or tuple(range(1, len(self.topics) + 1))
+        clauses = len(self.document.clauses) if self.document is not None else 0
+        if (
+            len(set(numbers)) != len(numbers)
+            or not all(1 <= n <= len(self.topics) for n in numbers)
+            or not all(0 <= c < clauses and n in numbers for c, n in self.pairs)
+        ):
+            raise ValueError("pairs or topic numbers do not fit the request")  # noqa: TRY003
 
 
 @runtime_checkable

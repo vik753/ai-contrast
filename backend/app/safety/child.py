@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 
 from pydantic import ValidationError
 
@@ -21,14 +22,19 @@ from app.segment.child import no_duplicate_keys
 INVALID_REQUEST = "invalid_request"
 
 
-def digest(document: PseudonymizedDocument) -> str:
+def digest_of(label: str, clauses: Iterable[tuple[str, str]]) -> str:
     """SHA-256 of the canonical masked document: label, clause ids and texts in order."""
     canonical = json.dumps(
-        [document.label, [[clause.id, clause.text] for clause in document.clauses]],
+        [label, [[clause_id, text] for clause_id, text in clauses]],
         ensure_ascii=False,
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def digest(document: PseudonymizedDocument) -> str:
+    """The digest of a checked document (see ``digest_of``)."""
+    return digest_of(document.label, ((clause.id, clause.text) for clause in document.clauses))
 
 
 def run(data: bytes, *, max_clauses: int) -> bytes:

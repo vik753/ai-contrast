@@ -114,6 +114,11 @@ class Settings(BaseSettings):
       ``FREE_TOPIC_CALLS_PER_IP_PER_DAY`` (free topic calls per /48 and day),
       ``FREE_PASS_MAX_CALLS`` (calls per free pass), ``FREE_PASS_MAX_ENTRIES``
       (live passes, 1 to 10000; the table fails closed when full).
+    - Tagging (S8-T2, ADR 0018): ``TAG_PER_MINUTE``, ``TAG_PER_DAY`` (per client key),
+      ``TAG_DEADLINE_SECONDS`` (all AI calls of one request), ``TAG_CALL_DEADLINE_SECONDS``
+      (one AI call), ``TAG_MAX_DOCUMENT_CHARS`` (clause characters per document),
+      ``KEYWORD_STEP_BUDGET`` (steps of the keyword matcher), ``ANALYSIS_PASS_MAX_CALLS`` and
+      ``ANALYSIS_PASS_MAX_NEURONS`` (worst-case AI calls and Neurons of one analysis pass).
     - In production the four free settings are all set or all unset, and the Cloudflare
       Turnstile test secrets (``1x…``, ``2x…``, ``3x…``) are refused.
 
@@ -218,6 +223,14 @@ class Settings(BaseSettings):
     free_topic_calls_per_ip_per_day: PositiveInt = 40
     free_pass_max_calls: PositiveInt = 20
     free_pass_max_entries: Annotated[int, Field(ge=1, le=10000)] = 10000
+    tag_per_minute: PositiveInt = 10
+    tag_per_day: PositiveInt = 60
+    tag_deadline_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 300.0
+    tag_call_deadline_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 60.0
+    tag_max_document_chars: PositiveInt = 300_000
+    keyword_step_budget: PositiveInt = 1_000_000
+    analysis_pass_max_calls: PositiveInt = 40
+    analysis_pass_max_neurons: PositiveInt = 3000
 
     max_file_bytes: PositiveInt = 10 * MIB
     max_json_body_bytes: PositiveInt = 64 * 1024

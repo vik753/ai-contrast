@@ -16,10 +16,10 @@ import hmac
 import re
 import secrets
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
-__all__ = ["FreePassError", "FreePasses"]
+__all__ = ["FreePassError", "FreePasses", "PassEntry"]
 
 VERSION: Final = "v1"
 AUDIENCE: Final = "topics"
@@ -40,20 +40,26 @@ class FreePassError(Exception):
 
 
 @dataclass(slots=True)
-class _Entry:
+class PassEntry:
     expiry: int
     calls: int
     owner: str
+    # Analysis passes only (``app.limits.analysis_pass``): Neurons reserved or spent, and the
+    # recorded documents (digest -> characters).
+    neurons: int = 0
+    documents: dict[str, int] = field(default_factory=dict)
 
 
 class FreePasses:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         max_entries: int,
         max_calls: int,
         clock: Callable[[], float],
         *,
         ttl: int = TTL_SECONDS,
+        audience: str = AUDIENCE,
+        code_prefix: str = "free_pass",
     ) -> None:
         if max_entries < 1 or max_calls < 1 or ttl < 1:
             msg = "max_entries, max_calls and ttl must be positive"
@@ -63,8 +69,10 @@ class FreePasses:
         self._max_calls = max_calls
         self._clock = clock
         self._ttl = ttl
+        self._audience = audience
+        self._prefix = code_prefix
         # nonce -> [expiry, calls]; the oldest pass first (the lifetime is fixed).
-        self._table: dict[str, _Entry] = {}
+        self._table: dict[str, PassEntry] = {}
         # client hash -> nonce of its one live pass (a new solve replaces the old pass).
         self._owner: dict[str, str] = {}
 
@@ -106,40 +114,50 @@ class FreePasses:
             return None
         expiry = int(now) + self._ttl
         nonce = secrets.token_hex(16)
-        self._table[nonce] = _Entry(expiry, 1, owner)
+        self._table[nonce] = PassEntry(expiry, 1, owner)
         self._owner[owner] = nonce
-        head = f"{VERSION}.{AUDIENCE}.{expiry}.{owner}.{nonce}"
+        head = f"{VERSION}.{self._audience}.{expiry}.{owner}.{nonce}"
         return f"{head}.{self._digest(head)}", nonce
+
+    def _error(self, kind: str) -> FreePassError:
+        return FreePassError(f"{self._prefix}_{kind}")
+
+    def lookup(self, value: str, client: str) -> tuple[str, PassEntry]:
+        """Validate a pass for ``client`` and return its nonce and entry (no call counting).
+
+        Raises ``FreePassError`` (``..._invalid`` or ``..._expired``)."""
+        parts = value.split(".")
+        if len(value) > MAX_PASS_CHARS or len(parts) != _PARTS:
+            raise self._error("invalid")
+        version, audience, expiry, owner, nonce, tag = parts
+        shape_ok = (
+            version == VERSION
+            and audience == self._audience
+            and _EXPIRY_RE.fullmatch(expiry) is not None
+            and all(_HEX_RE.fullmatch(part) is not None for part in (owner, nonce, tag))
+        )
+        if not shape_ok:
+            raise self._error("invalid")
+        head = ".".join(parts[:-1])
+        if not hmac.compare_digest(self._digest(head), tag):
+            raise self._error("invalid")
+        now = self._clock()
+        if now >= int(expiry):
+            raise self._error("expired")
+        if not hmac.compare_digest(self._client(client), owner):
+            raise self._error("invalid")
+        entry = self._table.get(nonce)
+        if entry is None:
+            raise self._error("invalid")
+        return nonce, entry
 
     def check(self, value: str, client: str) -> str:
         """Validate a pass for ``client`` and return its nonce; count nothing.
 
         Raises ``FreePassError``."""
-        parts = value.split(".")
-        if len(value) > MAX_PASS_CHARS or len(parts) != _PARTS:
-            raise FreePassError("free_pass_invalid")
-        version, audience, expiry, owner, nonce, tag = parts
-        shape_ok = (
-            version == VERSION
-            and audience == AUDIENCE
-            and _EXPIRY_RE.fullmatch(expiry) is not None
-            and all(_HEX_RE.fullmatch(part) is not None for part in (owner, nonce, tag))
-        )
-        if not shape_ok:
-            raise FreePassError("free_pass_invalid")
-        head = ".".join(parts[:-1])
-        if not hmac.compare_digest(self._digest(head), tag):
-            raise FreePassError("free_pass_invalid")
-        now = self._clock()
-        if now >= int(expiry):
-            raise FreePassError("free_pass_expired")
-        if not hmac.compare_digest(self._client(client), owner):
-            raise FreePassError("free_pass_invalid")
-        entry = self._table.get(nonce)
-        if entry is None:
-            raise FreePassError("free_pass_invalid")
+        nonce, entry = self.lookup(value, client)
         if entry.calls >= self._max_calls:
-            raise FreePassError("free_pass_exhausted")
+            raise self._error("exhausted")
         return nonce
 
     def use(self, value: str, client: str) -> str:
@@ -147,6 +165,10 @@ class FreePasses:
         nonce = self.check(value, client)
         self._table[nonce].calls += 1
         return nonce
+
+    def entry(self, nonce: str) -> PassEntry | None:
+        """The live entry of ``nonce`` (for the analysis pass subclass)."""
+        return self._table.get(nonce)
 
     def refund(self, nonce: str) -> None:
         """Give back one call of a pass whose call did no work (never below 1)."""

@@ -16,9 +16,11 @@ from typing import Final
 from app.net.guard import BlockedHostError, check_hostname
 
 __all__ = [
+    "MODEL_PAIRS",
     "PRESETS",
     "AdapterKind",
     "ConnectionConfigError",
+    "ModelPair",
     "Preset",
     "PresetId",
     "checked_base_url",
@@ -85,7 +87,7 @@ PRESETS: Final[Mapping[PresetId, Preset]] = MappingProxyType(
             PresetId.ANTHROPIC,
             AdapterKind.ANTHROPIC,
             "https://api.anthropic.com",
-            ("claude-sonnet-4-5", "claude-haiku-4-5"),
+            ("claude-sonnet-5-5", "claude-haiku-5-5", "claude-haiku-4-5"),
         ),
         PresetId.OPENAI: _openai(
             PresetId.OPENAI, "https://api.openai.com/v1", "gpt-4o", "gpt-4o-mini"
@@ -109,6 +111,27 @@ PRESETS: Final[Mapping[PresetId, Preset]] = MappingProxyType(
             "anthropic/claude-sonnet-4.5",
         ),
         PresetId.CUSTOM: _openai(PresetId.CUSTOM, None),
+    }
+)
+
+
+@dataclass(frozen=True)
+class ModelPair:
+    """The cheap model (tagging) and the strong model (checks) of a preset (ADR 0018 point 3)."""
+
+    cheap: str
+    strong: str
+
+
+# One pair per preset except ``custom`` (the client names both models). Both are preset models.
+MODEL_PAIRS: Final[Mapping[PresetId, ModelPair]] = MappingProxyType(
+    {
+        PresetId.FREE: ModelPair("@cf/openai/gpt-oss-120b", "@cf/openai/gpt-oss-120b"),
+        PresetId.ANTHROPIC: ModelPair("claude-haiku-5-5", "claude-sonnet-5-5"),
+        PresetId.OPENAI: ModelPair("gpt-4o-mini", "gpt-4o"),
+        PresetId.GEMINI: ModelPair("gemini-2.5-flash", "gemini-2.5-pro"),
+        PresetId.MISTRAL: ModelPair("mistral-small-latest", "mistral-large-latest"),
+        PresetId.OPENROUTER: ModelPair("openai/gpt-4o-mini", "anthropic/claude-sonnet-4.5"),
     }
 )
 
