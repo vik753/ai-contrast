@@ -48,6 +48,7 @@ Order: S9-T0 (fixtures, lexicons) and S9-T1 (verification library) in parallel; 
 
 - Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s9-ui`. After S9-T3's API is fixed. Threats: T1, T5, T9, T10.
 1. SSE client over `fetch` (strict parser, event size cap, abort), per-document runs in sequence, progress, stop; Clear all aborts streams and drops results; a free-pass reply that started before Clear all is ignored (stage 7 follow-up).
+1a. `topic`/`other` events are provisional: compare, final greens and cache only after `done` with `result_signature`; a stream without `done` → document `incomplete`, no greens, no comparison, nothing cached (test).
 2. `compare.ts` per point 5 (pure, tested: units, enums, categories, directions, not comparable, not confirmed).
 3. Minimal result view per point 9: colour + icon + text label, reason codes as text, quotes from the browser's own text by offsets, plain text only.
 4. Cache: one `CacheKey` type; `contractTextHash` null case; key includes the selection signature and `analysis_version` (stage 4 follow-ups).
@@ -60,7 +61,7 @@ Order: S9-T0 (fixtures, lexicons) and S9-T1 (verification library) in parallel; 
 ### S9-T6 Docs for stage 9
 
 - Owner: `docs-writer`. After S9-T0–T5 are merged.
-- ADR 0019 → accepted; threat model T5, T6, T10, T11 (document flags residual risk); `CLAUDE.md` Commands; README; archive stage 9; PROGRESS.
+- ADR 0019 → accepted; threat model T5 (browser-held extract flags residual risk; annex links are a client statement), T6, T10, T11 (cancelled calls charged at worst case; free mode refuses documents outside the pass digests); `CLAUDE.md` Commands; README; archive stage 9; PROGRESS.
 
 ## Open follow-ups
 

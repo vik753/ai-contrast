@@ -1,6 +1,6 @@
 # ADR 0019 — Analysis: rating per document, verification by code, comparison by code
 
-- Status: proposed (tech lead, 2026-11-06; round 2 after `security-reviewer` round 1)
+- Status: proposed (tech lead, 2026-11-06; `security-reviewer` approved the design after round 2)
 - Date: 2026-11-06
 - Related: ADR 0007 (free mode), ADR 0008/0015 (pseudonymization, gate types), ADR 0009 (Layers 3–4: one document per call, quotes, green rules, every cap fails closed), ADR 0013 (browser cache), ADR 0016 (AI port, limits, free mode), ADR 0017 (topics, attributes, directions), ADR 0018 (tagging, signature, analysis pass), threat model T1, T5, T6, T10, T11
 
@@ -66,7 +66,7 @@ The browser sends flags it got from `/api/extract` (and OCR) for this document: 
 - Request body ≤ 2 MiB; same document caps as `/api/tag`; at most 20 topics.
 - Worst-case reservation before the first call: topics × 2 + Other batches × 2 calls (one repair each), plus the Other batches needed if **every** topic fails at runtime and its clauses move to Other (each with a repair), each with its `max_tokens`. If that worst case exceeds the cap, the request is refused before any call. Above the per-request cap (`analysis_max_calls`, default 80) → `422 document_too_large_for_analysis` before any AI call.
 - Overall deadline 8 minutes per document; per-call deadline 90 s. Deadline → the open topics are `not_analyzed` (reason `timeout`), the open Other batches unrated → document `incomplete`, no greens.
-- Free mode: `/api/analyze` refuses a document whose digest is not among the analysis pass's recorded digests (`analysis_pass_document_mismatch`). The analysis pass of ADR 0018 point 7 covers the tag, check and analyze calls of its 2 documents; each call reserves its worst-case Neurons and settles with the reported usage; the pass call cap and Neuron cap apply.
+- Free mode: `/api/analyze` refuses a document whose digest is not among the analysis pass's recorded digests (`analysis_pass_document_mismatch`). The analysis pass of ADR 0018 point 7 covers the tag, check and analyze calls of its 2 documents; each call reserves its worst-case Neurons and settles with the reported usage (cancelled or unfinished calls at worst case, point 1); the pass call cap and Neuron cap apply.
 - Per-key concurrency and the AI slots of ADR 0016; `503 busy` with `Retry-After`.
 
 ### 8. Result signature and cache
@@ -77,6 +77,7 @@ The browser sends flags it got from `/api/extract` (and OCR) for this document: 
 ### 9. Browser (minimal view)
 
 - "Analyze" runs after tagging: per document an SSE stream (`fetch` + `ReadableStream`, strict event parser with a per-event and a total stream size cap), progress per document and topic, stop button, "Clear all" aborts every stream and drops results (as stage 8).
+- `topic` and `other` events are **provisional**. The browser compares values, shows greens as final and writes the cache only after a `done` event with a `result_signature`. A stream that ends without `done` gives an `incomplete` document: no greens, no comparison, nothing cached.
 - A minimal result view per topic: per document the attribute values (with `not_confirmed` / `not_stated`), the comparison marks, the findings with colour + icon + text label, the reason codes of capped greens as text, and "Other" findings; quotes are shown from the browser's own clause text by offsets. Plain text only. The full table, name restoration and export are stage 10.
 
 ### 10. Eval and policy tests
