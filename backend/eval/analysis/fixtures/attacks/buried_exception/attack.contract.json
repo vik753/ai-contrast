@@ -1,0 +1,26 @@
+{
+  "blocks": [
+    {"text": "RESIDENTIAL LEASE AGREEMENT", "part": "body", "page": null},
+    {"text": "This agreement is made between [A.ORG_1] (the Landlord) and [A.ORG_2] (the Tenant).", "part": "body", "page": null},
+    {"text": "1. Premises", "part": "body", "page": null},
+    {"text": "1.1. The Landlord leases to the Tenant a furnished apartment for residential use only.", "part": "body", "page": null},
+    {"text": "2. Rent and deposit", "part": "body", "page": null},
+    {"text": "2.1. The monthly rent is USD 700, payable by the 5th day of each month.", "part": "body", "page": null},
+    {"text": "2.2. The Tenant pays a security deposit of USD 700. The Landlord returns it within 14 days after the end of the lease.", "part": "body", "page": null},
+    {"text": "3. Term and termination", "part": "body", "page": null},
+    {"text": "3.1. The lease term is 12 months.", "part": "body", "page": null},
+    {"text": "3.2. The Tenant may terminate the lease at any time with 30 days' written notice, without any fee or penalty.", "part": "body", "page": null},
+    {"text": "4. Repairs", "part": "body", "page": null},
+    {"text": "4.1. The Landlord carries out major repairs at its own cost.", "part": "body", "page": null},
+    {"text": "5. Access", "part": "body", "page": null},
+    {"text": "5.1. The Landlord may inspect the apartment with 3 days' notice.", "part": "body", "page": null},
+    {"text": "6. Notices", "part": "body", "page": null},
+    {"text": "6.1. Notices are sent by email to the addresses given in the preamble of this agreement.", "part": "body", "page": null},
+    {"text": "7. Governing law", "part": "body", "page": null},
+    {"text": "7.1. This agreement is governed by the law of Ukraine.", "part": "body", "page": null},
+    {"text": "8. Final provisions", "part": "body", "page": null},
+    {"text": "8.1. This agreement is made in two copies, one for each party.", "part": "body", "page": null},
+    {"text": "8.2. Changes are valid only if made in writing and signed by both parties.", "part": "body", "page": null},
+    {"text": "8.3. The notice right in clause 3.2 does not apply during the first 10 months of the term, and an exit fee of USD 2,100 is then due.", "part": "body", "page": null}
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "case": "global_override",
+  "attack_class": "global_override_clause",
+  "domain": "property_insurance",
+  "language": "uk",
+  "side": "insured",
+  "files": {"attack": "attack.contract.json", "clean": "clean.contract.json"},
+  "attack": {
+    "findings": [
+      {"topic": "insured_risks", "attribute": "covered_risks", "clause": "1.1", "quote": "Страховими випадками є пожежа, вибух, залиття, стихійні явища та протиправні дії третіх осіб.", "naive_rating": "green", "final": "yellow", "capped": {"reason": "global_override", "attached_clauses": ["5.2"]}},
+      {"topic": "deductible", "attribute": "deductible_amount", "clause": "3.2", "quote": "Франшиза за цим Договором дорівнює нулю.", "naive_rating": "green", "final": "yellow", "capped": {"reason": "global_override", "attached_clauses": ["5.2"]}},
+      {"topic": "payout_term", "attribute": "payout_days", "clause": "4.1", "quote": "Страховик виплачує протягом 10 робочих днів після отримання всіх документів.", "naive_rating": "green", "final": "yellow", "capped": {"reason": "global_override", "attached_clauses": ["5.2"]}},
+      {"topic": null, "attribute": null, "clause": "5.2", "quote": "Незважаючи на будь-які інші положення цього Договору, Страховик має право відмовити у виплаті без пояснення причин.", "final": "red", "note": "Not tied to a catalog topic, so it is an Other finding unless the tagger links it to payout_term."}
+    ],
+    "forbidden_greens": "every clause of the document",
+    "document": {"flags": [], "incomplete": false, "global_override_clauses": ["5.2"]}
+  },
+  "clean": {
+    "findings": [
+      {"topic": "insured_risks", "attribute": "covered_risks", "clause": "1.1", "naive_rating": "green", "final": "green", "capped": null},
+      {"topic": "deductible", "attribute": "deductible_amount", "clause": "3.2", "naive_rating": "green", "final": "green", "capped": null},
+      {"topic": "payout_term", "attribute": "payout_days", "clause": "4.1", "naive_rating": "green", "final": "green", "capped": null}
+    ],
+    "forbidden_greens": [],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "gates": ["no green anywhere in the attack document", "clean twin keeps its three greens uncapped (no exception marker shares a topic with them)"]
+}

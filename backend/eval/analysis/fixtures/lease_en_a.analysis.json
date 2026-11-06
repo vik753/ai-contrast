@@ -1,0 +1,32 @@
+{
+  "contract": "lease_en_a",
+  "domain": "lease",
+  "language": "en",
+  "values_source": "backend/eval/topics/fixtures/lease_en_a/expected.json",
+  "value_notes": {"landlord_access.access_notice": "1 day (clause 7.1, written as 1 day's notice; the unit word has an apostrophe-s ending)"},
+  "findings": [
+    {"topic": "rent_amount", "attribute": "indexation_rate", "clause": "1.1", "quote": "The Landlord may increase the rent by up to 8% once a year.", "ratings": {"tenant": "yellow", "landlord": "green"}},
+    {"topic": "deposit", "attribute": "deposit_return_days", "clause": "1.2", "quote": "The Landlord returns it within 30 days after the end of the lease, less proven damage.", "ratings": {"tenant": "yellow", "landlord": "green"}},
+    {"topic": "term_renewal", "attribute": "renewal_option", "clause": "2.1", "quote": "The lease is renewed only by a new written agreement.", "ratings": {"tenant": "yellow", "landlord": "green"}},
+    {"topic": "utilities", "attribute": "utilities_payer", "clause": "3.1", "quote": "The Tenant pays all utilities and service charges.", "ratings": {"tenant": "yellow", "landlord": "green"}},
+    {"topic": "repairs_maintenance", "attribute": "major_repairs_by", "clause": "3.2", "quote": "Major repairs are carried out by the Landlord.", "ratings": {"tenant": "green", "landlord": "yellow"}},
+    {"topic": "termination_notice", "attribute": "tenant_notice_days", "clause": "4.1", "quote": "The Tenant may terminate the lease with 60 days' notice. The Landlord may terminate it with 30 days' notice.", "ratings": {"tenant": "red", "landlord": "green"}},
+    {"topic": "termination_notice", "attribute": "early_exit_fee", "clause": "4.2", "quote": "If the Tenant leaves early, the Tenant pays a fee of USD 600.", "ratings": {"tenant": "yellow", "landlord": "green"}},
+    {"topic": "late_penalties", "attribute": "late_penalty_rate", "clause": "5.1", "quote": "A late payment bears a penalty of 0.5% of the amount per day after a grace period of 3 days.", "ratings": {"tenant": "red", "landlord": "green"}},
+    {"topic": "sublease_use", "attribute": "sublease_allowed", "clause": "6.1", "quote": "Subletting is forbidden. Pets are allowed only with the Landlord's written consent.", "ratings": {"tenant": "yellow", "landlord": "green"}},
+    {"topic": "landlord_access", "attribute": "access_notice", "clause": "7.1", "quote": "The Landlord may inspect the premises with 1 day's notice.", "ratings": {"tenant": "yellow", "landlord": "green"}},
+    {"topic": "damage_liability", "attribute": "damage_cap", "clause": "8.1", "quote": "The Tenant is liable for damage caused by the Tenant without a cap on the amount.", "ratings": {"tenant": "red", "landlord": "green"}}
+  ],
+  "missing_topics": [],
+  "capped_greens": [],
+  "reduced_selection": {
+    "exclude_topics": ["late_penalties", "damage_liability"],
+    "other": [
+      {"clause": "5.1", "risk_term": true, "ratings": {"tenant": "red", "landlord": "green"}},
+      {"clause": "8.1", "risk_term": true, "ratings": {"tenant": "red", "landlord": "green"}},
+      {"clause": "5", "risk_term": false, "no_issue": true},
+      {"clause": "8", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false}
+}

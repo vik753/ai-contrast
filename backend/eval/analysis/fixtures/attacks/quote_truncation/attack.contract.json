@@ -1,0 +1,15 @@
+{
+  "blocks": [
+    {"text": "HOME INSURANCE POLICY", "part": "body", "page": null},
+    {"text": "[A.ORG_1] (the Insurer) insures the home of [A.ORG_2] (the Policyholder) on the terms below.", "part": "body", "page": null},
+    {"text": "1. Cover", "part": "body", "page": null},
+    {"text": "1.1. The policy covers fire, explosion, water damage and burglary.", "part": "body", "page": null},
+    {"text": "2. Settlement", "part": "body", "page": null},
+    {"text": "2.1. The Insurer pays the full cost of repair or replacement of the insured property; the payment is limited to 5% of the sum insured per event.", "part": "body", "page": null},
+    {"text": "2.2. The Insurer pays for loss of contents (e.g. furniture, appliances and clothing) unless the loss is below 20% of the item value.", "part": "body", "page": null},
+    {"text": "3. Sum insured", "part": "body", "page": null},
+    {"text": "3.1. The sum insured is EUR 90,000.", "part": "body", "page": null},
+    {"text": "4. Payout", "part": "body", "page": null},
+    {"text": "4.1. The Insurer pays within 15 working days after receiving all documents.", "part": "body", "page": null}
+  ]
+}

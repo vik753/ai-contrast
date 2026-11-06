@@ -10,6 +10,7 @@
     {
       "id": "liability_limits",
       "names": {"en": "Liability limits", "uk": "Ліміти відповідальності", "ru": "Лимиты ответственности"},
+      "essential": {"insured": true, "insurer": true, "injured_party": true},
       "descriptions": {"en": "Maximum payout per event for property damage and for life and health.", "uk": "Максимальна виплата за одну подію за шкоду майну та за життя і здоров'я.", "ru": "Максимальная выплата за одно событие за вред имуществу и за жизнь и здоровье."},
       "synonyms": {
         "en": ["liability", "liability limit", "maximum payout", "per event", "property damage", "life and health"],
@@ -77,6 +78,7 @@
     {
       "id": "payout_term",
       "names": {"en": "Payout term", "uk": "Строк виплати", "ru": "Срок выплаты"},
+      "essential": {"insured": false, "insurer": false, "injured_party": true},
       "descriptions": {"en": "Time to decide on the claim and to pay the injured party.", "uk": "Строк на рішення за заявою та виплату потерпілому.", "ru": "Срок на решение по заявлению и выплату потерпевшему."},
       "synonyms": {
         "en": ["payout term", "pay within", "settlement period", "decision", "claim"],
@@ -119,6 +121,7 @@
     {
       "id": "recourse",
       "names": {"en": "Recourse against the policyholder", "uk": "Регрес до страхувальника", "ru": "Регресс к страхователю"},
+      "essential": {"insured": true, "insurer": true, "injured_party": false},
       "descriptions": {"en": "Cases where the insurer, after paying, claims the amount back from the insured.", "uk": "Випадки, коли страховик після виплати вимагає суму від страхувальника.", "ru": "Случаи, когда страховщик после выплаты требует сумму со страхователя."},
       "synonyms": {
         "en": ["recourse", "regress", "reimburse the insurer", "recovery", "intoxication", "left the scene"],

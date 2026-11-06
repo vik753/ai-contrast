@@ -1,0 +1,32 @@
+{
+  "contract": "property_uk_a",
+  "domain": "property_insurance",
+  "language": "uk",
+  "values_source": "backend/eval/topics/fixtures/property_uk_a/expected.json",
+  "value_notes": {},
+  "findings": [
+    {"topic": "insured_risks", "attribute": "covered_risks", "clause": "1.1", "quote": "Страховими випадками є пожежа, вибух, залиття, стихійні явища, протиправні дії третіх осіб та воєнні ризики.", "ratings": {"insured": "green", "insurer": "red"}},
+    {"topic": "exclusions", "attribute": "excluded_situations", "clause": "2.1", "quote": "Не є страховими випадками збитки внаслідок умислу або грубої необережності Страхувальника, зносу майна та втрати готівки і цінностей.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "sum_insured_limits", "attribute": "contents_sublimit", "clause": "3.2", "quote": "Підліміт на рухоме майно — 30% від страхової суми.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "sum_insured_limits", "attribute": "proportional_reduction", "clause": "3.3", "quote": "У разі неповного страхування виплата зменшується пропорційно.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "deductible", "attribute": "deductible_amount", "clause": "4.1", "quote": "Франшиза становить 3 000 грн за кожною подією.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "valuation_depreciation", "attribute": "valuation_basis", "clause": "4.2", "quote": "Збиток визначається за вартістю відновлення без урахування зносу.", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "payout_term", "attribute": "payout_days", "clause": "5.1", "quote": "Страховик виплачує протягом 15 робочих днів після отримання всіх документів.", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "notice_documents", "attribute": "notice_deadline", "clause": "6.1", "quote": "Страхувальник повідомляє Страховика про подію протягом 3 робочих днів і надає довідку аварійної служби та фото пошкоджень.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "insured_obligations", "attribute": "required_measures", "clause": "7.1", "quote": "Страхувальник підтримує вхідні двері із сертифікованими замками та проводить щорічний огляд водопровідних комунікацій.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "premium_termination", "attribute": "refund_share", "clause": "8.1", "quote": "У разі дострокового припинення повертається 60% премії за невикористаний період.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "subrogation", "attribute": "recourse_against_insured", "clause": "9.1", "quote": "Регрес до Страхувальника не передбачений.", "ratings": {"insured": "green", "insurer": "yellow"}}
+  ],
+  "missing_topics": [],
+  "capped_greens": [],
+  "reduced_selection": {
+    "exclude_topics": ["insured_obligations", "subrogation"],
+    "other": [
+      {"clause": "7.1", "risk_term": false, "ratings": {"insured": "yellow", "insurer": "green"}},
+      {"clause": "9.1", "risk_term": false, "ratings": {"insured": "green", "insurer": "yellow"}},
+      {"clause": "7", "risk_term": false, "no_issue": true},
+      {"clause": "9", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false}
+}

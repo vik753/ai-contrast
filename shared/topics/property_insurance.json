@@ -9,6 +9,7 @@
     {
       "id": "insured_risks",
       "names": {"en": "Insured risks", "uk": "Страхові ризики", "ru": "Страховые риски"},
+      "essential": {"insured": true, "insurer": true},
       "descriptions": {"en": "Which events the policy covers for the property.", "uk": "Які події покриває поліс щодо майна.", "ru": "Какие события покрывает полис в отношении имущества."},
       "synonyms": {
         "en": ["insured risk", "insured event", "perils", "fire", "flood", "burst pipe", "burglary", "explosion"],
@@ -32,6 +33,7 @@
     {
       "id": "exclusions",
       "names": {"en": "Exclusions", "uk": "Винятки зі страхового покриття", "ru": "Исключения из страхового покрытия"},
+      "essential": {"insured": true, "insurer": true},
       "descriptions": {"en": "Events and property for which the insurer does not pay.", "uk": "Події та майно, за які страховик не виплачує.", "ru": "События и имущество, за которые страховщик не платит."},
       "synonyms": {
         "en": ["exclusion", "not covered", "excluded", "liable", "wear", "gross negligence"],
@@ -54,6 +56,7 @@
     {
       "id": "sum_insured_limits",
       "names": {"en": "Sum insured and sublimits", "uk": "Страхова сума та підліміти", "ru": "Страховая сумма и подлимиты"},
+      "essential": {"insured": true, "insurer": true},
       "descriptions": {"en": "Total limit, limits for contents and the rule on underinsurance.", "uk": "Загальний ліміт, ліміти на майно всередині та правило неповного страхування.", "ru": "Общий лимит, лимиты на имущество внутри и правило неполного страхования."},
       "synonyms": {
         "en": ["sum insured", "liability", "sublimit", "underinsurance", "proportional", "contents"],
@@ -115,6 +118,7 @@
     {
       "id": "payout_term",
       "names": {"en": "Payout term", "uk": "Строк страхової виплати", "ru": "Срок страховой выплаты"},
+      "essential": {"insured": true, "insurer": false},
       "descriptions": {"en": "Time to decide on the claim and to pay.", "uk": "Строк на рішення за заявою та виплату.", "ru": "Срок на решение по заявлению и выплату."},
       "synonyms": {
         "en": ["payout term", "pay within", "settlement period", "claim decision", "payment deadline"],

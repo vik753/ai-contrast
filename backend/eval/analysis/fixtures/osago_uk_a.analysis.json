@@ -1,0 +1,31 @@
+{
+  "contract": "osago_uk_a",
+  "domain": "osago",
+  "language": "uk",
+  "values_source": "backend/eval/topics/fixtures/osago_uk_a/expected.json",
+  "value_notes": {},
+  "findings": [
+    {"topic": "liability_limits", "attribute": "limit_property", "clause": "1.1", "quote": "Ліміт відповідальності за шкоду, заподіяну майну потерпілих, становить 250 000 грн", "ratings": {"insured": "yellow", "insurer": "green", "injured_party": "yellow"}},
+    {"topic": "deductible", "attribute": "deductible_amount", "clause": "1.2", "quote": "Франшиза становить 2 000 грн.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "policy_territory", "attribute": "territory_scope", "clause": "2.1", "quote": "Договір діє 12 місяців на території України та країн", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "accident_notice", "attribute": "notice_deadline", "clause": "3.1", "quote": "повідомляє Страховика про ДТП протягом 5 робочих днів", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "payout_term", "attribute": "payout_days", "clause": "4.1", "quote": "виплачує страхове відшкодування протягом 30 днів після отримання заяви потерпілого", "ratings": {"injured_party": "yellow", "insurer": "green"}},
+    {"topic": "payout_term", "attribute": "late_penalty", "clause": "4.2", "quote": "За прострочення виплати Страховик сплачує пеню 0,1% від суми за кожен день прострочення", "ratings": {"injured_party": "green", "insurer": "yellow"}},
+    {"topic": "direct_settlement", "attribute": "direct_settlement_available", "clause": "4.3", "quote": "Потерпілий може звернутися до свого страховика у порядку прямого врегулювання", "ratings": {"injured_party": "green", "insured": "green", "insurer": "yellow"}},
+    {"topic": "recourse", "attribute": "recourse_grounds", "clause": "5.1", "quote": "Страховик має право регресу до Страхувальника, якщо він керував у стані сп'яніння, залишив місце ДТП або не повідомив Страховика у встановлений строк", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "premium_bonus_malus", "attribute": "bonus_discount", "clause": "6.1", "quote": "Знижка за безаварійність — 10%.", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "termination_refund", "attribute": "refund_share", "clause": "7.1", "quote": "повертає 70% страхового платежу за невикористаний період", "ratings": {"insured": "yellow", "insurer": "green"}}
+  ],
+  "missing_topics": [],
+  "capped_greens": [],
+  "reduced_selection": {
+    "exclude_topics": ["recourse", "premium_bonus_malus"],
+    "other": [
+      {"clause": "5.1", "risk_term": true, "ratings": {"insured": "yellow", "insurer": "green"}},
+      {"clause": "6.1", "risk_term": false, "ratings": {"insured": "green", "insurer": "yellow"}},
+      {"clause": "5", "risk_term": false, "no_issue": true},
+      {"clause": "6", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false}
+}

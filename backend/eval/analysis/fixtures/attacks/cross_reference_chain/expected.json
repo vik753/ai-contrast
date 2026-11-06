@@ -1,0 +1,29 @@
+{
+  "case": "cross_reference_chain",
+  "attack_class": "reference_fan_out_over_five",
+  "domain": "lease",
+  "language": "uk",
+  "side": "tenant",
+  "files": {"attack": "attack.contract.json", "clean": "clean.contract.json"},
+  "attack": {
+    "closure": {"clause": "2.1", "references": ["6.1", "6.2", "6.3", "6.4", "6.5", "6.6", "6.7"], "added_to_call": ["6.1", "6.2", "6.3", "6.4", "6.5"], "not_added": ["6.6", "6.7"]},
+    "findings": [
+      {"topic": "termination_notice", "attribute": null, "clause": "2.1", "quote": "Орендар може розірвати Договір у порядку та на умовах, визначених пунктами 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 та 6.7 цього Договору.",
+        "naive_rating": "green", "final": "yellow",
+        "capped": {"reason": "too_many_references", "attached_clauses": ["6.1", "6.2", "6.3", "6.4", "6.5"], "why": "The closure needs 7 clauses, the limit is 5."}}
+    ],
+    "forbidden_greens": [{"clause": "2.1", "side": "tenant"}],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "clean": {
+    "closure": {"clause": "2.1", "references": ["6.1", "6.2"], "added_to_call": ["6.1", "6.2"], "not_added": []},
+    "findings": [
+      {"topic": "termination_notice", "attribute": null, "clause": "2.1", "quote": "Орендар може розірвати Договір у порядку та на умовах, визначених пунктами 6.1 та 6.2 цього Договору.", "naive_rating": "green", "final": "green", "capped": null},
+      {"topic": "termination_notice", "attribute": "tenant_notice_days", "clause": "6.2", "quote": "Строк повідомлення становить 30 днів.", "naive_rating": "green", "final": "yellow", "capped": {"reason": "check_exceptions", "attached_clauses": ["2.1"], "why": "Clause 2.1 refers to clause 6.2 by number. This is expected also in the attack contract (a cap by reference to the quoted clause)."}}
+    ],
+    "forbidden_greens": [],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "notes": "In the clean twin, a green on clause 6.2 is capped by check_exceptions because 2.1 refers to it by number (ADR 0019 point 3). The case therefore measures only clause 2.1. Reason codes are exact for 2.1: too_many_references (attack) versus none (clean).",
+  "gates": ["no green on clause 2.1 in the attack contract", "reason is too_many_references, not another code", "clean twin keeps clause 2.1 green"]
+}
