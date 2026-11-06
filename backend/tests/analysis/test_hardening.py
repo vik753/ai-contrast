@@ -296,3 +296,32 @@ def test_clean_value_still_verified_next_to_new_checks() -> None:
     lx = LANGS["en"]
     out = verify_value(ctx(c("c1", lx.base)), ValueIn("a", (ev("c1", lx.quote),), number=DAYS10))
     assert out.status is ValueStatus.verified
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Условия определены в размещённых выше документах.",
+        "Условия определены в размещенных выше документах.",
+        "УСЛОВИЯ ОПРЕДЕЛЕНЫ В РАЗМЕЩЁННЫХ ВЫШЕ ДОКУМЕНТАХ.",
+    ],
+)
+def test_yo_and_ye_spellings_match_the_same_relative_reference(sentence: str) -> None:
+    lx = LANGS["ru"]
+    out = apply_green_rules(ctx(c("c1", f"{lx.base} {sentence}")), green("c1", lx.quote))
+    assert Reason.unresolved_reference in out.reasons
+
+
+SELF_REF = [
+    ("en", "The deadline in this section may be changed."),
+    ("uk", "Строк згідно з умовами цього розділу може бути змінений."),
+    ("ru", "Срок согласно условиям настоящего раздела может быть изменён."),
+]
+
+
+@pytest.mark.parametrize(("lang", "sentence"), SELF_REF)
+def test_self_reference_phrase_caps_green_as_unresolved_reference(lang: str, sentence: str) -> None:
+    lx = LANGS[lang]
+    out = apply_green_rules(ctx(c("c1", f"{lx.base} {sentence}")), green("c1", lx.quote))
+    assert out.rating is Rating.yellow
+    assert Reason.unresolved_reference in out.reasons
