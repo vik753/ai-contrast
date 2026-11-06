@@ -21,7 +21,8 @@ def t(i: str, n: int = 0, state: TopicState = TopicState.ok, essential: bool = F
 
 def test_missing_topic_non_essential_is_yellow() -> None:
     (f,) = missing_topic_findings(OK, [t("x")])
-    assert f.topic == "x" and f.rating is Rating.yellow
+    assert f.topic == "x"
+    assert f.rating is Rating.yellow
 
 
 def test_missing_topic_essential_is_red() -> None:
@@ -57,7 +58,9 @@ def test_missing_topics_are_reported_per_topic_in_order() -> None:
 
 def test_all_other_clauses_rated_is_complete() -> None:
     r = document_completeness(other_total=5, other_rated=5)
-    assert not r.incomplete and r.unrated_other == 0 and r.greens_allowed
+    assert not r.incomplete
+    assert r.unrated_other == 0
+    assert r.greens_allowed
 
 
 def test_zero_other_clauses_is_complete() -> None:
@@ -66,7 +69,9 @@ def test_zero_other_clauses_is_complete() -> None:
 
 def test_unrated_other_clause_makes_document_incomplete_and_forbids_greens() -> None:
     r = document_completeness(other_total=5, other_rated=3)
-    assert r.incomplete and r.unrated_other == 2 and not r.greens_allowed
+    assert r.incomplete
+    assert r.unrated_other == 2
+    assert not r.greens_allowed
 
 
 def test_not_analyzed_topic_clauses_go_to_other() -> None:

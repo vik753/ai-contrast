@@ -1,6 +1,8 @@
+# ruff: noqa: RUF001
 """Quote check and expansion (ADR 0019 point 3.1, 3.2)."""
 
 import dataclasses
+
 import pytest
 
 from app.analysis.verify import Clause, Evidence, expand_quote, verify_quote
@@ -11,7 +13,8 @@ from .helpers import c
 def test_verify_quote_exact_match_returns_offsets() -> None:
     cl = c("c1", "Pay within 10 days of notice.")
     r = verify_quote(cl, "within 10 days")
-    assert r.ok and r.spans == ((4, 18),)
+    assert r.ok
+    assert r.spans == ((4, 18),)
 
 
 def test_verify_quote_whitespace_runs_in_quote_fold_to_one_space() -> None:
@@ -47,7 +50,8 @@ def test_verify_quote_punctuation_is_not_folded(text: str, quote: str) -> None:
 
 def test_verify_quote_absent_quote_fails() -> None:
     r = verify_quote(c("c1", "Pay within 10 days."), "within 20 days")
-    assert not r.ok and r.spans == ()
+    assert not r.ok
+    assert r.spans == ()
 
 
 @pytest.mark.parametrize("quote", ["", " ", "\n\t"])
@@ -136,7 +140,9 @@ def test_expand_quote_abbreviation_period_is_not_a_sentence_end(
     s = text.index(inside)
     a, b = expand_quote(text, s, s + len(inside), abbreviations=frozenset({abbr}))
     assert text[a:b].startswith(start_word)
-    assert text[a:b].endswith(".") and "Next" not in text[a:b] and "Дальше" not in text[a:b]
+    assert text[a:b].endswith(".")
+    assert "Next" not in text[a:b]
+    assert "Дальше" not in text[a:b]
 
 
 def test_expand_quote_without_that_abbreviation_the_period_ends_the_sentence() -> None:

@@ -1,8 +1,9 @@
+# ruff: noqa: RUF001
 """Cross-reference closure (ADR 0019 point 4)."""
 
 import pytest
 
-from app.analysis.verify import reference_closure
+from app.analysis.verify import Clause, reference_closure
 
 from .helpers import c
 
@@ -29,7 +30,8 @@ def test_reference_with_trailing_period_resolves() -> None:
 
 def test_reference_to_clause_not_in_document_adds_nothing() -> None:
     e = reference_closure([c("a", "See clause 9.", number="1")], ["a"])["a"]
-    assert e.added == () and not e.too_many
+    assert e.added == ()
+    assert not e.too_many
 
 
 def test_prefix_number_is_not_matched() -> None:
@@ -53,33 +55,40 @@ def test_depth_is_one() -> None:
 def test_cycle_terminates_and_does_not_duplicate() -> None:
     cl = [c("a", "See clause 2.", number="1"), c("b", "See clause 1.", number="2")]
     r = reference_closure(cl, ["a", "b"])
-    assert r["a"].added == ("b",) and r["b"].added == ("a",)
+    assert r["a"].added == ("b",)
+    assert r["b"].added == ("a",)
 
 
 def test_self_reference_is_ignored() -> None:
     e = reference_closure([c("a", "See clause 1.", number="1")], ["a"])["a"]
-    assert e.added == () and e.needed == 0
+    assert e.added == ()
+    assert e.needed == 0
 
 
 def test_repeated_reference_counts_once() -> None:
     cl = [c("a", "See clause 2 and clause 2.", number="1"), c("b", "x", number="2")]
     e = reference_closure(cl, ["a"])["a"]
-    assert e.added == ("b",) and e.needed == 1
+    assert e.added == ("b",)
+    assert e.needed == 1
 
 
-def _fan(n: int):  # type: ignore[no-untyped-def]
+def _fan(n: int) -> list[Clause]:
     refs = " ".join(f"See clause {i}." for i in range(2, 2 + n))
     return [c("a", refs, number="1"), *(c(f"r{i}", "x", number=str(i)) for i in range(2, 2 + n))]
 
 
 def test_exactly_five_references_are_added_and_not_too_many() -> None:
     e = reference_closure(_fan(5), ["a"])["a"]
-    assert len(e.added) == 5 and e.needed == 5 and not e.too_many
+    assert len(e.added) == 5
+    assert e.needed == 5
+    assert not e.too_many
 
 
 def test_six_references_are_too_many_and_extras_are_not_added() -> None:
     e = reference_closure(_fan(6), ["a"])["a"]
-    assert e.too_many and e.needed == 6 and len(e.added) <= 5
+    assert e.too_many
+    assert e.needed == 6
+    assert len(e.added) <= 5
 
 
 def test_max_refs_is_a_parameter() -> None:

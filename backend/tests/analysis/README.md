@@ -18,7 +18,8 @@ class TopicState(StrEnum): ok, model_tags_dropped, not_analyzed
 
 Clause(id: str, text: str, heading: str = "", number: str | None = None)   # number "1.1", "4.2"
 Evidence(clause: str, quote: str)
-NumericValue(number: Decimal, unit: str)   # units: days, working_days, months, years, percent, UAH, USD, EUR
+NumericValue(number: Decimal, unit: str | None)   # catalog units: days, working_days, months, years, UAH, USD, EUR,
+                                                  # percent_of_sum, percent_of_loss; None for a `percentage` attribute (a % sign or percent word)
 Finding(rating: Rating, evidence: tuple[Evidence, ...], topic: str | None,  # None = "Other" finding
         attribute: str | None = None, value: NumericValue | None = None)
 DocumentContext(clauses: tuple[Clause, ...],

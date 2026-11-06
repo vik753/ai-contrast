@@ -1,6 +1,7 @@
 """Linear time on 300,000 characters (ADR 0019 point 3; no regex built from client text)."""
 
 import time
+from collections.abc import Callable
 
 from app.analysis.verify import (
     Rating,
@@ -18,7 +19,7 @@ N = 300_000
 LIMIT = 3.0  # seconds; a quadratic implementation needs minutes
 
 
-def timed(fn):  # type: ignore[no-untyped-def]
+def timed[T](fn: Callable[[], T]) -> T:
     t0 = time.perf_counter()
     r = fn()
     assert time.perf_counter() - t0 < LIMIT

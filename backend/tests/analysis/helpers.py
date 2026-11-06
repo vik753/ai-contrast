@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001
 """Shared builders for the S9-T1 tests (see README.md). Synthetic text only."""
 
 from __future__ import annotations
@@ -114,3 +115,13 @@ def green(
 def span_of(clause: Clause, quote: str) -> tuple[int, int]:
     i = clause.text.index(quote)
     return i, i + len(quote)
+
+
+def refs(lang: str, n: int) -> tuple[Clause, ...]:
+    """Clause c1 (number 1.1) that refers to n numbered clauses r2..r(n+1)."""
+    lx = LANGS[lang]
+    ref_text = " ".join(lx.ref.format(n=i) for i in range(2, 2 + n))
+    return (
+        c("c1", f"{lx.base} {ref_text}", number="1.1"),
+        *(c(f"r{i}", lx.short, number=str(i)) for i in range(2, 2 + n)),
+    )
