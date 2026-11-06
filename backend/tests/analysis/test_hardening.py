@@ -50,7 +50,7 @@ def test_global_override_lookalike_in_other_clause_caps(lang: str) -> None:
     lx = LANGS[lang]
     glob = {
         "en": "Nоtwithstanding any other provision of this contract, the insurer decides.",
-        "uk": "Цей пункт має переваж\u0061ну силу над іншими положеннями договору.",
+        "uk": "Цей пункт має перев\u0061жну силу над іншими положеннями договору.",
         "ru": "Настоящий пункт имеет преимущественную силу над другими положениями.",
     }[lang]
     out = apply_green_rules(ctx(c("c1", lx.base), c("c4", glob)), green("c1", lx.quote))
@@ -325,3 +325,33 @@ def test_self_reference_phrase_caps_green_as_unresolved_reference(lang: str, sen
     out = apply_green_rules(ctx(c("c1", f"{lx.base} {sentence}")), green("c1", lx.quote))
     assert out.rating is Rating.yellow
     assert Reason.unresolved_reference in out.reasons
+
+
+@pytest.mark.parametrize("value", ["2.5", "2500"])
+@pytest.mark.parametrize(
+    "text", ["The limit is 2.500 UAH per event.", "Ліміт становить 2.500 грн за випадок."]
+)
+def test_ambiguous_separator_group_is_mismatch_for_any_value_dot(text: str, value: str) -> None:
+    out = verify_value(ctx(c("c1", text)), ValueIn("a", (ev("c1", text),), number=nv(value, "UAH")))
+    assert out.status is ValueStatus.not_confirmed
+    assert Reason.number_mismatch in out.reasons
+
+
+@pytest.mark.parametrize("value", ["1", "1000"])
+def test_ambiguous_separator_group_is_mismatch_for_any_value_comma(value: str) -> None:
+    text = "The limit is 1,000 UAH per event."
+    out = verify_value(ctx(c("c1", text)), ValueIn("a", (ev("c1", text),), number=nv(value, "UAH")))
+    assert out.status is ValueStatus.not_confirmed
+    assert Reason.number_mismatch in out.reasons
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("The limit is 1.000.000 UAH per event.", "1000000"),
+        ("The limit is 1 000 UAH per event.", "1000"),
+    ],
+)
+def test_unambiguous_thousands_forms_stay_verified(text: str, value: str) -> None:
+    out = verify_value(ctx(c("c1", text)), ValueIn("a", (ev("c1", text),), number=nv(value, "UAH")))
+    assert out.status is ValueStatus.verified
