@@ -32,6 +32,7 @@ const REQUIRED = [
   "add.button",
   "add.clauseCap",
   "removeTag",
+  "stale",
   ...["pending", "running", "done", "failed"].map((s) => `status.${s}`),
   ...["keyword", "model", "check", "client"].map((s) => `source.${s}`),
   ...["bad_output", "timeout", "quota", "check_failed", "clause_cap"].map((r) => `incomplete.${r}`),
