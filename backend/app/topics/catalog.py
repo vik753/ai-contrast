@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, model_validator
 
 from app.topics.model import (
     ALL_UNITS,
@@ -95,7 +95,7 @@ class Topic(_Model):
     synonyms: SynonymLists
     attributes: Annotated[tuple[Attribute, ...], Field(min_length=1, max_length=MAX_ATTRIBUTES)]
     # ADR 0019 point 3.4: side id to "a missing topic is red for this side". Absent = never red.
-    essential: dict[str, bool] | None = None
+    essential: dict[str, StrictBool] | None = None
 
 
 class Side(_Model):

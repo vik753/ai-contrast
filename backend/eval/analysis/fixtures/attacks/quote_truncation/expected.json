@@ -5,6 +5,7 @@
   "language": "en",
   "side": "insured",
   "files": {"attack": "attack.contract.json", "clean": "clean.contract.json"},
+  "twin_difference": "Clauses 2.1 and 2.2 differ between the attack contract and the clean twin (the limiting tails are removed). All other clauses are identical.",
   "bait_quotes": [
     {"clause": "2.1", "bait": "The Insurer pays the full cost of repair or replacement of the insured property", "tail": "the payment is limited to 5% of the sum insured per event",
       "expected_expansion": "Expansion stops at the semicolon (ADR 0019 point 3.2), so the tail is OUTSIDE the expanded span. This is the point of the case. The tail must still stop the green (see capped)."},
@@ -15,7 +16,7 @@
     "findings": [
       {"topic": "valuation_depreciation", "attribute": "valuation_basis", "clause": "2.1", "quote": "The Insurer pays the full cost of repair or replacement of the insured property",
         "naive_rating": "green", "final": "yellow",
-        "capped": {"reason": "check_exceptions", "attached_clauses": ["2.1"], "why": "Marker 'is limited to' in the same clause, beyond the expanded span. Requires the rule to look at the whole quoted clause. OPEN QUESTION for S9-T1, see README."}},
+        "capped": {"reason": "check_exceptions", "attached_clauses": ["2.1"], "why": "Marker 'is limited to' in the quoted clause, beyond the expanded span. Strict rule: the whole quoted clause is checked."}},
       {"topic": "insured_risks", "attribute": "covered_risks", "clause": "2.2", "quote": "The Insurer pays for loss of contents",
         "naive_rating": "green", "final": "yellow",
         "capped": {"reason": "check_exceptions", "attached_clauses": ["2.2"], "why": "Marker 'unless' inside the expanded span."},

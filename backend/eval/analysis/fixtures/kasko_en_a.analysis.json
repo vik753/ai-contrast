@@ -16,13 +16,16 @@
     {"topic": "premium_instalments", "attribute": "late_payment_effect", "clause": "7.1", "quote": "If an instalment is late, cover is suspended until it is paid.", "ratings": {"insured": "yellow", "insurer": "green"}},
     {"topic": "termination_refund", "attribute": "refund_share", "clause": "8.1", "quote": "50% of the unused premium is refunded", "ratings": {"insured": "yellow", "insurer": "green"}},
     {"topic": "subrogation", "attribute": "recourse_against_insured", "clause": "9.1", "quote": "The Insurer has no right of recourse against the Policyholder except for intentional damage.", "ratings": {"insured": "green", "insurer": "yellow"},
-      "note": "The exception marker 'except' is inside the quoted sentence. The rule check_exceptions looks at OTHER clauses, so no cap is expected. A model that rates this yellow is also acceptable (tolerance one step)."}
+      "capped": {"insured": {"reason": "check_exceptions", "by": ["9.1"], "final": "yellow"}},
+      "note": "Strict rule (tech-lead ruling): the exception marker 'except' inside the quoted clause caps the green."}
   ],
   "missing_topics": [
     {"topic": "theft_conditions", "ratings": {"insured": "yellow", "insurer": "yellow"}},
     {"topic": "drivers_allowed", "ratings": {"insured": "yellow", "insurer": "yellow"}}
   ],
-  "capped_greens": [],
+  "capped_greens": [
+    {"topic": "subrogation", "clause": "9.1", "side": "insured", "reasons": ["check_exceptions"], "attached_clauses": ["9.1"]}
+  ],
   "reduced_selection": {
     "exclude_topics": ["premium_instalments", "termination_refund"],
     "other": [

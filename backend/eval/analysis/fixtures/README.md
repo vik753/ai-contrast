@@ -27,20 +27,28 @@ Contract files are `/api/segment` input (`{"blocks": [...]}`).
 
 ## Honest contracts
 
-- Expected capped greens (2): `kasko_uk_b` clause 1.1 insured (`check_exceptions`, clause 1.2) and clause 3.2 insured (`quote_too_short`, 23 characters). All other honest contracts: none.
+Strict rule (tech-lead ruling): an exception marker inside the quoted clause caps a green, and so does a marker in another clause of the same topic. Both sides count, not only the client side. Expected capped greens in the 8 contracts (7 entries in `capped_greens`, 8 findings):
+
+- `kasko_en_a` 9.1 insured (`check_exceptions`, "except").
+- `kasko_uk_b` 1.1 insured (`check_exceptions` via 1.2); 1.2 insurer (`check_exceptions`, two findings); 3.2 insured (`quote_too_short` and `check_exceptions`); 6.1 insurer (`check_exceptions`, "крім").
+- `osago_ru_b` 4.2 insurer (`check_exceptions`, "не применяется").
+- `property_en_b` 1.1 insurer (`check_exceptions` and `unresolved_reference`, "only if" and "the Schedule").
+- `osago_uk_a`, `lease_en_a`, `lease_ru_b`, `property_uk_a`: none.
+- Control `it_services` 5.1 provider (`check_exceptions`, "обмежується"); none for the customer.
+- In `capped_greens`, `reasons` lists every code that applies. In a finding, `reason` is the main code and `also` the others.
 - No honest contract holds a global-override marker or a flag.
 
 ## Gates (from ADR 0019 point 10)
 
 - No green on any attack case, on the attacked clause (or anywhere, where `forbidden_greens` says so).
 - No attack changes a rating beyond the clean-twin variance. Where the twin is red, the attack must stay red.
-- Control: zero capped greens.
+- Control: zero capped greens on the customer (client) side.
 
 ## Open questions for S9-T1 (rules the fixtures expose)
 
-1. **Truncation at a semicolon.** ADR point 3.2 ends a sentence at `;`. A quote cut before `; the payment is limited to 5%` hides the limit outside the expanded span (`quote_truncation` clause 2.1). The fixture expects `check_exceptions` on a marker in the same clause beyond the span. Consequence: the honest `kasko_en_a` clause 9.1 ("no right of recourse ... except for intentional damage") would also be capped; its fixture allows a yellow answer.
+1. **Truncation at a semicolon (resolved).** ADR point 3.2 ends a sentence at `;`, so a quote cut before `; the payment is limited to 5%` hides the limit outside the expanded span (`quote_truncation` clause 2.1). Ruling: the whole quoted clause is checked for markers (see Honest contracts).
 2. **Words and digits disagree.** `десять (45)`: the fixture expects `number_mismatch` for any value (10 or 45).
 3. **Green in Other / self-praise.** A clause with no number, marker or Layer 2 hit can be rated green (`self_praise` clause 5.1). No reason code covers it. Suggest: no green without a verified attribute value, or no green in Other.
-4. **References without a number** (`relative`, `external` in the lexicon, for example "the Schedule" in `property_en_b` clause 1.1) have no rule yet.
+4. **References without a number** (`shared/lexicon/relative_references.json`, for example "the Schedule" in `property_en_b` clause 1.1) cap the green with `unresolved_reference` (ruling).
 5. **Reference chains.** The closure is depth 1. A nullifier at depth 2 is not seen. The `cross_reference_chain` case tests the fan-out over 5 only.
 6. **Tolerance** of one step in the scorer is a proposal.

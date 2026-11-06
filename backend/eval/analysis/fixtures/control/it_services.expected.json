@@ -27,13 +27,15 @@
     {"topic": "service_level", "attribute": "availability", "clause": "3.1", "quote": "Виконавець забезпечує доступність сервісу не менше 99,5% на місяць.", "final": {"customer": "green", "provider": "yellow"}, "capped": null},
     {"topic": "service_level", "attribute": "fix_hours", "clause": "3.2", "quote": "Критичні помилки усуваються протягом 24 годин після повідомлення Замовника.", "final": {"customer": "green", "provider": "yellow"}, "capped": null},
     {"topic": "ip_rights", "attribute": "ip_owner", "clause": "4.1", "quote": "Усі майнові права на розроблений код переходять до Замовника з моменту оплати відповідного місяця.", "final": {"customer": "green", "provider": "yellow"}, "capped": null},
-    {"topic": "liability", "attribute": "cap_months_of_fees", "clause": "5.1", "quote": "Відповідальність Виконавця обмежується сумою, сплаченою Замовником за останні 12 місяців.", "final": {"customer": "yellow", "provider": "green"}, "capped": null},
+    {"topic": "liability", "attribute": "cap_months_of_fees", "clause": "5.1", "quote": "Відповідальність Виконавця обмежується сумою, сплаченою Замовником за останні 12 місяців.", "final": {"customer": "yellow", "provider": "yellow"}, "capped": {"provider": {"reason": "check_exceptions", "by": ["5.1"], "from": "green"}}},
     {"topic": "confidentiality", "attribute": "survival_years", "clause": "6.1", "quote": "протягом 3 років після припинення Договору", "final": {"customer": "yellow", "provider": "yellow"}, "capped": null},
     {"topic": "termination", "attribute": "notice_days", "clause": "7.1", "quote": "Кожна сторона може розірвати Договір, повідомивши іншу сторону за 30 днів.", "final": {"customer": "green", "provider": "green"}, "capped": null},
     {"topic": "termination", "attribute": null, "clause": "7.2", "quote": "У разі розірвання Замовник оплачує фактично надані послуги.", "final": {"customer": "green", "provider": "green"}, "capped": null}
   ],
-  "capped_greens": [],
+  "capped_greens": [
+    {"topic": "liability", "clause": "5.1", "side": "provider", "reasons": ["check_exceptions"], "attached_clauses": ["5.1"], "note": "Marker 'обмежується' inside the quoted clause (strict rule). Provider side only."}
+  ],
   "document": {"flags": [], "incomplete": false},
-  "gates": ["capped greens on this contract: 0 (share 0 percent)", "each green above must be confirmed with a verified quote and a matching number and unit"],
-  "edge_cases": ["99,5% decimal comma", "30 календарних днів (phrase unit)", "1 200 доларів США (thousands space, currency phrase)", "24 годин (hours)", "clause 5.1 holds the marker 'обмежується' in its own text only; no other clause of topic liability exists, so check_exceptions must not fire"]
+  "gates": ["capped greens on the client side (customer): 0 (share 0 percent); on the provider side: 1 (clause 5.1)", "each green above must be confirmed with a verified quote and a matching number and unit"],
+  "edge_cases": ["99,5% decimal comma", "30 календарних днів (phrase unit)", "1 200 доларів США (thousands space, currency phrase)", "24 годин (hours)", "clause 5.1 holds the marker 'обмежується'; it is yellow for the customer, so only the provider green is capped"]
 }
