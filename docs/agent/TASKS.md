@@ -5,6 +5,64 @@ Check a task only when it is merged to `main` with green CI.
 
 Finished stages 0 to 8: `docs/agent/TASKS-archive.md`.
 
+## Stage 9 — Analysis (ADR 0019)
+
+Order: S9-T0 (fixtures, lexicons) and S9-T1 (verification library) in parallel; S9-T2 (prompts, schemas, AI steps, policy tests) after S9-T1's types are fixed; S9-T3 (`/api/analyze` SSE) after S9-T2; S9-T4 (browser) after S9-T3's API is fixed; S9-T5 (eval) after S9-T3; S9-T6 docs last.
+
+### S9-T0 Analysis fixtures and lexicons
+
+- Owner: `domain-analyst`. Branch: `feat/s9-fixtures`.
+- Expected findings per topic for the 8 S7-T0 contracts (attribute values with clause references, expected rating per side, expected capped greens with reason codes) in `backend/eval/analysis/fixtures/`.
+- Evidence-gaming contracts with clean twins: buried exception, global override, number in words vs digits mismatch, quote truncation bait, cross-reference chain over 5, injected rating command, self-praise; honest IT-services contract as a false-positive control.
+- Lexicons (EN/UK/RU, checked-in data with sources): exception markers, global-override markers, clause-reference patterns, unit words for every catalog unit, number words 0–100, sentence-end abbreviations. Catalog flag `essential` per topic and side (used for missing-topic red).
+- Threats: T5.
+
+### S9-T1 Verification library (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s9-verify`. Threats: T5.
+1. Pure module `app/analysis/verify/`: quote check (whitespace folding only), expansion to the sentence within the clause, offsets out, never text.
+2. Green rules of ADR 0019 point 3 with reason codes (`quote_too_short`, `suspicious_span`, `check_exceptions` incl. the quoted clause itself, `global_override`, `too_many_references`, `number_mismatch` incl. several numbers of one unit, `document_flags`, `other_not_green`); every occurrence of a repeated quote; the model cannot lift a cap; every rule has a positive and a negative test in EN, UK and RU.
+2a. Verified values (point 3.4): number and unit check on every numeric value; caps make a value `not_confirmed`.
+3. Cross-reference closure (point 4): depth 1, ≤ 5, cycles.
+4. Missing-topic findings from tagging only; Other completeness → document `incomplete`, no greens; topic `not_analyzed` → its clauses rated in Other.
+5. Linear time on 300,000 characters (test with a time bound); no regex built from client text.
+
+### S9-T2 Rating prompts, schemas and AI steps (backend)
+
+- Owner: `backend-dev` (prompts reviewed by `ai-eval-engineer`). Tests first: `test-engineer`. Branch: `feat/s9-rate`. After S9-T1. Threats: T1, T5, T11.
+1. `PromptTemplate.RATE_TOPIC`, `RATE_OTHER` with strict schemas (point 2); one repair with an error-code enum, never the previous output; output language enum.
+2. `AIRequest` subclasses carry one `PseudonymizedDocument` and `ConfirmedTopic`s only; policy test: at most one document per AI function and request (AST over `app/ai/`, `app/analysis/`, `app/tagging/`); wire canary fails on placeholders of two labels in one request.
+3. Typed optional `usage` on the port result (replaces `getattr` in `topic_ai._reported`).
+4. Strong model routing, `max_tokens` and reasoning effort per preset.
+
+### S9-T3 `POST /api/analyze` with SSE (backend)
+
+- Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s9-analyze`. After S9-T2. Threats: T1, T5, T6, T10, T11.
+1. Input and recompute per point 1 (sandbox; signature v2 — also a change to `/api/tag` — and `tagging_version` check → `409 tagging_signature_invalid`; missing-topic and topic status only from signed fields; client tags add-only and capped; selection via `app/topics/selection.py`; unprovided references and red Layer 2 recomputed).
+2. SSE stream: events and size caps per point 1, heartbeat, `no-store`, `X-Accel-Buffering: no`, no compression, send timeout, every refusal before the first byte, no clause or topic text; explanations cleaned and Layer 2-checked (point 2); disconnect cancels calls and charges cancelled calls at worst case.
+3. Limits per point 7: worst-case reservation, `document_too_large_for_analysis`, deadlines, topic call cap → `not_analyzed` + clauses to Other; free mode through the analysis pass (`aud=analysis`, recorded digests only, call and Neuron caps).
+4. Document flags as restrictions only (point 6). `result_signature` and `analysis_version` (point 8).
+5. Log canary on every path; `CLAUDE.md` Commands: one refused request without any network call.
+
+### S9-T4 Analysis in the browser (frontend)
+
+- Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s9-ui`. After S9-T3's API is fixed. Threats: T1, T5, T9, T10.
+1. SSE client over `fetch` (strict parser, event size cap, abort), per-document runs in sequence, progress, stop; Clear all aborts streams and drops results; a free-pass reply that started before Clear all is ignored (stage 7 follow-up).
+1a. `topic`/`other` events are provisional: compare, final greens and cache only after `done` with `result_signature`; a stream without `done` → document `incomplete`, no greens, no comparison, nothing cached (test).
+2. `compare.ts` per point 5 (pure, tested: units, enums, categories, directions, not comparable, not confirmed).
+3. Minimal result view per point 9: colour + icon + text label, reason codes as text, quotes from the browser's own text by offsets, plain text only.
+4. Cache: one `CacheKey` type; `contractTextHash` null case; key includes the selection signature and `analysis_version` (stage 4 follow-ups).
+
+### S9-T5 Analysis eval
+
+- Owner: `ai-eval-engineer`. Branch: `feat/s9-eval`. After S9-T3. Threats: T5.
+- `backend/eval/analysis/` per point 10 (recorded mode in CI with stub recordings, live mode locally); gates: no green on any attack case; attack vs clean twin; metrics recorded.
+
+### S9-T6 Docs for stage 9
+
+- Owner: `docs-writer`. After S9-T0–T5 are merged.
+- ADR 0019 → accepted; threat model T5 (browser-held extract flags residual risk; annex links are a client statement), T6, T10, T11 (cancelled calls charged at worst case; free mode refuses documents outside the pass digests); `CLAUDE.md` Commands; README; archive stage 9; PROGRESS.
+
 ## Open follow-ups
 
 - Stage 9: recompute keyword tags, "Other" and Layer 2 on the server, and accept only signed model/check tags and client tags (ADR 0018 point 8).
