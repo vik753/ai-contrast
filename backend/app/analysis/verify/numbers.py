@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001, RUF002, PLR2004, PLR0911, TRY003, E501
+# ruff: noqa: RUF001, PLR2004, PLR0911, PLR0912, PLR0915, TRY003, E501
 """Number and unit check (ADR 0019 point 3.3 ``number_mismatch``). Linear scan, lexicon data only.
 
 Forms: digits, decimal comma or point, thousands separated by spaces (or a comma followed by
@@ -95,37 +95,31 @@ _MARKS: Final = _build_phrases(LEXICON.percent_marks)
 _UNITS: Final = {u: _build_phrases(w) for u, w in LEXICON.units.items()}
 
 
-def _single_word_maps() -> tuple[dict[str, int], dict[tuple[str, str], int]]:
-    words: dict[str, int] = {}
-    pairs: dict[tuple[str, str], int] = {}
+_READ: Final = frozenset(Decimal(i) for i in (*range(20), *range(20, 100, 10), 100))
+
+
+def _phrase_table() -> dict[tuple[str, ...], tuple[Decimal, bool]]:
+    """Number phrases (value, read). Only 0-100 are read by the code; every other listed
+    form (halves, hundreds, thousands) is known but unmatchable (fail closed)."""
+    table: dict[tuple[str, ...], tuple[Decimal, bool]] = {}
     for lang in LANGS:
         for value, entries in LEXICON.number_words[lang].items():
+            read = value in _READ
             for raw in entries:
-                parts = normalize(raw)[0].split()
-                if len(parts) == 1:
-                    if words.setdefault(parts[0], value) != value:
-                        raise LexiconError("number_words.json: word with two values")
-                else:
-                    pairs[(parts[0], parts[1])] = value
-    return words, pairs
+                key = tuple(_WORD.findall(normalize(raw)[0]))
+                if table.setdefault(key, (value, read)) != (value, read):
+                    raise LexiconError("number_words.json: phrase with two values")
+    return table
 
 
-_WORDS, _PAIRS = _single_word_maps()
-# Number words the code does not read ("half", "півтора", "двісті", "тисяч"): next to a unit word
-# of the value's unit they make the number unmatchable.
+_PHRASES: Final = _phrase_table()
+_MAX_PHRASE: Final = max(len(k) for k in _PHRASES)
+_FIRST_WORDS: Final = frozenset(k[0] for k in _PHRASES)
+_WORDS: Final = {k[0]: int(v) for k, (v, read) in _PHRASES.items() if read and len(k) == 1}
+# Number words that are in no list: next to a unit word they make the number unmatchable.
 _UNREAD_EXACT: Final = frozenset(
-    normalize(w)[0]
-    for w in ("half", "quarter", "thousand", "thousands", "million", "millions", "billion", "dozen")
+    normalize(w)[0] for w in ("quarter", "billion", "billions", "thousands", "millions")
 )
-_UNREAD_STEMS: Final = tuple(
-    normalize(w)[0]
-    for w in (
-        "півтор", "полтор", "пів", "тисяч", "тысяч", "мільйон", "миллион", "млн", "двіст",
-        "двест", "трист", "чотириста", "четырест", "п'ятсот", "пятьсот", "шістсот", "шестьсот",
-        "сімсот", "семьсот", "вісімсот", "восемьсот", "дев'ятсот", "девятьсот",
-    )
-)  # fmt: skip
-_ARTICLES: Final = frozenset({"a", "an"})
 
 
 def _parse(raw: str) -> Decimal | None:
@@ -176,20 +170,27 @@ def _candidates(view: str) -> list[_Cand]:
             out.append(_Cand(t.start, t.end, _parse(t.text)))
             i += 1
             continue
+        hit: tuple[Decimal, bool] | None = None
         used = 0
-        value = 0
-        if i + 1 < n and joined(t, toks[i + 1]) and (t.text, toks[i + 1].text) in _PAIRS:
-            value, used = _PAIRS[(t.text, toks[i + 1].text)], 2
-        elif t.text in _WORDS:
-            value, used = _WORDS[t.text], 1
-        if not used:
-            if t.text in _UNREAD_EXACT or t.text.startswith(_UNREAD_STEMS):
-                end = t.end
-                if i + 1 < n and toks[i + 1].text in _ARTICLES and joined(t, toks[i + 1]):
-                    end = toks[i + 1].end
-                out.append(_Cand(t.start, end, None))
+        if t.text in _FIRST_WORDS:
+            for length in range(min(_MAX_PHRASE, n - i), 0, -1):
+                seg = toks[i : i + length]
+                if not all(joined(seg[k], seg[k + 1]) for k in range(length - 1)):
+                    continue
+                hit = _PHRASES.get(tuple(x.text for x in seg))
+                if hit is not None:
+                    used = length
+                    break
+        if hit is None:
+            if t.text in _UNREAD_EXACT:
+                out.append(_Cand(t.start, t.end, None))
             i += 1
             continue
+        if not hit[1]:
+            out.append(_Cand(t.start, toks[i + used - 1].end, None))
+            i += used
+            continue
+        value = int(hit[0])
         adjacent = i == last_word_end and compound(toks[i - 1], t)
         j = i + used
         end = toks[j - 1].end

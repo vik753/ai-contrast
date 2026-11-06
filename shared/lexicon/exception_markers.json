@@ -1,25 +1,33 @@
 {
-  "version": 1,
+  "version": 2,
   "en": [
     "except", "except for", "except that", "except as", "excepting", "unless", "excluding", "save for", "other than",
     "provided that", "provided however", "provided, however", "subject to", "only if", "only when", "only where",
     "only in case", "only upon", "on condition that", "conditional on", "however", "but not", "does not apply",
     "do not apply", "shall not apply", "not applicable", "is limited to", "are limited to", "at its discretion",
     "at its sole discretion", "at the discretion", "reserves the right", "may refuse", "may decline", "if the insurer",
-    "if the landlord", "in the cases listed", "in the cases specified"
+    "if the landlord", "in the cases listed", "in the cases specified",
+    "save that", "with the exception of", "to the extent", "in no event"
   ],
   "uk": [
     "крім", "окрім", "за винятком", "винятком", "виняток", "якщо інше не", "за умови", "за умови, що", "лише якщо",
     "лише за умови", "лише у разі", "лише при", "тільки якщо", "тільки за умови", "тільки у разі", "не застосовується",
     "не застосовуються", "не поширюється", "не поширюються", "проте", "однак", "але не", "обмежується",
     "обмежуються", "на власний розсуд", "на розсуд", "залишає за собою право", "має право відмовити", "може відмовити",
-    "у випадках, передбачених", "у випадках, зазначених", "з урахуванням", "з огляду на"
+    "у випадках, передбачених", "у випадках, зазначених", "з урахуванням", "з огляду на",
+    "в разі", "за виключенням"
   ],
   "ru": [
     "кроме", "помимо", "за исключением", "исключением", "исключение", "за изъятием", "если иное не", "при условии",
     "при условии, что", "только если", "только при условии", "только в случае", "только при", "не применяется",
     "не применяются", "не распространяется", "не распространяются", "однако", "но не", "ограничивается",
     "ограничиваются", "по своему усмотрению", "по усмотрению", "оставляет за собой право", "вправе отказать",
-    "может отказать", "в случаях, предусмотренных", "в случаях, указанных", "с учётом", "с учетом"
-  ]
+    "может отказать", "в случаях, предусмотренных", "в случаях, указанных", "с учётом", "с учетом",
+    "лишь"
+  ],
+  "added_in_review": {
+    "en": ["save that", "with the exception of", "to the extent", "in no event"],
+    "uk": ["в разі", "за виключенням"],
+    "ru": ["лишь"]
+  }
 }

@@ -37,7 +37,9 @@ _OVERRIDES: Final = Markers(
     (lang, e) for lang in LANGS for e in LEXICON.global_override_markers[lang]
 )
 _UNRESOLVED: Final = Markers(
-    (lang, e) for lang in LANGS for e in (*LEXICON.ref_relative[lang], *LEXICON.ref_external[lang])
+    (lang, e)
+    for lang in LANGS
+    for e in (*LEXICON.relative_references[lang], *LEXICON.ref_self[lang])
 )
 _VALUE_IGNORED: Final = frozenset({Reason.quote_too_short, Reason.other_not_green})
 

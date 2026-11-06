@@ -33,6 +33,8 @@ COPY backend/log_config.json ./
 COPY backend/app ./app
 # The topic catalog (ADR 0017); the runtime stage points TOPICS_CATALOG_DIR at it.
 COPY shared/topics ./shared/topics
+# The verification lexicons (ADR 0019); read at import by app.analysis.verify.
+COPY shared/lexicon ./shared/lexicon
 RUN python -m compileall -q app
 
 # ---- runtime: no uv, no build tools, non-root ----
@@ -44,6 +46,7 @@ FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c
 # Local development (Docker Compose) sets ENVIRONMENT=development explicitly.
 ENV ENVIRONMENT=production \
     TOPICS_CATALOG_DIR=/app/shared/topics \
+    LEXICON_DIR=/app/shared/lexicon \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:${PATH}"

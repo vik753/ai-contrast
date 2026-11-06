@@ -32,7 +32,7 @@ def missing_topic_findings(
 
 def document_completeness(other_total: int, other_rated: int) -> Completeness:
     if other_total < 0 or other_rated < 0:
-        raise ValueError("negative_count")  # noqa: TRY003
+        raise ValueError("negative_count")
     unrated = max(0, other_total - other_rated)
     return Completeness(unrated > 0, unrated, unrated == 0)
 

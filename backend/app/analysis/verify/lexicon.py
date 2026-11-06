@@ -1,4 +1,3 @@
-# ruff: noqa: PLR2004
 """Loader of the checked-in lexicons (``shared/lexicon/``). Validated at import; fail closed.
 
 Entries are literal words and phrases, never regular expressions. A bad file raises
@@ -10,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Final
 
@@ -17,6 +17,7 @@ __all__ = ["LANGS", "LEXICON", "Lexicon", "LexiconError", "load_lexicon"]
 
 LANGS: Final = ("en", "uk", "ru")
 DEFAULT_LEXICON_DIR: Final = Path(__file__).resolve().parents[4] / "shared" / "lexicon"
+_VERSIONS: Final = frozenset({1, 2})
 _MAX_ENTRIES: Final = 1000
 _MAX_ENTRY_LEN: Final = 100
 _MAX_FILE_BYTES: Final = 200_000
@@ -32,7 +33,8 @@ _UNITS: Final = (
     "percent_of_sum",
     "percent_of_loss",
 )
-_ATOMS: Final = (*range(20), *range(20, 100, 10), 100)
+_ATOMS: Final = frozenset(Decimal(i) for i in (*range(20), *range(20, 100, 10), 100))
+_MAX_PHRASE_WORDS: Final = 6
 
 
 class LexiconError(Exception):
@@ -48,12 +50,12 @@ class Lexicon:
     global_override_markers: Words
     ref_prefixes: Words
     ref_joiners: Words
+    ref_range_words: Words
     ref_self: Words
-    ref_relative: Words
-    ref_external: Words
+    relative_references: Words
     percent_marks: Words
     units: dict[str, Words]
-    number_words: dict[str, dict[int, tuple[str, ...]]]
+    number_words: dict[str, dict[Decimal, tuple[str, ...]]]
     never_end: frozenset[str]
     may_end: frozenset[str]
 
@@ -70,8 +72,8 @@ def _read(directory: Path, name: str) -> dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise _fail(name, "cannot read or parse") from exc
-    if not isinstance(data, dict) or data.get("version") != 1:
-        raise _fail(name, "version must be 1")
+    if not isinstance(data, dict) or data.get("version") not in _VERSIONS:
+        raise _fail(name, "unknown version")
     return data
 
 
@@ -95,25 +97,29 @@ def _words(file: str, raw: object, *, allow_note: bool = False) -> Words:
     return {lang: _entries(file, raw[lang]) for lang in LANGS}
 
 
-def _numbers(raw: object) -> dict[str, dict[int, tuple[str, ...]]]:
+def _numbers(raw: object) -> dict[str, dict[Decimal, tuple[str, ...]]]:
     name = "number_words.json"
     if not isinstance(raw, dict):
         raise _fail(name, "missing")
-    result: dict[str, dict[int, tuple[str, ...]]] = {}
+    result: dict[str, dict[Decimal, tuple[str, ...]]] = {}
     for lang in LANGS:
         table = raw.get(lang)
         if not isinstance(table, dict):
             raise _fail(name, f"{lang} missing")
-        parsed: dict[int, tuple[str, ...]] = {}
+        parsed: dict[Decimal, tuple[str, ...]] = {}
         for key, value in table.items():
-            if not (isinstance(key, str) and key.isdigit()):
+            try:
+                number = Decimal(key)
+            except (InvalidOperation, TypeError) as exc:
+                raise _fail(name, "bad key") from exc
+            if not number.is_finite() or number < 0:
                 raise _fail(name, "bad key")
-            parsed[int(key)] = _entries(name, value)
-        if set(parsed) != set(_ATOMS):
+            parsed[number] = _entries(name, value)
+        if not set(parsed) >= _ATOMS:
             raise _fail(name, f"{lang} atoms incomplete")
         for entries in parsed.values():
-            if any(len(e.split()) > 2 for e in entries):
-                raise _fail(name, "entry of more than two words")
+            if any(len(e.split()) > _MAX_PHRASE_WORDS for e in entries):
+                raise _fail(name, "entry too long")
         result[lang] = parsed
     return result
 
@@ -124,6 +130,7 @@ def load_lexicon(directory: Path | None = None) -> Lexicon:
     exc = _read(base, "exception_markers.json")
     glob = _read(base, "global_override_markers.json")
     refs = _read(base, "clause_references.json")
+    rel = _read(base, "relative_references.json")
     units = _read(base, "unit_words.json")
     nums = _read(base, "number_words.json")
     abbr = _read(base, "sentence_abbreviations.json")
@@ -139,9 +146,9 @@ def load_lexicon(directory: Path | None = None) -> Lexicon:
         ),
         ref_prefixes=_words("clause_references.json", refs.get("prefixes")),
         ref_joiners=_words("clause_references.json", refs.get("joiners")),
+        ref_range_words=_words("clause_references.json", refs.get("range_words")),
         ref_self=_words("clause_references.json", refs.get("self_reference")),
-        ref_relative=_words("clause_references.json", refs.get("relative")),
-        ref_external=_words("clause_references.json", refs.get("external")),
+        relative_references=_words("relative_references.json", {k: rel.get(k) for k in LANGS}),
         percent_marks=_words("unit_words.json", units.get("percent_marks")),
         units={u: _words("unit_words.json", unit_map[u], allow_note=True) for u in _UNITS},
         number_words=_numbers({k: nums.get(k) for k in LANGS}),
