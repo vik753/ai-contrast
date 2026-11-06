@@ -1,8 +1,8 @@
 # ruff: noqa: RUF001, PLR2004, PLR0911, PLR0912, PLR0915, TRY003, E501
 """Number and unit check (ADR 0019 point 3.3 ``number_mismatch``). Linear scan, lexicon data only.
 
-Forms: digits, decimal comma or point, thousands separated by spaces (or a comma followed by
-exactly three digits, or repeated groups), words 0-100 in EN/UK/RU, and "десять (10)" (words
+Forms: digits, decimal comma or point, thousands separated by spaces or repeated groups ("1.000.000"; a single
+separator and three digits is ambiguous and unmatchable), words 0-100 in EN/UK/RU, and "десять (10)" (words
 and digits are one number; if they disagree the number is unmatchable).
 """
 
@@ -144,8 +144,8 @@ def _parse(raw: str) -> Decimal | None:
             return Decimal("".join(groups))
         return None
     ip, fp = groups
-    if kind == "," and len(fp) == 3 and 1 <= len(ip) <= 3 and ip != "0":
-        return Decimal(ip + fp)
+    if len(fp) == 3 and ip != "0":
+        return None  # "2.500", "1,000": decimal or thousands, unreadable (fail closed)
     return Decimal(ip + "." + fp)
 
 
