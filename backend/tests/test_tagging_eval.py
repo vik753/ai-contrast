@@ -17,10 +17,15 @@ from __future__ import annotations
 import copy
 import json
 from functools import cache
+from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 
+from app.ai import factory
+from eval.tagging import run_eval
+from eval.tagging.oracle import OracleProvider
 from eval.tagging.run_eval import (
     BASELINE_PATH,
     RECORDINGS,
@@ -107,8 +112,10 @@ def test_adversarial_counts_are_zero(name: str, metric: str) -> None:
 def test_gated_metrics_are_present(name: str) -> None:
     metrics, _ = _result(name)
     for prefix in ("kw", "all"):
-        for metric in ("recall", "precision", "other.recall", "risk.recall", "other.share"):
+        for metric in ("recall", "precision", "other.share"):
             assert f"{prefix}.{metric}" in metrics
+        for metric in ("other.recall", "risk.recall"):
+            assert f"{prefix}.{metric}:adversarial" in metrics
         assert f"{prefix}.recall:kasko/deductible" in metrics
         assert f"{prefix}.precision:lease/deposit" in metrics
     for scope in ("en", "uk", "ru", "kasko", "osago", "property_insurance", "lease"):
@@ -175,3 +182,46 @@ def test_recordings_hold_no_key_field() -> None:
         text = (RECORDINGS / f"{name}.json").read_text(encoding="utf-8").casefold()
         assert "api_key" not in text
         assert "x-provider-key" not in text
+
+
+@pytest.mark.parametrize("name", NAMES, ids=_id)
+def test_nothing_to_measure_gives_no_metric(name: str) -> None:
+    """Only ``skip_me`` expects risk terms or "Other" clauses; a total of 0 is not 1.0."""
+    metrics, _ = _result(name)
+    for prefix in ("kw", "all"):
+        assert f"{prefix}.risk.recall" not in metrics
+        assert f"{prefix}.risk.recall:lease" not in metrics
+        assert f"{prefix}.missing.recall:osago" not in metrics
+        assert f"{prefix}.missing.recall:kasko" in metrics
+
+
+class _CanaryProvider(OracleProvider):
+    def __init__(self, key: SecretStr) -> None:
+        self.key = key
+
+
+def test_live_mode_never_writes_or_prints_the_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    canary = "sk-CANARY-7f3a9c1e5b2d"
+    seen: list[str] = []
+
+    def fake_provider_for(
+        preset: object, model: str, key: SecretStr, *args: object, **kwargs: object
+    ) -> _CanaryProvider:
+        seen.append(key.get_secret_value())
+        return _CanaryProvider(key)
+
+    monkeypatch.setenv("AIC_EVAL_PROVIDER_KEY", canary)
+    monkeypatch.setattr(factory, "provider_for", fake_provider_for)
+    monkeypatch.setattr(run_eval, "RECORDINGS", tmp_path)
+    monkeypatch.setattr(run_eval, "BASELINE_PATH", tmp_path / "baseline.json")
+    assert main(["--live", "--provider", "anthropic", "--write-baseline"]) == 0
+    assert seen
+    assert set(seen) == {canary}
+    out = capsys.readouterr()
+    files = list(tmp_path.glob("*.json"))
+    assert len(files) == 2  # the recording and the baseline
+    for text in (out.out, out.err, *(f.read_text(encoding="utf-8") for f in files)):
+        assert canary not in text
+        assert "CANARY" not in text

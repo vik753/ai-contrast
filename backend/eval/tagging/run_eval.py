@@ -3,8 +3,9 @@
 
 Every model answer goes through the same code as ``/api/tag``: masking and ``safety_pass``
 for documents, ``resolve_topics`` for the catalog topics, ``plan_batches`` for the batches,
-``run_model_steps`` (tagging call, check call, one repair each, strict schemas) and
-``merge_tags`` (caps, "Other", risk terms). Keyword tags come from ``keyword_tags``, the
+and the functions ``run_tagging`` uses: ``model_phase`` (tagging call, check call, one repair
+each, strict schemas, overall deadline) and ``finish_tags`` (caps, "Other", risk terms,
+incomplete reasons). Keyword tags come from ``keyword_tags``, the
 function the sandbox child runs (called in-process here).
 
 Modes:
@@ -28,9 +29,13 @@ Metrics (micro over clause-topic pairs; the unnumbered title clause is ignored),
 - ``all.recall`` / ``all.precision``: tags after the merge (keyword + model + check).
 - ``{kw,all}.other.share``: clauses in "Other" (informational, no direction).
 - ``{kw,all}.other.recall``: expected "Other" clauses that are in "Other".
-- ``{kw,all}.risk.recall``: expected risk-term clauses in "Other" with a risk-term hit.
+- ``{kw,all}.risk.recall``: expected risk-term clauses in "Other" with a risk-term hit. Only
+  ``skip_me`` expects risk terms, so it exists only as ``:adversarial``.
 - ``{kw,all}.missing.false_positives``: topics reported missing that the gold set has.
-- ``{kw,all}.missing.recall``: ``absent_topics`` of ``expected.json`` reported missing.
+- ``{kw,all}.missing.recall``: ``absent_topics`` of ``expected.json`` reported missing (only
+  ``kasko_en_a`` lists some today).
+
+A rate whose total is 0 (nothing expected, nothing predicted) is not emitted: it is not 1.0.
 - ``adversarial.*`` (counts, 0 is the only good value): hidden clauses (neither tagged nor in
   "Other"), the deductible tag lost on ``skip_me`` 3.2 or on ``flood`` 3.1, cap violations, a
   compromised topic not dropped, strings in a result that are not ids or enums (leaks). Each
@@ -64,18 +69,18 @@ from app.extraction.model import DEFAULT_MAX_BLOCKS, DEFAULT_MAX_PDF_PAGES, DEFA
 from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument
 from app.segment import child
 from app.settings import Settings
-from app.tagging.ai_steps import ModelState, run_model_steps
+from app.tagging.ai_steps import ModelState
 from app.tagging.batches import plan_batches
 from app.tagging.clauses import clauses_of
 from app.tagging.keywords import keyword_tags
 from app.tagging.merge import (
     MAX_MODEL_CLAUSES_PER_TOPIC,
     MAX_MODEL_TAGS_PER_CLAUSE,
-    Failure,
     TaggingResult,
     merge_tags,
 )
 from app.tagging.phrases import PhraseIndex, match_view
+from app.tagging.run import finish_tags, model_phase
 from app.tagging.schemas import CheckOut, TagOut
 from app.topics.catalog import Catalog, load_catalog
 from app.topics.selection import CatalogRef, TopicSelection, resolve_topics
@@ -98,9 +103,13 @@ ADVERSARIAL: Final = ("skip_me", "flood")
 ADVERSARIAL_DOMAIN: Final = ("kasko", "en")
 LOW_PRECISION: Final = 0.6
 # Higher is worse (the regression check is reversed).
-LOWER_IS_BETTER: Final = ("adversarial.", "kw.missing.false_positives", "all.missing.false_pos")
+LOWER_IS_BETTER: Final = (
+    "adversarial.",
+    "kw.missing.false_positives",
+    "all.missing.false_positives",
+)
 # Informational: no direction (always), model metrics (while the recording is a stub).
-NO_DIRECTION: Final = (".other.share",)
+NO_DIRECTION: Final = ".other.share"
 MODEL_METRICS: Final = ("all.",)
 STUB_LABEL: Final = (
     " [STUB numbers: oracle, not a model; all.* is informational, kw.* and adversarial.* are gated]"
@@ -318,38 +327,36 @@ class Run:
     error: str | None = None
 
 
-def _merge(
-    case: Case,
-    keyword: Mapping[str, Set[str]],
-    state: ModelState | None = None,
-    failures: Sequence[Failure] = (),
-) -> TaggingResult:
-    return merge_tags(
-        clauses=clauses_of(case.document),
-        topics=case.topics,
-        keyword=keyword,
-        model_high=state.high if state else None,
-        model_low=state.low if state else None,
-        check_yes=state.check_yes if state else None,
-        failures=failures,
-    )
+def _merge(case: Case, keyword: Mapping[str, Set[str]]) -> TaggingResult:
+    """Keyword tags alone (no model)."""
+    return merge_tags(clauses=clauses_of(case.document), topics=case.topics, keyword=keyword)
 
 
 def run_case(case: Case, tag: AIProvider, check: AIProvider, deadline: float) -> Run:
-    """Keyword tags, model steps and the merge, the way ``run_tagging`` does them."""
-    keyword = keyword_tags(clauses_of(case.document), case.topics)
+    """Keyword tags (production step budget), then the shared ``model_phase`` and
+    ``finish_tags`` of ``app/tagging/run.py``, the functions ``run_tagging`` uses."""
+    settings = Settings()
+    clauses = clauses_of(case.document)
+    keyword = keyword_tags(clauses, case.topics, budget_steps=settings.keyword_step_budget)
     state = ModelState()
     error: str | None = None
     try:
         asyncio.run(
-            run_model_steps(case.document, case.topics, case.batches, tag, check, state, deadline)
+            model_phase(
+                state,
+                case.document,
+                case.topics,
+                case.batches,
+                tag,
+                check,
+                deadline=deadline,
+                call_deadline=deadline,
+            )
         )
     except AIError as hard:
         error = hard.code.value
-    failures: list[Failure] = [f for f in ("bad_output", "timeout", "quota") if f in state.failures]
-    if "check_failed" in state.failures:
-        failures.append("check_failed")
-    return Run(keyword, _merge(case, keyword), _merge(case, keyword, state, failures), state, error)
+    result = finish_tags(clauses, case.topics, keyword, state)
+    return Run(keyword, _merge(case, keyword), result, state, error)
 
 
 def record(  # noqa: PLR0913
@@ -421,7 +428,7 @@ def replay(cases: Sequence[Case], recording: dict[str, Any], name: str) -> dict[
 
 
 def _rate(good: float, total: float) -> float:
-    return round(good / total, 4) if total else 1.0
+    return round(good / total, 4)
 
 
 @dataclass
@@ -433,7 +440,8 @@ class Tally:
         self.counts[name][1] += total
 
     def rates(self) -> dict[str, float]:
-        return {name: _rate(g, t) for name, (g, t) in self.counts.items()}
+        """Rates with a non-zero total only: nothing to measure gives no metric (never 1.0)."""
+        return {name: _rate(g, t) for name, (g, t) in self.counts.items() if t}
 
 
 def gold_pairs(case: Case) -> dict[str, set[str]]:
@@ -527,10 +535,10 @@ def _fixed_attack(case: Case, keyword: dict[str, set[str]]) -> tuple[TaggingResu
     state = ModelState()
     if case.name == "skip_me":
         state.high = {_clause(case, "3.2"): set(others[:MAX_MODEL_TAGS_PER_CLAUSE])}
-        return _merge(case, keyword, state), set()
+        return finish_tags(clauses_of(case.document), case.topics, keyword, state), set()
     flood = set(others[:MAX_MODEL_TAGS_PER_CLAUSE])
     state.high = {cid: set(flood) for cid in ids}
-    return _merge(case, keyword, state), flood
+    return finish_tags(clauses_of(case.document), case.topics, keyword, state), flood
 
 
 def _adversarial(case: Case, run: Run, metrics: dict[str, float]) -> None:
@@ -606,11 +614,7 @@ def info(runs: Mapping[str, Run], recording: dict[str, Any]) -> dict[str, Any]:
 
 
 def informational(name: str, *, stub: bool) -> bool:
-    return (
-        name.endswith(NO_DIRECTION)
-        or ".other.share:" in name
-        or (stub and name.startswith(MODEL_METRICS))
-    )
+    return NO_DIRECTION in name or (stub and name.startswith(MODEL_METRICS))
 
 
 def regressions(

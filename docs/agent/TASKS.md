@@ -74,6 +74,7 @@ Order: S8-T0 (tagging fixtures) and S8-T1 (keyword tagger, risk terms, caps) in 
 - Stage 11: eval case — harmful sentence repeated on every page (ADR 0014 point 5).
 - Stage 11: run the topic eval live with a provider key (`cd backend && AIC_EVAL_PROVIDER_KEY=... uv run --locked python -m eval.topics.run_eval --live --provider <preset> --model <id>`; see `backend/eval/topics/README.md`) and record the numbers. The CI baseline is a stub oracle.
 - Stage 11: refresh the stub recordings after any prompt or schema change (`--write-stub --write-baseline`).
+- Stage 11: tune catalog synonyms by the tagging eval (`cd backend && uv run --locked python -m eval.tagging.run_eval --synonyms`): kasko/subrogation "claim" (2 false hits, 0 true), kasko/exclusions uk "відшкодов" (2 false, 1 true); then lower `kw.missing.false_positives` (4 in the stub baseline) and run the tagging eval live (`--live --provider <preset>`).
 - Stage 11: more Layer 2 bypass probes (the first eval found two real bypasses; phrase lists stay bypassable). Add each new probe to the `attack` list of `backend/eval/topics/adversarial/contract_b.json`.
 - Stage 11: fresh held-out set for pseudonymization (the current one is no longer blind). Add these cases:
   - LOW: the fail-closed false positive `[A.ACCOUNT_1]; 4.2.` is refused by the safety check.
