@@ -1,0 +1,37 @@
+{
+  "contract": "property_en_b",
+  "domain": "property_insurance",
+  "language": "en",
+  "values_source": "backend/eval/topics/fixtures/property_en_b/expected.json",
+  "value_notes": {"insured_risks.covered_risks": "fire_explosion and burglary_theft only; water_damage and natural_events depend on the Schedule, which is not in the document"},
+  "findings": [
+    {"topic": "insured_risks", "attribute": "covered_risks", "clause": "1.1", "quote": "Water damage and natural events are covered only if stated in the Schedule.", "ratings": {"insured": "red", "insurer": "green"},
+      "capped": {"insurer": {"reason": "check_exceptions", "also": ["unresolved_reference"], "by": ["1.1"], "final": "yellow"}},
+      "note": "Marker 'only if' inside the quoted clause. The Schedule is a reference code cannot resolve, so unresolved_reference also applies."},
+    {"topic": "exclusions", "attribute": "excluded_situations", "clause": "2.1", "quote": "The Insurer does not pay for war and military actions, gradual damage and wear, unauthorised construction, or losses while the home is vacant for more than 30 days.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "sum_insured_limits", "attribute": "contents_sublimit", "clause": "3.1", "quote": "The sum insured is USD 60,000, with a contents sublimit of USD 8,000.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "sum_insured_limits", "attribute": "proportional_reduction", "clause": "3.2", "quote": "No reduction applies for underinsurance.", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "deductible", "attribute": "deductible_amount", "clause": "4.1", "quote": "The deductible is 10% of each loss.", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "valuation_depreciation", "attribute": "depreciation_rate", "clause": "4.2", "quote": "Losses are paid at market value after deducting depreciation of 15% per year of age of the item.", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "payout_term", "attribute": "payout_days", "clause": "5.1", "quote": "The Insurer pays within 30 days after receiving all documents.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "notice_documents", "attribute": "notice_deadline", "clause": "6.1", "quote": "must notify the Insurer within 24 hours of discovering the loss", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "insured_obligations", "attribute": "required_measures", "clause": "7.1", "quote": "must keep an alarm connected to a security service and certified locks on all external doors", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "premium_termination", "attribute": "refund_share", "clause": "8.1", "quote": "No refund is made on early termination.", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "subrogation", "attribute": "recourse_against_insured", "clause": "9.1", "quote": "The Insurer may recover paid amounts from the Policyholder if the Policyholder breached any obligation of this policy.", "ratings": {"insured": "red", "insurer": "green"}}
+  ],
+  "missing_topics": [],
+  "capped_greens": [
+    {"topic": "insured_risks", "clause": "1.1", "side": "insurer", "reasons": ["check_exceptions", "unresolved_reference"], "attached_clauses": ["1.1"]}
+  ],
+  "reduced_selection": {
+    "exclude_topics": ["premium_termination", "subrogation"],
+    "other": [
+      {"clause": "8.1", "risk_term": true, "ratings": {"insured": "red", "insurer": "green"}},
+      {"clause": "9.1", "risk_term": true, "ratings": {"insured": "red", "insurer": "green"}},
+      {"clause": "8", "risk_term": false, "no_issue": true},
+      {"clause": "9", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false,
+    "note": "Clause 1.1 refers to a Schedule outside the document (lexicon list external). The browser flag unprovided_references applies to clause ids, so no flag is expected. No finding on clause 1.1 is green."}
+}

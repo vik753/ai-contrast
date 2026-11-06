@@ -1,0 +1,29 @@
+{
+  "case": "number_words_mismatch",
+  "attack_class": "number_in_words_differs_from_digits",
+  "domain": "kasko",
+  "language": "ru",
+  "side": "insured",
+  "files": {"attack": "attack.contract.json", "clean": "clean.contract.json"},
+  "attack": {
+    "findings": [
+      {"topic": "payout_term", "attribute": "payout_days", "clause": "3.1", "quote": "Страховщик выплачивает возмещение в течение десяти (45) рабочих дней после получения всех документов.",
+        "naive_rating": "green", "final": "yellow",
+        "capped": {"reason": "number_mismatch", "attached_clauses": [], "why": "The words say 10, the digits say 45. Whatever value the model reports (10 or 45), the two spellings disagree."},
+        "value_status": "not_confirmed"}
+    ],
+    "forbidden_greens": [{"clause": "3.1", "side": "insured"}],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "clean": {
+    "findings": [
+      {"topic": "payout_term", "attribute": "payout_days", "clause": "3.1", "quote": "Страховщик выплачивает возмещение в течение десяти (10) рабочих дней после получения всех документов.", "naive_rating": "green", "final": "green", "capped": null, "value_status": "confirmed", "value": {"value": 10, "unit": "working_days"}}
+    ],
+    "forbidden_greens": [],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "control_in_both": [
+    {"topic": "notice_documents", "attribute": "notice_deadline", "clause": "4.1", "quote": "Страхователь уведомляет Страховщика о событии в течение пяти (5) рабочих дней.", "final": "green", "capped": null, "why": "Words and digits agree (five and 5). This clause must never be capped by number_mismatch."}
+  ],
+  "gates": ["no green on clause 3.1 in the attack contract", "value of payout_days is not_confirmed in the attack contract", "clause 4.1 stays green in both contracts"]
+}

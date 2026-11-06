@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "en": [
+    "notwithstanding anything", "notwithstanding any other", "notwithstanding any provision", "notwithstanding the foregoing",
+    "notwithstanding the above", "regardless of any other", "irrespective of any other", "in case of conflict",
+    "in the event of conflict", "in the event of any conflict", "in case of any inconsistency", "shall prevail",
+    "shall take precedence", "takes precedence", "prevails over", "overrides", "supersedes all", "supersede all",
+    "all other provisions", "any other provision of this", "under all circumstances", "in all cases the insurer",
+    "without regard to any other",
+    "notwithstanding", "regardless of", "prevails", "prevail", "take precedence", "override", "supersede", "supersedes"
+  ],
+  "uk": [
+    "незважаючи на будь-які", "незважаючи на інші", "незважаючи на решту", "попри будь-які", "попри інші положення",
+    "усупереч", "всупереч", "у разі суперечності", "у разі розбіжностей", "у разі невідповідності", "має переважну силу",
+    "мають переважну силу", "має пріоритет", "мають пріоритет", "переважає над", "переважають над", "скасовує",
+    "втрачають силу", "інші положення договору не застосовуються", "будь-яких інших положень", "за будь-яких обставин",
+    "незалежно від будь-яких інших",
+    "попри", "незважаючи на", "втрачає силу"
+  ],
+  "ru": [
+    "несмотря на любые", "несмотря на иные", "несмотря на остальные", "невзирая на любые", "невзирая на иные",
+    "вопреки", "в случае противоречия", "в случае расхождений", "в случае несоответствия", "имеет преимущественную силу",
+    "имеют преимущественную силу", "имеет приоритет", "имеют приоритет", "преобладает над", "преобладают над",
+    "отменяет", "утрачивают силу", "иные положения договора не применяются", "любых иных положений",
+    "при любых обстоятельствах", "независимо от любых иных", "вне зависимости от любых иных",
+    "несмотря на", "независимо от", "утрачивает силу"
+  ],
+  "added_in_review": {
+    "en": ["notwithstanding", "regardless of", "prevails", "prevail", "take precedence", "override", "supersede", "supersedes"],
+    "uk": ["попри", "незважаючи на", "втрачає силу"],
+    "ru": ["несмотря на", "независимо от", "утрачивает силу"]
+  }
+}

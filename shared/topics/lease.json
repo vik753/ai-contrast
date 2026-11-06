@@ -9,6 +9,7 @@
     {
       "id": "rent_amount",
       "names": {"en": "Rent", "uk": "Орендна плата", "ru": "Арендная плата"},
+      "essential": {"tenant": true, "landlord": true},
       "descriptions": {"en": "Monthly rent and how it may change during the term.", "uk": "Щомісячна орендна плата та як вона може змінюватися протягом строку.", "ru": "Ежемесячная арендная плата и как она может меняться в течение срока."},
       "synonyms": {
         "en": ["rent", "monthly rent", "rental fee", "indexation", "rent increase", "payment date"],
@@ -37,6 +38,7 @@
     {
       "id": "term_renewal",
       "names": {"en": "Term and renewal", "uk": "Строк та продовження", "ru": "Срок и продление"},
+      "essential": {"tenant": true, "landlord": true},
       "descriptions": {"en": "Length of the lease and the right to extend it.", "uk": "Тривалість оренди та право її продовжити.", "ru": "Длительность аренды и право её продлить."},
       "synonyms": {
         "en": ["lease term", "lease term", "renewal", "extension", "pre-emptive right", "expiry"],
@@ -96,6 +98,7 @@
     {
       "id": "termination_notice",
       "names": {"en": "Termination and notice", "uk": "Розірвання та попередження", "ru": "Расторжение и уведомление"},
+      "essential": {"tenant": true, "landlord": true},
       "descriptions": {"en": "Notice periods and costs when either party ends the lease early.", "uk": "Строки попередження та витрати, коли сторона достроково припиняє оренду.", "ru": "Сроки уведомления и расходы, когда сторона досрочно прекращает аренду."},
       "synonyms": {
         "en": ["termination", "early termination", "notice period", "terminate the lease", "move out", "eviction"],
@@ -166,6 +169,7 @@
     {
       "id": "damage_liability",
       "names": {"en": "Liability for damage and handover", "uk": "Відповідальність за шкоду та передача", "ru": "Ответственность за ущерб и передача"},
+      "essential": {"tenant": true, "landlord": false},
       "descriptions": {"en": "Condition at handover and who bears damage and losses.", "uk": "Стан приміщення при передачі та хто несе шкоду і збитки.", "ru": "Состояние помещения при передаче и кто несёт ущерб и убытки."},
       "synonyms": {
         "en": ["damage", "handover", "acceptance certificate", "inventory", "liability", "return premises"],
