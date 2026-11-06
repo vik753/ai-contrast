@@ -491,5 +491,99 @@
       "unknown": "The request failed for an unknown reason."
     },
     "open": "Choose topics"
+  },
+  "tagging": {
+    "title": "Tag clauses",
+    "start": "Start tagging",
+    "noTopics": "Choose at least one topic first.",
+    "pair": "Tagging model: {{cheap}}. Check model: {{strong}}.",
+    "pairDefault": "Tagging model: {{cheap}}. Check model: the provider's stronger model (server default).",
+    "cost": "Estimate: about {{calls}} tagging calls, up to {{checks}} check calls, about {{tokens}} input tokens. The real numbers can differ.",
+    "status": {
+      "pending": "Not started",
+      "running": "Tagging...",
+      "done": "Done",
+      "failed": "Failed"
+    },
+    "source": {
+      "keyword": "keyword",
+      "model": "model",
+      "check": "checked",
+      "client": "added by you"
+    },
+    "risk": {
+      "label": "Risk words found"
+    },
+    "other": {
+      "heading": "Other: clauses without a topic"
+    },
+    "counts": "Keyword tags: {{keyword}}. Model tags: {{model}}.",
+    "flag": {
+      "model_tags_dropped": "Model tags for this topic were dropped because there were too many.",
+      "not_analyzed": {
+        "too_many_clauses": "This topic matches too many clauses and was not analyzed further."
+      }
+    },
+    "missing": {
+      "heading": "Topics not found in this document"
+    },
+    "incomplete": {
+      "bad_output": "The model gave an unusable answer for part of the text.",
+      "timeout": "The model did not answer in time for part of the text.",
+      "quota": "The provider limit was reached for part of the text.",
+      "check_failed": "The second check of the model tags failed.",
+      "clause_cap": "Some clauses reached the limit of model tags."
+    },
+    "layer2": {
+      "heuristic": "Possible instruction to the AI in this clause",
+      "high": "Instruction to the AI found in this clause"
+    },
+    "add": {
+      "label": "Add a topic to this clause",
+      "button": "Add tag",
+      "clauseCap": "This clause has the maximum number of added tags."
+    },
+    "error": {
+      "request_too_large": "The request is too large.",
+      "invalid_request": "The request is not valid.",
+      "invalid_provider": "The provider is not supported.",
+      "invalid_model": "The model name is not valid.",
+      "unexpected_model": "The free mode does not accept a model name.",
+      "unexpected_base_url": "This provider does not accept a custom address.",
+      "invalid_base_url": "The provider address is not valid.",
+      "unexpected_turnstile_token": "A Cloudflare token was sent where it is not needed.",
+      "invalid_provider_key": "The API key is missing or not valid.",
+      "unexpected_provider_key": "The free mode does not accept an API key.",
+      "unexpected_analysis_pass": "An analysis pass was sent where it is not needed.",
+      "unmasked_identifier": "The document still has an identifier that is not masked. Check the replacements again.",
+      "detector_version_mismatch": "The detector changed. Check the replacements again.",
+      "too_many_topics": "Too many topics are selected.",
+      "unknown_topic": "A selected topic is not known to the server.",
+      "no_topics": "No topic is selected.",
+      "catalog_version_mismatch": "The catalog changed. Reload the page.",
+      "topic_flagged": "A topic text was refused by the safety check. Change it.",
+      "keyword_budget_exceeded": "The document is too complex for keyword matching. Shorten the topic synonyms or the document.",
+      "document_too_large_for_tagging": "The document is too large for tagging.",
+      "too_many_documents": "The free mode accepts at most two documents per analysis.",
+      "free_too_large": "The documents are too large for the free mode.",
+      "analysis_pass_invalid": "The analysis pass is not valid. Start again.",
+      "analysis_pass_expired": "The analysis pass expired. Start again.",
+      "analysis_pass_exhausted": "The analysis pass has no calls left. Start again.",
+      "analysis_pass_unavailable": "The server cannot issue an analysis pass now. Try again later.",
+      "turnstile_failed": "The Cloudflare check failed. Try again.",
+      "free_quota_exhausted": "The free quota for today is used up. Try tomorrow or use your own API key.",
+      "free_mode_unavailable": "The free mode is not available now.",
+      "rate_limited": "Too many requests. Wait a minute and try again.",
+      "busy": "The server is overloaded right now. Try again in a few seconds.",
+      "provider_auth_failed": "The provider did not accept the API key.",
+      "provider_model_not_found": "The provider does not know this model.",
+      "provider_bad_request": "The provider refused the request.",
+      "provider_blocked_host": "This provider address is not allowed.",
+      "digest_mismatch": "The server answered for a different text. The result was dropped.",
+      "network": "The server cannot be reached. Check your connection.",
+      "unknown": "The request failed for an unknown reason."
+    },
+    "removeTag": "Remove tag: {{topic}}",
+    "stale": "The topics changed after this result. Tag again to update it."
   }
 }

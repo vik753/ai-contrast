@@ -1,12 +1,14 @@
 import i18next from "i18next";
 import { useEffect, useId, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
-import type { SafetyDocument } from "./api/safetyCheck";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { RatingIcon, type Rating } from "./components/RatingIcon";
 import { SOURCE_CODE_URL } from "./config";
 import { getKey } from "./provider/keyStore";
 import { ProviderSettings, type ProviderChoice } from "./provider/ProviderSettings";
+import { useMaskedDocs } from "./tagging/maskedDocsStore";
+import { TaggingStep } from "./tagging/TaggingStep";
+import type { TopicSelection } from "./topics/types";
 import { TopicPanel } from "./topics/TopicPanel";
 import { SettingsPanel } from "./settings/SettingsPanel";
 import { startupCleanup } from "./storage/historySetting";
@@ -14,7 +16,7 @@ import { UploadForm } from "./upload/UploadForm";
 
 const RATINGS: readonly Rating[] = ["green", "yellow", "red"];
 
-const NO_DOCUMENTS: readonly SafetyDocument[] = [];
+const NO_SELECTION: TopicSelection = { catalog: [], suggested: [], custom: [] };
 
 /** The key is read from storage at render time; it is never kept in React state. */
 function keyOf(provider: string): { key?: string } {
@@ -30,6 +32,9 @@ function Shell() {
   const topicsId = useId();
   const [topicsOpen, setTopicsOpen] = useState(false);
   const [choice, setChoice] = useState<ProviderChoice>({ provider: "free" });
+  const documents = useMaskedDocs();
+  const [selection, setSelection] = useState<TopicSelection>(NO_SELECTION);
+  const [names, setNames] = useState<Readonly<Record<string, string>>>({});
 
   useEffect(() => {
     void startupCleanup();
@@ -86,12 +91,23 @@ function Shell() {
           <div id={topicsId}>
             <TopicPanel
               connection={{ ...choice, ...keyOf(choice.provider) }}
-              documents={NO_DOCUMENTS}
+              documents={documents}
+              onSelectionChange={(sel, n) => {
+                setSelection(sel);
+                setNames(n);
+              }}
             />
           </div>
         ) : null}
 
         <UploadForm />
+
+        <TaggingStep
+          connection={{ ...choice, ...keyOf(choice.provider) }}
+          documents={documents}
+          selection={selection}
+          topicNames={names}
+        />
 
         <section className="card" aria-labelledby="ratings-title">
           <h2 id="ratings-title" className="card__title">
