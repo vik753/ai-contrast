@@ -39,7 +39,7 @@ export interface TopicPanelProps {
   connection: TopicConnection;
   turnstileToken?: string;
   documents: readonly SafetyDocument[];
-  onSelectionChange?: (selection: TopicSelection) => void;
+  onSelectionChange?: (selection: TopicSelection, names: Record<string, string>) => void;
 }
 
 type Notice =
@@ -200,8 +200,11 @@ export function TopicPanel({
     notify.current = onSelectionChange;
   });
   useEffect(() => {
-    notify.current?.(selection);
-  }, [selection]);
+    const names: Record<string, string> = {};
+    for (const x of domain?.topics ?? []) names[x.id] = x.names[lang];
+    for (const x of own) names[x.topic_id] = x.title;
+    notify.current?.(selection, names);
+  }, [selection, domain, own, lang]);
 
   const onDomain = (id: string) => {
     setDomainId(id);

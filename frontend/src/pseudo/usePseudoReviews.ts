@@ -21,6 +21,7 @@ import {
   type Dispatch,
 } from "react";
 import { checkSafety } from "../api/safetyCheck";
+import { maskedDocsStore } from "../tagging/maskedDocsStore";
 import { freeSlots, released, type RequestBudget } from "../upload/budget";
 import {
   contractLabel,
@@ -49,6 +50,8 @@ export interface Entry {
   readonly phase: Phase;
   /** An error code (ours, never server text) shown next to the status. */
   readonly error: string | null;
+  /** The digest of the safety reply; meaningful only in phase `ready`. */
+  readonly digest?: string;
 }
 
 export interface ContractSection {
@@ -222,6 +225,47 @@ export function usePseudoReviews(
     });
   }, [state, entries, abort, store]);
 
+  // Confirmed masked documents go to the in-memory store (memory only, never persisted).
+  const synced = useRef<ReadonlyMap<string, Entry>>(new Map());
+  useEffect(() => {
+    const desired = new Map<string, Entry>();
+    for (const [id, entry] of entries) {
+      const index = state.contracts.findIndex((c) => c.id === id);
+      if (
+        index >= 0 &&
+        entry.phase === "ready" &&
+        entry.review !== null &&
+        entry.digest !== undefined &&
+        entry.review.label === contractLabel(index)
+      ) {
+        desired.set(entry.review.label, entry);
+      }
+    }
+    const prev = synced.current;
+    for (const label of prev.keys()) {
+      if (!desired.has(label)) maskedDocsStore.remove(label);
+    }
+    for (const [label, entry] of desired) {
+      if (prev.get(label) !== entry && entry.review !== null && entry.digest !== undefined) {
+        maskedDocsStore.set({
+          label,
+          detectorVersion: entry.review.detectorVersion,
+          clauses: maskedClauses(entry.review),
+          acknowledgedUnmasked: acknowledgedUnmasked(entry.review),
+          digest: entry.digest,
+        });
+      }
+    }
+    synced.current = desired;
+  }, [state, entries]);
+  useEffect(
+    () => () => {
+      for (const label of synced.current.keys()) maskedDocsStore.remove(label);
+      synced.current = new Map();
+    },
+    [],
+  );
+
   // Unmount: abort every request.
   useEffect(() => {
     const running = budget.safety;
@@ -268,7 +312,7 @@ export function usePseudoReviews(
         return;
       }
       if (result.ok) {
-        put(contractId, { ...current, phase: "ready", error: null });
+        put(contractId, { ...current, phase: "ready", error: null, digest: result.digest });
       } else if (result.code === "unmasked_identifier" && result.spans !== undefined) {
         // A span that cannot be mapped is an error, not a silent drop: no confirmation then.
         const unmapped = unmappedSpans(current.review, result.spans).length > 0;

@@ -3,6 +3,7 @@
  * History is off by default. Off means nothing is stored. The setting is `localStorage["aic.history"] === "on"`.
  */
 import { notifyKeysCleared } from "../provider/keyStore";
+import { maskedDocsStore } from "../tagging/maskedDocsStore";
 import { topicStore } from "../topics/topicStore";
 import type { CacheStore } from "./cacheStore";
 import { DisabledCacheStore } from "./disabledCacheStore";
@@ -179,6 +180,7 @@ export async function clearAllData(): Promise<ClearResult> {
   const keysOk = [removeAicKeys(() => localStorage), removeAicKeys(() => sessionStorage)];
   notifyKeysCleared();
   topicStore.clearAll();
+  maskedDocsStore.clearAll();
   const factory = getFactory();
   if (factory === null) {
     return keysOk.includes(false) ? "failed" : "cleared";
