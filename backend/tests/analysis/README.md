@@ -11,7 +11,7 @@ class Rating(StrEnum): green, yellow, red
 class Reason(StrEnum):
     quote_too_short, suspicious_span, check_exceptions, global_override,
     too_many_references, number_mismatch, document_flags, other_not_green,
-    unverified, incomplete
+    unverified, incomplete, unresolved_reference
 class DocFlag(StrEnum): not_read_material, hidden_text_removed
 class ValueStatus(StrEnum): verified, not_confirmed
 class TopicState(StrEnum): ok, model_tags_dropped, not_analyzed
@@ -75,3 +75,17 @@ thousands separated by spaces, words 0-100, "десять (10)" (words plus digi
 digits = mismatch). More than one number of the unit in the expanded quote = mismatch.
 
 Run: `cd backend && uv run --locked pytest tests/analysis -q`. All tests fail with ImportError before the implementation.
+
+## Hardening additions (S9-T0 security review)
+
+- Matching of markers (exception, global override), clause references and unit words runs on normalized
+  text: NFKC, case-folded, look-alike letters mapped (Latin/Cyrillic), hyphen variants (U+2011, dashes)
+  mapped to `-`, apostrophe variants (`'` U+2019 U+02BC `` ` `` U+FF07) mapped to one, format characters removed.
+  Offsets still refer to the original text.
+- References: any dotted number equal to an existing `Clause.number` counts even without a prefix word. Ranges
+  ("4.1-4.3", "4.1\u20134.9", "з 4.1 по 4.3", "с 4.1 по 4.3") expand to the existing flat-numbered clauses in range
+  (ordered by number); they count toward `needed` and the limit of 5.
+- `Reason.unresolved_reference`: the quoted clause holds a relative or external reference ("as set out above",
+  "згідно з Правилами", "указанных выше") and caps the green.
+- Number check: a number word the code cannot parse ("half", "two hundred", "півтора", "полтора") next to a unit
+  word of the value's unit is `number_mismatch`; "десять (45)" (words contradict digits) is a mismatch for any value.
