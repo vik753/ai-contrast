@@ -9,6 +9,7 @@
     {
       "id": "insured_risks",
       "names": {"en": "Insured risks", "uk": "Страхові ризики", "ru": "Страховые риски"},
+      "essential": {"insured": true, "insurer": false},
       "descriptions": {"en": "Which events the policy covers (collision, theft, fire, natural events, vandalism).", "uk": "Які події покриває поліс (ДТП, крадіжка, пожежа, стихія, вандалізм).", "ru": "Какие события покрывает полис (ДТП, кража, пожар, стихия, вандализм)."},
       "synonyms": {
         "en": ["insured risk", "insured event", "covered risk", "perils covered", "scope cover", "collision", "natural disaster", "vandalism"],
@@ -33,6 +34,7 @@
     {
       "id": "exclusions",
       "names": {"en": "Exclusions", "uk": "Винятки зі страхового покриття", "ru": "Исключения из страхового покрытия"},
+      "essential": {"insured": true, "insurer": true},
       "descriptions": {"en": "Situations where the insurer does not pay or may refuse.", "uk": "Ситуації, коли страховик не виплачує або може відмовити.", "ru": "Ситуации, когда страховщик не платит или может отказать."},
       "synonyms": {
         "en": ["exclusion", "not covered", "liable", "refuse payment", "grounds for refusal", "intoxication", "licence"],
@@ -59,6 +61,7 @@
     {
       "id": "deductible",
       "names": {"en": "Deductible", "uk": "Франшиза", "ru": "Франшиза"},
+      "essential": {"insured": true, "insurer": true},
       "descriptions": {"en": "The part of each loss the insured pays, fixed or as a share of the sum insured.", "uk": "Частина збитку, яку сплачує страхувальник, у сумі або у відсотках від страхової суми.", "ru": "Часть убытка, которую оплачивает страхователь, в сумме или в процентах от страховой суммы."},
       "synonyms": {
         "en": ["deductible", "excess", "own risk", "franchise", "self-participation"],
@@ -86,6 +89,7 @@
     {
       "id": "sum_insured_depreciation",
       "names": {"en": "Sum insured and depreciation", "uk": "Страхова сума та знос", "ru": "Страховая сумма и износ"},
+      "essential": {"insured": true, "insurer": true},
       "descriptions": {"en": "The maximum payout, whether it falls during the term, and the wear deduction.", "uk": "Максимальна виплата, чи зменшується вона протягом дії договору, та вирахування зносу.", "ru": "Максимальная выплата, уменьшается ли она в период действия договора, и вычет износа."},
       "synonyms": {
         "en": ["sum insured", "insured value", "liability", "depreciation", "wear deduction", "actual value"],
@@ -100,6 +104,7 @@
     {
       "id": "payout_term",
       "names": {"en": "Payout term", "uk": "Строк страхової виплати", "ru": "Срок страховой выплаты"},
+      "essential": {"insured": true, "insurer": false},
       "descriptions": {"en": "Time the insurer has to decide and pay after the documents arrive.", "uk": "Строк, протягом якого страховик ухвалює рішення та виплачує після отримання документів.", "ru": "Срок, в течение которого страховщик принимает решение и выплачивает после получения документов."},
       "synonyms": {
         "en": ["payout term", "within days", "pay within", "settlement period", "claim decision", "payment deadline"],

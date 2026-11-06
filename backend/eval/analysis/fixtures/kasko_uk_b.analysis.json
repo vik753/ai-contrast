@@ -1,0 +1,41 @@
+{
+  "contract": "kasko_uk_b",
+  "domain": "kasko",
+  "language": "uk",
+  "values_source": "backend/eval/topics/fixtures/kasko_uk_b/expected.json",
+  "value_notes": {"payout_term.payout_start_event": "documents_received (clause 4.1)", "deductible.deductible_scope": "per_event (clause 3.3)"},
+  "findings": [
+    {"topic": "insured_risks", "attribute": "covered_risks", "clause": "1.1", "quote": "Страховик відшкодовує збитки, завдані Транспортному засобу внаслідок ДТП, пожежі, стихійних явищ, протиправних дій третіх осіб, падіння предметів та пошкодження скла", "ratings": {"insured": "green", "insurer": "yellow"},
+      "capped": {"insured": {"reason": "check_exceptions", "by": ["1.2"], "final": "yellow"}}},
+    {"topic": "theft_conditions", "attribute": "theft_cover", "clause": "1.2", "quote": "Крадіжка та угон покриваються за умови наявності іммобілайзера та передачі страховику усіх ключів", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "theft_conditions", "attribute": "theft_waiting_days", "clause": "1.2", "quote": "Виплата за крадіжку здійснюється після очікування 90 днів", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "exclusions", "attribute": "excluded_situations", "clause": "2.1", "quote": "Страховик не відшкодовує збитки, якщо водій перебував у стані сп'яніння або використовував авто як таксі", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "sum_insured_depreciation", "attribute": "depreciation_rate", "clause": "3.2", "quote": "Знос не застосовується.", "ratings": {"insured": "green", "insurer": "red"},
+      "capped": {"insured": {"reason": "quote_too_short", "by": [], "final": "yellow"}}},
+    {"topic": "deductible", "attribute": "deductible_amount", "clause": "3.3", "quote": "Встановлюється умовна франшиза 5 000 грн за кожною подією", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "payout_term", "attribute": "payout_days", "clause": "4.1", "quote": "Страховик виплачує протягом 20 робочих днів після отримання всіх документів", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "repair_method", "attribute": "settlement_method", "clause": "4.2", "quote": "Ремонт здійснюється у офіційного дилера за вибором Страхувальника з використанням оригінальних запчастин", "ratings": {"insured": "green", "insurer": "red"}},
+    {"topic": "notice_documents", "attribute": "notice_deadline", "clause": "5.1", "quote": "Страхувальник повідомляє Страховика про подію протягом 5 робочих днів", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "territory", "attribute": "territory_scope", "clause": "6.1", "quote": "Поліс діє на території України та країн Європи, крім тимчасово окупованих територій", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "drivers_allowed", "attribute": "driver_scope", "clause": "7.1", "quote": "До керування допускається будь-яка особа зі стажем водіння не менше 2 років", "ratings": {"insured": "green", "insurer": "yellow"}},
+    {"topic": "premium_instalments", "attribute": "late_payment_effect", "clause": "8.1", "quote": "У разі прострочення траншу договір припиняється", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "termination_refund", "attribute": "refund_share", "clause": "9.1", "quote": "повертається 80% премії за невикористаний період", "ratings": {"insured": "green", "insurer": "yellow"}}
+  ],
+  "missing_topics": [
+    {"topic": "subrogation", "ratings": {"insured": "yellow", "insurer": "yellow"}}
+  ],
+  "capped_greens": [
+    {"topic": "insured_risks", "clause": "1.1", "side": "insured", "reason": "check_exceptions", "attached_clauses": ["1.2"], "note": "Clause 1.2 is tagged insured_risks (tagging fixture) and holds the marker 'за умови'."},
+    {"topic": "sum_insured_depreciation", "clause": "3.2", "side": "insured", "reason": "quote_too_short", "attached_clauses": [], "note": "The sentence has 23 characters."}
+  ],
+  "reduced_selection": {
+    "exclude_topics": ["premium_instalments", "drivers_allowed"],
+    "other": [
+      {"clause": "8.1", "risk_term": true, "ratings": {"insured": "red", "insurer": "green"}},
+      {"clause": "7.1", "risk_term": false, "ratings": {"insured": "green", "insurer": "yellow"}},
+      {"clause": "7", "risk_term": false, "no_issue": true},
+      {"clause": "8", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false}
+}

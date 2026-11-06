@@ -1,0 +1,36 @@
+{
+  "contract": "kasko_en_a",
+  "domain": "kasko",
+  "language": "en",
+  "values_source": "backend/eval/topics/fixtures/kasko_en_a/expected.json",
+  "value_notes": {"repair_method.parts_type": "not_stated", "deductible.deductible_scope": "per_event"},
+  "findings": [
+    {"topic": "insured_risks", "attribute": "covered_risks", "clause": "1.1", "quote": "covers damage to the Vehicle caused by collision, fire, natural events, vandalism and theft", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "exclusions", "attribute": "excluded_situations", "clause": "2.1", "quote": "does not pay if the driver was under the influence of alcohol or drugs, drove without a valid licence, or left the scene of the accident", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "sum_insured_depreciation", "attribute": "depreciation_rate", "clause": "3.2", "quote": "A depreciation of 12% per year is deducted from the sum insured", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "deductible", "attribute": "deductible_amount", "clause": "3.3", "quote": "An unconditional deductible of 1% of the sum insured applies to each event", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "payout_term", "attribute": "decision_days", "clause": "4.1", "quote": "decides on the claim within 10 working days after receiving all documents and pays within 5 working days after the decision", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "repair_method", "attribute": "settlement_method", "clause": "4.2", "quote": "Repair is carried out at a service chosen by the Insurer from its partner list", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "notice_documents", "attribute": "notice_deadline", "clause": "5.1", "quote": "must notify the Insurer of the event within 48 hours", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "territory", "attribute": "territory_scope", "clause": "6.1", "quote": "The policy applies in Ukraine only.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "premium_instalments", "attribute": "late_payment_effect", "clause": "7.1", "quote": "If an instalment is late, cover is suspended until it is paid.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "termination_refund", "attribute": "refund_share", "clause": "8.1", "quote": "50% of the unused premium is refunded", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "subrogation", "attribute": "recourse_against_insured", "clause": "9.1", "quote": "The Insurer has no right of recourse against the Policyholder except for intentional damage.", "ratings": {"insured": "green", "insurer": "yellow"},
+      "note": "The exception marker 'except' is inside the quoted sentence. The rule check_exceptions looks at OTHER clauses, so no cap is expected. A model that rates this yellow is also acceptable (tolerance one step)."}
+  ],
+  "missing_topics": [
+    {"topic": "theft_conditions", "ratings": {"insured": "yellow", "insurer": "yellow"}},
+    {"topic": "drivers_allowed", "ratings": {"insured": "yellow", "insurer": "yellow"}}
+  ],
+  "capped_greens": [],
+  "reduced_selection": {
+    "exclude_topics": ["premium_instalments", "termination_refund"],
+    "other": [
+      {"clause": "7.1", "risk_term": true, "ratings": {"insured": "yellow", "insurer": "green"}},
+      {"clause": "8.1", "risk_term": false, "ratings": {"insured": "yellow", "insurer": "green"}},
+      {"clause": "7", "risk_term": false, "no_issue": true},
+      {"clause": "8", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false}
+}

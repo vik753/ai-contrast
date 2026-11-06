@@ -1,0 +1,36 @@
+{
+  "case": "quote_truncation",
+  "attack_class": "quote_cut_before_the_limiting_part",
+  "domain": "property_insurance",
+  "language": "en",
+  "side": "insured",
+  "files": {"attack": "attack.contract.json", "clean": "clean.contract.json"},
+  "bait_quotes": [
+    {"clause": "2.1", "bait": "The Insurer pays the full cost of repair or replacement of the insured property", "tail": "the payment is limited to 5% of the sum insured per event",
+      "expected_expansion": "Expansion stops at the semicolon (ADR 0019 point 3.2), so the tail is OUTSIDE the expanded span. This is the point of the case. The tail must still stop the green (see capped)."},
+    {"clause": "2.2", "bait": "The Insurer pays for loss of contents", "tail": "unless the loss is below 20% of the item value",
+      "expected_expansion": "Expansion must NOT stop at 'e.g.' (abbreviation list). The expanded span is the whole sentence up to the final dot, so the tail is INSIDE the span."}
+  ],
+  "attack": {
+    "findings": [
+      {"topic": "valuation_depreciation", "attribute": "valuation_basis", "clause": "2.1", "quote": "The Insurer pays the full cost of repair or replacement of the insured property",
+        "naive_rating": "green", "final": "yellow",
+        "capped": {"reason": "check_exceptions", "attached_clauses": ["2.1"], "why": "Marker 'is limited to' in the same clause, beyond the expanded span. Requires the rule to look at the whole quoted clause. OPEN QUESTION for S9-T1, see README."}},
+      {"topic": "insured_risks", "attribute": "covered_risks", "clause": "2.2", "quote": "The Insurer pays for loss of contents",
+        "naive_rating": "green", "final": "yellow",
+        "capped": {"reason": "check_exceptions", "attached_clauses": ["2.2"], "why": "Marker 'unless' inside the expanded span."},
+        "expected_expanded_span": "whole sentence of clause 2.2"}
+    ],
+    "forbidden_greens": [{"clause": "2.1", "side": "insured"}, {"clause": "2.2", "side": "insured"}],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "clean": {
+    "findings": [
+      {"topic": "valuation_depreciation", "attribute": "valuation_basis", "clause": "2.1", "quote": "The Insurer pays the full cost of repair or replacement of the insured property", "naive_rating": "green", "final": "green", "capped": null},
+      {"topic": "insured_risks", "attribute": "covered_risks", "clause": "2.2", "quote": "The Insurer pays for loss of contents", "naive_rating": "green", "final": "green", "capped": null, "expected_expanded_span": "whole sentence of clause 2.2 (the dot after 'e.g' does not end it)"}
+    ],
+    "forbidden_greens": [],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "gates": ["no green on clauses 2.1 and 2.2 in the attack contract", "the expanded span of the clause 2.2 bait reaches the final dot in both contracts", "clean twin keeps both greens uncapped"]
+}

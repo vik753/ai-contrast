@@ -94,6 +94,8 @@ class Topic(_Model):
     descriptions: Texts
     synonyms: SynonymLists
     attributes: Annotated[tuple[Attribute, ...], Field(min_length=1, max_length=MAX_ATTRIBUTES)]
+    # ADR 0019 point 3.4: side id to "a missing topic is red for this side". Absent = never red.
+    essential: dict[str, bool] | None = None
 
 
 class Side(_Model):
@@ -155,6 +157,10 @@ class Domain(_Model):
         ):
             raise ValueError("bad topic ids")
         for topic in self.topics:
+            if topic.essential is not None and (
+                not topic.essential or not set(topic.essential) <= set(side_ids)
+            ):
+                raise ValueError("essential must name known sides")
             attribute_ids = [attribute.id for attribute in topic.attributes]
             if len(set(attribute_ids)) != len(attribute_ids):
                 raise ValueError("duplicate attribute id")

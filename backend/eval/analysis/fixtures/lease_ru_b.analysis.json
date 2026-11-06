@@ -1,0 +1,31 @@
+{
+  "contract": "lease_ru_b",
+  "domain": "lease",
+  "language": "ru",
+  "values_source": "backend/eval/topics/fixtures/lease_ru_b/expected.json",
+  "value_notes": {},
+  "findings": [
+    {"topic": "rent_amount", "attribute": "indexation_rate", "clause": "1.1", "quote": "Арендодатель вправе ежегодно индексировать арендную плату на 12%.", "ratings": {"tenant": "red", "landlord": "green"}},
+    {"topic": "deposit", "attribute": "deposit_return_days", "clause": "1.2", "quote": "Депозит возвращается в течение 10 рабочих дней после освобождения помещения.", "ratings": {"tenant": "green", "landlord": "yellow"}},
+    {"topic": "term_renewal", "attribute": "renewal_option", "clause": "2.1", "quote": "По окончании срока договор автоматически продлевается на тот же срок, если ни одна сторона не заявила о прекращении.", "ratings": {"tenant": "yellow", "landlord": "yellow"}},
+    {"topic": "utilities", "attribute": "utilities_payer", "clause": "3.1", "quote": "Коммунальные услуги оплачиваются Арендатором и Арендодателем поровну.", "ratings": {"tenant": "green", "landlord": "red"}},
+    {"topic": "repairs_maintenance", "attribute": "major_repairs_by", "clause": "3.2", "quote": "Капитальный ремонт выполняет Арендатор за свой счёт.", "ratings": {"tenant": "red", "landlord": "green"}},
+    {"topic": "termination_notice", "attribute": "tenant_notice_days", "clause": "4.1", "quote": "Арендатор вправе расторгнуть договор, уведомив Арендодателя за 14 дней. Арендодатель вправе расторгнуть договор, уведомив Арендатора за 90 дней.", "ratings": {"tenant": "green", "landlord": "red"}},
+    {"topic": "late_penalties", "attribute": "late_penalty_rate", "clause": "5.1", "quote": "За просрочку платежа начисляется пеня 0,1% за каждый день просрочки. Льготный период — 10 дней.", "ratings": {"tenant": "green", "landlord": "yellow"}},
+    {"topic": "sublease_use", "attribute": "sublease_allowed", "clause": "6.1", "quote": "Субаренда разрешена без дополнительного согласия Арендодателя.", "ratings": {"tenant": "green", "landlord": "red"}},
+    {"topic": "landlord_access", "attribute": "access_notice", "clause": "7.1", "quote": "Арендодатель вправе осматривать помещение, предварительно уведомив Арендатора за 5 рабочих дней.", "ratings": {"tenant": "green", "landlord": "yellow"}},
+    {"topic": "damage_liability", "attribute": "damage_cap", "clause": "8.1", "quote": "Ответственность Арендатора за ущерб ограничена суммой 100 000 грн.", "ratings": {"tenant": "green", "landlord": "red"}}
+  ],
+  "missing_topics": [],
+  "capped_greens": [],
+  "reduced_selection": {
+    "exclude_topics": ["term_renewal", "landlord_access"],
+    "other": [
+      {"clause": "2.1", "risk_term": true, "ratings": {"tenant": "yellow", "landlord": "yellow"}},
+      {"clause": "7.1", "risk_term": false, "ratings": {"tenant": "green", "landlord": "yellow"}},
+      {"clause": "2", "risk_term": false, "no_issue": true},
+      {"clause": "7", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false}
+}

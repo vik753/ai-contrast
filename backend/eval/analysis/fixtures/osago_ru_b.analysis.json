@@ -1,0 +1,30 @@
+{
+  "contract": "osago_ru_b",
+  "domain": "osago",
+  "language": "ru",
+  "values_source": "backend/eval/topics/fixtures/osago_ru_b/expected.json",
+  "value_notes": {},
+  "findings": [
+    {"topic": "liability_limits", "attribute": "limit_property", "clause": "1.1", "quote": "Лимит ответственности за вред, причинённый имуществу потерпевших, составляет 160 000 грн", "ratings": {"insured": "yellow", "insurer": "green", "injured_party": "red"}},
+    {"topic": "deductible", "attribute": "deductible_amount", "clause": "1.2", "quote": "Франшиза составляет 5 000 грн и удерживается из каждой выплаты.", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "policy_territory", "attribute": "policy_term", "clause": "2.1", "quote": "Договор действует 6 месяцев на территории Украины.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "accident_notice", "attribute": "notice_deadline", "clause": "3.1", "quote": "обязан уведомить Страховщика о ДТП в течение 3 рабочих дней", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "payout_term", "attribute": "payout_days", "clause": "4.1", "quote": "Страховщик принимает решение и производит выплату в течение 90 дней после получения заявления потерпевшего", "ratings": {"injured_party": "red", "insurer": "green"}},
+    {"topic": "direct_settlement", "attribute": "direct_settlement_available", "clause": "4.2", "quote": "Прямое урегулирование не применяется.", "ratings": {"injured_party": "red", "insured": "yellow", "insurer": "green"}},
+    {"topic": "recourse", "attribute": "recourse_grounds", "clause": "5.1", "quote": "Страховщик вправе предъявить регрессное требование к Страхователю, если он находился в состоянии опьянения, не имел водительского удостоверения, оставил место ДТП, не прошёл технический осмотр или не уведомил Страховщика в срок", "ratings": {"insured": "red", "insurer": "green"}},
+    {"topic": "premium_bonus_malus", "attribute": "bonus_discount", "clause": "6.1", "quote": "Скидки за безаварийное вождение не предусмотрены.", "ratings": {"insured": "yellow", "insurer": "green"}},
+    {"topic": "termination_refund", "attribute": "refund_share", "clause": "7.1", "quote": "страховой платёж возвращается в размере 40% за неиспользованный период", "ratings": {"insured": "red", "insurer": "green"}}
+  ],
+  "missing_topics": [],
+  "capped_greens": [],
+  "reduced_selection": {
+    "exclude_topics": ["recourse", "termination_refund"],
+    "other": [
+      {"clause": "5.1", "risk_term": true, "ratings": {"insured": "red", "insurer": "green"}},
+      {"clause": "7.1", "risk_term": true, "ratings": {"insured": "red", "insurer": "green"}},
+      {"clause": "5", "risk_term": false, "no_issue": true},
+      {"clause": "7", "risk_term": false, "no_issue": true}
+    ]
+  },
+  "document": {"flags": [], "incomplete": false}
+}

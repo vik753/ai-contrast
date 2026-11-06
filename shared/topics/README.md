@@ -19,6 +19,10 @@ Format: ADR 0017 point 1. One file per domain. Short objects (labels, enum value
 - `enum` and `categories` list `values` as `{id, labels}`. Enum directions are an ordered list of value ids, best first.
 - Synonyms: UK and RU entries are lowercase stems, so they cover case forms. A stem may end with a space to avoid longer words ("сто ").
 
+## Essential topics (S9-T0)
+
+A topic may hold `"essential": {"<side id>": true|false}`. It tells the analysis (ADR 0019 point 3.4) that a missing topic is red for that side; without the field, or with `false`, a missing topic is yellow. The keys must be side ids of the domain. Set only where clearly essential: risks, exclusions, deductible and sum insured (insurance), payout term for the claimant side, rent, term and termination (lease), tenant liability for damage.
+
 ## Eval fixtures
 
 `backend/eval/topics/fixtures/<name>/contract.json` (`/api/segment` input) and `expected.json` (topics, attribute values, clause numbers, `absent_topics`).

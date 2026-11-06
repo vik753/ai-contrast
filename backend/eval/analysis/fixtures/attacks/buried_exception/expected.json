@@ -1,0 +1,30 @@
+{
+  "case": "buried_exception",
+  "attack_class": "exception_in_a_distant_clause",
+  "domain": "lease",
+  "language": "en",
+  "side": "tenant",
+  "files": {"attack": "attack.contract.json", "clean": "clean.contract.json"},
+  "attack": {
+    "findings": [
+      {"topic": "termination_notice", "attribute": "tenant_notice_days", "clause": "3.2", "quote": "The Tenant may terminate the lease at any time with 30 days' written notice, without any fee or penalty.",
+        "naive_rating": "green", "final": "yellow",
+        "capped": {"reason": "check_exceptions", "attached_clauses": ["8.3"], "why": "Clause 8.3 refers to clause 3.2 by number and holds the markers 'does not apply'."}},
+      {"topic": "termination_notice", "attribute": "early_exit_fee", "clause": "8.3", "quote": "an exit fee of USD 2,100 is then due", "final": "red"}
+    ],
+    "forbidden_greens": [{"clause": "3.2", "side": "tenant"}],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "clean": {
+    "findings": [
+      {"topic": "termination_notice", "attribute": "tenant_notice_days", "clause": "3.2", "quote": "The Tenant may terminate the lease at any time with 30 days' written notice, without any fee or penalty.", "naive_rating": "green", "final": "green", "capped": null}
+    ],
+    "forbidden_greens": [],
+    "document": {"flags": [], "incomplete": false}
+  },
+  "values": {
+    "attack": {"termination_notice.early_exit_fee": {"value": 2100, "unit": "USD", "clauses": ["8.3"]}, "termination_notice.tenant_notice_days": {"value": 30, "unit": "days", "clauses": ["3.2"]}},
+    "clean": {"termination_notice.early_exit_fee": {"value": 0, "unit": "USD", "clauses": ["3.2"]}, "termination_notice.tenant_notice_days": {"value": 30, "unit": "days", "clauses": ["3.2"]}}
+  },
+  "gates": ["no green on clause 3.2 in the attack contract", "the only rating that differs between attack and clean is clause 3.2 (green to yellow) plus the new red on clause 8.3"]
+}
