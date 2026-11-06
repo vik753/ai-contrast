@@ -115,19 +115,31 @@ def test_request_rate_topic_is_an_airequest_with_one_document_and_a_topic() -> N
             2048,
             document=doc(),
             topic=rating_topic(),
+            side="insured",
             language=EN,
         ),
         lambda: RateOtherRequest(
-            PromptTemplate.RATE_OTHER, OtherRatingOut, 2048, side="insured", language=EN
+            PromptTemplate.RATE_OTHER,
+            OtherRatingOut,
+            2048,
+            side="insured",
+            side="insured",
+            language=EN,
         ),
         lambda: RateOtherRequest(
-            PromptTemplate.RATE_TOPIC, OtherRatingOut, 2048, document=doc(), language=EN
+            PromptTemplate.RATE_TOPIC,
+            OtherRatingOut,
+            2048,
+            document=doc(),
+            side="insured",
+            language=EN,
         ),
         lambda: RateOtherRequest(
             PromptTemplate.RATE_OTHER,
             OtherRatingOut,
             2048,
             document=doc(),
+            side="insured",
             language="de",  # type: ignore[arg-type]
         ),
     ],

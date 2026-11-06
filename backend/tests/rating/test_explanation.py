@@ -103,6 +103,8 @@ def test_explanation_rate_other_returns_cleaned_explanations() -> None:
     answer = other_answer("c1", "c3")
     answer["clauses"].append(other_finding_clause("c2", explanation="Odd﻿ term. " + INJECTION))
 
-    result = run(rate_other(FakeProvider(answer), doc(), language=OutputLanguage.EN))
+    result = run(
+        rate_other(FakeProvider(answer), doc(), side="insured", language=OutputLanguage.EN)
+    )
 
     assert result.clauses[-1].findings[0].explanation == EXPLANATION_WITHHELD
