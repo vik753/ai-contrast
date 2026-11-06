@@ -121,7 +121,7 @@ def test_repair_second_bad_answer_raises_bad_output_after_two_calls() -> None:
 def test_repair_other_missing_clause_gets_one_repair() -> None:
     provider = FakeProvider(other_answer("c1"), other_answer())
 
-    result = run(rate_other(provider, doc(), language=EN))
+    result = run(rate_other(provider, doc(), side="insured", language=EN))
 
     assert [r.repair for r in provider.requests] == [0, REPAIR_SCHEMA]
     assert len(result.clauses) == 3
@@ -133,7 +133,7 @@ def test_repair_other_missing_clause_gets_one_repair() -> None:
 def test_repair_other_provider_errors_are_not_repaired(code: AIErrorCode) -> None:
     provider = FakeProvider(AIError(code))
 
-    error = failure(rate_other(provider, doc(), language=EN))
+    error = failure(rate_other(provider, doc(), side="insured", language=EN))
 
     assert isinstance(error, AIError)
     assert error.code is code

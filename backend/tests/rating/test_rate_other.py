@@ -48,14 +48,18 @@ def test_rate_other_missing_unknown_or_repeated_clause_is_bad_output(
 ) -> None:
     provider = FakeProvider(answer)
 
-    assert isinstance(failure(rate_other(provider, doc(), language=EN)), BadOutputError)
+    assert isinstance(
+        failure(rate_other(provider, doc(), side="insured", language=EN)), BadOutputError
+    )
     assert len(provider.requests) == 2
 
 
 def test_rate_other_empty_answer_is_bad_output() -> None:
     provider = FakeProvider({"clauses": []})
 
-    assert isinstance(failure(rate_other(provider, doc(), language=EN)), BadOutputError)
+    assert isinstance(
+        failure(rate_other(provider, doc(), side="insured", language=EN)), BadOutputError
+    )
 
 
 def test_rate_other_finding_with_an_attribute_is_bad_output() -> None:
@@ -79,7 +83,7 @@ def test_rate_other_sends_one_document_and_no_topic() -> None:
     provider = FakeProvider(other_answer())
     document = doc()
 
-    run(rate_other(provider, document, language=EN))
+    run(rate_other(provider, document, side="insured", language=EN))
 
     assert provider.requests[0].document is document
     assert provider.requests[0].topic is None

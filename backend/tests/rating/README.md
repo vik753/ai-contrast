@@ -13,7 +13,7 @@ No network, no real provider: `FakeProvider` in `helpers.py` records every `AIRe
 - `AIRequest.effort: ReasoningEffort | None = None` (new field). The OpenAI-compatible adapter sends it as `reasoning_effort`.
 - `AIProvider.usage -> Usage | None` (protocol member; both adapters). Replaces `getattr(provider, "usage")` in `app.limits.free.reported_neurons`.
 - `RateTopicRequest(AIRequest)`: template `RATE_TOPIC`, `document` and `topic` required, `text` forbidden, field `language: OutputLanguage`, schema `TopicRatingOut`.
-- `RateOtherRequest(AIRequest)`: template `RATE_OTHER`, `document` required, `topic` and `text` forbidden, field `language`, schema `OtherRatingOut`.
+- `RateOtherRequest(AIRequest)`: template `RATE_OTHER`, `document` required, `topic` and `text` forbidden, fields `side: str` (catalog side id, named in the instruction) and `language`, schema `OtherRatingOut`.
   Both raise `TypeError` for a wrong template, wrong schema, wrong fields or a `language` that is not an `OutputLanguage`.
   `AIRequest(PromptTemplate.RATE_*, ...)` built directly raises `TypeError`.
 - `PromptTemplate.RATE_TOPIC`, `PromptTemplate.RATE_OTHER`.
@@ -32,7 +32,7 @@ JSON shapes:
 
 `app.analysis.rate`:
 - `async rate_topic(provider, document, topic, *, language, effort=None) -> TopicRatingOut`.
-- `async rate_other(provider, document, *, language, effort=None) -> OtherRatingOut`.
+- `async rate_other(provider, document, *, side, language, effort=None) -> OtherRatingOut`.
 - `clean_explanation(text: str) -> str` and `EXPLANATION_WITHHELD == "explanation_withheld"`.
 - `topic_max_tokens(topic) -> int`, `other_max_tokens(clause_count) -> int` (1..16384).
 - Both calls check the answer against the request (below), clean every explanation, make at most one repair call, raise `BadOutputError` after the second bad answer, and let hard `AIError` codes through without a repair (any code except `PROVIDER_BAD_RESPONSE`).
@@ -41,5 +41,6 @@ JSON shapes:
 
 ## Not covered (gaps)
 
-- `RATE_OTHER` has no side of the client (the ADR gives it none).
 - Real adapter behaviour of `reasoning_effort` on Anthropic.
+
+`RATE_TOPIC` and `RATE_OTHER` data blocks: role and special tokens (`<|start|>`, `<|im_start|>`, `[INST]`, `</document boundary=...>`, `Human:` at line start) are neutralized (absent verbatim); the nonce is never in clause text.
