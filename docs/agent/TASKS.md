@@ -21,7 +21,8 @@ Order: S9-T0 (fixtures, lexicons) and S9-T1 (verification library) in parallel; 
 
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s9-verify`. Threats: T5.
 1. Pure module `app/analysis/verify/`: quote check (whitespace folding only), expansion to the sentence within the clause, offsets out, never text.
-2. Green rules of ADR 0019 point 3 with reason codes (`quote_too_short`, `suspicious_span`, `check_exceptions`, `global_override`, `too_many_references`, `number_mismatch`, `document_flags`); the model cannot lift a cap; every rule has a positive and a negative test in EN, UK and RU.
+2. Green rules of ADR 0019 point 3 with reason codes (`quote_too_short`, `suspicious_span`, `check_exceptions` incl. the quoted clause itself, `global_override`, `too_many_references`, `number_mismatch` incl. several numbers of one unit, `document_flags`, `other_not_green`); every occurrence of a repeated quote; the model cannot lift a cap; every rule has a positive and a negative test in EN, UK and RU.
+2a. Verified values (point 3.4): number and unit check on every numeric value; caps make a value `not_confirmed`.
 3. Cross-reference closure (point 4): depth 1, ≤ 5, cycles.
 4. Missing-topic findings from tagging only; Other completeness → document `incomplete`, no greens; topic `not_analyzed` → its clauses rated in Other.
 5. Linear time on 300,000 characters (test with a time bound); no regex built from client text.
@@ -37,9 +38,9 @@ Order: S9-T0 (fixtures, lexicons) and S9-T1 (verification library) in parallel; 
 ### S9-T3 `POST /api/analyze` with SSE (backend)
 
 - Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s9-analyze`. After S9-T2. Threats: T1, T5, T6, T10, T11.
-1. Input and recompute per point 1 (sandbox; signature and `tagging_version` check → `409 tagging_signature_invalid`; client tags add-only and capped; selection via `app/topics/selection.py`).
-2. SSE stream: events and size caps per point 1, heartbeat, no clause or topic text; disconnect cancels calls and settles the reservation.
-3. Limits per point 7: worst-case reservation, `document_too_large_for_analysis`, deadlines, topic call cap → `not_analyzed` + clauses to Other; free mode through the analysis pass (`aud=analysis`, call and Neuron caps).
+1. Input and recompute per point 1 (sandbox; signature v2 — also a change to `/api/tag` — and `tagging_version` check → `409 tagging_signature_invalid`; missing-topic and topic status only from signed fields; client tags add-only and capped; selection via `app/topics/selection.py`; unprovided references and red Layer 2 recomputed).
+2. SSE stream: events and size caps per point 1, heartbeat, `no-store`, `X-Accel-Buffering: no`, no compression, send timeout, every refusal before the first byte, no clause or topic text; explanations cleaned and Layer 2-checked (point 2); disconnect cancels calls and charges cancelled calls at worst case.
+3. Limits per point 7: worst-case reservation, `document_too_large_for_analysis`, deadlines, topic call cap → `not_analyzed` + clauses to Other; free mode through the analysis pass (`aud=analysis`, recorded digests only, call and Neuron caps).
 4. Document flags as restrictions only (point 6). `result_signature` and `analysis_version` (point 8).
 5. Log canary on every path; `CLAUDE.md` Commands: one refused request without any network call.
 
