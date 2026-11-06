@@ -5,10 +5,10 @@ import { createElement } from "react";
 import { I18nextProvider } from "react-i18next";
 import en from "../i18n/locales/en.json";
 import { setupI18n } from "../i18n";
-import { flattenLocale } from "../test/locale-utils";
-import { NAMES, SELECTION, maskedDoc } from "../test/tagging-fakes";
-import type { MaskedDoc } from "./maskedDocsStore";
-import { TaggingStep } from "./TaggingStep";
+import { flattenLocale } from "./locale-utils";
+import { NAMES, SELECTION, maskedDoc } from "./tagging-fakes";
+import type { MaskedDoc } from "../tagging/maskedDocsStore";
+import { TaggingStep } from "../tagging/TaggingStep";
 
 const EN = flattenLocale(en);
 export const t = (k: string): string => String(EN[k]);

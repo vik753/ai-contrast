@@ -1,6 +1,7 @@
 /** S8-T3 AC2 — the "Tag clauses" step: pair, cost, progress, chips, Other, flags, Layer 2. */
 import { afterEach, expect, it, vi } from "vitest";
 import { jsonResponse } from "../test/provider-fakes";
+import { must } from "../test/topics-fakes";
 import {
   DIGEST_B,
   SELECTION,
@@ -21,7 +22,7 @@ import {
   t,
   waitFor,
   within,
-} from "./stepHarness";
+} from "../test/tagging-step-harness";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -44,9 +45,9 @@ it("test_step_free_mode_pair_shows_the_free_model", async () => {
 it("test_step_without_selected_topics_disables_start_and_says_why", async () => {
   stubTagFetch();
   await renderStep({ selection: { catalog: [], suggested: [], custom: [] } });
-  expect(
-    (screen.getByRole("button", { name: t("tagging.start") }) as HTMLButtonElement).disabled,
-  ).toBe(true);
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: t("tagging.start") }).disabled).toBe(
+    true,
+  );
   expect(screen.getByText(t("tagging.noTopics"))).toBeTruthy();
 });
 
@@ -67,7 +68,7 @@ it("test_step_progress_per_document_pending_running_done", async () => {
     () =>
       new Promise<Response>((r) => {
         release = r;
-      }) as never,
+      }),
   );
   await renderStep({ documents: [maskedDoc("A"), maskedDoc("B", DIGEST_B)] });
   start();
@@ -116,7 +117,7 @@ it("test_step_chips_show_source_with_icon_and_text_for_each_source", async () =>
   const c1 = chips(clauseEl(root, "c1"));
   expect(c1.map((c) => c.dataset.source).sort()).toEqual(["check", "keyword"]);
   for (const chip of [...c1, ...chips(clauseEl(root, "c2"))]) {
-    const source = chip.dataset.source as string;
+    const source = must(chip.dataset.source);
     expect(chip.querySelector(`[data-source-icon="${source}"]`)).not.toBeNull();
     expect(chip.textContent).toContain(t(`tagging.source.${source}`));
   }

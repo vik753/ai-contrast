@@ -7,7 +7,7 @@ import { resetBrowserEnv } from "../test/browser-env";
 import { flattenLocale } from "../test/locale-utils";
 import { BLOCKS, DETECTOR_VERSION, fixtureReply, installRouter } from "../test/pseudo-fakes";
 import { jsonResponse as provJson } from "../test/provider-fakes";
-import { CATALOG } from "../test/topics-fakes";
+import { CATALOG, must } from "../test/topics-fakes";
 import { Servers, addFile, region, settle } from "../test/segment-fakes";
 import { jsonResponse, makeFile } from "../test/upload-fakes";
 
@@ -118,11 +118,13 @@ it("test_app_clear_all_empties_the_store_and_hides_the_tagging_step", async () =
   const dialogs = await screen
     .findAllByRole("dialog")
     .catch(() => screen.findAllByRole("alertdialog"));
-  const dialog = dialogs[dialogs.length - 1] as HTMLElement;
-  const go = within(dialog)
-    .getAllByRole("button")
-    .find((b) => !/cancel/i.test(b.textContent)) as HTMLElement;
-  await act(async () => {
+  const dialog = must(dialogs[dialogs.length - 1]);
+  const go = must(
+    within(dialog)
+      .getAllByRole("button")
+      .find((b) => !/cancel/i.test(b.textContent)),
+  );
+  act(() => {
     fireEvent.click(go);
   });
   await waitFor(() => expect(store.get()).toHaveLength(0));
@@ -134,7 +136,12 @@ it("test_app_clear_all_empties_the_store_and_hides_the_tagging_step", async () =
 it("test_app_does_not_write_masked_text_to_browser_storage", async () => {
   await mountApp();
   await confirmContract();
-  const dump = JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage });
-  expect(dump).not.toContain("[A.");
-  expect(dump).not.toContain(DIGEST);
+  const dump = [localStorage, sessionStorage]
+    .flatMap((s) => Array.from({ length: s.length }, (_, i) => must(s.key(i))))
+    .join("|");
+  const values = [localStorage, sessionStorage]
+    .flatMap((s) => Array.from({ length: s.length }, (_, i) => s.getItem(must(s.key(i))) ?? ""))
+    .join("|");
+  expect(dump + values).not.toContain("[A.");
+  expect(dump + values).not.toContain(DIGEST);
 });

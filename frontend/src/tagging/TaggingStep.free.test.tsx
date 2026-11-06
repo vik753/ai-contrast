@@ -15,7 +15,7 @@ import {
   tagCalls,
   tagReply,
 } from "../test/tagging-fakes";
-import { t } from "./stepHarness";
+import { t } from "../test/tagging-step-harness";
 
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -31,7 +31,7 @@ const REQUIRED = [
   "add.label",
   "add.button",
   "add.clauseCap",
-  "client.remove",
+  "removeTag",
   ...["pending", "running", "done", "failed"].map((s) => `status.${s}`),
   ...["keyword", "model", "check", "client"].map((s) => `source.${s}`),
   ...["bad_output", "timeout", "quota", "check_failed", "clause_cap"].map((r) => `incomplete.${r}`),
@@ -56,7 +56,7 @@ describe("tagging locales", () => {
   });
 
   it("test_placeholders_match_in_every_language", () => {
-    for (const k of ["tagging.pair", "tagging.cost", "tagging.counts"]) {
+    for (const k of ["tagging.pair", "tagging.cost", "tagging.counts", "tagging.removeTag"]) {
       const ph = (v: unknown) => (String(v).match(/\{\{\w+\}\}/g) ?? []).sort();
       expect(ph(U[k]), k).toEqual(ph(E[k]));
       expect(ph(R[k]), k).toEqual(ph(E[k]));
@@ -66,9 +66,7 @@ describe("tagging locales", () => {
 
 describe("tagging sources", () => {
   const dir = __dirname;
-  const files = readdirSync(dir).filter(
-    (f) => /\.tsx?$/.test(f) && !/\.test\./.test(f) && f !== "stepHarness.tsx",
-  );
+  const files = readdirSync(dir).filter((f) => /\.tsx?$/.test(f) && !f.includes(".test."));
   it("test_no_html_sinks_in_tagging_sources", () => {
     expect(files.length).toBeGreaterThan(0);
     for (const f of files) {

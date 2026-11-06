@@ -25,6 +25,14 @@ const base = () => ({
   topics: SELECTION,
 });
 
+const freeBase = () => ({
+  provider: "free",
+  domain: "kasko",
+  side: "insured",
+  document: maskedDoc("A"),
+  topics: SELECTION,
+});
+
 it("test_tag_document_posts_wire_body_snake_case_without_key_or_digest", async () => {
   const { calls } = stubTagFetch();
   const r = await tagDocument(base());
@@ -60,7 +68,7 @@ it("test_tag_document_sends_key_only_in_header_and_pins_fetch_options", async ()
 
 it("test_tag_document_analysis_pass_goes_only_in_its_header", async () => {
   const { calls } = stubTagFetch();
-  const { key: _k, model: _m, checkModel: _c, ...free } = base();
+  const free = freeBase();
   await tagDocument({ ...free, provider: "free", analysisPass: "v1.analysis.pass" });
   const c = tagCalls(calls)[0];
   expect(c?.headers.get("X-Analysis-Pass")).toBe("v1.analysis.pass");
@@ -72,7 +80,7 @@ it("test_tag_document_analysis_pass_goes_only_in_its_header", async () => {
 
 it("test_tag_document_turnstile_token_goes_in_body_only", async () => {
   const { calls } = stubTagFetch();
-  const { key: _k, model: _m, checkModel: _c, ...free } = base();
+  const free = freeBase();
   await tagDocument({ ...free, provider: "free", turnstileToken: "tok-1" });
   const c = tagCalls(calls)[0];
   expect(bodyOf(c as never).turnstile_token).toBe("tok-1");
