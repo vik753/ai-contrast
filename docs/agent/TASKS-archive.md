@@ -870,3 +870,46 @@ Order: S7-T0 (catalog content) and S7-T1 (catalog loader, Layer 2, topic safety 
 ### S7-T5 Docs for stage 7
 
 - [x] Owner: `docs-writer`. ADR 0017 accepted (with "Decisions made during stage 7"); threat model T5, T6, T8, T10, T11; `CLAUDE.md` Commands (Docker build context); README (topics); follow-ups below.
+
+## Stage 8 — Clause tagging (ADR 0018)
+
+Done in PRs #89–#94. Order: S8-T0 and S8-T1 in parallel; S8-T2 after S8-T1; S8-T3 and S8-T4 after S8-T2; S8-T5 last.
+
+### S8-T0 Tagging fixtures
+
+- [x] Owner: `domain-analyst`. Branch: `feat/s8-fixtures` (only `backend/eval/tagging/fixtures/` and the S7-T0 fixtures' `expected.json`).
+- For each of the 8 S7-T0 contracts: expected topic ids per clause id, expected "Other" clauses, and risk-term clauses. Two adversarial contracts: a clause that tells the tagger to skip it, and one that floods one topic (more than 60 clauses mentioning it in passing).
+
+### S8-T1 Keyword tagger, risk terms and caps (backend)
+
+- [x] Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s8-keywords`. Threats: T5, T6.
+1. `app/tagging/keywords.py`: synonym matching per ADR 0018 point 2, linear time, adversarial tests at the caps.
+2. `app/tagging/risk_terms.py`: checked-in EN/UK/RU risk-term list and scan of "Other" clauses.
+3. `app/tagging/merge.py`: merge of keyword, model, check and client tags; `model_tagging_incomplete`; missing-topic rule; caps of point 5; property test: no clause is lost.
+4. Layer 2 per clause as a pure function. Keyword tags, risk terms and Layer 2 run in the sandbox child with the safety pass.
+5. `tagging_version` hash.
+
+### S8-T2 `/api/tag` with model tags, check calls and the analysis pass (backend)
+
+- [x] Owner: `backend-dev`. Tests first: `test-engineer`. Branch: `feat/s8-tag`. Threats: T1, T5, T6, T10, T11.
+1. `TAG_CLAUSES` and `CHECK_TAGS` prompts (one document, topics as opaque-index lists), strict schemas, batches, one repair.
+2. Cheap/strong model pair per preset; the request may name both; `free` uses one model.
+3. `POST /api/tag` per ADR 0018 point 1: sandbox safety pass, slot released before AI calls, size checks, worst case reserved, at most 60 batches, 5-minute deadline, tag signature.
+4. Analysis pass (`aud=analysis`), quota once, reserve and settle per call, free size limits counted from characters.
+5. Log and wire canaries.
+
+### S8-T3 Tagging step in the browser (frontend)
+
+- [x] Owner: `frontend-dev`. Tests first: `test-engineer`. Branch: `feat/s8-tag-ui`. Threats: T1, T3, T5.
+1. Confirmed masked documents in a small in-memory store (emptied by Clear all, never persisted); enables Suggest in the topic panel.
+2. "Tag clauses" step per ADR 0018 point 8 (model pair, cost estimate, progress, chips with icon and text, "Other" with risk marks, flags, client tags, Layer 2 flags); en/uk/ru; plain text only.
+3. Free mode uses the analysis pass (`X-Analysis-Pass`), one Turnstile per analysis.
+
+### S8-T4 Tagging eval
+
+- [x] Owner: `ai-eval-engineer`. Branch: `feat/s8-eval`.
+- `backend/eval/tagging/` per ADR 0018 point 9: recorded mode in CI (stub oracle), live mode locally, baseline, two adversarial contracts. Baseline: keyword recall 0.81, precision 0.89, hidden clauses 0.
+
+### S8-T5 Docs for stage 8
+
+- [x] Owner: `docs-writer`. ADR 0018 accepted; threat model T5, T6, T10, T11; `CLAUDE.md` Commands (`/api/tag` refused request, `no_topics`); README (tagging, eval).

@@ -1,7 +1,7 @@
 # ADR 0018 — Clause tagging: keyword tags, model tags, "Other" and the analysis pass
 
-- Status: proposed (tech lead, 2026-11-05; `security-reviewer` approved the design after round 2)
-- Date: 2026-11-05
+- Status: accepted (2026-11-06; implemented in stage 8, S8-T0 to S8-T4; `security-reviewer` approved the design after round 2)
+- Date: 2026-11-05 (proposed), 2026-11-06 (accepted)
 - Related: ADR 0009 (Layers 2–4; "tagging cannot hide a clause"; one document per call; every cap fails closed), ADR 0014 (clauses), ADR 0015 (safety pass, gate), ADR 0016 (AI port, limits, free mode), ADR 0017 (`ConfirmedTopic`, synonyms, Layer 2), threat model T5, T6, T10, T11
 
 ## Context
@@ -67,7 +67,13 @@ Stage 9 rates a topic using only the clauses tagged with it. If tagging misses a
 
 - The merge (which also scans the risk terms of "Other" clauses, after model tags are known) runs in a worker thread, not in the child. Measured at 300,000 characters in 2,000 clauses: about 0.13 s of CPU, so it is bounded by the document cap.
 - Free settlement charges the worst case of the request when any call did not complete (timeout, transport error, hard error, cancellation); only a request whose calls all reported usage is charged the reported Neurons.
-- Check calls use `check_model`, else the strong model of the preset (`custom`: the cheap model; `free`: the one model).
+- Check calls use `check_model`, else the strong model of the preset (`custom`: the cheap model; `free`: the one model). So `CHECK_TAGS` runs on the strong model by default.
+- The reason `clause_cap` is set when a clause has more model/check pairs than the 5 slots (pairs that are also keyword tags use no slot). The extra pairs are dropped, and the document is `model_tagging_incomplete`.
+- The keyword step budget (`keyword_step_budget`, 1,000,000 steps) fails closed with `keyword_budget_exceeded`. `/api/tag` refuses the request; it never continues with empty keyword tags.
+- Client tags are capped at 5 per clause (separately from model tags), and their clause and topic ids are checked (`invalid_client_tag`, `too_many_client_tags`).
+- The tag signature is `HMAC-SHA256` over `v1`, the document digest, `tagging_version` and the hash of the model and check tags. A restart invalidates it.
+- The model phase and the final merge are shared functions in `app/tagging/run.py` (`model_phase`, `finish_tags`). `model_phase` runs the model steps under the overall deadline; a deadline hit adds the reason `timeout`. `finish_tags` is the pure merge after the AI calls; it adds `check_failed` when a check call failed.
+- Eval (S8-T4, recorded mode, stub oracle): keyword recall 0.81 and precision 0.89; hidden clauses 0 (every clause is tagged or in "Other"). Live numbers come in stage 11.
 
 ## Consequences
 
