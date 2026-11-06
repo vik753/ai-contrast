@@ -44,8 +44,7 @@ export function Chip({
           <button
             type="button"
             className="button button--quiet button--small"
-            aria-label={tk("tagging.client.remove")}
-            title={name}
+            aria-label={tk("tagging.removeTag", { topic: name })}
             onClick={onRemove}
           >
             <span aria-hidden="true">x</span>
