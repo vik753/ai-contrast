@@ -527,8 +527,7 @@ def test_scale_statement_in_a_different_document_does_not_leak(
 
 
 @pytest.mark.parametrize(
-    "target",
-    ["event", "claim", "occurrence", "insured event", "day", "month", "year", "person", "vehicle"],
+    "target", ["event", "claim", "occurrence", "insured event", "person", "vehicle"]
 )
 def test_per_followed_by_a_target_word_stays_verified(target: str) -> None:
     text = f"The limit is 100 000 UAH per {target}."
@@ -548,3 +547,65 @@ def test_per_at_the_end_without_target_is_mismatch() -> None:
         value_out("The limit is 100 000 UAH per", "100000", "UAH").status
         is ValueStatus.not_confirmed
     )
+
+
+@pytest.mark.parametrize("word", ["day", "month", "year"])
+def test_per_followed_by_a_time_unit_is_mismatch(word: str) -> None:
+    out = value_out(f"The limit is USD 10 per {word}.", "10", "USD")
+    assert out.status is ValueStatus.not_confirmed
+    assert Reason.number_mismatch in out.reasons
+
+
+@pytest.mark.parametrize("value", ["10", "5", "10000"])
+@pytest.mark.parametrize(
+    "scale",
+    [
+        "Суми вказано в тис. грн.",
+        "Суммы указаны в тыс. руб.",
+        "Суми вказано в млн грн.",
+        "Amounts in USD mln.",
+        "Amounts in USD bn.",
+        "Amounts in USD '000.",
+        "Amounts in USD 000s.",
+        "Amounts in kUSD.",
+        "Amounts are \u00d71000 USD.",
+    ],
+)
+def test_short_scale_statement_makes_document_scaled(scale: str, value: str) -> None:
+    text = "The insurer pays within 10 days after notice."
+    out = verify_value(
+        ctx(c("c1", text), c("c2", scale)),
+        ValueIn(
+            "a", (ev("c1", text),), number=nv("10", "days") if value == "10" else nv(value, "USD")
+        ),
+    )
+    assert out.status is ValueStatus.not_confirmed
+    assert Reason.number_mismatch in out.reasons
+
+
+@pytest.mark.parametrize(
+    "address", ["м. Київ, вул. Хрещатик, к. 5.", "Address: m. Kyiv, k. 5, mm 3."]
+)
+def test_bare_k_m_mm_in_an_address_do_not_scale_the_document(address: str) -> None:
+    text = "The insurer pays within 10 days after notice."
+    out = verify_value(
+        ctx(c("c1", text), c("c2", address)),
+        ValueIn("a", (ev("c1", text),), number=nv("10", "days")),
+    )
+    assert out.status is ValueStatus.verified
+
+
+@pytest.mark.parametrize(
+    ("text", "values"),
+    [
+        ("The limit is USD 1\u0660 per event.", ["10", "1", "0"]),
+        ("The limit is USD 1\u0966 per event.", ["10", "1"]),
+        ("The limit is USD 10\u00b2 per event.", ["10", "102", "100"]),
+        ("The limit is USD \u0661\u0660 per event.", ["10"]),
+    ],
+)
+def test_non_ascii_digits_inside_a_number_are_unreadable(text: str, values: list[str]) -> None:
+    for v in values:
+        out = value_out(text, v, "USD")
+        assert out.status is ValueStatus.not_confirmed
+        assert Reason.number_mismatch in out.reasons
