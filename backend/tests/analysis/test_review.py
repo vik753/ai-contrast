@@ -434,3 +434,93 @@ WINDOW_CLEAN = [
 @pytest.mark.parametrize(("text", "num", "unit"), WINDOW_CLEAN)
 def test_number_with_clean_window_stays_verified(text: str, num: str, unit: str) -> None:
     assert value_out(text, num, unit).status is ValueStatus.verified
+
+
+# Allowlist grammar for numbers (replaces denylist windows)
+GRAMMAR_BAD = [
+    ("The limit is USD 10/1000 per event.", "USD", ["10", "1000", "0.01"]),
+    ("The limit is USD 10·1000 per event.", "USD", ["10", "1000", "10000"]),
+    ("The limit is USD 10⋅1000 per event.", "USD", ["10", "1000", "10000"]),
+    ("The limit is USD 10, multiplied by 1000.", "USD", ["10", "1000", "10000"]),
+    ("The limit is USD 10^3 per event.", "USD", ["10", "3", "1000"]),
+    ("The limit is USD 10±2 per event.", "USD", ["10", "2", "12"]),
+    ("The limit is USD 10× per event.", "USD", ["10"]),
+    ("The insurer pays within twice 10 days of notice.", "days", ["10", "20"]),
+    ("The insurer pays within 10 days doubled.", "days", ["10", "20"]),
+    ("The limit is USD 10 in the stated thousands.", "USD", ["10", "10000"]),
+    ("The limit is USD 10 in each of the thousands.", "USD", ["10", "10000"]),
+    ("The limit is USD 10 per mille.", "USD", ["10", "0.01"]),
+    ("The limit is USD 10 per cent.", "USD", ["10", "0.1"]),
+    ("The insurer pays up to 10 days after notice.", "days", ["10"]),
+    ("Страховик сплачує до 10 днів після повідомлення.", "days", ["10"]),
+    ("Страховщик платит до 10 дней после уведомления.", "days", ["10"]),
+    ("Ліміт становить USD 10 у зазначених тисячах.", "USD", ["10", "10000"]),
+    ("Лимит составляет USD 10 в указанных тысячах.", "USD", ["10", "10000"]),
+    ("Страховик сплачує протягом 10 днів подвоєно.", "days", ["10", "20"]),
+    ("Страховщик платит в течение 10 дней вдвое.", "days", ["10", "20"]),
+]
+
+
+@pytest.mark.parametrize(("text", "unit", "values"), GRAMMAR_BAD)
+def test_number_outside_the_allowlist_grammar_is_unreadable(
+    text: str, unit: str, values: list[str]
+) -> None:
+    for v in values:
+        out = value_out(text, v, unit)
+        assert out.status is ValueStatus.not_confirmed
+        assert Reason.number_mismatch in out.reasons
+
+
+DOC_SCALE = [
+    ("The deductible is UAH 5 000.", "All amounts are in thousands.", "UAH", ["5000", "5"]),
+    ("Франшиза становить 5 000 грн.", "Суми вказані в тисячах.", "UAH", ["5000", "5"]),
+    ("Франшиза составляет 5 000 грн.", "Суммы указаны в тысячах.", "UAH", ["5000", "5"]),
+    (
+        "The insurer pays within 10 days after notice.",
+        "All amounts are in thousands.",
+        "days",
+        ["10"],
+    ),
+]
+
+
+@pytest.mark.parametrize(("text", "scale", "unit", "values"), DOC_SCALE)
+def test_scale_statement_anywhere_in_document_makes_every_number_unreadable(
+    text: str, scale: str, unit: str, values: list[str]
+) -> None:
+    for v in values:
+        out = verify_value(
+            ctx(c("c1", text), c("c2", scale)),
+            ValueIn("a", (ev("c1", text),), number=nv(v, unit)),
+        )
+        assert out.status is ValueStatus.not_confirmed
+        assert Reason.number_mismatch in out.reasons
+
+
+def test_scale_word_in_same_sentence_makes_number_unreadable() -> None:
+    text = "The deductible is UAH 5 000, all in thousands."
+    assert value_out(text, "5000", "UAH").status is ValueStatus.not_confirmed
+
+
+GRAMMAR_OK = [
+    ("The deductible is UAH 5 000.", "5000", "UAH"),
+    ("The insurer pays within 10 days after notice.", "10", "days"),
+    ("Страховик сплачує протягом 10 днів з дня повідомлення.", "10", "days"),
+    ("Страховщик платит в течение 10 дней с момента получения.", "10", "days"),
+    ("Страховик покриває збиток у розмірі 2 % від суми.", "2", None),
+    ("Страховщик покрывает ущерб в размере 2 % от суммы.", "2", None),
+]
+
+
+@pytest.mark.parametrize(("text", "num", "unit"), GRAMMAR_OK)
+def test_honest_numbers_stay_verified_under_the_grammar(
+    text: str, num: str, unit: str | None
+) -> None:
+    assert value_out(text, num, unit).status is ValueStatus.verified
+
+
+@pytest.mark.parametrize(("text", "num", "unit"), GRAMMAR_OK[:3])
+def test_scale_statement_in_a_different_document_does_not_leak(
+    text: str, num: str, unit: str | None
+) -> None:
+    assert value_out(text, num, unit).status is ValueStatus.verified

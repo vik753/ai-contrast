@@ -115,3 +115,24 @@ forms ("USD 10"). The number is unreadable (`number_mismatch` for any claimed va
 (`×`, `*`, `x` between digits, `+`, `-` as minus, plus/minus/плюс/мінус/минус); (d) a range or alternative word
 (or/або/чи/или/либо/and/і/й/та/и/to/до/по/through/between, від...до, от...до). Words such as "per", "з", "в", "на",
 "after" are neutral.
+
+## Allowlist grammar for numbers (replaces the window denylist)
+
+A number is readable only when ALL hold:
+
+- (a) it is digits with only the allowed separators (space or NBSP thousands groups, one `.` or `,` decimal);
+  any other symbol touching it (`/ · ⋅ × * x ^ ' ’ ±` ...) makes it unreadable;
+- (b) the token before it is the start of a sentence or clause, a currency, an opening bracket or a word of the
+  closed `safe_before_number` list (within, of, is, at, for, протягом, у розмірі, в размере, у сумі, в сумме,
+  становить, составляет, з, ...); NOT "до"/"up to", NOT multipliers ("twice", "multiplied by");
+- (c) it is followed by its unit word, currency or `%`, and then by a terminator (`. ; : )` or end of clause) or a
+  word of the closed `safe_after_unit` list (after, from, of, following, upon, з, після, від, с, после, со ...);
+  NOT "per", NOT a comma, NOT any other word;
+- (d) the sentence holds no scale word, and no clause of the document states a scale ("amounts in thousands",
+  "суми в тисячах", "суммы в тысячах"): then every number of the document is unreadable.
+
+Unreadable = `number_mismatch` for any claimed value.
+Earlier tests that may conflict with this grammar (the developer may report them to the test engineer, who
+then changes them): the OK cases "... within 10 days and a penalty of 5% applies." and
+"The limit is 100 000 UAH per event." / "1 000 000 UAH per event." in `test_values.py` (the word "and" or "per"
+after the unit), and `test_several_numbers_of_other_units_do_not_break_the_check`.
