@@ -32,6 +32,10 @@ _SPACE_SPLIT: Final = re.compile(f"[{_SPACES}]")
 _MAX_DIGITS: Final = 40
 _GAP_CHARS: Final = f" {_NBSP}-)"
 _MAX_GAP: Final = 6
+_WINDOW_TOKENS: Final = 6  # tokens looked at, numbers included, so a flood costs O(1) per number
+_WORDS_AFTER: Final = 3
+_WORDS_BEFORE: Final = 2
+_OPERATOR_CHARS: Final = frozenset("+*\u00d7")
 _MAX_RANGE_GAP: Final = 12
 _QUALIFIER_REACH: Final = 60
 _LOOKBACK: Final = 40
@@ -55,6 +59,8 @@ class _Cand(NamedTuple):
     start: int
     end: int
     value: Decimal | None
+    first: int  # index of its first token
+    last: int  # index after its last token
 
 
 class _Words(NamedTuple):
@@ -129,6 +135,14 @@ _RANGE_WORDS: Final = frozenset(
         *(normalize(w)[0] for lang in LANGS for w in LEXICON.ref_range_words[lang]),
         *(normalize(w)[0] for w in _ALTERNATIVES),
     }
+)
+_OPERATORS: Final = frozenset(
+    normalize(w)[0] for lang in LANGS for w in LEXICON.operator_words[lang]
+)
+_ALTERNATIVE_WORDS: Final = frozenset(
+    normalize(w)[0]
+    for lang in LANGS
+    for w in (*LEXICON.alternative_words[lang], *LEXICON.ref_range_words[lang])
 )
 _SAFE: Final = frozenset(normalize(w)[0] for lang in LANGS for w in LEXICON.safe_after_number[lang])
 
@@ -251,9 +265,11 @@ class _Scan:
         if words is None or close is None:
             return None
         digits = _parse(t.text, currency=self.currency)
-        return _Cand(t.start, close, digits if digits == words.value else None), words.next
+        return _Cand(
+            t.start, close, digits if digits == words.value else None, i, words.next
+        ), words.next
 
-    def words_then_digits(self, start: int, words: _Words) -> tuple[_Cand, int]:
+    def words_then_digits(self, i: int, start: int, words: _Words) -> tuple[_Cand, int]:
         """ "десять (10)": one number written twice."""
         toks = self.toks
         value, j, end = words.value, words.next, words.end
@@ -261,8 +277,8 @@ class _Scan:
             close = self.paren_close(toks[j].end)
             if close is not None:
                 digits = _parse(toks[j].text, currency=self.currency)
-                return _Cand(start, close, value if digits == value else None), j + 1
-        return _Cand(start, end, value), j
+                return _Cand(start, close, value if digits == value else None, i, j + 1), j + 1
+        return _Cand(start, end, value, i, j), j
 
     def candidates(self) -> list[_Cand]:
         toks = self.toks
@@ -277,22 +293,24 @@ class _Scan:
                     out.append(pair[0])
                     i = pair[1]
                 else:
-                    out.append(_Cand(t.start, t.end, _parse(t.text, currency=self.currency)))
+                    out.append(
+                        _Cand(t.start, t.end, _parse(t.text, currency=self.currency), i, i + 1)
+                    )
                     i += 1
                 continue
             words = self.words_at(i)
             if words is None:
                 if t.text in _UNLISTED:
-                    out.append(_Cand(t.start, t.end, None))
+                    out.append(_Cand(t.start, t.end, None, i, i + 1))
                 i += 1
                 continue
-            cand, nxt = self.words_then_digits(t.start, words)
+            cand, nxt = self.words_then_digits(i, t.start, words)
             if i == last_words_end and self.compound(toks[i - 1], t):
-                cand = _Cand(cand.start, cand.end, None)  # "two five", "two and fifty"
+                cand = cand._replace(value=None)  # "two five", "two and fifty"
             out.append(cand)
             last_words_end = words.next
             i = nxt
-        return self.mark_ranges(out)
+        return self.mark_windows(self.mark_ranges(out))
 
     def compound(self, a: _Tok, b: _Tok) -> bool:
         return (
@@ -307,9 +325,61 @@ class _Scan:
             gap = self.view[a.end : b.start]
             tokens = gap.replace("-", " - ").split() if len(gap) <= _MAX_RANGE_GAP else []
             if tokens and all(t in _RANGE_WORDS for t in tokens):
-                out[k - 1] = _Cand(a.start, a.end, None)
-                out[k] = _Cand(b.start, b.end, None)
+                out[k - 1] = a._replace(value=None)
+                out[k] = b._replace(value=None)
         return out
+
+    def hit_after(self, k: int) -> bool:
+        """Does the word token ``k`` make a neighbouring number unreadable? A scale word, an
+        operator word, a number word, or an alternative or range word that stands right before
+        a number."""
+        tok = self.toks[k]
+        if _SCALES.match_at(self.view, tok.start) is not None or tok.text in _OPERATORS:
+            return True
+        if self.phrase_at(k) is not None:
+            return True
+        nxt = self.toks[k + 1] if k + 1 < len(self.toks) else None
+        return tok.text in _ALTERNATIVE_WORDS and nxt is not None and self.starts_number(nxt, k + 1)
+
+    def starts_number(self, tok: _Tok, k: int) -> bool:
+        return tok.num or self.phrase_at(k) is not None
+
+    def window_hit(self, cand: _Cand) -> bool:
+        toks = self.toks
+        # operator characters between this number and the next token
+        nxt = toks[cand.last] if cand.last < len(toks) else None
+        gap = self.view[cand.end : nxt.start if nxt else cand.end + _MAX_RANGE_GAP]
+        if any(ch in _OPERATOR_CHARS for ch in gap[:_MAX_RANGE_GAP]):
+            return True
+        if nxt is not None and nxt.text == "x" and cand.last + 1 < len(toks):
+            if toks[cand.last + 1].num:
+                return True  # "10 x 1000"
+        words = 0
+        for k in range(cand.last, min(len(toks), cand.last + _WINDOW_TOKENS)):
+            if toks[k].num:
+                continue
+            if self.hit_after(k):
+                return True
+            words += 1
+            if words == _WORDS_AFTER:
+                break
+        words = 0
+        for k in range(cand.first - 1, max(-1, cand.first - 1 - _WINDOW_TOKENS), -1):
+            if toks[k].num:
+                continue
+            if k == cand.first - 1 and toks[k].text in _ALTERNATIVE_WORDS:
+                return True  # "between 10", "до 10": a range or alternative word right before
+            if _SCALES.match_at(self.view, toks[k].start) is not None or toks[k].text in _OPERATORS:
+                return True
+            words += 1
+            if words == _WORDS_BEFORE:
+                break
+        return False
+
+    def mark_windows(self, cands: list[_Cand]) -> list[_Cand]:
+        """The window rule: a number with a scale word, operator, other number or alternative
+        near it is unmatchable."""
+        return [c._replace(value=None) if self.window_hit(c) else c for c in cands]
 
 
 def _after_gap(view: str, j: int) -> int:

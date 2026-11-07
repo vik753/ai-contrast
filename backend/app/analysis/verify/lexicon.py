@@ -58,6 +58,8 @@ class Lexicon:
     number_words: dict[str, dict[Decimal, tuple[str, ...]]]
     scale_words: Words
     safe_after_number: Words
+    operator_words: Words
+    alternative_words: Words
     never_end: frozenset[str]
     may_end: frozenset[str]
 
@@ -156,6 +158,8 @@ def load_lexicon(directory: Path | None = None) -> Lexicon:
         number_words=_numbers({k: nums.get(k) for k in LANGS}),
         scale_words=_words("number_words.json", nums.get("scale_words")),
         safe_after_number=_words("number_words.json", nums.get("safe_after_number")),
+        operator_words=_words("number_words.json", nums.get("operator_words")),
+        alternative_words=_words("number_words.json", nums.get("alternative_words")),
         never_end=frozenset(e.lower() for lang in LANGS for e in never[lang]),
         may_end=frozenset(e.lower() for lang in LANGS for e in may[lang]),
     )
