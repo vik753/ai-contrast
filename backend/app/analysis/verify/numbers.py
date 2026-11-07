@@ -384,12 +384,15 @@ def _has_scale(scan: _Scan) -> bool:
     return False
 
 
+def _currency_at(view: str, j: int) -> bool:
+    return any(_UNITS[u].match_at(view, j) is not None for u in _CURRENCY)
+
+
 def _currency_suffix(view: str, tok: _Tok) -> bool:
-    """ "kUSD", "mUSD": a one-letter scale glued to a currency."""
-    if tok.text[:1] not in ("k", "m") or len(tok.text) < 2:  # noqa: PLR2004
-        return False
-    end = tok.start + 1
-    return any(_UNITS[u].match_at(view, end) is not None for u in _CURRENCY)
+    """A one-letter scale next to a currency: "kUSD", "TUSD", "K USD", "k€"."""
+    if tok.text in ("k", "m", "t"):
+        return _currency_at(view, _skip_spaces(view, tok.end))
+    return len(tok.text) > 1 and tok.text[0] in "kmt" and _currency_at(view, tok.start + 1)
 
 
 def states_scale(text: str) -> bool:
@@ -402,6 +405,8 @@ def states_scale(text: str) -> bool:
     toks = scan.toks
     for k, tok in enumerate(toks):
         if tok.num:
+            if tok.text == "000":  # "(000) USD", "USD 000"
+                return True
             continue
         if _currency_suffix(view, tok):
             return True

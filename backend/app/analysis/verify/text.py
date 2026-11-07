@@ -30,7 +30,8 @@ _IGNORABLE: Final = re.compile(
 # A non-ASCII decimal digit (category Nd) that NFKC leaves: the skeleton may turn it into a
 # letter or a dot, so it becomes a caret and any number it touches is unreadable.
 _FOREIGN_DIGIT: Final = re.compile(r"[^\x00-\x7f\D]")
-_IN_WORD_APOSTROPHE: Final = re.compile(r"(?<=\w)'(?=\w)")
+# An apostrophe between two letters is part of the word. A digit does not count: "USD'000".
+_IN_WORD_APOSTROPHE: Final = re.compile(r"(?<=[^\W\d_])'(?=[^\W\d_])")
 _JOINER: Final = "ʼ"  # a letter: an apostrophe between letters stays inside the word
 # Superscripts, subscripts and vulgar fractions: NFKC would turn "10²" into "102". A caret
 # keeps the number from being read (a symbol touches it).
