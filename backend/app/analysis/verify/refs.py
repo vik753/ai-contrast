@@ -30,7 +30,7 @@ __all__ = [
 
 NEEDED_CAP: Final = 1000
 
-_NUMBER: Final = re.compile(r"\d+(?:\.\d+)*")
+_NUMBER: Final = re.compile(r"[0-9]+(?:\.[0-9]+)*")
 _WINDOW: Final = 40
 _MAX_GAP: Final = 12
 _MAX_NUMBER: Final = 40

@@ -57,6 +57,7 @@ class Lexicon:
     units: dict[str, Words]
     number_words: dict[str, dict[Decimal, tuple[str, ...]]]
     scale_words: Words
+    scale_marks: Words
     safe_before_number: Words
     safe_after_unit: Words
     per_words: Words
@@ -158,6 +159,7 @@ def load_lexicon(directory: Path | None = None) -> Lexicon:
         units={u: _words("unit_words.json", unit_map[u], allow_note=True) for u in _UNITS},
         number_words=_numbers({k: nums.get(k) for k in LANGS}),
         scale_words=_words("number_words.json", nums.get("scale_words")),
+        scale_marks=_words("number_words.json", nums.get("scale_marks")),
         safe_before_number=_words("number_words.json", nums.get("safe_before_number")),
         safe_after_unit=_words("number_words.json", nums.get("safe_after_unit")),
         per_words=_words("number_words.json", nums.get("per_words")),

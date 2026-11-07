@@ -25,7 +25,7 @@ _NBSP: Final = chr(0xA0)
 _NNBSP: Final = chr(0x202F)
 _SPACES: Final = f" {_NBSP}{_NNBSP}"
 _TOKEN: Final = re.compile(
-    rf"(?P<num>\d+(?:[{_SPACES}]\d{{3}}(?!\d))*(?:[.,]\d+)*)|(?P<word>[^\W\d_]+)"
+    rf"(?P<num>[0-9]+(?:[{_SPACES}][0-9]{{3}}(?![0-9]))*(?:[.,][0-9]+)*)|(?P<word>[^\W\d_]+)"
 )
 _WORD: Final = re.compile(r"[^\W\d_]+")
 _SPACE_SPLIT: Final = re.compile(f"[{_SPACES}]")
@@ -129,7 +129,6 @@ _PER: Final = _build(LEXICON.per_words)
 _PER_TARGETS: Final = _build(LEXICON.per_targets)
 _CLAUSE_START: Final = frozenset('.;:!?(["\u00ab\n')
 _TOUCH_OK: Final = frozenset('.,;:()[]%-"\u00ab\u00bb')
-_MIN_SCALE_STATEMENT: Final = 4  # letters; shorter scale words (k, m, mn, mm) are too ambiguous
 _CURRENCY_SYMBOLS: Final = frozenset(
     sym for unit in _CURRENCY for sym in _UNITS[unit].symbols if len(sym) == 1
 )
@@ -365,9 +364,15 @@ def _after_ok(view: str, p: int, *, allow_per: bool = True) -> bool:
     return target_end is not None and _after_ok(view, target_end, allow_per=False)
 
 
+_BARE_SCALES: Final = frozenset(normalize(w)[0] for w in ("k", "m", "mm"))
+_SCALE_MARKS: Final = tuple(normalize(w)[0] for lang in LANGS for w in LEXICON.scale_marks[lang])
+
+
 def _has_scale(scan: _Scan) -> bool:
-    """(d) A scale word in the sentence. A one-letter scale ("5k") counts only after a digit."""
+    """(d) A scale word or mark in the sentence. A bare ``k`` counts only right after a digit."""
     view = scan.view
+    if any(mark in view for mark in _SCALE_MARKS):
+        return True
     for tok in scan.toks:
         if tok.num:
             continue
@@ -379,16 +384,28 @@ def _has_scale(scan: _Scan) -> bool:
     return False
 
 
+def _currency_suffix(view: str, tok: _Tok) -> bool:
+    """ "kUSD", "mUSD": a one-letter scale glued to a currency."""
+    if tok.text[:1] not in ("k", "m") or len(tok.text) < 2:  # noqa: PLR2004
+        return False
+    end = tok.start + 1
+    return any(_UNITS[u].match_at(view, end) is not None for u in _CURRENCY)
+
+
 def states_scale(text: str) -> bool:
-    """Does the text state a scale ("amounts in thousands")? A scale word that does not stand
-    right after a number. Short scale words are left to the sentence rule."""
+    """Does the text state a scale ("amounts in thousands", "USD mln", "'000", "kUSD")? A scale
+    word that does not stand right after a number. The bare letters k, m and mm are exempt."""
     view, _ = normalize(text)
+    if any(mark in view for mark in _SCALE_MARKS):
+        return True
     scan = _Scan(view, currency=False)
     toks = scan.toks
     for k, tok in enumerate(toks):
-        if tok.num or len(tok.text) < _MIN_SCALE_STATEMENT:
+        if tok.num:
             continue
-        if _SCALES.match_at(view, tok.start) is None:
+        if _currency_suffix(view, tok):
+            return True
+        if tok.text in _BARE_SCALES or _SCALES.match_at(view, tok.start) is None:
             continue
         prev = toks[k - 1] if k > 0 else None
         attached = (

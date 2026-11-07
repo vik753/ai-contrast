@@ -27,6 +27,9 @@ _WORD: Final = re.compile(r"[^\W_]+")
 _IGNORABLE: Final = re.compile(
     "[" + "".join(f"\\U{low:08x}-\\U{high:08x}" for low, high in RANGES) + "]"
 )
+# A non-ASCII decimal digit (category Nd) that NFKC leaves: the skeleton may turn it into a
+# letter or a dot, so it becomes a caret and any number it touches is unreadable.
+_FOREIGN_DIGIT: Final = re.compile(r"[^\x00-\x7f\D]")
 _IN_WORD_APOSTROPHE: Final = re.compile(r"(?<=\w)'(?=\w)")
 _JOINER: Final = "ʼ"  # a letter: an apostrophe between letters stays inside the word
 # Superscripts, subscripts and vulgar fractions: NFKC would turn "10²" into "102". A caret
@@ -61,7 +64,11 @@ def _tidy(view: str) -> str:
 
 def normalize(text: str) -> tuple[str, Source | None]:
     """The matching view and, when its length differs from ``text``, the map back."""
-    if _IGNORABLE.search(text) is None and unicodedata.is_normalized("NFKC", text):
+    if (
+        _IGNORABLE.search(text) is None
+        and _FOREIGN_DIGIT.search(text) is None
+        and unicodedata.is_normalized("NFKC", text)
+    ):
         return _tidy(fold_view(text.translate(_TRANSLATE))), None
     return _normalize_slow(text)
 
@@ -82,7 +89,9 @@ def _normalize_slow(text: str) -> tuple[str, Source | None]:
         piece = cache.get(chunk)
         if piece is None:
             kept = _IGNORABLE.sub("", chunk).translate(_PRE)
-            piece = fold_view(unicodedata.normalize("NFKC", kept).translate(_TRANSLATE))
+            piece = fold_view(
+                _FOREIGN_DIGIT.sub("^", unicodedata.normalize("NFKC", kept)).translate(_TRANSLATE)
+            )
             cache[chunk] = piece
         pieces.append(piece)
         if len(piece) != j - i:
