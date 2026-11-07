@@ -18,7 +18,16 @@ from app.ai.port import AIRequest, OutputLanguage, RateOtherRequest, RateTopicRe
 from app.analysis.rate import rate_other, rate_topic
 from tests.canary.harness import WireCapture
 
-from .helpers import FakeProvider, doc, other_answer, rating_topic, run, topic_answer
+from .helpers import (
+    CATALOG,
+    DOMAIN,
+    FakeProvider,
+    doc,
+    other_answer,
+    rating_topic,
+    run,
+    topic_answer,
+)
 
 APP = Path(__file__).resolve().parents[2] / "app"
 DOC = "PseudonymizedDocument"
@@ -183,7 +192,16 @@ def test_wire_rating_request_holds_placeholders_of_one_label_only(kind: str) -> 
         run(rate_topic(provider, document, rating_topic(), language=OutputLanguage.EN))
     else:
         provider = FakeProvider(other_answer())
-        run(rate_other(provider, document, side="insured", language=OutputLanguage.EN))
+        run(
+            rate_other(
+                provider,
+                document,
+                side="insured",
+                domain=DOMAIN,
+                catalog=CATALOG,
+                language=OutputLanguage.EN,
+            )
+        )
     for index in range(len(provider.requests)):
         capture.record("\n".join(m.content for m in provider.messages(index)))
 

@@ -2,7 +2,8 @@
 
 A schema is the shape and the caps only. ``app.analysis.rate`` compares an answer with the
 request (clause ids, attribute ids, units, value ids). A broken cap fails the whole answer
-(no truncation). Explanations are cleaned and checked by code after validation.
+(no truncation). The rule "a stated value needs evidence, not_stated has none" lives in
+``rate_topic``, not here. Explanations are cleaned and checked by code after validation.
 """
 
 from __future__ import annotations

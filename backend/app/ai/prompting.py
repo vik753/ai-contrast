@@ -72,8 +72,13 @@ _LANGUAGE_NAMES: Final = {
 }
 # Role markers, special tokens and delimiter look-alikes in contract text (ADR 0019 point 2).
 # A space breaks each of them; the model still reads the clause.
-_ROLE_LINE: Final = re.compile(r"(?im)^([ \t]*(?:human|assistant|system|user|developer))[ \t]*:")
-_FULLWIDTH: Final = str.maketrans("\uff1c\uff1e\uff3b\uff3d\uff5c\uff0f", "<>[]|/")
+_ROLE_LINE: Final = re.compile(
+    r"(?im)^([^\S\n]*(?:human|assistant|system|user|developer))[^\S\n]*[:\uff1a]"
+)
+_FULLWIDTH: Final = str.maketrans(
+    "\uff1c\uff1e\uff3b\uff3d\uff5c\uff0f\ufe64\ufe65\u2039\u203a\u27e8\u27e9\u3008\u3009",
+    "<>[]|/<><><><>",
+)
 _CLAUSE_MARK: Final = re.compile(r"(?m)^\[(?=c[0-9]+\])")
 _CLOSING_TAG: Final = re.compile(r"</")
 _INST: Final = re.compile(r"(?i)\[(/?)INST\]")

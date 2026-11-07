@@ -11,6 +11,8 @@ from app.ai.port import OutputLanguage
 from app.analysis.rate import EXPLANATION_WITHHELD, clean_explanation, rate_other, rate_topic
 
 from .helpers import (
+    CATALOG,
+    DOMAIN,
     FakeProvider,
     doc,
     finding,
@@ -104,7 +106,14 @@ def test_explanation_rate_other_returns_cleaned_explanations() -> None:
     answer["clauses"].append(other_finding_clause("c2", explanation="Odd﻿ term. " + INJECTION))
 
     result = run(
-        rate_other(FakeProvider(answer), doc(), side="insured", language=OutputLanguage.EN)
+        rate_other(
+            FakeProvider(answer),
+            doc(),
+            side="insured",
+            domain=DOMAIN,
+            catalog=CATALOG,
+            language=OutputLanguage.EN,
+        )
     )
 
     assert result.clauses[-1].findings[0].explanation == EXPLANATION_WITHHELD

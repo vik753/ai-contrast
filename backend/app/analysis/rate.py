@@ -225,14 +225,12 @@ async def rate_other(  # noqa: PLR0913
     side: str,
     language: OutputLanguage,
     effort: ReasoningEffort | None = None,
-    domain: str | None = None,
-    catalog: Catalog | None = None,
+    domain: str,
+    catalog: Catalog,
 ) -> OtherRatingOut:
-    """``side`` must be a catalog id shape; with a ``catalog`` it must be a side of ``domain``.
+    """``side`` must be a side of ``domain`` in the catalog.
     More than 40 clauses is refused. Both raise ``ValueError`` before any call."""
-    if not _SIDE_RE.fullmatch(side) or (
-        catalog is not None and (domain is None or not catalog.has_side(domain, side))
-    ):
+    if not _SIDE_RE.fullmatch(side) or not catalog.has_side(domain, side):
         raise ValueError("side is not a catalog side")  # noqa: TRY003
     clauses = clause_refs(document)
     if len(clauses) > MAX_OTHER_CLAUSES:

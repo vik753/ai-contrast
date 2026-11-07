@@ -27,7 +27,9 @@ from app.analysis.schemas import OtherRatingOut, TopicRatingOut
 from app.tagging.schemas import TagOut
 
 from .helpers import (
+    CATALOG,
     DIRECTIONS,
+    DOMAIN,
     SYNONYM,
     FakeProvider,
     doc,
@@ -254,7 +256,16 @@ def test_prompt_instruction_says_the_data_is_untrusted_and_holds_the_schema() ->
 
 def test_prompt_other_instruction_has_no_topic_block_and_the_same_structure() -> None:
     provider = FakeProvider(other_answer())
-    run(rate_other(provider, doc(), side="insured", language=OutputLanguage.RU))
+    run(
+        rate_other(
+            provider,
+            doc(),
+            side="insured",
+            domain=DOMAIN,
+            catalog=CATALOG,
+            language=OutputLanguage.RU,
+        )
+    )
     messages = provider.messages()
     users = [m for m in messages if m.role == "user"]
 
@@ -286,7 +297,17 @@ def test_routing_other_max_tokens_grow_with_the_batch_and_stay_capped() -> None:
 
 def test_routing_other_request_carries_the_effort() -> None:
     provider = FakeProvider(other_answer())
-    run(rate_other(provider, doc(), side="insured", language=EN, effort=ReasoningEffort.LOW))
+    run(
+        rate_other(
+            provider,
+            doc(),
+            side="insured",
+            domain=DOMAIN,
+            catalog=CATALOG,
+            language=EN,
+            effort=ReasoningEffort.LOW,
+        )
+    )
 
     assert provider.requests[0].effort is ReasoningEffort.LOW
 
@@ -336,7 +357,7 @@ def _data_blocks(provider: FakeProvider) -> list[str]:
 
 def test_prompt_other_instruction_names_the_client_side() -> None:
     provider = FakeProvider(other_answer())
-    run(rate_other(provider, doc(), side="insured", language=EN))
+    run(rate_other(provider, doc(), side="insured", domain=DOMAIN, catalog=CATALOG, language=EN))
 
     assert provider.requests[0].side == "insured"
     assert "insured" in system_text(provider.messages())
@@ -350,7 +371,11 @@ def test_prompt_role_and_special_tokens_are_neutralized_in_the_data_block(kind: 
         run(rate_topic(provider, document, rating_topic(), language=EN))  # type: ignore[arg-type]
     else:
         provider = FakeProvider(other_answer())
-        run(rate_other(provider, document, side="insured", language=EN))  # type: ignore[arg-type]
+        run(
+            rate_other(
+                provider, document, side="insured", domain=DOMAIN, catalog=CATALOG, language=EN
+            )
+        )  # type: ignore[arg-type]
     blocks = _data_blocks(provider)
 
     assert blocks
@@ -367,7 +392,11 @@ def test_prompt_nonce_is_never_in_clause_text(kind: str) -> None:
         run(rate_topic(provider, document, rating_topic(), language=EN))  # type: ignore[arg-type]
     else:
         provider = FakeProvider(other_answer())
-        run(rate_other(provider, document, side="insured", language=EN))  # type: ignore[arg-type]
+        run(
+            rate_other(
+                provider, document, side="insured", domain=DOMAIN, catalog=CATALOG, language=EN
+            )
+        )  # type: ignore[arg-type]
     match = BEGIN.match(_data_blocks(provider)[0])
 
     assert match is not None

@@ -10,9 +10,12 @@ from typing import Any
 from app.ai.port import AIRequest, CheckResult, ModelJson
 from app.ai.prompting import Message, build_messages
 from app.pseudo.gate import ConfirmedTopic, PseudonymizedDocument
+from app.topics.catalog import load_catalog
 from tests.ai.helpers import make_document
-from tests.topics.helpers import attribute, confirmed
+from tests.topics.helpers import CATALOG_OK, attribute, confirmed
 
+DOMAIN = "kasko"
+CATALOG = load_catalog(CATALOG_OK)
 SYNONYM = "zzcanarysynonym"
 DIRECTIONS = ("lower_better", "higher_better", "more_better", "fewer_better")
 TEXTS = (

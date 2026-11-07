@@ -24,6 +24,8 @@ from tests.ai.helpers import run as run_op
 from tests.topics.helpers import CATALOG_OK, attribute, confirmed
 
 from .helpers import (
+    CATALOG,
+    DOMAIN,
     FakeProvider,
     doc,
     ev,
@@ -283,7 +285,7 @@ def test_side_that_is_not_a_catalog_id_shape_is_refused_before_any_call(side: st
     provider = FakeProvider(other_answer())
 
     with pytest.raises(ValueError, match=r"."):
-        run(rate_other(provider, doc(), side=side, language=EN))
+        run(rate_other(provider, doc(), side=side, domain=DOMAIN, catalog=CATALOG, language=EN))
 
     assert provider.requests == []
 
@@ -294,7 +296,11 @@ def test_rate_other_more_than_40_clauses_is_refused_before_any_call() -> None:
     provider = FakeProvider(other_answer())
 
     with pytest.raises(ValueError, match=r"."):
-        run(rate_other(provider, doc(*texts), side="insured", language=EN))
+        run(
+            rate_other(
+                provider, doc(*texts), side="insured", domain=DOMAIN, catalog=CATALOG, language=EN
+            )
+        )
 
     assert provider.requests == []
 
@@ -303,7 +309,16 @@ def test_rate_other_exactly_40_clauses_is_accepted() -> None:
     texts = [f"{i}. Clause number {i}." for i in range(1, 41)]
     answer = other_answer(*[f"c{i}" for i in range(1, 41)])
 
-    result = run(rate_other(FakeProvider(answer), doc(*texts), side="insured", language=EN))
+    result = run(
+        rate_other(
+            FakeProvider(answer),
+            doc(*texts),
+            side="insured",
+            domain=DOMAIN,
+            catalog=CATALOG,
+            language=EN,
+        )
+    )
 
     assert len(result.clauses) == 40
 
