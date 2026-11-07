@@ -139,6 +139,7 @@ def test_docker_context_allowlist_admits_only_the_runtime_files() -> None:
             "backend/log_config.json",
             "backend/app/",
             "shared/topics/",
+            "shared/lexicon/",
         ]
     )
     assert not [line for line in lines[1:] if not line.startswith(("!", "backend/app/**"))]

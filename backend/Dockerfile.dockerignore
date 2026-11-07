@@ -7,6 +7,5 @@
 !backend/app/
 !shared/topics/
 !shared/lexicon/
-shared/lexicon/README.md
 backend/app/**/__pycache__
 backend/app/**/*.py[cod]
