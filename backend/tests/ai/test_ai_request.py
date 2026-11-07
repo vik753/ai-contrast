@@ -124,10 +124,10 @@ def test_error_codes_are_the_documented_set() -> None:
     }
 
 
-def test_provider_protocol_has_exactly_check_and_complete_json() -> None:
+def test_provider_protocol_has_exactly_check_complete_json_and_usage() -> None:
     members = {n for n in vars(AIProvider) if not n.startswith("_")}
 
-    assert members == {"check", "complete_json"}
+    assert members == {"check", "complete_json", "usage"}
 
 
 # --- prompt assembly --------------------------------------------------------------------------
