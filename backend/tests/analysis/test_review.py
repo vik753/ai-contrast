@@ -330,3 +330,59 @@ def test_index_is_not_cached_between_documents() -> None:
     assert apply_green_rules(ctx(*a), green("c1", lx.quote), ia).rating is Rating.green
     assert apply_green_rules(ctx(*b), green("c1", lx.quote), ib).rating is Rating.yellow
     assert apply_green_rules(ctx(*a), green("c1", lx.quote), ia).rating is Rating.green
+
+
+# Security delta: unknown word after a number, alternatives
+UNREADABLE = [
+    ("The limit is USD 10 mln per event.", "USD"),
+    ("The limit is USD 10mln per event.", "USD"),
+    ("The limit is USD 10 bln per event.", "USD"),
+    ("The limit is EUR 5 mio per event.", "EUR"),
+    ("The limit is EUR 5 Mio. per event.", "EUR"),
+    ("The limit is USD 10 MM per event.", "USD"),
+    ("The limit is USD 10 thsd per event.", "USD"),
+    ("The limit is USD 10 ths per event.", "USD"),
+    ("Ліміт становить 10 тис за випадок.", "UAH"),
+    ("Ліміт становить 10 млн грн за випадок.", "UAH"),
+    ("Лимит составляет 10 тыс за случай.", "UAH"),
+    ("Лимит составляет 10 млн руб за случай.", "UAH"),
+]
+
+
+@pytest.mark.parametrize(("text", "unit"), UNREADABLE)
+@pytest.mark.parametrize("value", ["10", "5", "10000", "10000000", "5000000"])
+def test_unknown_word_after_number_makes_it_unreadable(text: str, unit: str, value: str) -> None:
+    out = value_out(text, value, unit)
+    assert out.status is ValueStatus.not_confirmed
+    assert Reason.number_mismatch in out.reasons
+
+
+ALTERNATIVES = [
+    ("The insurer pays within 10 or 15 days of notice.", "days"),
+    ("The insurer pays within 10…15 days of notice.", "days"),
+    ("Страховик сплачує протягом 10 або 15 днів з дня повідомлення.", "days"),
+    ("Страховщик платит в течение 10 или 15 дней со дня уведомления.", "days"),
+]
+
+
+@pytest.mark.parametrize(("text", "unit"), ALTERNATIVES)
+@pytest.mark.parametrize("value", ["10", "15"])
+def test_alternatives_are_mismatch_like_ranges(text: str, unit: str, value: str) -> None:
+    out = value_out(text, value, unit)
+    assert out.status is ValueStatus.not_confirmed
+    assert Reason.number_mismatch in out.reasons
+
+
+CLEAN = [
+    ("The insurer pays within 10 days of notice.", "10", "days"),
+    ("The limit is UAH 10 000 per event.", "10000", "UAH"),
+    ("The insurer pays within 10 working days of notice.", "10", "working_days"),
+    ("Страховик сплачує протягом 10 днів з дня повідомлення.", "10", "days"),
+    ("Страховщик платит в течение 10 дней со дня уведомления.", "10", "days"),
+    ("The limit is 10 000 UAH per event.", "10000", "UAH"),
+]
+
+
+@pytest.mark.parametrize(("text", "num", "unit"), CLEAN[:6])
+def test_clean_numbers_stay_verified(text: str, num: str, unit: str) -> None:
+    assert value_out(text, num, unit).status is ValueStatus.verified
