@@ -21,7 +21,8 @@ def _with(**changes: Any) -> dict[str, Any]:
 
 
 def _value(value: dict[str, Any]) -> dict[str, Any]:
-    return _with(attributes=[{"attribute": "limit", "value": value, "evidence": []}])
+    evidence = [] if value.get("type") == "not_stated" else [ev()]
+    return _with(attributes=[{"attribute": "limit", "value": value, "evidence": evidence}])
 
 
 def test_schema_valid_answer_passes() -> None:

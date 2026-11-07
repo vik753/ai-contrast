@@ -72,14 +72,14 @@ def test_repair_list_cap_uses_the_cap_code() -> None:
     assert [r.repair for r in provider.requests] == [0, REPAIR_CAP]
 
 
-def test_repair_explanation_cap_uses_a_schema_or_cap_code_and_never_truncates() -> None:
+def test_repair_string_over_its_cap_uses_the_cap_code_and_never_truncates() -> None:
     bad = topic_answer(findings=[finding(explanation="x" * 401)])
     provider = FakeProvider(bad, bad)
 
     assert isinstance(
         failure(rate_topic(provider, doc(), rating_topic(), language=EN)), BadOutputError
     )
-    assert provider.requests[1].repair in {REPAIR_SCHEMA, REPAIR_CAP}
+    assert provider.requests[1].repair == REPAIR_CAP
 
 
 def test_repair_request_has_the_same_inputs_as_the_first() -> None:

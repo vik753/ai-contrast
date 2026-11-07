@@ -44,3 +44,13 @@ JSON shapes:
 - Real adapter behaviour of `reasoning_effort` on Anthropic.
 
 `RATE_TOPIC` and `RATE_OTHER` data blocks: role and special tokens (`<|start|>`, `<|im_start|>`, `[INST]`, `</document boundary=...>`, `Human:` at line start) are neutralized (absent verbatim); the nonce is never in clause text.
+
+## Review round 1 additions
+
+- `TextValue.text` is cleaned like an explanation (`clean_explanation` rules). On a Layer 2 hit (or empty after cleaning) the text becomes `EXPLANATION_WITHHELD` (the "withheld marker"; the value stays a `text` value, evidence kept; verification will not confirm it).
+- A stated value (any type but `not_stated`) needs 1..3 evidence items; `not_stated` has none. Otherwise bad output (one repair). Enforced by schema or `rate_topic`.
+- Topic free text (title, description, attribute and value labels) in the rating instruction is neutralized (`<|`, `|>`, `[INST]`, `</`, `<<<`, `>>>`, `Human:` at line start, also after NFKC). Tests lift the gate's text check with `monkeypatch.setattr(gate, "_check_texts", ...)` because the gate already refuses these texts.
+- Neutralization covers every DOCUMENT and TEXT block of every template (tagging, check, suggest, document_json) and the TOPIC block of propose/expand, including fullwidth look-alikes (`＜｜`, `［INST］`).
+- `rate_other(..., domain: str | None = None, catalog: Catalog | None = None)`: `side` must match `[a-z][a-z0-9_]{1,47}`; with a `catalog`, `catalog.has_side(domain, side)` must hold. Else `ValueError` before any call. More than 40 clauses: `ValueError` before any call.
+- A string over its cap is the cap repair code (`REPAIR_CAP`).
+- The Anthropic adapter puts no effort field on the wire.

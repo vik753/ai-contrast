@@ -29,7 +29,8 @@ def _attrs(*items: dict[str, Any]) -> dict[str, Any]:
 
 
 def _attr(name: str, value: dict[str, Any]) -> dict[str, Any]:
-    return {"attribute": name, "value": value, "evidence": [ev()]}
+    evidence = [] if value["type"] == "not_stated" else [ev()]
+    return {"attribute": name, "value": value, "evidence": evidence}
 
 
 def _rate(answer: dict[str, Any]) -> Any:
@@ -104,7 +105,13 @@ def test_rate_topic_attribute_listed_twice_is_bad_output() -> None:
     [
         topic_answer(findings=[finding(evidence=[ev("c9")])]),
         topic_answer(injection_suspected=[ev("c9", "x")]),
-        _attrs({"attribute": "limit", "value": {"type": "not_stated"}, "evidence": [ev("c4")]}),
+        _attrs(
+            {
+                "attribute": "limit",
+                "value": {"type": "amount", "number": 1, "currency": "UAH"},
+                "evidence": [ev("c4")],
+            }
+        ),
         topic_answer(findings=[finding(attribute="nope")]),
     ],
     ids=["finding_clause", "injection_clause", "attribute_clause", "finding_attribute"],
