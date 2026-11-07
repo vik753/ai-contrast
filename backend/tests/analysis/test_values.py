@@ -43,7 +43,6 @@ OK = [
     ("The insurer pays within ten (10) days of notice.", nv("10", "days")),
     ("Страховик сплачує протягом десять (10) днів з дня повідомлення.", nv("10", "days")),
     ("Страховщик платит в течение десять (10) дней со дня уведомления.", nv("10", "days")),
-    ("The insurer pays within 10 days and a penalty of 5% applies.", nv("10", "days")),
     ("The self-risk is 5% of the insured sum.", nv("5", "percent_of_sum")),
 ]
 
@@ -54,6 +53,7 @@ def test_number_check_accepts_matching_forms(text: str, value: NumericValue) -> 
 
 
 BAD = [
+    ("The insurer pays within 10 days and a penalty of 5% applies.", nv("10", "days")),
     ("The insurer pays within 15 days of notice.", nv("10", "days")),
     ("Страховик сплачує протягом 15 днів з дня повідомлення.", nv("10", "days")),
     ("Страховщик платит в течение 15 дней со дня уведомления.", nv("10", "days")),
@@ -84,7 +84,7 @@ def test_number_check_rejects_mismatch(text: str, value: NumericValue) -> None:
 
 
 def test_several_numbers_of_other_units_do_not_break_the_check() -> None:
-    t = "Pay 10 days after 3 months of delay or 5% of 100 000 UAH."
+    t = "The insurer pays within 10 days after notice. The fee is 5 %."
     assert check(t, nv("10", "days")).status is ValueStatus.verified
 
 

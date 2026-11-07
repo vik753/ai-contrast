@@ -524,3 +524,27 @@ def test_scale_statement_in_a_different_document_does_not_leak(
     text: str, num: str, unit: str | None
 ) -> None:
     assert value_out(text, num, unit).status is ValueStatus.verified
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["event", "claim", "occurrence", "insured event", "day", "month", "year", "person", "vehicle"],
+)
+def test_per_followed_by_a_target_word_stays_verified(target: str) -> None:
+    text = f"The limit is 100 000 UAH per {target}."
+    assert value_out(text, "100000", "UAH").status is ValueStatus.verified
+
+
+@pytest.mark.parametrize("word", ["thousand", "mille", "cent", "share", "unit", "million"])
+@pytest.mark.parametrize("value", ["100000", "100"])
+def test_per_followed_by_a_non_target_word_is_mismatch(word: str, value: str) -> None:
+    out = value_out(f"The limit is {value} UAH per {word}.", value, "UAH")
+    assert out.status is ValueStatus.not_confirmed
+    assert Reason.number_mismatch in out.reasons
+
+
+def test_per_at_the_end_without_target_is_mismatch() -> None:
+    assert (
+        value_out("The limit is 100 000 UAH per", "100000", "UAH").status
+        is ValueStatus.not_confirmed
+    )
