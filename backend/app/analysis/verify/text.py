@@ -34,10 +34,8 @@ _JOINER: Final = "ʼ"  # a letter: an apostrophe between letters stays inside th
 _PRE: Final = {
     **{ord(c): ord("^") for c in "\u00b2\u00b3\u00b9\u2070\u2074\u2075\u2076\u2077\u2078\u2079"},
     **{code: ord("^") for code in range(0x2080, 0x208A)},
-    **{
-        ord(c): ord("^")
-        for c in "\u00bc\u00bd\u00be\u2150\u2151\u2152\u2153\u2154\u2155\u2156\u2157\u2158\u2159\u215a\u215b\u215c\u215d\u215e"
-    },
+    **{ord(c): ord("^") for c in "\u00bc\u00bd\u00be"},
+    **{code: ord("^") for code in range(0x2150, 0x215F)},
 }
 _TRANSLATE: Final = {
     **DASH_FOLD,
