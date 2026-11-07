@@ -1,4 +1,3 @@
-# ruff: noqa: RUF001
 """Clause references and cross-reference closure (ADR 0019 point 4). Depth 1, linear.
 
 A number is a reference after a prefix word ("clause", "п."), after a joiner that follows a
@@ -44,7 +43,7 @@ def _set(words: dict[str, tuple[str, ...]]) -> frozenset[str]:
 
 _PREFIXES: Final = _set(LEXICON.ref_prefixes)
 _JOINERS: Final = _set(LEXICON.ref_joiners)
-_FROM: Final = frozenset(normalize(w)[0] for w in ("з", "с", "from"))
+_FROM: Final = frozenset(normalize(w)[0] for w in ("\u0437", "\u0441", "from"))
 _RANGE_WORDS: Final = frozenset(
     {"-", *(normalize(w)[0] for lang in LANGS for w in LEXICON.ref_range_words[lang])}
 )

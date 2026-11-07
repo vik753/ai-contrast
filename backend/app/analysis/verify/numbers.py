@@ -1,4 +1,3 @@
-# ruff: noqa: RUF001
 """Number and unit check (ADR 0019 point 3.3 ``number_mismatch``). Linear scan, lexicon data only.
 
 Read forms: digits, a decimal comma or point, thousands in space groups ("100 000") or repeated
@@ -22,12 +21,16 @@ from app.analysis.verify.text import normalize
 
 __all__ = ["number_values"]
 
-_SPACES: Final = "   "
-_TOKEN: Final = re.compile(r"(?P<num>\d+(?:[   ]\d{3}(?!\d))*(?:[.,]\d+)*)|(?P<word>[^\W\d_]+)")
+_NBSP: Final = chr(0xA0)
+_NNBSP: Final = chr(0x202F)
+_SPACES: Final = f" {_NBSP}{_NNBSP}"
+_TOKEN: Final = re.compile(
+    rf"(?P<num>\d+(?:[{_SPACES}]\d{{3}}(?!\d))*(?:[.,]\d+)*)|(?P<word>[^\W\d_]+)"
+)
 _WORD: Final = re.compile(r"[^\W\d_]+")
-_SPACE_SPLIT: Final = re.compile(r"[   ]")
+_SPACE_SPLIT: Final = re.compile(f"[{_SPACES}]")
 _MAX_DIGITS: Final = 40
-_GAP_CHARS: Final = "  -)"
+_GAP_CHARS: Final = f" {_NBSP}-)"
 _MAX_GAP: Final = 6
 _MAX_RANGE_GAP: Final = 12
 _QUALIFIER_REACH: Final = 60
@@ -109,9 +112,25 @@ def _build(per_lang: dict[str, tuple[str, ...]]) -> _Phrases:
 _MARKS: Final = _build(LEXICON.percent_marks)
 _SCALES: Final = _build(LEXICON.scale_words)
 _UNITS: Final = {u: _build(w) for u, w in LEXICON.units.items()}
-_RANGE_WORDS: Final = frozenset(
-    {"-", *(normalize(w)[0] for lang in LANGS for w in LEXICON.ref_range_words[lang])}
+_ALTERNATIVES: Final = (
+    "or",
+    "and/or",
+    "\u0430\u0431\u043e",
+    "\u0447\u0438",
+    "\u0438\u043b\u0438",
+    "\u043b\u0438\u0431\u043e",
+    "..",
+    "...",
 )
+# Between two numbers these make the pair ambiguous: ranges and alternatives.
+_RANGE_WORDS: Final = frozenset(
+    {
+        "-",
+        *(normalize(w)[0] for lang in LANGS for w in LEXICON.ref_range_words[lang]),
+        *(normalize(w)[0] for w in _ALTERNATIVES),
+    }
+)
+_SAFE: Final = frozenset(normalize(w)[0] for lang in LANGS for w in LEXICON.safe_after_number[lang])
 
 
 def _phrase_table() -> dict[tuple[str, ...], tuple[Decimal, bool]]:
@@ -324,6 +343,18 @@ def _percent_check(unit: str | None) -> _Check:
     return check
 
 
+def _unknown_word(view: str, j: int) -> int | None:
+    """End of a letters-only word at ``j`` that is no function word, unit, mark or scale."""
+    m = _WORD.match(view, j) if j < len(view) else None
+    if m is None or m.group() in _SAFE:
+        return None
+    if _SCALES.match_at(view, j) is not None or _MARKS.match_at(view, j) is not None:
+        return None
+    if any(p.match_at(view, j) is not None for p in _UNITS.values()):
+        return None
+    return m.end()
+
+
 def _plain_check(unit: str) -> _Check:
     phrases = _UNITS[unit]
 
@@ -332,6 +363,8 @@ def _plain_check(unit: str) -> _Check:
         before = unit in _CURRENCY and phrases.ends_at(view, k)
         gap_end = _after_gap(view, cand.end)
         scale_end = _SCALES.match_at(view, gap_end)
+        if scale_end is None:
+            scale_end = _unknown_word(view, gap_end)  # may be a scale or unit we do not know
         if scale_end is not None:
             after = phrases.match_at(view, _after_gap(view, scale_end)) is not None
             return after or before, True
