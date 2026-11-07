@@ -13,11 +13,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
 
+from app.ai.port import ReasoningEffort
 from app.net.guard import BlockedHostError, check_hostname
 
 __all__ = [
     "MODEL_PAIRS",
     "PRESETS",
+    "REASONING_EFFORT",
     "AdapterKind",
     "ConnectionConfigError",
     "ModelPair",
@@ -27,6 +29,7 @@ __all__ = [
     "checked_model",
     "free_base_url",
     "is_ip_literal_url",
+    "strong_model",
 ]
 
 _MODEL_RE: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}", re.ASCII)
@@ -134,6 +137,33 @@ MODEL_PAIRS: Final[Mapping[PresetId, ModelPair]] = MappingProxyType(
         PresetId.OPENROUTER: ModelPair("openai/gpt-4o-mini", "anthropic/claude-sonnet-4.5"),
     }
 )
+
+
+# Reasoning effort sent with a rating call. ``None`` sends nothing: a non-reasoning model
+# (``gpt-4o``) refuses the parameter. Refresh with the model pairs (stage 11).
+REASONING_EFFORT: Final[Mapping[PresetId, ReasoningEffort | None]] = MappingProxyType(
+    {
+        PresetId.FREE: ReasoningEffort.MEDIUM,
+        PresetId.ANTHROPIC: None,
+        PresetId.OPENAI: None,
+        PresetId.GEMINI: None,
+        PresetId.MISTRAL: None,
+        PresetId.OPENROUTER: None,
+        PresetId.CUSTOM: None,
+    }
+)
+
+
+def strong_model(preset: PresetId, client_model: str | None = None) -> str:
+    """The model of the rating calls: the strong one of the preset. A model named by the client
+    wins, except in free mode (one model). ``custom`` needs the client's model."""
+    if preset is PresetId.FREE:
+        return MODEL_PAIRS[preset].strong
+    if client_model is not None:
+        return checked_model(client_model)
+    if preset not in MODEL_PAIRS:
+        raise ConnectionConfigError("invalid_model") from None
+    return MODEL_PAIRS[preset].strong
 
 
 def checked_model(model: str) -> str:

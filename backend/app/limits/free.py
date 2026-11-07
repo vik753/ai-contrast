@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from app.ai.port import AIProvider
 from app.limits.window import FixedWindowLimiter
 
 DAY_SECONDS: Final = 86400
@@ -187,13 +188,9 @@ class FreeQuota:
         self._settle(estimate, actual, topic=False, analysis=True)
 
 
-_USAGE_FIELDS: Final = 2
-
-
-def reported_neurons(provider: object) -> int | None:
-    """The Neurons a provider reported so far (``usage`` = input and output tokens), or
-    ``None`` when it reports no usage."""
-    usage = getattr(provider, "usage", None)
-    if not (isinstance(usage, tuple) and len(usage) == _USAGE_FIELDS):
+def reported_neurons(provider: AIProvider) -> int | None:
+    """The Neurons a provider reported so far, or ``None`` when it reports no usage."""
+    usage = provider.usage
+    if usage is None:
         return None
-    return usage_neurons(*usage)
+    return usage_neurons(usage.input_tokens, usage.output_tokens)

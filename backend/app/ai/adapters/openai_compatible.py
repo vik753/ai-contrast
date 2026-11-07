@@ -21,7 +21,15 @@ from app.ai.adapters._common import (
     _model_json,
     _quiet_sdk_loggers,
 )
-from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson
+from app.ai.port import (
+    AIError,
+    AIErrorCode,
+    AIRequest,
+    CheckResult,
+    ModelJson,
+    ReasoningEffort,
+    Usage,
+)
 from app.ai.prompting import CHECK_MAX_TOKENS, CHECK_PROBE, Message, build_messages
 from app.net.ai_client import AITransport, ai_client
 
@@ -79,10 +87,10 @@ class OpenAICompatibleAdapter:
         self._usage_missing = False
 
     @property
-    def usage(self) -> tuple[int, int] | None:
+    def usage(self) -> Usage | None:
         """Input and output tokens the provider reported for all calls of this adapter, or
         ``None`` if any answer did not report them (the caller then assumes the worst case)."""
-        return None if self._usage_missing else self._usage
+        return None if self._usage_missing else Usage(*self._usage)
 
     def _record_usage(self, payload: dict[str, object]) -> None:
         reported = _usage_of(payload)
@@ -92,7 +100,11 @@ class OpenAICompatibleAdapter:
             self._usage = (self._usage[0] + reported[0], self._usage[1] + reported[1])
 
     async def _post(
-        self, messages: tuple[Message, ...], max_tokens: int, timeout: float
+        self,
+        messages: tuple[Message, ...],
+        max_tokens: int,
+        timeout: float,
+        effort: ReasoningEffort | None = None,
     ) -> dict[str, object]:
         _quiet_sdk_loggers()
         wire: list[openai.types.chat.ChatCompletionMessageParam] = [
@@ -124,6 +136,7 @@ class OpenAICompatibleAdapter:
                         max_completion_tokens=(
                             max_tokens if self._completion_tokens_field else openai.omit
                         ),
+                        reasoning_effort=openai.omit if effort is None else effort.value,
                     )
                     return _load_object(await raw.http_response.aread())
                 finally:
@@ -143,7 +156,7 @@ class OpenAICompatibleAdapter:
 
     async def complete_json(self, request: AIRequest) -> ModelJson:
         payload = await self._post(
-            build_messages(request), request.max_tokens, COMPLETE_TIMEOUT_SECONDS
+            build_messages(request), request.max_tokens, COMPLETE_TIMEOUT_SECONDS, request.effort
         )
         self._record_usage(payload)
         return _model_json(_text_of(payload, require_text=True))

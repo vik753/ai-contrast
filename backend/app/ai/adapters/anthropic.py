@@ -21,7 +21,7 @@ from app.ai.adapters._common import (
     _model_json,
     _quiet_sdk_loggers,
 )
-from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson
+from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson, Usage
 from app.ai.prompting import CHECK_MAX_TOKENS, CHECK_PROBE, build_messages
 from app.net.ai_client import AITransport, ai_client
 
@@ -44,6 +44,9 @@ def _text_of(payload: dict[str, object], *, require_text: bool) -> str:
     return "".join(parts)
 
 
+MAX_TOKEN_COUNT = 10**9
+
+
 class AnthropicAdapter:
     def __init__(
         self, model: str, key: SecretStr, base_url: str, transport: AITransport | None = None
@@ -52,6 +55,30 @@ class AnthropicAdapter:
         self._key = key
         self._base_url = base_url
         self._transport = transport
+        self._usage = (0, 0)
+        self._usage_missing = False
+
+    @property
+    def usage(self) -> Usage | None:
+        """Input and output tokens reported for all calls of this adapter, or ``None`` if any
+        answer did not report them."""
+        return None if self._usage_missing else Usage(*self._usage)
+
+    def _record_usage(self, payload: dict[str, object]) -> None:
+        usage = payload.get("usage")
+        counts = (
+            (usage.get("input_tokens"), usage.get("output_tokens"))
+            if isinstance(usage, dict)
+            else (None, None)
+        )
+        if (
+            type(counts[0]) is not int
+            or type(counts[1]) is not int
+            or not (0 <= counts[0] <= MAX_TOKEN_COUNT and 0 <= counts[1] <= MAX_TOKEN_COUNT)
+        ):
+            self._usage_missing = True
+        else:
+            self._usage = (self._usage[0] + counts[0], self._usage[1] + counts[1])
 
     async def _post(
         self,
@@ -113,4 +140,5 @@ class AnthropicAdapter:
             request.max_tokens,
             COMPLETE_TIMEOUT_SECONDS,
         )
+        self._record_usage(payload)
         return _model_json(_text_of(payload, require_text=True))
