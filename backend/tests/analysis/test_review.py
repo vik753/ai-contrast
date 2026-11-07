@@ -556,34 +556,37 @@ def test_per_followed_by_a_time_unit_is_mismatch(word: str) -> None:
     assert Reason.number_mismatch in out.reasons
 
 
-@pytest.mark.parametrize("value", ["10", "5", "10000"])
-@pytest.mark.parametrize(
-    "scale",
-    [
-        "Суми вказано в тис. грн.",
-        "Суммы указаны в тыс. руб.",
-        "Суми вказано в млн грн.",
-        "Amounts in USD mln.",
-        "Amounts in USD bn.",
-        "Amounts in USD '000.",
-        "Amounts in USD 000s.",
-        "Amounts in kUSD.",
-        "Amounts are \u00d71000 USD.",
-    ],
-)
-def test_short_scale_statement_makes_document_scaled(scale: str, value: str) -> None:
-    text = "The insurer pays within 10 days after notice."
+UAH_TEXT = "Ліміт становить 10 грн."
+USD_TEXT = "The limit is USD 10."
+SCALES = [
+    ("Суми вказано в тис. грн.", UAH_TEXT, "UAH"),
+    ("Суммы указаны в тыс. руб.", UAH_TEXT, "UAH"),
+    ("Суми вказано в млн грн.", UAH_TEXT, "UAH"),
+    ("Amounts in USD mln.", USD_TEXT, "USD"),
+    ("Amounts in USD bn.", USD_TEXT, "USD"),
+    ("Amounts in USD '000.", USD_TEXT, "USD"),
+    ("Amounts in USD 000s.", USD_TEXT, "USD"),
+    ("Amounts in kUSD.", USD_TEXT, "USD"),
+    ("Amounts are \u00d71000 USD.", USD_TEXT, "USD"),
+]
+
+
+@pytest.mark.parametrize(("text", "unit"), [(UAH_TEXT, "UAH"), (USD_TEXT, "USD")])
+def test_amount_without_scale_statement_is_verified(text: str, unit: str) -> None:
+    assert value_out(text, "10", unit).status is ValueStatus.verified
+
+
+@pytest.mark.parametrize(("scale", "text", "unit"), SCALES)
+@pytest.mark.parametrize("value", ["10", "10000"])
+def test_short_scale_statement_makes_document_scaled(
+    scale: str, text: str, unit: str, value: str
+) -> None:
     out = verify_value(
         ctx(c("c1", text), c("c2", scale)),
-        ValueIn(
-            "a", (ev("c1", text),), number=nv("10", "days") if value == "10" else nv(value, "USD")
-        ),
+        ValueIn("a", (ev("c1", text),), number=nv(value, unit)),
     )
     assert out.status is ValueStatus.not_confirmed
     assert Reason.number_mismatch in out.reasons
-
-
-@pytest.mark.parametrize(
     "address", ["м. Київ, вул. Хрещатик, к. 5.", "Address: m. Kyiv, k. 5, mm 3."]
 )
 def test_bare_k_m_mm_in_an_address_do_not_scale_the_document(address: str) -> None:
