@@ -56,11 +56,11 @@ class Message:
     content: str
 
 
-def _document_text(document: PseudonymizedDocument, *, neutralize: bool = False) -> str:
+def _document_text(document: PseudonymizedDocument) -> str:
     lines: list[str] = []
     for number, clause in enumerate(document.clauses, 1):
         clause_id = clause.id if _SAFE_ID.fullmatch(clause.id) else f"c{number}"
-        text = _neutralized(clause.text) if neutralize else clause.text
+        text = _neutralized(clause.text)
         lines.append(f"[{clause_id}]\n{text}")
     return "\n\n".join(lines)
 
@@ -73,6 +73,7 @@ _LANGUAGE_NAMES: Final = {
 # Role markers, special tokens and delimiter look-alikes in contract text (ADR 0019 point 2).
 # A space breaks each of them; the model still reads the clause.
 _ROLE_LINE: Final = re.compile(r"(?im)^([ \t]*(?:human|assistant|system|user|developer))[ \t]*:")
+_FULLWIDTH: Final = str.maketrans("\uff1c\uff1e\uff3b\uff3d\uff5c\uff0f", "<>[]|/")
 _CLAUSE_MARK: Final = re.compile(r"(?m)^\[(?=c[0-9]+\])")
 _CLOSING_TAG: Final = re.compile(r"</")
 _INST: Final = re.compile(r"(?i)\[(/?)INST\]")
@@ -80,11 +81,12 @@ _SPECIAL_REPLACEMENTS: Final = (("<|", "< |"), ("|>", "| >"), ("<<<", "< < <"), 
 
 
 def _neutralized(text: str) -> str:
+    text = text.translate(_FULLWIDTH)
     for old, new in _SPECIAL_REPLACEMENTS:
         text = text.replace(old, new)
     text = _INST.sub(r"[ \1INST ]", text)
     text = _CLOSING_TAG.sub("< /", text)
-    text = _ROLE_LINE.sub(r"\1 :", text)
+    text = _ROLE_LINE.sub(r"\1 -", text)
     return _CLAUSE_MARK.sub("[ ", text)
 
 
@@ -100,17 +102,21 @@ def _rate_context(request: RateTopicRequest | RateOtherRequest) -> str:
     """The request-specific part of a rating instruction: client side, topic, language."""
     language = _LANGUAGE_NAMES[request.language]
     if isinstance(request, RateOtherRequest):
-        return f"Client side: {request.side}.\nOutput language: {language}."
+        return f"Client side: {_safe_line(request.side)}.\nOutput language: {language}."
     topic = request.topic
     if topic is None:  # the request class forbids it; keeps the types narrow
         raise AIError(AIErrorCode.PROVIDER_BAD_REQUEST) from None
-    lines = [f"Topic: {_line(topic.title)}"]
+    lines = [f"Topic: {_safe_line(topic.title)}"]
     if topic.description:
-        lines.append(f"Topic description: {_line(topic.description)}")
-    lines.append(f"Client side: {topic.side}.")
+        lines.append(f"Topic description: {_safe_line(topic.description)}")
+    lines.append(f"Client side: {_safe_line(topic.side)}.")
     lines.append("Attributes:")
     for attribute in topic.attributes:
-        parts = [f"id={attribute.id}", f"label={_line(attribute.label)}", f"type={attribute.type}"]
+        parts = [
+            f"id={attribute.id}",
+            f"label={_safe_line(attribute.label)}",
+            f"type={attribute.type}",
+        ]
         if attribute.units:
             parts.append("units=" + ",".join(attribute.units))
         if attribute.value_ids:
@@ -168,6 +174,10 @@ def _line(text: str) -> str:
     return " ".join(text.split())
 
 
+def _safe_line(text: str) -> str:
+    return _neutralized(_line(text))
+
+
 def _clause_ref(clause: PseudonymizedClause, number: int) -> str:
     return clause.id if _SAFE_ID.fullmatch(clause.id) else f"c{number}"
 
@@ -188,14 +198,13 @@ def _topics_text(request: TaggingRequest) -> str:
 def _blocks(request: AIRequest) -> list[tuple[str, str]]:
     blocks: list[tuple[str, str]] = []
     if request.document is not None:
-        rating = isinstance(request, RateTopicRequest | RateOtherRequest)
-        blocks.append(("DOCUMENT", _document_text(request.document, neutralize=rating)))
+        blocks.append(("DOCUMENT", _document_text(request.document)))
     if request.text is not None:
-        blocks.append(("TEXT", request.text.text))
+        blocks.append(("TEXT", _neutralized(request.text.text)))
     if request.topic is not None and not isinstance(request, RateTopicRequest):
-        blocks.append(("TOPIC", _topic_text(request.topic)))
+        blocks.append(("TOPIC", _neutralized(_topic_text(request.topic))))
     if isinstance(request, TaggingRequest):
-        blocks.append(("TOPICS", _topics_text(request)))
+        blocks.append(("TOPICS", _neutralized(_topics_text(request))))
         if request.pairs and request.document is not None:
             clauses = request.document.clauses
             lines = [

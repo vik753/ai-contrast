@@ -6,6 +6,7 @@ logs; no model text is kept beyond the validated answer."""
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 
 from pydantic import ValidationError
@@ -38,11 +39,13 @@ from app.analysis.schemas import (
     FindingOut,
     NotStatedValue,
     OtherRatingOut,
+    TextValue,
     TopicRatingOut,
 )
 from app.injection import scan
 from app.pseudo.gate import ConfirmedAttribute, ConfirmedTopic, PseudonymizedDocument
 from app.textclean import TextCleaner
+from app.topics.catalog import Catalog
 
 __all__ = [
     "EXPLANATION_WITHHELD",
@@ -54,6 +57,9 @@ __all__ = [
 ]
 
 EXPLANATION_WITHHELD = "explanation_withheld"
+MAX_OTHER_CLAUSES = 40
+_SIDE_RE = re.compile(r"[a-z][a-z0-9_]{1,47}", re.ASCII)
+_CAP_TYPES = frozenset({"too_long", "string_too_long"})
 ATTEMPTS = 2  # one call and one repair call
 _FLOOR = 1024
 # Reasoning models spend output tokens on thinking, so the budgets are generous.
@@ -104,7 +110,7 @@ async def _complete[ResultT](
         except ValidationError as error:
             repair = (
                 REPAIR_CAP
-                if any(item["type"] == "too_long" for item in error.errors())
+                if any(item["type"] in _CAP_TYPES for item in error.errors())
                 else REPAIR_SCHEMA
             )
         except BadOutputError:
@@ -140,19 +146,29 @@ def _checked_topic(
 ) -> TopicRatingOut:
     by_id = {attribute.id: attribute for attribute in topic.attributes}
     seen: set[str] = set()
+    attributes = []
     for item in result.attributes:
         if item.attribute not in by_id or item.attribute in seen:
             raise BadOutputError
         seen.add(item.attribute)
         _check_value(item.value, by_id[item.attribute])
+        if bool(item.evidence) == isinstance(item.value, NotStatedValue):
+            raise BadOutputError  # a stated value needs evidence; not_stated has none
         _check_evidence(item.evidence, clauses)
+        if isinstance(item.value, TextValue):
+            value = item.value.model_copy(update={"text": clean_explanation(item.value.text)})
+            item = item.model_copy(update={"value": value})  # noqa: PLW2901
+        attributes.append(item)
     for finding in result.findings:
         if finding.attribute is not None and finding.attribute not in by_id:
             raise BadOutputError
         _check_evidence(finding.evidence, clauses)
     _check_evidence(result.injection_suspected, clauses)
     return result.model_copy(
-        update={"findings": [_clean_finding(finding) for finding in result.findings]}
+        update={
+            "attributes": attributes,
+            "findings": [_clean_finding(finding) for finding in result.findings],
+        }
     )
 
 
@@ -202,15 +218,25 @@ async def rate_topic(
     return await _complete(provider, make, check)
 
 
-async def rate_other(
+async def rate_other(  # noqa: PLR0913
     provider: AIProvider,
     document: PseudonymizedDocument,
     *,
     side: str,
     language: OutputLanguage,
     effort: ReasoningEffort | None = None,
+    domain: str | None = None,
+    catalog: Catalog | None = None,
 ) -> OtherRatingOut:
+    """``side`` must be a catalog id shape; with a ``catalog`` it must be a side of ``domain``.
+    More than 40 clauses is refused. Both raise ``ValueError`` before any call."""
+    if not _SIDE_RE.fullmatch(side) or (
+        catalog is not None and (domain is None or not catalog.has_side(domain, side))
+    ):
+        raise ValueError("side is not a catalog side")  # noqa: TRY003
     clauses = clause_refs(document)
+    if len(clauses) > MAX_OTHER_CLAUSES:
+        raise ValueError("too many clauses for one call")  # noqa: TRY003
     max_tokens = other_max_tokens(len(clauses))
 
     def make(repair: int) -> AIRequest:

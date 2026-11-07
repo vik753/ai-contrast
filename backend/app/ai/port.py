@@ -118,6 +118,9 @@ _SIDE_RE: Final = re.compile(r"[a-z][a-z0-9_]{1,47}", re.ASCII)
 
 @dataclass(frozen=True)
 class AIRequest:
+    """One model call. ``effort`` is the reasoning effort: the OpenAI-compatible adapter sends it
+    as ``reasoning_effort``; the Anthropic adapter ignores it."""
+
     template: PromptTemplate
     schema: type[BaseModel]
     max_tokens: int

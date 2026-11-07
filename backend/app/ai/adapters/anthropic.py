@@ -15,8 +15,10 @@ from app.ai.adapters._common import (
     CHECK_TIMEOUT_SECONDS,
     COMPLETE_TIMEOUT_SECONDS,
     CONNECT_TIMEOUT_SECONDS,
+    UsageMeter,
     _bad_response,
     _code_for,
+    _count,
     _load_object,
     _model_json,
     _quiet_sdk_loggers,
@@ -44,9 +46,6 @@ def _text_of(payload: dict[str, object], *, require_text: bool) -> str:
     return "".join(parts)
 
 
-MAX_TOKEN_COUNT = 10**9
-
-
 class AnthropicAdapter:
     def __init__(
         self, model: str, key: SecretStr, base_url: str, transport: AITransport | None = None
@@ -55,30 +54,22 @@ class AnthropicAdapter:
         self._key = key
         self._base_url = base_url
         self._transport = transport
-        self._usage = (0, 0)
-        self._usage_missing = False
+        self._meter = UsageMeter()
 
     @property
     def usage(self) -> Usage | None:
         """Input and output tokens reported for all calls of this adapter, or ``None`` if any
         answer did not report them."""
-        return None if self._usage_missing else Usage(*self._usage)
+        return self._meter.usage
 
     def _record_usage(self, payload: dict[str, object]) -> None:
         usage = payload.get("usage")
-        counts = (
-            (usage.get("input_tokens"), usage.get("output_tokens"))
-            if isinstance(usage, dict)
-            else (None, None)
-        )
-        if (
-            type(counts[0]) is not int
-            or type(counts[1]) is not int
-            or not (0 <= counts[0] <= MAX_TOKEN_COUNT and 0 <= counts[1] <= MAX_TOKEN_COUNT)
-        ):
-            self._usage_missing = True
+        if isinstance(usage, dict):
+            self._meter.record(
+                _count(usage.get("input_tokens")), _count(usage.get("output_tokens"))
+            )
         else:
-            self._usage = (self._usage[0] + counts[0], self._usage[1] + counts[1])
+            self._meter.record(None, None)
 
     async def _post(
         self,
