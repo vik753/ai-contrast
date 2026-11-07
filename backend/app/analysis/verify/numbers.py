@@ -351,9 +351,9 @@ class _Scan:
         gap = self.view[cand.end : nxt.start if nxt else cand.end + _MAX_RANGE_GAP]
         if any(ch in _OPERATOR_CHARS for ch in gap[:_MAX_RANGE_GAP]):
             return True
-        if nxt is not None and nxt.text == "x" and cand.last + 1 < len(toks):
-            if toks[cand.last + 1].num:
-                return True  # "10 x 1000"
+        flanked = nxt is not None and nxt.text == "x" and cand.last + 1 < len(toks)
+        if flanked and toks[cand.last + 1].num:
+            return True  # "10 x 1000"
         words = 0
         for k in range(cand.last, min(len(toks), cand.last + _WINDOW_TOKENS)):
             if toks[k].num:
