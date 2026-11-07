@@ -141,3 +141,4 @@ Rulings: "per" after the unit is allowed only before a word of the closed `per_t
 occurrence, insured event, day, month, year, person, vehicle; випадок, страховий випадок, подію, день, місяць, рік,
 особу, транспортний засіб; случай, страховой случай, событие, день, месяц, год, лицо, транспортное средство);
 "per thousand/mille/cent" stays unreadable. "and" is not a safe follower ("10 days and a penalty ..." is a mismatch).
+UK/RU `per` words are not in the lexicon contract; no UK/RU per+time tests (EN only).
