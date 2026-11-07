@@ -18,6 +18,7 @@ from starlette.middleware.cors import CORSMiddleware
 from app import __version__
 from app.analysis import verify as _verify  # noqa: F401  (loads the lexicons; a bad file stops startup)
 from app.api import (
+    analyze,
     extract,
     google_doc,
     health,
@@ -111,6 +112,7 @@ def create_app(
     topics.install(app, load_catalog(settings.topics_catalog_dir))
     app.include_router(topic_ai.router)
     app.include_router(tag.router)
+    app.include_router(analyze.router)
 
     # A new guarded client per fetch; tests replace this attribute.
     app.state.google_client_factory = lambda: outbound_client(

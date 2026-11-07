@@ -35,6 +35,7 @@ from app.ai.presets import (
     checked_model,
     is_ip_literal_url,
 )
+from app.analysis.signature import ResultSigner
 from app.api.common import early_error, error_response
 from app.api.provider_key import ProviderKeyHeader, provider_key_header
 from app.extraction.limiter import ExtractionLimiter
@@ -147,6 +148,14 @@ class CheckState:
             settings.tag_per_day, DAY_SECONDS, keys, wall, aligned=True
         )
         self.signer = TagSigner()
+        # Analysis (S9-T3): its own rate limits and the key of the result signature.
+        self.analysis_minute = FixedWindowLimiter(
+            settings.analysis_per_minute, MINUTE_SECONDS, keys, mono
+        )
+        self.analysis_day = FixedWindowLimiter(
+            settings.analysis_per_day, DAY_SECONDS, keys, wall, aligned=True
+        )
+        self.result_signer = ResultSigner()
         self.analysis = AnalysisPasses(
             settings.free_pass_max_entries,
             settings.analysis_pass_max_calls,

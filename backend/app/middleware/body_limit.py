@@ -36,6 +36,8 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.http_limits import (
+    ANALYZE_MAX_BODY_BYTES,
+    ANALYZE_PATH,
     CHECK_MAX_BODY_BYTES,
     CHECK_PATH,
     EXPAND_PATH,
@@ -87,6 +89,7 @@ class BodySizeLimitMiddleware:
             SAFETY_PATH: self.max_safety_body_bytes,
             SUGGEST_PATH: self.max_safety_body_bytes,
             TAG_PATH: self.max_safety_body_bytes,
+            ANALYZE_PATH: ANALYZE_MAX_BODY_BYTES,
             PROPOSE_PATH: TOPIC_MAX_BODY_BYTES,
             EXPAND_PATH: TOPIC_MAX_BODY_BYTES,
             CHECK_PATH: CHECK_MAX_BODY_BYTES,

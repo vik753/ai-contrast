@@ -11,6 +11,9 @@ SEGMENT_PATH: Final = "/api/segment"
 SAFETY_PATH: Final = "/api/safety-check"
 CHECK_PATH: Final = "/api/provider/check"
 TAG_PATH: Final = "/api/tag"
+ANALYZE_PATH: Final = "/api/analyze"
+# Body cap of the analysis request: one masked document and its tagging (ADR 0019 point 7).
+ANALYZE_MAX_BODY_BYTES: Final = 2 * 1024 * 1024
 SUGGEST_PATH: Final = "/api/topics/suggest"
 PROPOSE_PATH: Final = "/api/topics/propose-attributes"
 EXPAND_PATH: Final = "/api/topics/expand-synonyms"

@@ -25,7 +25,7 @@ from app.tagging.clauses import clauses_of
 from app.tagging.merge import Failure, Reason, TaggingResult, merge_tags
 from app.tagging.model import TagClause
 from app.tagging.runner import TagChildOk, run_tag_child
-from app.tagging.signature import TagSigner
+from app.tagging.signature import SignedTopic, TagSigner, tag_binding, topic_fingerprint
 from app.tagging.version import tagging_version
 from app.topics.catalog import Catalog
 from app.topics.selection import TopicSelection, resolve_topics
@@ -68,6 +68,8 @@ class JobPlan:
     calls: int
     neurons: int
     chars: int
+    domain: str = ""
+    side: str = ""
 
 
 @dataclass(frozen=True)
@@ -112,7 +114,7 @@ def plan_job(  # noqa: PLR0913, PLR0917
     ids = [clause.id for clause in document.clauses]
     batches = tuple(tuple(ids[start:end]) for start, end in ranges)
     calls, neurons = worst_case(ranges, lengths, topics)
-    return JobPlan(topics, batches, calls, neurons, chars)
+    return JobPlan(topics, batches, calls, neurons, chars, domain, side)
 
 
 async def prepare_job(
@@ -167,10 +169,22 @@ def _reply(signer: TagSigner, job: TagJob, result: TaggingResult) -> dict[str, o
     reasons = set(result.incomplete_reasons)
     version = tagging_version()
     digest = job.child.digest
+    signed = [
+        SignedTopic(
+            topic.topic_id,
+            topic_fingerprint(topic),
+            result.topics[topic.topic_id].model_tags_dropped,
+            result.topics[topic.topic_id].not_analyzed,
+        )
+        for topic in job.plan.topics
+    ]
     signature = signer.sign(
         digest=digest,
         tagging_version=version,
         tags={clause_id: dict(by_topic) for clause_id, by_topic in result.tags.items()},
+        binding=tag_binding(
+            reasons=reasons, topics=signed, domain=job.plan.domain, side=job.plan.side
+        ),
     )
     return {
         "digest": digest,

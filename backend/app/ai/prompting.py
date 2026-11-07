@@ -27,6 +27,8 @@ from app.pseudo.gate import ConfirmedTopic, PseudonymizedClause, PseudonymizedDo
 __all__ = [
     "CHECK_MAX_TOKENS",
     "CHECK_PROBE",
+    "FULLWIDTH_TABLE",
+    "NEUTRAL_STEPS",
     "Message",
     "build_messages",
     "clause_refs",
@@ -83,16 +85,23 @@ _CLAUSE_MARK: Final = re.compile(r"(?m)^\[(?=c[0-9]+\])")
 _CLOSING_TAG: Final = re.compile(r"</")
 _INST: Final = re.compile(r"(?i)\[(/?)INST\]")
 _SPECIAL_REPLACEMENTS: Final = (("<|", "< |"), ("|>", "| >"), ("<<<", "< < <"), (">>>", "> > >"))
+# The neutralization after the full-width map: ``(pattern, template)`` applied in order. The
+# analysis maps quotes of the neutralized text back to the source text with the same steps.
+FULLWIDTH_TABLE: Final = _FULLWIDTH
+NEUTRAL_STEPS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
+    *((re.compile(re.escape(old)), new) for old, new in _SPECIAL_REPLACEMENTS),
+    (_INST, r"[ \1INST ]"),
+    (_CLOSING_TAG, "< /"),
+    (_ROLE_LINE, r"\1 -"),
+    (_CLAUSE_MARK, "[ "),
+)
 
 
 def _neutralized(text: str) -> str:
-    text = text.translate(_FULLWIDTH)
-    for old, new in _SPECIAL_REPLACEMENTS:
-        text = text.replace(old, new)
-    text = _INST.sub(r"[ \1INST ]", text)
-    text = _CLOSING_TAG.sub("< /", text)
-    text = _ROLE_LINE.sub(r"\1 -", text)
-    return _CLAUSE_MARK.sub("[ ", text)
+    text = text.translate(FULLWIDTH_TABLE)
+    for pattern, template in NEUTRAL_STEPS:
+        text = pattern.sub(template, text)
+    return text
 
 
 def clause_refs(document: PseudonymizedDocument) -> tuple[str, ...]:

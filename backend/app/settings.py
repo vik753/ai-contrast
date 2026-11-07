@@ -119,6 +119,12 @@ class Settings(BaseSettings):
       (one AI call), ``TAG_MAX_DOCUMENT_CHARS`` (clause characters per document),
       ``KEYWORD_STEP_BUDGET`` (steps of the keyword matcher), ``ANALYSIS_PASS_MAX_CALLS`` and
       ``ANALYSIS_PASS_MAX_NEURONS`` (worst-case AI calls and Neurons of one analysis pass).
+    - Analysis (S9-T3, ADR 0019 point 7): ``ANALYSIS_PER_MINUTE``, ``ANALYSIS_PER_DAY`` (per client
+      key), ``ANALYSIS_MAX_CALLS`` (worst-case AI calls of one document),
+      ``ANALYSIS_DEADLINE_SECONDS`` (all AI calls of one document),
+      ``ANALYSIS_CALL_DEADLINE_SECONDS`` (one AI call),
+      ``ANALYSIS_HEARTBEAT_SECONDS`` (idle time before a stream comment),
+      ``ANALYSIS_SEND_TIMEOUT_SECONDS`` (one stream write; a slower client is dropped).
     - In production the four free settings are all set or all unset, and the Cloudflare
       Turnstile test secrets (``1x…``, ``2x…``, ``3x…``) are refused.
 
@@ -231,6 +237,13 @@ class Settings(BaseSettings):
     keyword_step_budget: PositiveInt = 1_000_000
     analysis_pass_max_calls: PositiveInt = 40
     analysis_pass_max_neurons: PositiveInt = 3000
+    analysis_per_minute: PositiveInt = 10
+    analysis_per_day: PositiveInt = 60
+    analysis_max_calls: PositiveInt = 80
+    analysis_deadline_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 480.0
+    analysis_call_deadline_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 90.0
+    analysis_heartbeat_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 15.0
+    analysis_send_timeout_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 30.0
 
     max_file_bytes: PositiveInt = 10 * MIB
     max_json_body_bytes: PositiveInt = 64 * 1024

@@ -254,6 +254,17 @@ curl -sS -i -X POST -H 'Content-Type: application/json' -H 'X-Provider-Key: sk-t
 Expected: status `422` and the body `{"error":"no_topics"}`. The server makes no outbound call.
 With at least one topic the reply holds ids, enums, counts and offsets only (`tags`, `other`, `risk`, `topics`, `layer2`, `signature`, ...), never clause or topic text.
 
+Check that `/api/analyze` refuses a request before any AI call (S9-T3). The body is incomplete on purpose (no `tagging`), and the key is a dummy that is never sent:
+
+```bash
+curl -sS -i -X POST -H 'Content-Type: application/json' -H 'X-Provider-Key: sk-test-key' \
+  -d '{"provider":"openai","domain":"kasko","side":"insured","language":"en"}' \
+  http://127.0.0.1:8000/api/analyze
+```
+
+Expected: status `422` and the body `{"error":"invalid_request"}`. The server makes no outbound call.
+A valid request answers `200` with `Content-Type: text/event-stream`, `Cache-Control: no-store` and the events `start`, `topic`, `other`, `progress`, `done` (or `error`). Events hold ids, enums, numbers and offsets, never clause or topic text.
+
 Always keep `--log-config log_config.json` (it installs the log redaction filter, threat model T1) and `--no-access-log` (our own access log omits query strings).
 
 Backend checks (the same as CI):

@@ -216,22 +216,23 @@ def document_digest(document: PseudonymizedDocument) -> str:
 
 
 def subset_document(
-    document: PseudonymizedDocument, clause_ids: Sequence[str]
+    document: PseudonymizedDocument, clause_ids: Sequence[str], *, keep_order: bool = False
 ) -> PseudonymizedDocument:
     """A document made of some clauses of an already checked document (same clause objects).
 
     Used to send a batch of clauses to the AI layer (ADR 0018). The order of the original
-    document is kept. Raises ``ValueError`` for an unknown or repeated id."""
+    document is kept, or the order of ``clause_ids`` with ``keep_order`` (ADR 0019: risk-term
+    clauses first). Raises ``ValueError`` for an unknown or repeated id."""
     wanted = set(clause_ids)
-    known = {clause.id for clause in document.clauses}
-    if len(wanted) != len(clause_ids) or not wanted <= known:
+    by_id = {clause.id: clause for clause in document.clauses}
+    if len(wanted) != len(clause_ids) or not wanted <= by_id.keys():
         msg = "unknown or repeated clause id"
         raise ValueError(msg)
-    return PseudonymizedDocument(
-        document.label,
-        tuple(clause for clause in document.clauses if clause.id in wanted),
-        _SENTINEL,
-    )
+    if keep_order:
+        chosen = tuple(by_id[clause_id] for clause_id in clause_ids)
+    else:
+        chosen = tuple(clause for clause in document.clauses if clause.id in wanted)
+    return PseudonymizedDocument(document.label, chosen, _SENTINEL)
 
 
 def _detector_clauses(texts: list[str]) -> list[Clause]:

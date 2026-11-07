@@ -120,10 +120,29 @@ def _verify(app: FastAPI, reply: dict[str, Any], **change: Any) -> bool:
     tags = {
         cid: {t["topic_id"]: t["source"] for t in items} for cid, items in reply["tags"].items()
     }
+    from app.api.topics import catalog_of_app
+    from app.tagging.signature import SignedTopic, tag_binding, topic_fingerprint
+    from app.topics.selection import TopicSelection, resolve_topics
+
+    resolved = resolve_topics(
+        TopicSelection.model_validate(tag_body()["topics"]), catalog_of_app(app)
+    )
+    signed = [
+        SignedTopic(
+            t.topic_id,
+            topic_fingerprint(t),
+            reply["topics"][t.topic_id]["model_tags_dropped"],
+            reply["topics"][t.topic_id]["not_analyzed"],
+        )
+        for t in resolved
+    ]
     args: dict[str, Any] = {
         "digest": reply["digest"],
         "tagging_version": reply["tagging_version"],
         "tags": tags,
+        "binding": tag_binding(
+            reasons=reply["incomplete_reasons"], topics=signed, domain="kasko", side="insured"
+        ),
     }
     args.update(change)
     from app.tagging.signature import verify_tag_signature
