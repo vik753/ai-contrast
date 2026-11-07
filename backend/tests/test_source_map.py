@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001
+# ruff: noqa: RUF001, S105
 """S9-T3 review: ``app.analysis.source_map`` offset arithmetic (synthetic text only)."""
 
 from __future__ import annotations
