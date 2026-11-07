@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from bisect import bisect_left
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Final
 
-from app.analysis.verify.lexicon import LANGS, LEXICON
+from app.analysis.verify.index import DocumentIndex, InRef, build_document_index
 from app.analysis.verify.model import (
     Clause,
+    ClosureEntry,
     DocumentContext,
     Evidence,
     Finding,
@@ -25,22 +27,12 @@ from app.analysis.verify.model import (
 )
 from app.analysis.verify.numbers import number_values
 from app.analysis.verify.quote import expand_quote, verify_quote
-from app.analysis.verify.refs import covers, find_references, reference_closure
-from app.analysis.verify.text import Markers
 
 __all__ = ["apply_green_rules", "verify_value"]
 
 MIN_QUOTE_CHARS: Final = 25
 MAX_ATTACHED: Final = 20
-_EXCEPTIONS: Final = Markers((lang, e) for lang in LANGS for e in LEXICON.exception_markers[lang])
-_OVERRIDES: Final = Markers(
-    (lang, e) for lang in LANGS for e in LEXICON.global_override_markers[lang]
-)
-_UNRESOLVED: Final = Markers(
-    (lang, e)
-    for lang in LANGS
-    for e in (*LEXICON.relative_references[lang], *LEXICON.ref_self[lang])
-)
+MAX_REFS: Final = 5
 _VALUE_IGNORED: Final = frozenset({Reason.quote_too_short, Reason.other_not_green})
 
 
@@ -54,18 +46,6 @@ class _Eval:
     def attach(self, span: Span) -> None:
         if span not in self.attached and len(self.attached) < MAX_ATTACHED:
             self.attached.append(span)
-
-
-def _marker_span(markers: Markers, clause: Clause) -> Span | None:
-    """The sentence of the first marker in the clause text, or the whole clause when only
-    the heading holds one."""
-    hit = markers.first(clause.text)
-    if hit is not None:
-        a, b = expand_quote(clause.text, *hit)
-        return clause.id, a, b
-    if clause.heading and markers.first(clause.heading) is not None:
-        return clause.id, 0, len(clause.text)
-    return None
 
 
 def _overlaps(merged: list[tuple[int, int]], starts: list[int], a: int, b: int) -> bool:
@@ -83,25 +63,19 @@ def _merge(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return out
 
 
-def _evaluate(  # noqa: PLR0912
-    ctx: DocumentContext,
-    evidence: Sequence[Evidence],
-    topic: str | None,
-    number: NumericValue | None,
-) -> _Eval:
-    ev = _Eval()
-    by_id: dict[str, Clause] = {}
-    for clause in ctx.clauses:
-        by_id.setdefault(clause.id, clause)
-    quoted: dict[str, Clause] = {}  # clauses named by the evidence (valid ids only)
+def _quotes(
+    index: DocumentIndex, evidence: Sequence[Evidence], ev: _Eval
+) -> tuple[dict[str, Clause], list[Span]]:
+    """Verify the quotes. Returns the clauses named by the evidence (valid ids only) and the
+    raw quote spans; fills the expanded spans, one per sentence."""
+    quoted: dict[str, Clause] = {}
     raw: list[Span] = []
     seen: set[Span] = set()
     for item in evidence:
-        found = by_id.get(item.clause)
-        if found is None:
+        clause = index.by_id.get(item.clause)
+        if clause is None:
             ev.dropped += 1
             continue
-        clause = found
         quoted.setdefault(clause.id, clause)
         check = verify_quote(clause, item.quote)
         if not check.ok:
@@ -117,35 +91,7 @@ def _evaluate(  # noqa: PLR0912
             if span not in seen:
                 seen.add(span)
                 ev.verified.append(span)
-    reasons = ev.reasons
-    if not ev.verified:
-        reasons.add(Reason.unverified)
-    if topic is None:
-        reasons.add(Reason.other_not_green)
-    if ctx.incomplete:
-        reasons.add(Reason.incomplete)
-    if ctx.flags or ctx.unprovided_reference_clauses & quoted.keys():
-        reasons.add(Reason.document_flags)
-    if any(s[2] - s[1] < MIN_QUOTE_CHARS for s in ev.verified):
-        reasons.add(Reason.quote_too_short)
-    _suspicious(ctx, quoted, raw, ev)
-    _exceptions(ctx, by_id, quoted, topic, ev)
-    for each in ctx.clauses:
-        override = _marker_span(_OVERRIDES, each)
-        if override is not None:
-            reasons.add(Reason.global_override)
-            ev.attach(override)
-    if any(
-        _UNRESOLVED.first(c.text) is not None
-        or (c.heading and _UNRESOLVED.first(c.heading) is not None)
-        for c in quoted.values()
-    ):
-        reasons.add(Reason.unresolved_reference)
-    if any(e.too_many for e in reference_closure(ctx.clauses, quoted).values()):
-        reasons.add(Reason.too_many_references)
-    if number is not None and ev.verified and not _number_ok(by_id, ev.verified, number):
-        reasons.add(Reason.number_mismatch)
-    return ev
+    return quoted, raw
 
 
 def _suspicious(
@@ -167,56 +113,114 @@ def _suspicious(
             return
 
 
+def _inbound_span(index: DocumentIndex, hit: InRef) -> Span:
+    clause = index.by_id[hit.clause]
+    if hit.heading:
+        return clause.id, 0, len(clause.text)
+    a, b = expand_quote(clause.text, hit.ref.start, hit.ref.end)
+    return clause.id, a, b
+
+
+def _parents(number: str) -> list[str]:
+    parts = number.split(".")
+    return [".".join(parts[:k]) for k in range(1, len(parts))]
+
+
+def _mark(index: DocumentIndex, cid: str, ev: _Eval) -> None:
+    span = index.info[cid].exception
+    if span is not None:
+        ev.reasons.add(Reason.check_exceptions)
+        ev.attach(span)
+
+
 def _exceptions(
-    ctx: DocumentContext,
-    by_id: dict[str, Clause],
+    index: DocumentIndex,
     quoted: dict[str, Clause],
-    topic: str | None,
+    closure: dict[str, ClosureEntry],
+    topic_ids: Collection[str],
     ev: _Eval,
 ) -> None:
+    """Exception markers in the quoted clauses, their parents, their outgoing references, the
+    clauses of the topic; and any other clause that names a quoted clause."""
+    for cid, clause in quoted.items():
+        _mark(index, cid, ev)
+        parents = (
+            pid
+            for number in _parents(clause.number or "")
+            for pid in index.numbers.by_number.get(number, ())
+        )
+        for other in (*parents, *closure[cid].added):
+            if other not in quoted:
+                _mark(index, other, ev)
+    for cid in sorted(topic_ids):
+        if cid in index.info and cid not in quoted:
+            _mark(index, cid, ev)
     for clause in quoted.values():
-        span = _marker_span(_EXCEPTIONS, clause)
-        if span is not None:
-            ev.reasons.add(Reason.check_exceptions)
-            ev.attach(span)
-    if topic is not None:
-        for cid in sorted(ctx.topic_clauses.get(topic, ())):
-            other = by_id.get(cid)
-            if other is None or cid in quoted:
-                continue
-            span = _marker_span(_EXCEPTIONS, other)
-            if span is not None:
-                ev.reasons.add(Reason.check_exceptions)
-                ev.attach(span)
-    numbers = [c.number for c in quoted.values() if c.number is not None]
-    if not numbers:
-        return
-    known = {c.number for c in ctx.clauses if c.number is not None}
-    for other in ctx.clauses:
-        if other.id in quoted:
+        if clause.number is None:
             continue
-        for ref in find_references(other.text, known):
-            if any(covers(ref, n) for n in numbers):
-                s, e = expand_quote(other.text, ref.start, ref.end)
+        for hit in index.inbound_to(clause.number):
+            if hit.clause not in quoted:
                 ev.reasons.add(Reason.check_exceptions)
-                ev.attach((other.id, s, e))
-                break
+                if len(ev.attached) < MAX_ATTACHED:
+                    ev.attach(_inbound_span(index, hit))
 
 
-def _number_ok(by_id: dict[str, Clause], spans: list[Span], number: NumericValue) -> bool:
-    found: set[object] = set()
+def _number_ok(index: DocumentIndex, spans: list[Span], number: NumericValue) -> bool:
+    found: set[Decimal | None] = set()
     for cid, a, b in spans:
-        found |= number_values(by_id[cid].text[a:b], number.unit)
+        found |= number_values(index.by_id[cid].text[a:b], number.unit)
     return found == {number.number}
+
+
+def _evaluate(
+    ctx: DocumentContext,
+    index: DocumentIndex,
+    evidence: Sequence[Evidence],
+    topic: str | None,
+    number: NumericValue | None,
+) -> _Eval:
+    ev = _Eval()
+    quoted, raw = _quotes(index, evidence, ev)
+    reasons = ev.reasons
+    flags = {
+        Reason.unverified: not ev.verified,
+        Reason.other_not_green: topic is None,
+        Reason.incomplete: ctx.incomplete,
+        Reason.document_flags: bool(ctx.flags or ctx.unprovided_reference_clauses & quoted.keys()),
+        Reason.quote_too_short: any(s[2] - s[1] < MIN_QUOTE_CHARS for s in ev.verified),
+        Reason.unresolved_reference: any(index.info[cid].unresolved for cid in quoted),
+        Reason.global_override: bool(index.overrides),
+    }
+    reasons.update(reason for reason, on in flags.items() if on)
+    for span in index.overrides[:MAX_ATTACHED]:
+        ev.attach(span)
+    closure = {cid: index.numbers.resolve(index.info[cid].refs, cid, MAX_REFS) for cid in quoted}
+    if any(entry.too_many for entry in closure.values()):
+        reasons.add(Reason.too_many_references)
+    _suspicious(ctx, quoted, raw, ev)
+    topic_ids = ctx.topic_clauses.get(topic, ()) if topic is not None else ()
+    _exceptions(index, quoted, closure, topic_ids, ev)
+    if (
+        number is not None
+        and ev.verified
+        and (index.scaled or not _number_ok(index, ev.verified, number))
+    ):
+        reasons.add(Reason.number_mismatch)
+    return ev
 
 
 def _ordered(reasons: set[Reason]) -> tuple[Reason, ...]:
     return tuple(r for r in Reason if r in reasons)
 
 
-def apply_green_rules(ctx: DocumentContext, finding: Finding) -> RatedFinding:
-    """Cap a green to yellow when a rule fails. Yellow and red never change."""
-    ev = _evaluate(ctx, finding.evidence, finding.topic, finding.value)
+def apply_green_rules(
+    ctx: DocumentContext, finding: Finding, index: DocumentIndex | None = None
+) -> RatedFinding:
+    """Cap a green to yellow when a rule fails. Yellow and red never change.
+
+    ``index`` is ``build_document_index(ctx.clauses)``; it is built here when missing."""
+    idx = index if index is not None else build_document_index(ctx.clauses)
+    ev = _evaluate(ctx, idx, finding.evidence, finding.topic, finding.value)
     rating = finding.rating
     reasons: tuple[Reason, ...] = ()
     attached: tuple[Span, ...] = ()
@@ -234,9 +238,12 @@ def apply_green_rules(ctx: DocumentContext, finding: Finding) -> RatedFinding:
     )
 
 
-def verify_value(ctx: DocumentContext, value: ValueIn) -> ValueOut:
+def verify_value(
+    ctx: DocumentContext, value: ValueIn, index: DocumentIndex | None = None
+) -> ValueOut:
     """``verified`` only with a verified quote, a passing number check and no cap."""
-    ev = _evaluate(ctx, value.evidence, value.topic, value.number)
+    idx = index if index is not None else build_document_index(ctx.clauses)
+    ev = _evaluate(ctx, idx, value.evidence, value.topic, value.number)
     reasons = ev.reasons - _VALUE_IGNORED
     return ValueOut(
         ValueStatus.not_confirmed if reasons else ValueStatus.verified, _ordered(reasons)

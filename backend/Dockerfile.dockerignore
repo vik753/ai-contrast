@@ -6,5 +6,6 @@
 !backend/log_config.json
 !backend/app/
 !shared/topics/
+!shared/lexicon/
 backend/app/**/__pycache__
 backend/app/**/*.py[cod]

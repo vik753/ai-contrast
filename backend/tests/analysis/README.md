@@ -89,3 +89,56 @@ Run: `cd backend && uv run --locked pytest tests/analysis -q`. All tests fail wi
   "згідно з Правилами", "указанных выше") and caps the green.
 - Number check: a number word the code cannot parse ("half", "two hundred", "півтора", "полтора") next to a unit
   word of the value's unit is `number_mismatch`; "десять (45)" (words contradict digits) is a mismatch for any value.
+
+## PR #98 review additions
+
+- `DocumentIndex` (frozen, pure, built once per document, **no module-level cache**) and
+  `build_document_index(clauses: Sequence[Clause]) -> DocumentIndex`. It holds whatever the rules need
+  (normalized texts, number map, marker and override positions). `apply_green_rules(ctx, finding, index=None)` and
+  `verify_value(ctx, v, index=None)` accept it; with `None` they build one. Results are identical either way.
+  Budget: building plus 100 findings over a 264,000-character document (NBSP, Cyrillic) in under 3 s.
+- A reference to a parent number ("Section 4", "Розділ 4", "Раздел 4") covers its sub-clauses (4.1, 4.2 ...),
+  at dot boundaries only (not 40.1). A reference in another clause's **heading** counts like one in its text.
+- `check_exceptions` also fires when (a) a parent clause body (number "4" for "4.x") holds an exception marker,
+  (b) a clause in the quoted clause's outgoing reference closure holds one.
+- Number check, fail closed (`number_mismatch` for any claimed value): a currency before the number with a scale
+  word or suffix after it ("USD 10 million", "$10 million", "10 тис. грн", "10 млн грн", "5k", "2 bn"); digits followed
+  by disagreeing words ("10 (eleven)"); ranges ("UAH 1 000-100 000", "0-50 %", "from 5 to 10 days", "від 5 до 10");
+  two different separators ("1.2,3", "1,5.2"); a single space group of 3 digits after a 1-digit head ("5 100 days").
+- Startup: `import app.main` loads the lexicon; with `LEXICON_DIR` pointing at a bad directory the import fails.
+
+## Window rule for numbers (replaces word-by-word checks)
+
+For each number the code looks at the next 3 word tokens, and at the 2 tokens before it for currency-first
+forms ("USD 10"). The number is unreadable (`number_mismatch` for any claimed value) if that window holds:
+(a) another number (digits or a number word); (b) a scale word (thousand, млн, тис, ...); (c) an operator
+(`×`, `*`, `x` between digits, `+`, `-` as minus, plus/minus/плюс/мінус/минус); (d) a range or alternative word
+(or/або/чи/или/либо/and/і/й/та/и/to/до/по/through/between, від...до, от...до). Words such as "per", "з", "в", "на",
+"after" are neutral.
+
+## Allowlist grammar for numbers (replaces the window denylist)
+
+A number is readable only when ALL hold:
+
+- (a) it is digits with only the allowed separators (space or NBSP thousands groups, one `.` or `,` decimal);
+  any other symbol touching it (`/ · ⋅ × * x ^ ' ’ ±` ...) makes it unreadable;
+- (b) the token before it is the start of a sentence or clause, a currency, an opening bracket or a word of the
+  closed `safe_before_number` list (within, of, is, at, for, протягом, у розмірі, в размере, у сумі, в сумме,
+  становить, составляет, з, ...); NOT "до"/"up to", NOT multipliers ("twice", "multiplied by");
+- (c) it is followed by its unit word, currency or `%`, and then by a terminator (`. ; : )` or end of clause) or a
+  word of the closed `safe_after_unit` list (after, from, of, following, upon, з, після, від, с, после, со ...);
+  NOT "per", NOT a comma, NOT any other word;
+- (d) the sentence holds no scale word, and no clause of the document states a scale ("amounts in thousands",
+  "суми в тисячах", "суммы в тысячах"): then every number of the document is unreadable.
+
+Unreadable = `number_mismatch` for any claimed value.
+Earlier tests that may conflict with this grammar (the developer may report them to the test engineer, who
+then changes them): the OK cases "... within 10 days and a penalty of 5% applies." and
+"The limit is 100 000 UAH per event." / "1 000 000 UAH per event." in `test_values.py` (the word "and" or "per"
+after the unit), and `test_several_numbers_of_other_units_do_not_break_the_check`.
+
+Rulings: "per" after the unit is allowed only before a word of the closed `per_targets` list (event, claim,
+occurrence, insured event, day, month, year, person, vehicle; випадок, страховий випадок, подію, день, місяць, рік,
+особу, транспортний засіб; случай, страховой случай, событие, день, месяц, год, лицо, транспортное средство);
+"per thousand/mille/cent" stays unreadable. "and" is not a safe follower ("10 days and a penalty ..." is a mismatch).
+UK/RU `per` words are not in the lexicon contract; no UK/RU per+time tests (EN only).

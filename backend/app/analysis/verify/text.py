@@ -27,8 +27,20 @@ _WORD: Final = re.compile(r"[^\W_]+")
 _IGNORABLE: Final = re.compile(
     "[" + "".join(f"\\U{low:08x}-\\U{high:08x}" for low, high in RANGES) + "]"
 )
-_IN_WORD_APOSTROPHE: Final = re.compile(r"(?<=\w)'(?=\w)")
+# A non-ASCII decimal digit (category Nd) that NFKC leaves: the skeleton may turn it into a
+# letter or a dot, so it becomes a caret and any number it touches is unreadable.
+_FOREIGN_DIGIT: Final = re.compile(r"[^\x00-\x7f\D]")
+# An apostrophe between two letters is part of the word. A digit does not count: "USD'000".
+_IN_WORD_APOSTROPHE: Final = re.compile(r"(?<=[^\W\d_])'(?=[^\W\d_])")
 _JOINER: Final = "ʼ"  # a letter: an apostrophe between letters stays inside the word
+# Superscripts, subscripts and vulgar fractions: NFKC would turn "10²" into "102". A caret
+# keeps the number from being read (a symbol touches it).
+_PRE: Final = {
+    **{ord(c): ord("^") for c in "\u00b2\u00b3\u00b9\u2070\u2074\u2075\u2076\u2077\u2078\u2079"},
+    **{code: ord("^") for code in range(0x2080, 0x208A)},
+    **{ord(c): ord("^") for c in "\u00bc\u00bd\u00be"},
+    **{code: ord("^") for code in range(0x2150, 0x215F)},
+}
 _TRANSLATE: Final = {
     **DASH_FOLD,
     0x2018: ord("'"),
@@ -38,6 +50,12 @@ _TRANSLATE: Final = {
 }
 
 
+# Order of steps. The lexicon README lists NFKC, case folding, yo as ye, apostrophes, dashes, the
+# UTS #39 skeleton, whitespace. Here the apostrophe and dash maps run right after NFKC and
+# before the skeleton, and ``fold_view`` is upper case, skeleton, lower case, with the capital
+# yo mapped like the capital ye. The result is the same: the maps touch only punctuation, the
+# skeleton leaves punctuation of those kinds alone, and a skeleton applied to ye gives the
+# same letter as to yo. Whitespace runs are one flexible separator in ``PhraseIndex``.
 def _tidy(view: str) -> str:
     view = view.replace("ё", "е")
     if "'" in view:
@@ -47,7 +65,11 @@ def _tidy(view: str) -> str:
 
 def normalize(text: str) -> tuple[str, Source | None]:
     """The matching view and, when its length differs from ``text``, the map back."""
-    if _IGNORABLE.search(text) is None and unicodedata.is_normalized("NFKC", text):
+    if (
+        _IGNORABLE.search(text) is None
+        and _FOREIGN_DIGIT.search(text) is None
+        and unicodedata.is_normalized("NFKC", text)
+    ):
         return _tidy(fold_view(text.translate(_TRANSLATE))), None
     return _normalize_slow(text)
 
@@ -67,8 +89,10 @@ def _normalize_slow(text: str) -> tuple[str, Source | None]:
         chunk = text[i:j]
         piece = cache.get(chunk)
         if piece is None:
-            kept = _IGNORABLE.sub("", chunk)
-            piece = fold_view(unicodedata.normalize("NFKC", kept).translate(_TRANSLATE))
+            kept = _IGNORABLE.sub("", chunk).translate(_PRE)
+            piece = fold_view(
+                _FOREIGN_DIGIT.sub("^", unicodedata.normalize("NFKC", kept)).translate(_TRANSLATE)
+            )
             cache[chunk] = piece
         pieces.append(piece)
         if len(piece) != j - i:
@@ -101,12 +125,16 @@ class Markers:
         if not text:
             return []
         view, source = normalize(text)
+        return self.find_in(view, source)
+
+    def find_in(self, view: str, source: Source | None) -> list[tuple[int, int]]:
+        """``find`` on a text that ``normalize`` already processed."""
         return [
             span_to_source(source, a, b) for _, a, b in self._index.find(view.replace("-", " "))
         ]
 
-    def first(self, text: str) -> tuple[int, int] | None:
-        found = self.find(text)
+    def first_in(self, view: str, source: Source | None) -> tuple[int, int] | None:
+        found = self.find_in(view, source)
         return found[0] if found else None
 
 
