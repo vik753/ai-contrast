@@ -587,6 +587,9 @@ def test_short_scale_statement_makes_document_scaled(
     )
     assert out.status is ValueStatus.not_confirmed
     assert Reason.number_mismatch in out.reasons
+
+
+@pytest.mark.parametrize(
     "address", ["м. Київ, вул. Хрещатик, к. 5.", "Address: m. Kyiv, k. 5, mm 3."]
 )
 def test_bare_k_m_mm_in_an_address_do_not_scale_the_document(address: str) -> None:
