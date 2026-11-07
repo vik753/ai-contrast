@@ -288,7 +288,7 @@ class AnalyzeRig(TagRig):
     def base(
         self, *texts: str, topics: dict[str, Any] | None = None, **over: Any
     ) -> dict[str, Any]:
-        topics = topics if topics is not None else topics_for(self, "deductible")
+        topics = topics if topics is not None else topics_for(self, "deductible", n_custom=0)
         return tag_body(*(texts or DEFAULT_TEXTS), topics=topics, **over)
 
     def tagged(self, tb: dict[str, Any], **kw: Any) -> dict[str, Any]:

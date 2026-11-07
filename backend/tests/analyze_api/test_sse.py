@@ -84,7 +84,7 @@ def test_every_event_is_one_json_object_of_at_most_64_kib() -> None:
     r = _ok()
     for block in sse_blocks(r.raw):
         assert len(block.encode()) <= LIMIT
-        assert block.count("\ndata:") == 0  # one data line
+        assert block.count("data:") == 1  # one data line
 
 
 def test_a_large_other_batch_with_long_cyrillic_explanations_is_split_below_64_kib() -> None:

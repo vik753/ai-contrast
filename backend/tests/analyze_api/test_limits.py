@@ -263,7 +263,9 @@ def test_a_digest_that_the_pass_never_recorded_is_403_document_mismatch() -> Non
 
 
 def test_the_call_cap_of_the_pass_refuses_a_worst_case_that_does_not_fit_before_any_call() -> None:
-    rig, body, pass_ = _free(analysis_pass_max_calls=5)  # tag 4 + analyze 6 do not fit
+    rig, body, pass_ = _free(
+        analysis_pass_max_calls=4
+    )  # tag 4 fits; analyze (worst case 4) does not
     r = free_analyze(rig, body, pass_)
     assert (r.status, r.error) == (403, "analysis_pass_exhausted")
     assert rig.up.rates == []

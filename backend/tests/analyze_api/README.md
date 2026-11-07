@@ -51,7 +51,7 @@ start    {"digest", "topics": n, "other_batches": n, "reserved_calls": n}
            that are not already not_analyzed, B_all = batches (greedy, <=12,000 chars and <=40 clauses) of Other plus all clauses of those topics.
 topic    {"topic_id", "state": "ok"|"model_tags_dropped"|"not_analyzed", "reason": null|"too_many_clauses"|"topic_call_cap"|"bad_output"|"timeout"|"budget",
           "clauses": [ids sent to the model], "missing": null|{"rating": "yellow"|"red"},
-          "values": [{"attribute", "value": {as the model gave it}, "status": "verified"|"not_confirmed", "reasons": [Reason], "evidence": [[c,s,e]]}],
+          "values": [{"attribute", "value": {as the model gave it}, "status": "verified"|"not_confirmed"|"not_stated", "reasons": [Reason], "evidence": [[c,s,e]]}],
           "findings": [{"rating", "attribute": null|id, "explanation": str, "reasons": [Reason], "unverified": bool, "evidence": [[c,s,e]], "attached": [[c,s,e]]}]}
 other    {"batch": i, "part": j, "clauses": [ids], "rated": bool, "reason": null|"bad_output"|"timeout"|"budget",
           "no_issue": [ids], "findings": [{"clause", "rating", "explanation", "reasons", "unverified", "evidence", "attached"}]}
@@ -62,5 +62,6 @@ done     {"digest", "incomplete": bool, "unrated_other": n, "greens_allowed": bo
 error    {"error": code}
 ```
 
+A `not_stated` value (no evidence) keeps status `not_stated`.
 `Reason` = the `app.analysis.verify.Reason` values. A withheld explanation is the string `explanation_withheld`.
 `result_signature` = HMAC (per-process key) over the document digest, `analysis_version`, domain, side, model, language, flags hash and the verified result.
