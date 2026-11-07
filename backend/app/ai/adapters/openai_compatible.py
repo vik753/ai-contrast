@@ -15,13 +15,23 @@ from app.ai.adapters._common import (
     CHECK_TIMEOUT_SECONDS,
     COMPLETE_TIMEOUT_SECONDS,
     CONNECT_TIMEOUT_SECONDS,
+    UsageMeter,
     _bad_response,
     _code_for,
+    _count,
     _load_object,
     _model_json,
     _quiet_sdk_loggers,
 )
-from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson
+from app.ai.port import (
+    AIError,
+    AIErrorCode,
+    AIRequest,
+    CheckResult,
+    ModelJson,
+    ReasoningEffort,
+    Usage,
+)
 from app.ai.prompting import CHECK_MAX_TOKENS, CHECK_PROBE, Message, build_messages
 from app.net.ai_client import AITransport, ai_client
 
@@ -43,22 +53,6 @@ def _text_of(payload: dict[str, object], *, require_text: bool) -> str:
     return ""
 
 
-MAX_TOKEN_COUNT = 10**9
-
-
-def _usage_of(payload: dict[str, object]) -> tuple[int, int] | None:
-    """``(prompt_tokens, completion_tokens)`` if both are plain non-negative integers."""
-    usage = payload.get("usage")
-    if not isinstance(usage, dict):
-        return None
-    prompt, completion = usage.get("prompt_tokens"), usage.get("completion_tokens")
-    if type(prompt) is not int or type(completion) is not int:
-        return None
-    if not (0 <= prompt <= MAX_TOKEN_COUNT and 0 <= completion <= MAX_TOKEN_COUNT):
-        return None
-    return prompt, completion
-
-
 class OpenAICompatibleAdapter:
     def __init__(
         self,
@@ -75,24 +69,29 @@ class OpenAICompatibleAdapter:
         self._transport = transport
         # OpenAI's own models want ``max_completion_tokens``; compatible servers ``max_tokens``.
         self._completion_tokens_field = completion_tokens_field
-        self._usage = (0, 0)
-        self._usage_missing = False
+        self._meter = UsageMeter()
 
     @property
-    def usage(self) -> tuple[int, int] | None:
+    def usage(self) -> Usage | None:
         """Input and output tokens the provider reported for all calls of this adapter, or
         ``None`` if any answer did not report them (the caller then assumes the worst case)."""
-        return None if self._usage_missing else self._usage
+        return self._meter.usage
 
     def _record_usage(self, payload: dict[str, object]) -> None:
-        reported = _usage_of(payload)
-        if reported is None:
-            self._usage_missing = True
+        usage = payload.get("usage")
+        if isinstance(usage, dict):
+            self._meter.record(
+                _count(usage.get("prompt_tokens")), _count(usage.get("completion_tokens"))
+            )
         else:
-            self._usage = (self._usage[0] + reported[0], self._usage[1] + reported[1])
+            self._meter.record(None, None)
 
     async def _post(
-        self, messages: tuple[Message, ...], max_tokens: int, timeout: float
+        self,
+        messages: tuple[Message, ...],
+        max_tokens: int,
+        timeout: float,
+        effort: ReasoningEffort | None = None,
     ) -> dict[str, object]:
         _quiet_sdk_loggers()
         wire: list[openai.types.chat.ChatCompletionMessageParam] = [
@@ -124,6 +123,7 @@ class OpenAICompatibleAdapter:
                         max_completion_tokens=(
                             max_tokens if self._completion_tokens_field else openai.omit
                         ),
+                        reasoning_effort=openai.omit if effort is None else effort.value,
                     )
                     return _load_object(await raw.http_response.aread())
                 finally:
@@ -143,7 +143,7 @@ class OpenAICompatibleAdapter:
 
     async def complete_json(self, request: AIRequest) -> ModelJson:
         payload = await self._post(
-            build_messages(request), request.max_tokens, COMPLETE_TIMEOUT_SECONDS
+            build_messages(request), request.max_tokens, COMPLETE_TIMEOUT_SECONDS, request.effort
         )
         self._record_usage(payload)
         return _model_json(_text_of(payload, require_text=True))

@@ -15,13 +15,15 @@ from app.ai.adapters._common import (
     CHECK_TIMEOUT_SECONDS,
     COMPLETE_TIMEOUT_SECONDS,
     CONNECT_TIMEOUT_SECONDS,
+    UsageMeter,
     _bad_response,
     _code_for,
+    _count,
     _load_object,
     _model_json,
     _quiet_sdk_loggers,
 )
-from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson
+from app.ai.port import AIError, AIErrorCode, AIRequest, CheckResult, ModelJson, Usage
 from app.ai.prompting import CHECK_MAX_TOKENS, CHECK_PROBE, build_messages
 from app.net.ai_client import AITransport, ai_client
 
@@ -52,6 +54,22 @@ class AnthropicAdapter:
         self._key = key
         self._base_url = base_url
         self._transport = transport
+        self._meter = UsageMeter()
+
+    @property
+    def usage(self) -> Usage | None:
+        """Input and output tokens reported for all calls of this adapter, or ``None`` if any
+        answer did not report them."""
+        return self._meter.usage
+
+    def _record_usage(self, payload: dict[str, object]) -> None:
+        usage = payload.get("usage")
+        if isinstance(usage, dict):
+            self._meter.record(
+                _count(usage.get("input_tokens")), _count(usage.get("output_tokens"))
+            )
+        else:
+            self._meter.record(None, None)
 
     async def _post(
         self,
@@ -113,4 +131,5 @@ class AnthropicAdapter:
             request.max_tokens,
             COMPLETE_TIMEOUT_SECONDS,
         )
+        self._record_usage(payload)
         return _model_json(_text_of(payload, require_text=True))

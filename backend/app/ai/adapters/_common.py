@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Final, NoReturn
 
-from app.ai.port import AIError, AIErrorCode, ModelJson
+from app.ai.port import AIError, AIErrorCode, ModelJson, Usage
 from app.net.ai_client import (
     RedirectRefusedError,
     ResponseEncodingError,
@@ -18,6 +18,7 @@ CONNECT_TIMEOUT_SECONDS: Final = 5.0
 CHECK_TIMEOUT_SECONDS: Final = 20.0
 COMPLETE_TIMEOUT_SECONDS: Final = 120.0
 
+MAX_TOKEN_COUNT: Final = 10**9
 _SDK_LOGGERS: Final = ("anthropic", "openai", "httpx2", "httpcore2")
 _CHAIN_DEPTH: Final = 8
 _HTTP_UNAUTHORIZED: Final = frozenset({401, 403})
@@ -100,3 +101,28 @@ def _load_object(data: bytes | str) -> dict[str, object]:
 
 def _model_json(text: str) -> ModelJson:
     return _load_object(text)
+
+
+def _count(value: object) -> int | None:
+    """A plain non-negative integer token count in range, else ``None``."""
+    if type(value) is int and 0 <= value <= MAX_TOKEN_COUNT:
+        return value
+    return None
+
+
+class UsageMeter:
+    """Sums the usage a provider reports. One missing or odd count makes the total unknown."""
+
+    def __init__(self) -> None:
+        self._total: Usage | None = Usage(0, 0)
+
+    @property
+    def usage(self) -> Usage | None:
+        return self._total
+
+    def record(self, prompt: int | None, completion: int | None) -> None:
+        total = self._total
+        if total is None or prompt is None or completion is None:
+            self._total = None
+        else:
+            self._total = Usage(total.input_tokens + prompt, total.output_tokens + completion)

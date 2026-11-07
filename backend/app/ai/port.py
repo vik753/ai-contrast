@@ -7,12 +7,14 @@ No ``str`` parameter anywhere: content reaches a model only as gate types
 from __future__ import annotations
 
 import enum
+import re
 from dataclasses import dataclass
 from typing import Final, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
 from app.ai.prompts import PromptTemplate
+from app.analysis.schemas import OtherRatingOut, TopicRatingOut
 from app.pseudo.gate import (
     ConfirmedTopic,
     PseudonymizedDocument,
@@ -30,7 +32,12 @@ __all__ = [
     "AIRequest",
     "CheckResult",
     "ModelJson",
+    "OutputLanguage",
+    "RateOtherRequest",
+    "RateTopicRequest",
+    "ReasoningEffort",
     "TaggingRequest",
+    "Usage",
 ]
 
 MAX_OUTPUT_TOKENS: Final = 16384
@@ -42,6 +49,28 @@ REPAIR_CAP: Final = 3
 
 # The parsed JSON object of a model answer. Schema validation happens in the caller.
 type ModelJson = dict[str, object]
+
+
+class OutputLanguage(enum.StrEnum):
+    """The language of the explanations of a rating call (a closed set; ADR 0019 point 2)."""
+
+    EN = "en"
+    UK = "uk"
+    RU = "ru"
+
+
+class ReasoningEffort(enum.StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+@dataclass(frozen=True)
+class Usage:
+    """Tokens a provider reported (summed over the calls of one adapter)."""
+
+    input_tokens: int
+    output_tokens: int
 
 
 class AIErrorCode(enum.StrEnum):
@@ -77,14 +106,21 @@ _FIELD_SETS: dict[PromptTemplate, tuple[str, str, str]] = {
     PromptTemplate.SUGGEST_TOPICS: ("required", "forbidden", "forbidden"),
     PromptTemplate.PROPOSE_ATTRIBUTES: ("forbidden", "required", "forbidden"),
     PromptTemplate.EXPAND_SYNONYMS: ("forbidden", "required", "forbidden"),
+    PromptTemplate.RATE_TOPIC: ("required", "required", "forbidden"),
+    PromptTemplate.RATE_OTHER: ("required", "forbidden", "forbidden"),
 }
 
 
 _TAGGING_TEMPLATES = frozenset({PromptTemplate.TAG_CLAUSES, PromptTemplate.CHECK_TAGS})
+_RATE_TEMPLATES = frozenset({PromptTemplate.RATE_TOPIC, PromptTemplate.RATE_OTHER})
+_SIDE_RE: Final = re.compile(r"[a-z][a-z0-9_]{1,47}", re.ASCII)
 
 
 @dataclass(frozen=True)
 class AIRequest:
+    """One model call. ``effort`` is the reasoning effort: the OpenAI-compatible adapter sends it
+    as ``reasoning_effort``; the Anthropic adapter ignores it."""
+
     template: PromptTemplate
     schema: type[BaseModel]
     max_tokens: int
@@ -92,12 +128,19 @@ class AIRequest:
     text: PseudonymizedText | None = None
     topic: ConfirmedTopic | None = None
     repair: int = 0
+    effort: ReasoningEffort | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.template, PromptTemplate):
             raise TypeError("template has a wrong type")  # noqa: TRY003
         if self.template in _TAGGING_TEMPLATES and not isinstance(self, TaggingRequest):
             raise TypeError("the fields do not fit the template")  # noqa: TRY003
+        if self.template is PromptTemplate.RATE_TOPIC and not isinstance(self, RateTopicRequest):
+            raise TypeError("the fields do not fit the template")  # noqa: TRY003
+        if self.template is PromptTemplate.RATE_OTHER and not isinstance(self, RateOtherRequest):
+            raise TypeError("the fields do not fit the template")  # noqa: TRY003
+        if self.effort is not None and not isinstance(self.effort, ReasoningEffort):
+            raise TypeError("effort has a wrong type")  # noqa: TRY003
         checks = (
             (self.document, PseudonymizedDocument),
             (self.text, PseudonymizedText),
@@ -158,8 +201,51 @@ class TaggingRequest(AIRequest):
             raise ValueError("pairs or topic numbers do not fit the request")  # noqa: TRY003
 
 
+@dataclass(frozen=True, kw_only=True)
+class RateTopicRequest(AIRequest):
+    """Rate one document on one confirmed topic (ADR 0019 point 2): the document and the topic
+    only. ``language`` is the language of the explanations."""
+
+    language: OutputLanguage
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if (
+            self.template is not PromptTemplate.RATE_TOPIC
+            or self.schema is not TopicRatingOut
+            or not isinstance(self.language, OutputLanguage)
+        ):
+            raise TypeError("the fields do not fit the template")  # noqa: TRY003
+
+
+@dataclass(frozen=True, kw_only=True)
+class RateOtherRequest(AIRequest):
+    """Rate the clauses of one document that no topic covers. ``side`` is the catalog id of the
+    client side."""
+
+    side: str
+    language: OutputLanguage
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if (
+            self.template is not PromptTemplate.RATE_OTHER
+            or self.schema is not OtherRatingOut
+            or not isinstance(self.language, OutputLanguage)
+            or not isinstance(self.side, str)
+            or not _SIDE_RE.fullmatch(self.side)
+        ):
+            raise TypeError("the fields do not fit the template")  # noqa: TRY003
+
+
 @runtime_checkable
 class AIProvider(Protocol):
+    @property
+    def usage(self) -> Usage | None:
+        """Tokens the provider reported for all calls so far, or ``None`` when it did not
+        report them for every call (the caller then assumes the worst case)."""
+        ...
+
     async def check(self) -> CheckResult:
         """Send the fixed probe. Return success or raise ``AIError``. Never returns model text."""
         ...

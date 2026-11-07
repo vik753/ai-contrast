@@ -33,7 +33,15 @@ ALLOWED_PARAM_LEAVES = GATE_TYPES | {
 }
 EXEMPT_MODULES = {"factory.py", "presets.py"}
 FIELD_FORBIDDEN = {"str", "bytes", "bytearray", "Any", "dict", "list", "set", "object", "Mapping"}
-FIELD_ALLOWED = GATE_TYPES | {"PromptTemplate", "type", "BaseModel", "int", "None"}
+FIELD_ALLOWED = GATE_TYPES | {
+    "PromptTemplate",
+    "type",
+    "BaseModel",
+    "int",
+    "None",
+    "ReasoningEffort",
+    "OutputLanguage",
+}
 SDK_ROOTS = {"anthropic", "openai"}
 SDK_CLIENTS = {"Anthropic", "AsyncAnthropic", "OpenAI", "AsyncOpenAI"}
 
