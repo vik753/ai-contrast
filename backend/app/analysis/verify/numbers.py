@@ -19,7 +19,7 @@ from typing import Final, NamedTuple
 from app.analysis.verify.lexicon import LANGS, LEXICON, LexiconError
 from app.analysis.verify.text import normalize
 
-__all__ = ["number_values"]
+__all__ = ["number_values", "states_scale"]
 
 _NBSP: Final = chr(0xA0)
 _NNBSP: Final = chr(0x202F)
@@ -32,10 +32,6 @@ _SPACE_SPLIT: Final = re.compile(f"[{_SPACES}]")
 _MAX_DIGITS: Final = 40
 _GAP_CHARS: Final = f" {_NBSP}-)"
 _MAX_GAP: Final = 6
-_WINDOW_TOKENS: Final = 6  # tokens looked at, numbers included, so a flood costs O(1) per number
-_WORDS_AFTER: Final = 3
-_WORDS_BEFORE: Final = 2
-_OPERATOR_CHARS: Final = frozenset("+*\u00d7")
 _MAX_RANGE_GAP: Final = 12
 _QUALIFIER_REACH: Final = 60
 _LOOKBACK: Final = 40
@@ -75,7 +71,7 @@ class _Phrases:
     def __init__(self, entries: list[str]) -> None:
         self.words: dict[str, list[str]] = {}
         self.symbols: list[str] = []
-        self._all: list[str] = []
+        self.all_entries: list[str] = []
         for raw in entries:
             entry = normalize(raw)[0]
             m = _WORD.match(entry)
@@ -83,7 +79,7 @@ class _Phrases:
                 self.symbols.append(entry)
             else:
                 self.words.setdefault(m.group(), []).append(entry)
-            self._all.append(entry)
+            self.all_entries.append(entry)
 
     def match_at(self, view: str, j: int) -> int | None:
         """End of a phrase starting exactly at ``j``, or ``None``."""
@@ -103,7 +99,7 @@ class _Phrases:
     def ends_at(self, view: str, k: int) -> bool:
         """A phrase that ends right before ``k`` (symbol or whole word)."""
         before = view[max(0, k - _LOOKBACK) : k]
-        for entry in self._all:
+        for entry in self.all_entries:
             if before.endswith(entry):
                 cut = len(before) - len(entry)
                 if not entry[0].isalnum() or cut == 0 or not before[cut - 1].isalnum():
@@ -118,33 +114,25 @@ def _build(per_lang: dict[str, tuple[str, ...]]) -> _Phrases:
 _MARKS: Final = _build(LEXICON.percent_marks)
 _SCALES: Final = _build(LEXICON.scale_words)
 _UNITS: Final = {u: _build(w) for u, w in LEXICON.units.items()}
-_ALTERNATIVES: Final = (
-    "or",
-    "and/or",
-    "\u0430\u0431\u043e",
-    "\u0447\u0438",
-    "\u0438\u043b\u0438",
-    "\u043b\u0438\u0431\u043e",
-    "..",
-    "...",
-)
-# Between two numbers these make the pair ambiguous: ranges and alternatives.
+# Between two numbers these make the pair ambiguous: ranges and ellipses.
 _RANGE_WORDS: Final = frozenset(
     {
         "-",
+        "..",
+        "...",
         *(normalize(w)[0] for lang in LANGS for w in LEXICON.ref_range_words[lang]),
-        *(normalize(w)[0] for w in _ALTERNATIVES),
     }
 )
-_OPERATORS: Final = frozenset(
-    normalize(w)[0] for lang in LANGS for w in LEXICON.operator_words[lang]
+_SAFE_BEFORE: Final = _build(LEXICON.safe_before_number)
+_SAFE_AFTER: Final = _build(LEXICON.safe_after_unit)
+_PER: Final = _build(LEXICON.per_words)
+_PER_TARGETS: Final = _build(LEXICON.per_targets)
+_CLAUSE_START: Final = frozenset('.;:!?(["\u00ab\n')
+_TOUCH_OK: Final = frozenset('.,;:()[]%-"\u00ab\u00bb')
+_MIN_SCALE_STATEMENT: Final = 4  # letters; shorter scale words (k, m, mn, mm) are too ambiguous
+_CURRENCY_SYMBOLS: Final = frozenset(
+    sym for unit in _CURRENCY for sym in _UNITS[unit].symbols if len(sym) == 1
 )
-_ALTERNATIVE_WORDS: Final = frozenset(
-    normalize(w)[0]
-    for lang in LANGS
-    for w in (*LEXICON.alternative_words[lang], *LEXICON.ref_range_words[lang])
-)
-_SAFE: Final = frozenset(normalize(w)[0] for lang in LANGS for w in LEXICON.safe_after_number[lang])
 
 
 def _phrase_table() -> dict[tuple[str, ...], tuple[Decimal, bool]]:
@@ -310,7 +298,7 @@ class _Scan:
             out.append(cand)
             last_words_end = words.next
             i = nxt
-        return self.mark_windows(self.mark_ranges(out))
+        return self.mark_ranges(out)
 
     def compound(self, a: _Tok, b: _Tok) -> bool:
         return (
@@ -329,58 +317,6 @@ class _Scan:
                 out[k] = b._replace(value=None)
         return out
 
-    def hit_after(self, k: int) -> bool:
-        """Does the word token ``k`` make a neighbouring number unreadable? A scale word, an
-        operator word, a number word, or an alternative or range word that stands right before
-        a number."""
-        tok = self.toks[k]
-        if _SCALES.match_at(self.view, tok.start) is not None or tok.text in _OPERATORS:
-            return True
-        if self.phrase_at(k) is not None:
-            return True
-        nxt = self.toks[k + 1] if k + 1 < len(self.toks) else None
-        return tok.text in _ALTERNATIVE_WORDS and nxt is not None and self.starts_number(nxt, k + 1)
-
-    def starts_number(self, tok: _Tok, k: int) -> bool:
-        return tok.num or self.phrase_at(k) is not None
-
-    def window_hit(self, cand: _Cand) -> bool:
-        toks = self.toks
-        # operator characters between this number and the next token
-        nxt = toks[cand.last] if cand.last < len(toks) else None
-        gap = self.view[cand.end : nxt.start if nxt else cand.end + _MAX_RANGE_GAP]
-        if any(ch in _OPERATOR_CHARS for ch in gap[:_MAX_RANGE_GAP]):
-            return True
-        flanked = nxt is not None and nxt.text == "x" and cand.last + 1 < len(toks)
-        if flanked and toks[cand.last + 1].num:
-            return True  # "10 x 1000"
-        words = 0
-        for k in range(cand.last, min(len(toks), cand.last + _WINDOW_TOKENS)):
-            if toks[k].num:
-                continue
-            if self.hit_after(k):
-                return True
-            words += 1
-            if words == _WORDS_AFTER:
-                break
-        words = 0
-        for k in range(cand.first - 1, max(-1, cand.first - 1 - _WINDOW_TOKENS), -1):
-            if toks[k].num:
-                continue
-            if k == cand.first - 1 and toks[k].text in _ALTERNATIVE_WORDS:
-                return True  # "between 10", "до 10": a range or alternative word right before
-            if _SCALES.match_at(self.view, toks[k].start) is not None or toks[k].text in _OPERATORS:
-                return True
-            words += 1
-            if words == _WORDS_BEFORE:
-                break
-        return False
-
-    def mark_windows(self, cands: list[_Cand]) -> list[_Cand]:
-        """The window rule: a number with a scale word, operator, other number or alternative
-        near it is unmatchable."""
-        return [c._replace(value=None) if self.window_hit(c) else c for c in cands]
-
 
 def _after_gap(view: str, j: int) -> int:
     k = j
@@ -393,7 +329,79 @@ def _qualifiers(unit: str) -> list[str]:
     return [normalize(e)[0] for lang in LANGS for e in LEXICON.units[unit][lang]]
 
 
-# A check returns (matches the unit, a scale word follows the number).
+def _skip_spaces(view: str, j: int) -> int:
+    while j < len(view) and view[j] in _SPACES + "\t":
+        j += 1
+    return j
+
+
+def _touch_ok(view: str, cand: _Cand) -> bool:
+    """(a) Only space, letters and plain punctuation may touch the number."""
+    for k in (cand.start - 1, cand.end):
+        if 0 <= k < len(view):
+            ch = view[k]
+            if not (ch.isspace() or ch.isalpha() or ch in _TOUCH_OK or ch in _CURRENCY_SYMBOLS):
+                return False
+    return True
+
+
+def _before_ok(view: str, pos: int) -> bool:
+    """(b) The number (or its currency) starts a sentence or clause, or follows a safe word."""
+    k = pos
+    while k > 0 and view[k - 1] in _SPACES + "\t":
+        k -= 1
+    return k == 0 or view[k - 1] in _CLAUSE_START or _SAFE_BEFORE.ends_at(view, k)
+
+
+def _after_ok(view: str, p: int, *, allow_per: bool = True) -> bool:
+    """(c) After the unit comes a terminator, a safe word, or "per" and a target word."""
+    q = _skip_spaces(view, p)
+    if q >= len(view) or view[q] in ".;:)\n" or _SAFE_AFTER.match_at(view, q) is not None:
+        return True
+    per_end = _PER.match_at(view, q) if allow_per else None
+    if per_end is None:
+        return False
+    target_end = _PER_TARGETS.match_at(view, _skip_spaces(view, per_end))
+    return target_end is not None and _after_ok(view, target_end, allow_per=False)
+
+
+def _has_scale(scan: _Scan) -> bool:
+    """(d) A scale word in the sentence. A one-letter scale ("5k") counts only after a digit."""
+    view = scan.view
+    for tok in scan.toks:
+        if tok.num:
+            continue
+        end = _SCALES.match_at(view, tok.start)
+        if end is not None and (
+            end - tok.start > 1 or (tok.start > 0 and view[tok.start - 1].isdigit())
+        ):
+            return True
+    return False
+
+
+def states_scale(text: str) -> bool:
+    """Does the text state a scale ("amounts in thousands")? A scale word that does not stand
+    right after a number. Short scale words are left to the sentence rule."""
+    view, _ = normalize(text)
+    scan = _Scan(view, currency=False)
+    toks = scan.toks
+    for k, tok in enumerate(toks):
+        if tok.num or len(tok.text) < _MIN_SCALE_STATEMENT:
+            continue
+        if _SCALES.match_at(view, tok.start) is None:
+            continue
+        prev = toks[k - 1] if k > 0 else None
+        attached = (
+            prev is not None
+            and view[prev.end : tok.start].strip(_SPACES + "-") == ""
+            and (prev.num or scan.phrase_at(k - 1) is not None)
+        )
+        if not attached:
+            return True
+    return False
+
+
+# A check returns (the number has the unit, the number is readable).
 _Check = Callable[[str, _Cand], tuple[bool, bool]]
 
 
@@ -404,25 +412,16 @@ def _percent_check(unit: str | None) -> _Check:
         mark_end = _MARKS.match_at(view, _after_gap(view, cand.end))
         if mark_end is None:
             return False, False
-        if qualifiers is None:
-            return True, False
-        return any(
+        if qualifiers is not None and not any(
             view.find(q, mark_end, mark_end + _QUALIFIER_REACH + len(q)) >= 0 for q in qualifiers
-        ), False
+        ):
+            return False, False
+        readable = (
+            _touch_ok(view, cand) and _before_ok(view, cand.start) and _after_ok(view, mark_end)
+        )
+        return True, readable
 
     return check
-
-
-def _unknown_word(view: str, j: int) -> int | None:
-    """End of a letters-only word at ``j`` that is no function word, unit, mark or scale."""
-    m = _WORD.match(view, j) if j < len(view) else None
-    if m is None or m.group() in _SAFE:
-        return None
-    if _SCALES.match_at(view, j) is not None or _MARKS.match_at(view, j) is not None:
-        return None
-    if any(p.match_at(view, j) is not None for p in _UNITS.values()):
-        return None
-    return m.end()
 
 
 def _plain_check(unit: str) -> _Check:
@@ -430,17 +429,27 @@ def _plain_check(unit: str) -> _Check:
 
     def check(view: str, cand: _Cand) -> tuple[bool, bool]:
         k = cand.start - 1 if cand.start > 0 and view[cand.start - 1] == " " else cand.start
-        before = unit in _CURRENCY and phrases.ends_at(view, k)
-        gap_end = _after_gap(view, cand.end)
-        scale_end = _SCALES.match_at(view, gap_end)
-        if scale_end is None:
-            scale_end = _unknown_word(view, gap_end)  # may be a scale or unit we do not know
-        if scale_end is not None:
-            after = phrases.match_at(view, _after_gap(view, scale_end)) is not None
-            return after or before, True
-        return phrases.match_at(view, gap_end) is not None or before, False
+        currency_first = unit in _CURRENCY and phrases.ends_at(view, k)
+        unit_end = phrases.match_at(view, _after_gap(view, cand.end))
+        if unit_end is None and not currency_first:
+            return False, False
+        if not _touch_ok(view, cand):
+            return True, False
+        # the position before the number, or before its currency when the currency comes first
+        start = _currency_start(view, k, phrases) if currency_first else cand.start
+        after = unit_end if unit_end is not None else cand.end
+        return True, _before_ok(view, start) and _after_ok(view, after)
 
     return check
+
+
+def _currency_start(view: str, k: int, phrases: _Phrases) -> int:
+    """Offset where the currency that ends at ``k`` begins."""
+    before = view[max(0, k - _LOOKBACK) : k]
+    for entry in phrases.all_entries:
+        if before.endswith(entry):
+            return k - len(entry)
+    return k
 
 
 def number_values(text: str, unit: str | None) -> set[Decimal | None]:
@@ -452,9 +461,12 @@ def number_values(text: str, unit: str | None) -> set[Decimal | None]:
     view, _ = normalize(text)
     percent = unit is None or unit.startswith("percent")
     check = _percent_check(unit) if percent else _plain_check(unit or "")
+    scan = _Scan(view, currency=unit in _CURRENCY)
+    cands = scan.candidates()
+    scaled = _has_scale(scan)
     found: set[Decimal | None] = set()
-    for cand in _Scan(view, currency=unit in _CURRENCY).candidates():
-        matched, scaled = check(view, cand)
+    for cand in cands:
+        matched, readable = check(view, cand)
         if matched:
-            found.add(None if scaled else cand.value)
+            found.add(cand.value if readable and not scaled else None)
     return found

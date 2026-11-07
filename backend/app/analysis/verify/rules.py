@@ -200,7 +200,11 @@ def _evaluate(
     _suspicious(ctx, quoted, raw, ev)
     topic_ids = ctx.topic_clauses.get(topic, ()) if topic is not None else ()
     _exceptions(index, quoted, closure, topic_ids, ev)
-    if number is not None and ev.verified and not _number_ok(index, ev.verified, number):
+    if (
+        number is not None
+        and ev.verified
+        and (index.scaled or not _number_ok(index, ev.verified, number))
+    ):
         reasons.add(Reason.number_mismatch)
     return ev
 

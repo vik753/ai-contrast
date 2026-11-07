@@ -13,6 +13,7 @@ from typing import Final
 
 from app.analysis.verify.lexicon import LANGS, LEXICON
 from app.analysis.verify.model import Clause, Span
+from app.analysis.verify.numbers import states_scale
 from app.analysis.verify.quote import expand_quote
 from app.analysis.verify.refs import NumberTable, Reference, covers, find_references_in
 from app.analysis.verify.text import Markers, Source, normalize
@@ -58,6 +59,7 @@ class DocumentIndex:
     overrides: tuple[Span, ...]
     inbound: Mapping[str, tuple[InRef, ...]]  # exact referenced number -> references
     ranges: tuple[InRef, ...]
+    scaled: bool  # some clause states a scale ("amounts in thousands")
 
     def inbound_to(self, number: str) -> list[InRef]:
         """References that name ``number``: exact, its parents ("4" for "4.1"), and ranges."""
@@ -126,4 +128,5 @@ def build_document_index(clauses: Sequence[Clause]) -> DocumentIndex:
         overrides=tuple(overrides),
         inbound={k: tuple(v) for k, v in inbound.items()},
         ranges=tuple(ranges),
+        scaled=any(states_scale(c.text) or states_scale(c.heading) for c in by_id.values()),
     )

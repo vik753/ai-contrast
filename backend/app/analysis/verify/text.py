@@ -29,6 +29,16 @@ _IGNORABLE: Final = re.compile(
 )
 _IN_WORD_APOSTROPHE: Final = re.compile(r"(?<=\w)'(?=\w)")
 _JOINER: Final = "ʼ"  # a letter: an apostrophe between letters stays inside the word
+# Superscripts, subscripts and vulgar fractions: NFKC would turn "10²" into "102". A caret
+# keeps the number from being read (a symbol touches it).
+_PRE: Final = {
+    **{ord(c): ord("^") for c in "\u00b2\u00b3\u00b9\u2070\u2074\u2075\u2076\u2077\u2078\u2079"},
+    **{code: ord("^") for code in range(0x2080, 0x208A)},
+    **{
+        ord(c): ord("^")
+        for c in "\u00bc\u00bd\u00be\u2150\u2151\u2152\u2153\u2154\u2155\u2156\u2157\u2158\u2159\u215a\u215b\u215c\u215d\u215e"
+    },
+}
 _TRANSLATE: Final = {
     **DASH_FOLD,
     0x2018: ord("'"),
@@ -73,7 +83,7 @@ def _normalize_slow(text: str) -> tuple[str, Source | None]:
         chunk = text[i:j]
         piece = cache.get(chunk)
         if piece is None:
-            kept = _IGNORABLE.sub("", chunk)
+            kept = _IGNORABLE.sub("", chunk).translate(_PRE)
             piece = fold_view(unicodedata.normalize("NFKC", kept).translate(_TRANSLATE))
             cache[chunk] = piece
         pieces.append(piece)
