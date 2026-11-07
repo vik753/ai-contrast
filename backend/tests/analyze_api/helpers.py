@@ -280,6 +280,11 @@ class AnalyzeRig(TagRig):
     ) -> None:
         settings.setdefault("analysis_per_minute", 1000)
         settings.setdefault("analysis_per_day", 10000)
+        # No wall-clock deadline can fire by accident on a slow machine; deadline tests set their own.
+        settings.setdefault("analysis_deadline_seconds", 3600.0)
+        settings.setdefault("analysis_call_deadline_seconds", 600.0)
+        settings.setdefault("tag_deadline_seconds", 3600.0)
+        settings.setdefault("tag_call_deadline_seconds", 600.0)
         self.up = upstream or AnalyzeUpstream(tag)
         super().__init__(upstream=self.up, **settings)
 

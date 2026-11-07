@@ -419,3 +419,12 @@ def test_a_cross_reference_adds_the_referenced_clause_to_the_topic_call() -> Non
     )
     rig.run(*texts)
     assert "c2" in rig.up.topic_calls("deductible")[0].ids
+
+
+def test_an_annex_link_does_not_lift_an_unresolved_internal_number_reference() -> None:
+    rig = AnalyzeRig()
+    rig.up.topic_fn = lambda t, ids: topic_out([rfind("green", evidence=[rev("c1", QUOTE1)])])
+    text = "The deductible for each insured event is 5000 UAH, see clause 15.3."
+    (f,) = rig.run(text, "Notices are sent in writing.", annex_links=["c1"]).findings("deductible")
+    assert f["rating"] == "yellow"
+    assert f["reasons"]

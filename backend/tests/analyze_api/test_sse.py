@@ -316,16 +316,35 @@ def test_a_hard_provider_error_ends_the_stream_with_an_error_event_and_no_done()
     assert r.of("done") == []
 
 
-@pytest.mark.parametrize(("status", "reason"), [(503, "timeout")])
-def test_a_soft_provider_error_marks_the_topic_not_analyzed(status: int, reason: str) -> None:
+@pytest.mark.parametrize("status", [429, 503])
+def test_a_provider_429_or_503_marks_the_topic_rate_limited_not_timeout(status: int) -> None:
     rig = AnalyzeRig()
     rig.up.topic_fn = lambda t, ids: status
     r = _ok(rig)
     assert (r.topic("deductible")["state"], r.topic("deductible")["reason"]) == (
         "not_analyzed",
-        reason,
+        "rate_limited",
     )
-    assert r.of("error") == [] and r.done
+    assert r.of("error") == []
+    assert r.done
+
+
+def test_an_oversized_topic_event_marks_that_topic_too_large_and_the_stream_goes_on() -> None:
+    rig = AnalyzeRig()
+    # One 19,000-character clause: the quote occurs 1000 times, so every finding carries 1000 spans.
+    clause = "The deductible. " + "A fee is 5000 UAH. " * 1000
+    quote = rev("c1", "A fee is 5000 UAH")
+    rig.up.topic_fn = lambda t, ids: topic_out(
+        [rfind("yellow", evidence=[quote]) for _ in range(8)]
+    )
+    r = _ok(rig, clause, "Notices are sent in writing.")
+    assert r.of("error") == []  # not internal_error
+    assert r.topic("deductible")["state"] == "not_analyzed"
+    assert r.topic("deductible")["reason"] == "too_large"
+    assert r.of("other")
+    assert r.done["incomplete"] is False
+    for block in sse_blocks(r.raw):
+        assert len(block.encode()) <= LIMIT
 
 
 # --- a stalled client ------------------------------------------------------------------------------

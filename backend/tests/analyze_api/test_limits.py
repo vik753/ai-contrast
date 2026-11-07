@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501, PT018, PLC0415
 """S9-T3 AC3: worst-case reservation, deadlines, disconnect, concurrency, free mode (analysis pass)."""
 
 from __future__ import annotations
@@ -304,3 +304,37 @@ def test_a_free_analysis_that_finished_settles_from_reported_usage_so_many_runs_
     for n in range(8):
         r = free_analyze(rig, body, pass_)
         assert r.status == 200, (n, r.raw[:200])
+
+
+def test_slots_are_released_when_the_response_is_never_called() -> None:
+    import gc
+
+    from starlette.requests import Request
+
+    from app.api.analyze import analyze
+
+    rig = AnalyzeRig()
+    body = rig.ready()
+    raw = json.dumps(body).encode()
+
+    async def handler_only() -> None:
+        sc = scope(ANALYZE, raw, PUBLIC_IP, KEY_HEADER)
+        sc["app"] = rig.app
+        sent = False
+
+        async def receive() -> dict[str, Any]:
+            nonlocal sent
+            if sent:
+                return {"type": "http.disconnect"}
+            sent = True
+            return {"type": "http.request", "body": raw, "more_body": False}
+
+        response = await analyze(Request(sc, receive))
+        assert response.status_code == 200
+        del response  # the ASGI server never called it
+
+    for _ in range(3):
+        asyncio.run(handler_only())
+        gc.collect()
+    assert rig.up.rates == []
+    assert rig.analyze(body).status == 200  # not busy: the slot and the reservation are free

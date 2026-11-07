@@ -49,7 +49,7 @@ Order: `start`, then `topic` (one per selected topic, in topic order T1..), `oth
 start    {"digest", "topics": n, "other_batches": n, "reserved_calls": n}
            topics = selected topics; other_batches = batches of the "Other" set; reserved_calls = 2*T + 2*B_all, T = topics with >=1 clause
            that are not already not_analyzed, B_all = batches (greedy, <=12,000 chars and <=40 clauses) of Other plus all clauses of those topics.
-topic    {"topic_id", "state": "ok"|"model_tags_dropped"|"not_analyzed", "reason": null|"too_many_clauses"|"topic_call_cap"|"bad_output"|"timeout"|"budget",
+topic    {"topic_id", "state": "ok"|"model_tags_dropped"|"not_analyzed", "reason": null|"too_many_clauses"|"topic_call_cap"|"bad_output"|"timeout"|"budget"|"rate_limited"|"too_large",
           "clauses": [ids sent to the model], "missing": null|{"rating": "yellow"|"red"},
           "values": [{"attribute", "value": {as the model gave it}, "status": "verified"|"not_confirmed"|"not_stated", "reasons": [Reason], "evidence": [[c,s,e]]}],
           "findings": [{"rating", "attribute": null|id, "explanation": str, "reasons": [Reason], "unverified": bool, "evidence": [[c,s,e]], "attached": [[c,s,e]]}]}
