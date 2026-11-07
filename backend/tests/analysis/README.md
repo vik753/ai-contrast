@@ -106,3 +106,12 @@ Run: `cd backend && uv run --locked pytest tests/analysis -q`. All tests fail wi
   by disagreeing words ("10 (eleven)"); ranges ("UAH 1 000-100 000", "0-50 %", "from 5 to 10 days", "від 5 до 10");
   two different separators ("1.2,3", "1,5.2"); a single space group of 3 digits after a 1-digit head ("5 100 days").
 - Startup: `import app.main` loads the lexicon; with `LEXICON_DIR` pointing at a bad directory the import fails.
+
+## Window rule for numbers (replaces word-by-word checks)
+
+For each number the code looks at the next 3 word tokens, and at the 2 tokens before it for currency-first
+forms ("USD 10"). The number is unreadable (`number_mismatch` for any claimed value) if that window holds:
+(a) another number (digits or a number word); (b) a scale word (thousand, млн, тис, ...); (c) an operator
+(`×`, `*`, `x` between digits, `+`, `-` as minus, plus/minus/плюс/мінус/минус); (d) a range or alternative word
+(or/або/чи/или/либо/and/і/й/та/и/to/до/по/through/between, від...до, от...до). Words such as "per", "з", "в", "на",
+"after" are neutral.

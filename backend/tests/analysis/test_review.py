@@ -386,3 +386,51 @@ CLEAN = [
 @pytest.mark.parametrize(("text", "num", "unit"), CLEAN[:6])
 def test_clean_numbers_stay_verified(text: str, num: str, unit: str) -> None:
     assert value_out(text, num, unit).status is ValueStatus.verified
+
+
+# Window rule: 3 tokens after a number, 2 before (currency first)
+WINDOW = [
+    ("The limit is USD 10 in thousands per event.", "USD", ["10", "10000"]),
+    ("The limit is USD 10 per thousand of the sum.", "USD", ["10", "1000"]),
+    ("The limit is USD 10 × 1000 per event.", "USD", ["10", "1000", "10000"]),
+    ("The limit is USD 10*1000 per event.", "USD", ["10", "1000", "10000"]),
+    ("The limit is USD 10 x 1000 per event.", "USD", ["10", "1000", "10000"]),
+    ("The limit is USD 10 plus 5 per event.", "USD", ["10", "5", "15"]),
+    ("The insurer pays within between 10 and 15 days of notice.", "days", ["10", "15"]),
+    ("The insurer pays within 10 minus 2 days of notice.", "days", ["10", "2", "8"]),
+    ("The insurer pays within 10 through 15 days of notice.", "days", ["10", "15"]),
+    ("Страховик сплачує протягом 10 і 15 днів з дня повідомлення.", "days", ["10", "15"]),
+    ("Страховик сплачує протягом 10 днів та 5 днів після повідомлення.", "days", ["10", "5", "15"]),
+    ("Страховик сплачує протягом 10 плюс 5 днів після повідомлення.", "days", ["10", "5", "15"]),
+    ("Страховик сплачує протягом 10 мінус 2 дні після повідомлення.", "days", ["10", "2", "8"]),
+    ("Ліміт становить USD 10 у тисячах за випадок.", "USD", ["10", "10000"]),
+    ("Страховщик платит в течение 10 и 15 дней со дня уведомления.", "days", ["10", "15"]),
+    ("Страховщик платит в течение 10 либо 15 дней со дня уведомления.", "days", ["10", "15"]),
+    ("Страховщик платит в течение 10 минус 2 дня со дня уведомления.", "days", ["10", "2", "8"]),
+    ("Страховщик платит в течение 10 плюс 5 дней со дня уведомления.", "days", ["10", "5", "15"]),
+    ("Лимит составляет USD 10 в тысячах за случай.", "USD", ["10", "10000"]),
+]
+
+
+@pytest.mark.parametrize(("text", "unit", "values"), WINDOW)
+def test_number_with_number_scale_operator_or_alternative_in_window_is_unreadable(
+    text: str, unit: str, values: list[str]
+) -> None:
+    for v in values:
+        out = value_out(text, v, unit)
+        assert out.status is ValueStatus.not_confirmed
+        assert Reason.number_mismatch in out.reasons
+
+
+WINDOW_CLEAN = [
+    ("The insurer pays within 10 days.", "10", "days"),
+    ("The limit is UAH 10 000 per event.", "10000", "UAH"),
+    ("The insurer pays within 10 working days after notice.", "10", "working_days"),
+    ("Страховик сплачує протягом 10 днів з дня повідомлення.", "10", "days"),
+    ("Страховщик платит в течение 10 дней с момента получения.", "10", "days"),
+]
+
+
+@pytest.mark.parametrize(("text", "num", "unit"), WINDOW_CLEAN)
+def test_number_with_clean_window_stays_verified(text: str, num: str, unit: str) -> None:
+    assert value_out(text, num, unit).status is ValueStatus.verified
