@@ -16,6 +16,7 @@ from fastapi.telemetry import TelemetryConfig
 from starlette.middleware.cors import CORSMiddleware
 
 from app import __version__
+from app.analysis import verify as _verify  # noqa: F401  (loads the lexicons; a bad file stops startup)
 from app.api import (
     extract,
     google_doc,
